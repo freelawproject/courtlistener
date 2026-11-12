@@ -47,7 +47,7 @@ def upload_pdfs_to_internet_archive(options, do_non_free: bool = False):
 
 
 def upload_oral_arguments_to_internet_archive(options):
-    """Upload oral arguments to the Internet Archive"""
+    """Upload oral arguments to the Internet Archive."""
     q = options["queue"]
     af_pks = (
         Audio.objects.filter(

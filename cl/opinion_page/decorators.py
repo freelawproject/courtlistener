@@ -18,8 +18,7 @@ def handle_cluster_redirection[
 ](
     view_func: DjangoViewType[P, Request, Response],
 ) -> DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]]:
-    """
-    Redirect from deleted clusters to existing clusters
+    """Redirect from deleted clusters to existing clusters.
 
     Uses the ClusterRedirection table, and only changed the `pk` of the request
     """

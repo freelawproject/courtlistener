@@ -14,8 +14,7 @@ from cl.favorites.utils import get_note_for_target
 
 
 class NoteForm(ModelForm):
-    """Create/edit form for a user's Note; content_type/object_id are
-    hidden inputs."""
+    """Create/edit form for a user's Note; content_type/object_id are hidden inputs."""
 
     class Meta:
         model = Note
@@ -65,18 +64,20 @@ async def get_note_form_for(
     user: AnonymousUser | User,
     name: str | Callable[[], Awaitable[str]],
 ) -> NoteForm:
-    """Build a NoteForm for a noteable object: bound to the user's
-    existing Note if one exists, else blank and pre-filled.
+    """Build a NoteForm for a noteable object: bound to the user's existing Note if one exists, else blank and pre-filled.
 
-    :param obj: A noteable model instance (see NOTEABLE_MODELS).
-    :param user: The user requesting the form, possibly anonymous.
-    :param name: The suggested default value for the note's "name" field,
-        used only when no existing Note is found. Pass an async callable
-        instead of a plain string to defer computing it -- e.g. audio
-        pages only know their case name via their parent Docket, so
-        deferring means that extra query never runs when a Note already
-        exists and the name ends up unused.
-    :return: A NoteForm bound to the user's existing Note for obj, or an
+    Args:
+        obj: A noteable model instance (see NOTEABLE_MODELS).
+        user: The user requesting the form, possibly anonymous.
+        name: The suggested default value for the note's "name" field,
+            used only when no existing Note is found. Pass an async callable
+            instead of a plain string to defer computing it -- e.g. audio
+            pages only know their case name via their parent Docket, so
+            deferring means that extra query never runs when a Note already
+            exists and the name ends up unused.
+
+    Returns:
+        A NoteForm bound to the user's existing Note for obj, or an
         unsaved one pre-filled with obj's content_type/object_id.
     """
     note = await sync_to_async(get_note_for_target)(type(obj), obj.pk, user)

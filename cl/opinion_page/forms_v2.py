@@ -1,3 +1,5 @@
+"""Opinion page forms for the new frontend stack."""
+
 from typing import Any
 
 from cl.lib import widgets

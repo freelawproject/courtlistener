@@ -181,7 +181,7 @@ from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
-    """Test the basic views"""
+    """Test the basic views."""
 
     @classmethod
     def setUpTestData(cls):
@@ -524,8 +524,7 @@ class WikiDataRssFeedTests(TestCase):
                 self.assertIn(marker_key, cached)
 
     async def test_bust_cache_refreshes_nested_fd_cache(self) -> None:
-        """Does ?bust_cache also refresh get_coverage_data_fds()'s own,
-        separately-cached financial disclosure counts?
+        """Does ?bust_cache also refresh get_coverage_data_fds()'s own, separately-cached financial disclosure counts?
 
         get_coverage_data_fds() caches its counts under "coverage-data.fd3"
         for a week, independent of the wiki endpoints' own caches. Busting
@@ -600,7 +599,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
 
     async def test_make_court_variable(self) -> None:
         """Confirm opinions counts per court are properly returned."""
-
         r = get_redis_interface("CACHE")
         cache_count = r.keys(":1:court_counts_o")
         if cache_count:
@@ -618,7 +616,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
     return_value="api:test_counts",
 )
 class ApiQueryCountTests(TestCase):
-    """Check that the number of queries for an API doesn't explode
+    """Check that the number of queries for an API doesn't explode.
 
     I expect these tests to regularly need updating as new features are added
     to the APIs, but in the meantime, they're important checks because of how
@@ -634,8 +632,8 @@ class ApiQueryCountTests(TestCase):
     ]
 
     def clear_query_caches(self):
-        """
-        Resets all caches that may prevent query execution.
+        """Resets all caches that may prevent query execution.
+
         Needed to ensure deterministic behavior of ``assertNumQueries`` (or
         after external changes to some Django database records).
         """
@@ -742,11 +740,7 @@ class ApiQueryCountTests(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     def test_count_on_query_counts(self, mock_logging_prefix) -> None:
-        """
-        Check that a v4 API request with param `count=on` only performs
-        2 queries to the database: one to check the authenticated user,
-        and another to select the count.
-        """
+        """Check that a v4 API request with param `count=on` only performs 2 queries to the database: one to check the authenticated user, and another to select the count."""
         with CaptureQueriesContext(connection) as ctx:
             path = reverse("audio-list", kwargs={"version": "v4"})
             params = {"count": "on"}
@@ -775,10 +769,7 @@ class ApiQueryCountTests(TestCase):
     def test_standard_request_no_count_query(
         self, mock_logging_prefix
     ) -> None:
-        """
-        Check that a v4 API request without param `count=on` doesn't perform
-        a count query.
-        """
+        """Check that a v4 API request without param `count=on` doesn't perform a count query."""
         with CaptureQueriesContext(connection) as ctx:
             path = reverse("docket-list", kwargs={"version": "v4"})
             self.client.get(path)
@@ -1032,8 +1023,7 @@ class BlockV3APITests(TestCase):
             self.r.sadd("v3-users-list", *v3_stats_members)
 
     async def test_block_v3_for_new_users(self, mock_api_prefix) -> None:
-        """Confirm new v3 API users are blocked"""
-
+        """Confirm new v3 API users are blocked."""
         # A new user request is not detected because we only check some
         # requests. In this case, it's not checked.
         with mock.patch.object(
@@ -1071,8 +1061,7 @@ class BlockV3APITests(TestCase):
         )
 
     async def test_allow_v3_for_existing_users(self, mock_api_prefix) -> None:
-        """Confirm that existing v3 API users are granted access to use it"""
-
+        """Confirm that existing v3 API users are granted access to use it."""
         # Simulate v3 existing user and create v3 user list.
         self.r.zincrby("api-block-test:v3.user.counts", 1, self.user_2.pk)
         self.create_v3_user_list()
@@ -1085,7 +1074,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_block_v3_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm anonymous v3 API users are blocked"""
+        """Confirm anonymous v3 API users are blocked."""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
@@ -1093,7 +1082,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
-        """Confirm new API users are allowed to use V4 of the API"""
+        """Confirm new API users are allowed to use V4 of the API."""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
@@ -1103,7 +1092,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_block_v4_for_anonymous_users(self, mock_api_prefix) -> None:
-        """Confirm anonymous API users are not allowed to use V4 of the API"""
+        """Confirm anonymous API users are not allowed to use V4 of the API."""
         with mock.patch.object(
             V3APIPermission, "check_request", return_value=True
         ):
@@ -1611,7 +1600,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)
 
     async def test_position_filters(self) -> None:
-        """Can we filter on positions"""
+        """Can we filter on positions."""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
         # I want positions to do with judge #2 (Judy)
@@ -2264,7 +2253,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
 
 class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
-    """Test selecting only certain fields"""
+    """Test selecting only certain fields."""
 
     fixtures = [
         "judge_judy.json",
@@ -2273,7 +2262,6 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
 
     async def test_only_some_fields_returned(self) -> None:
         """Can we return only some of the fields?"""
-
         # First check the Judge endpoint, one of our more complicated ones.
         path = reverse("person-list", kwargs={"version": "v3"})
         fields_to_return = ["educations", "date_modified", "slug"]
@@ -2409,11 +2397,14 @@ class V4DRFPaginationTest(TestCase):
 
     @classmethod
     def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:
-        """Generates a valid cursor for testing according to the ordering
-        key type.
-        :param paginator: paginator object to encode cursor.
-        :param ordering_key: The ordering key of the cursor.
-        :return: A valid cursor for testing.
+        """Generates a valid cursor for testing according to the ordering key type.
+
+        Args:
+            paginator: paginator object to encode cursor.
+            ordering_key: The ordering key of the cursor.
+
+        Returns:
+            A valid cursor for testing.
         """
         position = 10 if "id" in ordering_key else now()
         cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
@@ -2431,7 +2422,6 @@ class V4DRFPaginationTest(TestCase):
         viewset,
     ):
         """Base test for V4 endpoints for cursor and page number pagination."""
-
         cursor_paginator = CursorPagination()
         cursor_paginator.base_url = "/"
 
@@ -2590,9 +2580,7 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(queryset, list(page_1_expected))
 
     async def test_next_page_cursor_default_sorting(self) -> None:
-        """Confirm cursor pagination is used as default pagination class on
-        the default sorting key ID"""
-
+        """Confirm cursor pagination is used as default pagination class on the default sorting key ID."""
         # Request then first page and compare the results.
         with mock.patch.object(
             DocketViewSet, "pagination_class", ExamplePagination
@@ -2617,10 +2605,7 @@ class V4DRFPaginationTest(TestCase):
         await self._compare_page_results(ids, "-id", 5, 10)
 
     async def test_next_page_cursor_date_created_sorting(self) -> None:
-        """Confirm cursor pagination is used as pagination class when
-        sorting by date_created which also supports cursor pagination.
-        """
-
+        """Confirm cursor pagination is used as pagination class when sorting by date_created which also supports cursor pagination."""
         params = {"order_by": "date_created"}
         # Request then first page and compare the results.
         with mock.patch.object(
@@ -2671,11 +2656,7 @@ class V4DRFPaginationTest(TestCase):
         await self._compare_page_results(ids, "-date_created", 5, 10)
 
     async def test_next_page_date_filed_sorting(self) -> None:
-        """Confirm normal pagination is used as the pagination class when
-        sorting by keys other than ID and date_created, which don’t support
-        cursor pagination, such as date_filed.
-        """
-
+        """Confirm normal pagination is used as the pagination class when sorting by keys other than ID and date_created, which don’t support cursor pagination, such as date_filed."""
         for i in range(5):
             await sync_to_async(DocketFactory)(
                 court=self.court,
@@ -2746,9 +2727,7 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(len(results), 5)
 
     async def test_ignore_cursor_or_page_params(self) -> None:
-        """Confirm that the cursor or page param is ignored on a request that
-        belongs to a sorting cursor-only or page-only key."""
-
+        """Confirm that the cursor or page param is ignored on a request that belongs to a sorting cursor-only or page-only key."""
         for i in range(5):
             await sync_to_async(DocketFactory)(
                 court=self.court,
@@ -2806,10 +2785,7 @@ class V4DRFPaginationTest(TestCase):
         await self._compare_page_results(ids, "-id", 0, 5)
 
     async def test_next_page_invalid_cursor_request(self) -> None:
-        """Confirm that an invalid cursor error message is raised if the
-        sorting key is changed to an incompatible one from the current cursor.
-        """
-
+        """Confirm that an invalid cursor error message is raised if the sorting key is changed to an incompatible one from the current cursor."""
         # Request the first page sorting by date_created
         params = {"order_by": "date_created"}
         with mock.patch.object(
@@ -2837,9 +2813,7 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(response.json()["detail"], "Invalid cursor")
 
     async def test_alerts_endpoint(self):
-        """Test the V4 Alerts endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Alerts endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="alert-list",
             default_ordering="-date_created",
@@ -2849,9 +2823,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_docket_entries_endpoint(self):
-        """Test the V4 Docket Entries endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 Docket Entries endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="docketentry-list",
             default_ordering="-id",
@@ -2861,9 +2833,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_originatingcourtinformation_endpoint(self):
-        """Test the V4 Originating Court Information endpoint confirming that
-        their cursor and page number pagination works properly."""
-
+        """Test the V4 Originating Court Information endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="originatingcourtinformation-list",
             default_ordering="-id",
@@ -2873,9 +2843,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_recapdocument_endpoint(self):
-        """Test the V4 RECAPDocument endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 RECAPDocument endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="recapdocument-list",
             default_ordering="-id",
@@ -2885,9 +2853,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_audio_endpoint(self):
-        """Test the V4 Audio endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Audio endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="audio-list",
             default_ordering="-id",
@@ -2897,9 +2863,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_opinioncluster_endpoint(self):
-        """Test the V4 OpinionCluster endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 OpinionCluster endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="opinioncluster-list",
             default_ordering="-id",
@@ -2909,9 +2873,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_opinion_endpoint(self):
-        """Test the V4 Opinion endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Opinion endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="opinion-list",
             default_ordering="-id",
@@ -2921,9 +2883,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_opinions_cited_endpoint(self):
-        """Test the V4 OpinionsCited endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 OpinionsCited endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="opinionscited-list",
             default_ordering="-id",
@@ -2945,9 +2905,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_tag_endpoint(self):
-        """Test the V4 Tag endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Tag endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="tag-list",
             default_ordering="-id",
@@ -2957,9 +2915,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_people_endpoint(self):
-        """Test the V4 People endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 People endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="person-list",
             default_ordering="-id",
@@ -2969,9 +2925,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_positions_endpoint(self):
-        """Test the V4 Positions endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Positions endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="position-list",
             default_ordering="-id",
@@ -2981,9 +2935,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_retention_events_endpoint(self):
-        """Test the V4 Retention Events endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 Retention Events endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="retentionevent-list",
             default_ordering="-id",
@@ -2993,9 +2945,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_educations_endpoint(self):
-        """Test the V4 Educations endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 Educations endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="education-list",
             default_ordering="-id",
@@ -3005,9 +2955,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_schools_endpoint(self):
-        """Test the V4 Schools endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Schools endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="school-list",
             default_ordering="-id",
@@ -3017,9 +2965,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_political_affiliations_endpoint(self):
-        """Test the V4 Political Affiliations endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 Political Affiliations endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="politicalaffiliation-list",
             default_ordering="-id",
@@ -3029,9 +2975,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_sources_endpoint(self):
-        """Test the V4 Sources endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Sources endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="source-list",
             default_ordering="-id",
@@ -3041,9 +2985,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_aba_ratings_endpoint(self):
-        """Test the V4 ABA Ratings endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 ABA Ratings endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="abarating-list",
             default_ordering="-id",
@@ -3053,9 +2995,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_party_endpoint(self):
-        """Test the V4 Party endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Party endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="party-list",
             default_ordering="-id",
@@ -3065,9 +3005,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_attorney_endpoint(self):
-        """Test the V4 Attorney endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Attorney endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="attorney-list",
             default_ordering="-id",
@@ -3077,9 +3015,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_processingqueue_endpoint(self):
-        """Test the V4 ProcessingQueue endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 ProcessingQueue endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="processingqueue-list",
             default_ordering="-id",
@@ -3089,9 +3025,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_emailprocessingqueue_endpoint(self):
-        """Test the V4 EmailProcessingQueue endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 EmailProcessingQueue endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="emailprocessingqueue-list",
             default_ordering="-id",
@@ -3101,9 +3035,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_pacerfetchqueue_endpoint(self):
-        """Test the V4 PacerFetchQueue endpoint confirming that their cursor
-        and page number pagination works properly."""
-
+        """Test the V4 PacerFetchQueue endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="pacerfetchqueue-list",
             default_ordering="-id",
@@ -3113,9 +3045,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_fjcintegrateddatabase_endpoint(self):
-        """Test the V4 FJCIntegratedDatabase endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 FJCIntegratedDatabase endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="fjcintegrateddatabase-list",
             default_ordering="-id",
@@ -3125,9 +3055,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_usertag_endpoint(self):
-        """Test the V4 User Tag endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 User Tag endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="UserTag-list",
             default_ordering="-id",
@@ -3137,9 +3065,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_dockettag_endpoint(self):
-        """Test the V4 DocketTag endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 DocketTag endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="DocketTag-list",
             default_ordering="-id",
@@ -3149,9 +3075,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_jsonversion_endpoint(self):
-        """Test the V4 JSONVersion endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 JSONVersion endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="jsonversion-list",
             default_ordering="-id",
@@ -3161,9 +3085,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_scotusmap_endpoint(self):
-        """Test the V4 SCOTUSMap endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 SCOTUSMap endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="scotusmap-list",
             default_ordering="-id",
@@ -3173,9 +3095,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_agreement_endpoint(self):
-        """Test the V4 Agreement endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Agreement endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="agreement-list",
             default_ordering="-id",
@@ -3185,9 +3105,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_debt_endpoint(self):
-        """Test the V4 Debt endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Debt endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="debt-list",
             default_ordering="-id",
@@ -3197,9 +3115,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_financialdisclosure_endpoint(self):
-        """Test the V4 Financial Disclosure endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 Financial Disclosure endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="financialdisclosure-list",
             default_ordering="-id",
@@ -3209,9 +3125,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_gift_endpoint(self):
-        """Test the V4 Gift endpoint confirming that their cursor and page
-        number pagination works properly."""
-
+        """Test the V4 Gift endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="gift-list",
             default_ordering="-id",
@@ -3221,9 +3135,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_investment_endpoint(self):
-        """Test the V4 Investment endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 Investment endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="investment-list",
             default_ordering="-id",
@@ -3233,9 +3145,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_noninvestmentincome_endpoint(self):
-        """Test the V4 Non-Investment Income endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 Non-Investment Income endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="noninvestmentincome-list",
             default_ordering="-id",
@@ -3245,9 +3155,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_disclosureposition_endpoint(self):
-        """Test the V4 Disclosure Position endpoint confirming that their
-        cursor and page number pagination works properly."""
-
+        """Test the V4 Disclosure Position endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="disclosureposition-list",
             default_ordering="-id",
@@ -3257,9 +3165,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_reimbursement_endpoint(self):
-        """Test the V4 Reimbursement endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 Reimbursement endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="reimbursement-list",
             default_ordering="-id",
@@ -3269,9 +3175,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_spouseincome_endpoint(self):
-        """Test the V4 Spouse Income endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 Spouse Income endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="spouseincome-list",
             default_ordering="-id",
@@ -3281,9 +3185,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_docket_alert_endpoint(self):
-        """Test the V4 DocketAlert endpoint confirming that their cursor and
-        page number pagination works properly."""
-
+        """Test the V4 DocketAlert endpoint confirming that their cursor and page number pagination works properly."""
         await self._base_test_for_v4_endpoints(
             endpoint="docket-alert-list",
             default_ordering="-date_created",
@@ -3294,9 +3196,7 @@ class V4DRFPaginationTest(TestCase):
 
     # non-cursor pagination endpoints
     async def test_courts_endpoint(self):
-        """Test the V4 Courts endpoint confirming page number pagination works
-        properly."""
-
+        """Test the V4 Courts endpoint confirming page number pagination works properly."""
         await self._test_v4_non_cursor_endpoints(
             endpoint="court-list",
             additional_params={},
@@ -3305,9 +3205,7 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_recap_query_endpoint(self):
-        """Test the V4 RECAPQuery endpoint confirming page number pagination
-        works properly."""
-
+        """Test the V4 RECAPQuery endpoint confirming page number pagination works properly."""
         await self._test_v4_non_cursor_endpoints(
             endpoint="fast-recapdocument-list",
             additional_params={"pacer_doc_id": "1"},
@@ -3316,15 +3214,14 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_membership_webhooks_endpoint(self):
-        """Test membership-webhooks endpoint works on V4"""
+        """Test membership-webhooks endpoint works on V4."""
         r = await self._api_v4_request("membership-webhooks-list", {}, "post")
         data = json.loads(r.content)
         self.assertIn("This field is required.", data["eventTrigger"])
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_citation_lookup_endpoint(self):
-        """Test CitationLookup endpoint works on V4"""
-
+        """Test CitationLookup endpoint works on V4."""
         r = await self._api_v4_request(
             "citation-lookup-list", {"text": "this is a text"}, "post"
         )
@@ -3375,7 +3272,7 @@ class DRFRecapPermissionTest(TestCase):
 
 
 class WebhooksProxySecurityTest(TestCase):
-    """Test Webhook proxy security"""
+    """Test Webhook proxy security."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3402,7 +3299,6 @@ class WebhooksProxySecurityTest(TestCase):
 
     def test_avoid_sending_webhooks_to_internal_ips(self):
         """Can we avoid sending webhooks to internal IPs?"""
-
         webhook_event = WebhookEventFactory(
             webhook=self.webhook_https,
             content="{'message': 'ok_1'}",
@@ -3459,7 +3355,7 @@ class WebhooksProxySecurityTest(TestCase):
 
 
 class WebhooksMilestoneEventsTest(TestCase):
-    """Test Webhook milestone events tracking"""
+    """Test Webhook milestone events tracking."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3497,7 +3393,6 @@ class WebhooksMilestoneEventsTest(TestCase):
     )
     async def test_webhook_milestone_events_creation(self, mock_prefix):
         """Are webhook events properly tracked and milestone events created?"""
-
         webhook_event_1 = await sync_to_async(WebhookEventFactory)(
             webhook=self.webhook_user_1,
             content="{'message': 'ok_1'}",
@@ -3608,7 +3503,6 @@ class WebhooksMilestoneEventsTest(TestCase):
         self, mock_prefix
     ):
         """Can we avoid logging debug and failing webhook events?"""
-
         webhook_event_1 = await sync_to_async(WebhookEventFactory)(
             webhook=self.webhook_user_1,
             content="{'message': 'ok_1'}",
@@ -3691,9 +3585,7 @@ class CountParameterTests(TestCase):
         self.client = make_client(self.user_1.user.pk)
 
     async def test_count_on_returns_only_count(self):
-        """
-        Test that when 'count=on' is specified, the API returns only the count.
-        """
+        """Test that when 'count=on' is specified, the API returns only the count."""
         params = {"count": "on"}
         response = await self.client.get(self.url, params)
 
@@ -3706,9 +3598,7 @@ class CountParameterTests(TestCase):
         self.assertEqual(response.data["count"], expected_count)
 
     async def test_standard_response_includes_count_url(self):
-        """
-        Test that the standard response includes a 'count' key with the count URL.
-        """
+        """Test that the standard response includes a 'count' key with the count URL."""
         response = await self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
@@ -3718,9 +3608,7 @@ class CountParameterTests(TestCase):
         self.assertIn("count=on", count_url)
 
     async def test_invalid_count_parameter(self):
-        """
-        Test that invalid 'count' parameter values are handled appropriately.
-        """
+        """Test that invalid 'count' parameter values are handled appropriately."""
         params = {"count": "invalid"}
         response = await self.client.get(self.url, params)
 
@@ -3730,9 +3618,7 @@ class CountParameterTests(TestCase):
         self.assertIsInstance(response.data["results"], list)
 
     async def test_count_with_filters(self):
-        """
-        Test that the count returned matches the filters applied.
-        """
+        """Test that the count returned matches the filters applied."""
         params = {"court": "canb", "source": Docket.RECAP, "count": "on"}
         response = await self.client.get(self.url, params)
 
@@ -3744,9 +3630,7 @@ class CountParameterTests(TestCase):
         self.assertEqual(response.data["count"], expected_count)
 
     async def test_count_with_no_results(self):
-        """
-        Test that 'count=on' returns zero when no results match the filters.
-        """
+        """Test that 'count=on' returns zero when no results match the filters."""
         params = {"court": "cand", "source": Docket.RECAP, "count": "on"}
         response = await self.client.get(self.url, params)
 
@@ -3755,11 +3639,11 @@ class CountParameterTests(TestCase):
 
 
 class TestApiUsage(SimpleTestCase):
-    """Tests for combining v3 and v4 API usage data"""
+    """Tests for combining v3 and v4 API usage data."""
 
     def setUp(self):
-        """
-        Set up test environment before each test.
+        """Set up test environment before each test.
+
         We create fresh mocks to avoid state bleeding between tests.
         """
         self.mock_redis = MagicMock()
@@ -3768,11 +3652,11 @@ class TestApiUsage(SimpleTestCase):
 
     @patch("cl.api.utils.get_redis_interface")
     def test_single_date_combined_usage(self, mock_get_redis):
-        """
-        Test that for a single date:
+        """Test the following for a single date.
+
         1. Both v3 and v4 usage is fetched
         2. Counts are properly combined
-        3. The output format matches template expectations
+        3. The output format matches template expectations.
         """
         mock_get_redis.return_value = self.mock_redis
 
@@ -3795,12 +3679,12 @@ class TestApiUsage(SimpleTestCase):
 
     @patch("cl.api.utils.get_redis_interface")
     def test_multiple_dates_combined_usage(self, mock_get_redis):
-        """
-        Test that across multiple dates:
+        """Test the following across multiple dates.
+
         1. API usage is correctly combined from both v3 and v4
         2. Totals accumulate properly across dates
         3. The data structure matches template expectations
-        4. Date ordering is preserved
+        4. Date ordering is preserved.
         """
         mock_get_redis.return_value = self.mock_redis
         self.mock_pipeline.execute.return_value = [
@@ -3869,12 +3753,12 @@ class TestApiUsage(SimpleTestCase):
 
     @patch("cl.api.utils.get_redis_interface")
     def test_anonymous_user_handling(self, mock_get_redis):
-        """
-        Test the handling of anonymous users, which have special requirements:
+        """Test the handling of anonymous users, which have the following special requirements.
+
         1. Both 'None' and 'AnonymousUser' should be treated as the same user
         2. They should be combined under 'AnonymousUser' in the output
         3. Their usage should be summed correctly across both identifiers
-        4. They should work with both API versions
+        4. They should work with both API versions.
         """
         mock_get_redis.return_value = self.mock_redis
         self.mock_pipeline.execute.return_value = [
@@ -3966,8 +3850,7 @@ class CacheListApiResponseTest(TestCase):
             r.delete(*keys)
 
     def _check_cached_request(self, path, params, cache_key):
-        """
-        Helper method to verify caching behavior for a given request.
+        """Helper method to verify caching behavior for a given request.
 
         Args:
             path (str): The URL path to make the request to.
@@ -4001,9 +3884,7 @@ class CacheListApiResponseTest(TestCase):
     def test_no_filters_no_pagination_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a response is cached when there are no filters and no pagination.
-        """
+        """Test that a response is cached when there are no filters and no pagination."""
         fake_cache_key = "cache_no_filter_no_pagination"
         # Mock the method that generates the cache key to return a predictable value
         mock_cache_key_method.return_value = fake_cache_key
@@ -4020,9 +3901,7 @@ class CacheListApiResponseTest(TestCase):
     def test_no_filters_count_request_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a v4 count request is cached when no filters are applied.
-        """
+        """Test that a v4 count request is cached when no filters are applied."""
         fake_cache_key = "cache_no_filter_count_request"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4040,9 +3919,7 @@ class CacheListApiResponseTest(TestCase):
     def test_count_request_with_filters_not_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a v4 count request is not cached when filters are applied.
-        """
+        """Test that a v4 count request is not cached when filters are applied."""
         fake_cache_key = "count_request_w_filters_no_cache"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4063,9 +3940,7 @@ class CacheListApiResponseTest(TestCase):
     def test_no_filters_ordering_request_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a ordered response is cached when no filters are requested.
-        """
+        """Test that a ordered response is cached when no filters are requested."""
         fake_cache_key = "cache_no_filter_count_request"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4082,9 +3957,7 @@ class CacheListApiResponseTest(TestCase):
     def test_filters_applied_not_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a response is NOT cached when filters are applied.
-        """
+        """Test that a response is NOT cached when filters are applied."""
         fake_cache_key = "cache_filters_key"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4107,9 +3980,7 @@ class CacheListApiResponseTest(TestCase):
     def test_pagination_applied_not_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that a response is NOT cached when pagination (cursor or page) is applied.
-        """
+        """Test that a response is NOT cached when pagination (cursor or page) is applied."""
         fake_cache_key = "cache_page_or_cursor"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4134,9 +4005,7 @@ class CacheListApiResponseTest(TestCase):
     def test_dynamic_fields_applied_not_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
-        """
-        Test that responses with dynamic 'fields' or 'omit' parameters are not cached.
-        """
+        """Test that responses with dynamic 'fields' or 'omit' parameters are not cached."""
         fake_cache_key = "cache_dynamic_fields"
         mock_cache_key_method.return_value = fake_cache_key
 
@@ -4322,9 +4191,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         return await api_client.get(url, params)
 
     async def test_omit_nested_field(self) -> None:
-        """Confirm that specifying 'omit' for parent or nested fields excludes
-        them from the API response.
-        """
+        """Confirm that specifying 'omit' for parent or nested fields excludes them from the API response."""
         response = await self._api_v4_request(
             "docketentry-list",
             {"omit": "entry_number,recap_documents__plain_text"},
@@ -4341,9 +4208,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         )
 
     async def test_allowed_nested_field(self) -> None:
-        """Confirm that specifying 'fields' for parent or nested fields filters
-        the API response to include only those fields.
-        """
+        """Confirm that specifying 'fields' for parent or nested fields filters the API response to include only those fields."""
         response = await self._api_v4_request(
             "docketentry-list",
             {"fields": "entry_number,recap_documents__plain_text"},
@@ -4362,9 +4227,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         )
 
     async def test_fields_all_gone_nested(self):
-        """If no fields are selected, all fields are omitted, including those
-        from the nested serializer.
-        """
+        """If no fields are selected, all fields are omitted, including those from the nested serializer."""
         response = await self._api_v4_request(
             "docketentry-list",
             {"fields": ""},
@@ -4399,9 +4262,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertEqual(set(results[0]["recap_documents"][0].keys()), {"id"})
 
     def test_deffer_fields_custom_queryset(self):
-        """Confirms that the deferring fields logic works correctly with a custom
-        queryset that uses select_related and prefetch_related.
-        """
+        """Confirms that the deferring fields logic works correctly with a custom queryset that uses select_related and prefetch_related."""
         request = self.factory.get(
             "/",
             {
@@ -4431,9 +4292,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertIn("tags", prefetches)
 
     def test_deffer_omit_fields_custom_queryset(self):
-        """Confirms that the deferring fields logic works correctly with a custom
-        queryset that uses select_related and prefetch_related.
-        """
+        """Confirms that the deferring fields logic works correctly with a custom queryset that uses select_related and prefetch_related."""
         request = self.factory.get(
             "/",
             {
@@ -4456,9 +4315,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertIn("tags", prefetches)
 
     def test_deffer_fields_custom_queryset_with_only(self):
-        """Confirms that the deferring fields logic doesn't modify original
-        only statements in the queryset.
-        """
+        """Confirms that the deferring fields logic doesn't modify original only statements in the queryset."""
         request = self.factory.get(
             "/",
             {
@@ -4500,7 +4357,7 @@ class ClusterRedirectionTest(TestCase):
         )
 
     async def test_opinion_cluster_redirection(self):
-        """Test that a deleted cluster redirects to an existing cluster"""
+        """Test that a deleted cluster redirects to an existing cluster."""
         url = reverse(
             "opinioncluster-detail",
             kwargs={
@@ -4548,8 +4405,7 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
     async def test_non_integer_cluster_id_returns_404(self):
-        """Test that a non-integer cluster ID returns 404 instead of
-        raising a ValueError."""
+        """Test that a non-integer cluster ID returns 404 instead of raising a ValueError."""
         api_client = await sync_to_async(make_client)(self.user.user.pk)
         for bad_pk in ("undefined", "abc"):
             with self.subTest(pk=bad_pk):
@@ -4561,8 +4417,7 @@ class ClusterRedirectionTest(TestCase):
                 self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_cluster_redirections_nested_field(self):
-        """Test that cluster_redirections appears as a nested field on
-        the OpinionCluster detail endpoint with correct data."""
+        """Test that cluster_redirections appears as a nested field on the OpinionCluster detail endpoint with correct data."""
         url = reverse(
             "opinioncluster-detail",
             kwargs={"version": "v4", "pk": self.redirect_to_cluster.pk},
@@ -4641,9 +4496,7 @@ class TestOpinionViewsetXMLRendering(TestCase):
 
 
 class BankruptcyInformationAPITests(TestCase):
-    """Tests for the bankruptcy-information endpoint and the
-    bankruptcy_information field on the docket endpoint.
-    """
+    """Tests for the bankruptcy-information endpoint and the bankruptcy_information field on the docket endpoint."""
 
     @classmethod
     def setUpTestData(cls):
@@ -4690,9 +4543,7 @@ class BankruptcyInformationAPITests(TestCase):
     async def test_bankruptcy_information_field_appears_in_docket_list(
         self,
     ) -> None:
-        """Confirm that the bankruptcy_information field appears in the
-        docket-list endpoint response when a docket has bankruptcy info.
-        """
+        """Confirm that the bankruptcy_information field appears in the docket-list endpoint response when a docket has bankruptcy info."""
         response = await self._api_v4_request("docket-list")
         results = response.json()["results"]
 
@@ -4724,9 +4575,7 @@ class BankruptcyInformationAPITests(TestCase):
         self.assertIsNone(docket_without_bankruptcy["bankruptcy_information"])
 
     async def test_bankruptcy_information_endpoint_returns_data(self) -> None:
-        """Confirm that the bankruptcy-information endpoint returns the
-        expected data.
-        """
+        """Confirm that the bankruptcy-information endpoint returns the expected data."""
         response = await self._api_v4_request("bankruptcyinformation-list")
         self.assertEqual(response.status_code, 200)
 
@@ -4740,9 +4589,7 @@ class BankruptcyInformationAPITests(TestCase):
         self.assertIn("/api/rest/v4/dockets/", bankruptcy_data["docket"])
 
     async def test_bankruptcy_information_detail_endpoint(self) -> None:
-        """Confirm that the bankruptcy-information detail endpoint works
-        correctly.
-        """
+        """Confirm that the bankruptcy-information detail endpoint works correctly."""
         url = reverse(
             "bankruptcyinformation-detail",
             kwargs={"version": "v4", "pk": self.bankruptcy_info.id},
@@ -4760,9 +4607,7 @@ class BankruptcyInformationAPITests(TestCase):
     async def test_omit_bankruptcy_information_field_from_docket(
         self,
     ) -> None:
-        """Confirm that the bankruptcy_information field can be omitted
-        from the docket-list endpoint using the omit parameter.
-        """
+        """Confirm that the bankruptcy_information field can be omitted from the docket-list endpoint using the omit parameter."""
         response = await self._api_v4_request(
             "docket-list", {"omit": "bankruptcy_information"}
         )
@@ -4779,9 +4624,7 @@ class BankruptcyInformationAPITests(TestCase):
         self.assertNotIn("bankruptcy_information", docket_with_bankruptcy)
 
     async def test_filter_bankruptcy_information_fields(self) -> None:
-        """Confirm that specific fields can be requested from the
-        bankruptcy-information endpoint using the fields parameter.
-        """
+        """Confirm that specific fields can be requested from the bankruptcy-information endpoint using the fields parameter."""
         response = await self._api_v4_request(
             "bankruptcyinformation-list", {"fields": "id,chapter"}
         )
@@ -4796,9 +4639,7 @@ class BankruptcyInformationAPITests(TestCase):
     async def test_docket_list_with_bankruptcy_information_in_fields(
         self,
     ) -> None:
-        """Confirm that when requesting specific fields on docket-list,
-        the bankruptcy_information field can be included.
-        """
+        """Confirm that when requesting specific fields on docket-list, the bankruptcy_information field can be included."""
         response = await self._api_v4_request(
             "docket-list",
             {"fields": "id,docket_number,bankruptcy_information"},
@@ -4842,8 +4683,7 @@ class UnknownFilterParameterBlockingTests(TestCase):
         self.assertIn("invalid_param", data["unknown_params"])
 
     def test_framework_params_always_accepted(self) -> None:
-        """Standard framework parameters (page, order_by, etc.) are never
-        rejected."""
+        """Standard framework parameters (page, order_by, etc.) are never rejected."""
         self.client.force_login(self.user)
         response = self.client.get(
             reverse("court-list", kwargs={"version": "v4"}),
@@ -4858,9 +4698,7 @@ class UnknownFilterParameterBlockingTests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_fjc_class_action_in_lookup_returns_400(self) -> None:
-        """`class_action__in` on the FJC endpoint is no longer a valid filter
-        (it produced a 500 when combined with a BooleanField in
-        django-filter), so it should be rejected as an unknown param."""
+        """`class_action__in` on the FJC endpoint is no longer a valid filter (it produced a 500 when combined with a BooleanField in django-filter), so it should be rejected as an unknown param."""
         FjcIntegratedDatabaseFactory(class_action=True)
         self.client.force_login(self.user)
         response = self.client.get(
@@ -6203,10 +6041,7 @@ class TestApiUsageEndpoint(TestCase):
         )
 
     def test_fetch_scope_reflects_dedicated_throttle(self):
-        """The Fetch API's own throttle (#7503) is reported like any other
-        scope, keyed off its own cache entry and independent of the "user"
-        scope's usage.
-        """
+        """The Fetch API's own throttle (#7503) is reported like any other scope, keyed off its own cache entry and independent of the "user" scope's usage."""
         default_cache = caches["default"]
         default_cache.delete(f"throttle_fetch_{self.user.pk}")
 
@@ -6219,9 +6054,7 @@ class TestApiUsageEndpoint(TestCase):
         self.assertIsNone(fetch_usage["reset_at"])
 
     def test_fetch_override_reported_independently_of_user_scope(self):
-        """A RECAP_FETCH override changes the "fetch" row's limit without
-        affecting the "user" scope's rows.
-        """
+        """A RECAP_FETCH override changes the "fetch" row's limit without affecting the "user" scope's rows."""
         APIThrottleFactory(
             user=self.user,
             throttle_type=ThrottleType.RECAP_FETCH,

@@ -370,11 +370,14 @@ class ContactForm(forms.Form):
         user input (e.g. the Message textarea) has its newlines converted
         to ``<br>`` so they render in Zoho Desk's HTML description.
 
-        :param user_agent: The submitter's browser User-Agent string.
-        :param logged_in_info: If the submitter was authenticated, a dict
-            with their ``username``, ``email``, and ``email_confirmed``
-            status. ``None`` for anonymous submissions.
-        :return: HTML string suitable for the Zoho Desk ``description``
+        Args:
+            user_agent: The submitter's browser User-Agent string.
+            logged_in_info: If the submitter was authenticated, a dict
+                with their ``username``, ``email``, and ``email_confirmed``
+                status. ``None`` for anonymous submissions.
+
+        Returns:
+            HTML string suitable for the Zoho Desk ``description``
             field.
         """
         cd = self.cleaned_data
@@ -457,7 +460,7 @@ class ContactForm(forms.Form):
         return "<br><br>".join(lines)
 
     def _get_email(self) -> str:
-        """Return the email for the form"""
+        """Return the email for the form."""
         if self.is_authenticated:
             return self.account_email
         return self.cleaned_data.get("email", "")

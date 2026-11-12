@@ -1,4 +1,5 @@
-# Code for importing Centralia structured opinion extractions into the DB
+"""Import Centralia structured opinion extractions into the DB."""
+
 import logging
 from enum import StrEnum
 from typing import Any
@@ -27,6 +28,16 @@ INGESTIBLE_STATUS = "valid"
 # structured read likely lost whole pages. Centralia legitimately drops
 # running headers and page furniture, so the bar is deliberately low.
 MIN_TEXT_COVERAGE = 0.5
+
+# Opinion text fields that outrank `html`, the field a merge writes, for
+# display and citation finding. See make_get_citations_kwargs.
+FIELDS_OUTRANKING_HTML = (
+    "xml_harvard",
+    "xml_scan",
+    "html_anon_2020",
+    "html_columbia",
+    "html_lawbox",
+)
 
 
 class StructuredExtractionStatus(StrEnum):
@@ -177,7 +188,7 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
 
 
 def check_structured_extraction(
-    opinion: Opinion, data: dict[str, Any]
+    opinion: Opinion, data: dict[str, Any], skip_validation: bool = False
 ) -> tuple[bool, str]:
     """Decide whether a structured extraction can be merged into an opinion.
 
@@ -188,17 +199,39 @@ def check_structured_extraction(
     :param opinion: The opinion the extraction was read from.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
+    :param skip_validation: Whether to skip should_ingest's quality checks.
+    Only the single writing with HTML that merging needs is still required,
+    so a partial or garbled read passes. Opinions with text in a field that
+    outranks `html` are still refused, since the merged HTML would be
+    neither shown nor cited. Meant for previews and one-off fixes.
     :return: A 2-tuple of whether the extraction can be merged and the
     reason, for logging.
     """
-    ingestible, reason = should_ingest(opinion, data)
-    if not ingestible:
-        return False, reason
-    if (count := len(data["opinions"])) != 1:
+    if skip_validation:
+        # Without validation, the command no longer filters these opinions
+        # out by source or anon 2020 content, so check them here.
+        if outranking := [
+            field
+            for field in FIELDS_OUTRANKING_HTML
+            if getattr(opinion, field)
+        ]:
+            return False, (
+                f"text in {', '.join(outranking)} outranks html, so the "
+                "extraction would be neither shown nor cited"
+            )
+        reason = f"status={data.get('status') or ''}, validation skipped"
+    else:
+        ingestible, reason = should_ingest(opinion, data)
+        if not ingestible:
+            return False, reason
+    writings = data.get("opinions") or []
+    if (count := len(writings)) != 1:
         return False, (
             f"found {count} opinions; only single-opinion documents are "
             "supported"
         )
+    if not (writings[0].get("html") or "").strip():
+        return False, "writing carries no html"
     return True, reason
 
 
@@ -250,7 +283,7 @@ def compare_structured_extraction(
 
 
 def merge_structured_opinion_into_cl_opinion(
-    opinion: Opinion, data: dict[str, Any]
+    opinion: Opinion, data: dict[str, Any], skip_validation: bool = False
 ) -> tuple[bool, str]:
     """Merge a Centralia structured extraction into a CL opinion and save it.
 
@@ -270,6 +303,9 @@ def merge_structured_opinion_into_cl_opinion(
     opinion.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
+    :param skip_validation: Whether to skip the quality checks. See
+    check_structured_extraction. A partial or garbled read can then replace
+    the opinion's existing content.
     :return: A 2-tuple of whether the opinion was updated and saved, and
     the reason, for logging.
     """
@@ -277,7 +313,9 @@ def merge_structured_opinion_into_cl_opinion(
         "opinion_id": opinion.pk,
         "opinion_cluster_id": opinion.cluster_id,
     }
-    mergeable, reason = check_structured_extraction(opinion, data)
+    mergeable, reason = check_structured_extraction(
+        opinion, data, skip_validation=skip_validation
+    )
     if not mergeable:
         logger.warning(
             "Skipped structured extraction for cluster %s: %s",
@@ -288,7 +326,7 @@ def merge_structured_opinion_into_cl_opinion(
         return False, reason
 
     extracted = data["opinions"][0]
-    # should_ingest has already rejected writings without HTML
+    # check_structured_extraction has already rejected writings without HTML
     opinion.html = _wrap(extracted["html"])
     opinion.ordering_key = extracted["order"]
     centralia_type = extracted.get("type")

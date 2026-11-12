@@ -242,7 +242,7 @@ class FLScrapeCommand(BaseCommand):
         throttle_min_items: int,
         s3_base: Path,
     ) -> "tuple[CeleryThrottle, FloridaScraper, S3Cache]":
-        """Initializes a celery queue throttle and Florida scraper with the given parameters and returns them"""
+        """Initializes a celery queue throttle and Florida scraper with the given parameters and returns them."""
         throttle = CeleryThrottle(
             queue_name=queue, min_items=throttle_min_items
         )
@@ -270,14 +270,16 @@ class FLScrapeCommand(BaseCommand):
 
 @dataclass
 class S3Cache(RequestHandler):
-    """Handler to use S3 as a (successful) response cache
+    """Handler to use S3 as a (successful) response cache.
 
-    :ivar base: The prefix where cached values are stored
-    :ivar save: Whether to archive responses
-    :ivar load: Whether to intercept requests and load responses from S3 if available
-    :ivar throttle: The celery throttle to use when adding responses to the queue
-    :ivar queue_name: The celery queue to dispatch archive tasks to
-    :ivar storage: The S3 storage backend to use for archiving and retrieval"""
+    Attributes:
+        base: The prefix where cached values are stored
+        save: Whether to archive responses
+        load: Whether to intercept requests and load responses from S3 if available
+        throttle: The celery throttle to use when adding responses to the queue
+        queue_name: The celery queue to dispatch archive tasks to
+        storage: The S3 storage backend to use for archiving and retrieval
+    """
 
     base: Path
     save: bool
@@ -298,8 +300,11 @@ class S3Cache(RequestHandler):
     )
     @lru_cache(512)
     def s3_key_exists(self, key: str) -> bool:
-        """Cached check for whether a key exists in S3 with retries. Allows us to avoid an extra `storage.exists` call
-        when `save` and `load` are both enabled."""
+        """Cached check for whether a key exists in S3 with retries.
+
+        Allows us to avoid an extra `storage.exists` call when `save` and
+        `load` are both enabled.
+        """
         if self.storage.exists(key):
             return True
         return False
