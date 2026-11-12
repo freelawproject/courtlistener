@@ -1,3 +1,5 @@
+"""Celery tasks for indexing search documents, percolating alerts, and generating embeddings."""
+
 import asyncio
 import concurrent.futures
 import csv
@@ -1882,10 +1884,12 @@ def inception_cpu_batch_request(batch: dict) -> list[dict]:
 
 
 def embeddings_cache_key():
+    """Get the prefix of embeddings cache keys."""
     return "embeddings:"
 
 
 def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    """Get the cache key for an embeddings batch's range."""
     return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
 
 

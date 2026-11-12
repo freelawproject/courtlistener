@@ -33,6 +33,8 @@ ERRORS_SHOWN: Final = 20
 
 
 class CheckOutcome(Enum):
+    """The answer a preflight check gives."""
+
     PASSED = auto()
     PARTIAL = auto()
     FAILED = auto()

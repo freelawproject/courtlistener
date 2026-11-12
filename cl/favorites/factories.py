@@ -1,3 +1,5 @@
+"""Factories for notes, tags, and prayers."""
+
 from django.contrib.contenttypes.models import ContentType
 from factory import Faker, LazyAttribute, SelfAttribute, SubFactory
 from factory.django import DjangoModelFactory
@@ -32,11 +34,15 @@ class NoteFactory(DjangoModelFactory):
 
 
 class UserTagFactory(DjangoModelFactory):
+    """Make a tag with no field defaults."""
+
     class Meta:
         model = UserTag
 
 
 class PrayerFactory(DjangoModelFactory):
+    """Make a waiting or granted prayer by a new user for a new RECAP document."""
+
     class Meta:
         model = Prayer
 

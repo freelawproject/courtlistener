@@ -1,3 +1,5 @@
+"""Custom Django model fields and Elasticsearch document fields."""
+
 from typing import Any
 
 from django.db import models

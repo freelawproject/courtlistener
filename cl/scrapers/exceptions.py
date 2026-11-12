@@ -1,3 +1,5 @@
+"""Exceptions raised while scraping and merging scraped content."""
+
 import logging
 
 from juriscraper.lib.exceptions import AutoLoggingException

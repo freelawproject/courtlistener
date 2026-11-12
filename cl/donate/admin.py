@@ -1,3 +1,5 @@
+"""Django admin configuration for donations, memberships, and Neon webhook events."""
+
 from django.contrib import admin
 
 from cl.donate.models import (
@@ -10,6 +12,8 @@ from cl.donate.models import (
 
 @admin.register(Donation)
 class DonationAdmin(admin.ModelAdmin):
+    """Admin for donations."""
+
     readonly_fields = (
         "date_modified",
         "date_created",
@@ -31,12 +35,16 @@ class DonationAdmin(admin.ModelAdmin):
 
 
 class DonationInline(admin.StackedInline):
+    """Inline for editing donations on a parent object's admin page."""
+
     model = Donation
     extra = 0
 
 
 @admin.register(MonthlyDonation)
 class MonthlyDonationAdmin(admin.ModelAdmin):
+    """Admin for monthly donations."""
+
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -58,17 +66,23 @@ class MonthlyDonationAdmin(admin.ModelAdmin):
 
 
 class MonthlyDonationInline(admin.TabularInline):
+    """Inline for editing monthly donations on a parent object's admin page."""
+
     model = MonthlyDonation
     extra = 0
 
 
 class NeonMembershipInline(admin.StackedInline):
+    """Inline for editing Neon memberships on a parent object's admin page."""
+
     model = NeonMembership
     extra = 0
 
 
 @admin.register(NeonWebhookEvent)
 class NeonWebhookEventAdmin(admin.ModelAdmin):
+    """Admin for Neon webhook events."""
+
     list_display = (
         "id",
         "get_trigger",
@@ -82,4 +96,5 @@ class NeonWebhookEventAdmin(admin.ModelAdmin):
 
     @admin.display(description="Trigger")
     def get_trigger(self, obj):
+        """Display the event's trigger."""
         return obj.get_trigger_display()

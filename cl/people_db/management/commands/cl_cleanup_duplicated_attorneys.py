@@ -1,3 +1,5 @@
+"""Split attorneys with roles on several dockets into one attorney per docket."""
+
 from django.db import transaction
 from django.db.models import Count
 
@@ -9,6 +11,10 @@ from cl.search.models import Docket
 
 @transaction.atomic
 def clone_attorney(orig_atty_id, atty, docket):
+    """Save a copy of an attorney and move the original's roles and organizations on a docket to it.
+
+    ``atty`` is modified in place to become the new attorney.
+    """
     # Clone the atty, then swap it in. After this point, the atty
     # variable is the *NEW* attorney, no longer the one one. Be
     # careful which you use for lookups and assignment.
@@ -39,9 +45,12 @@ def clone_attorney(orig_atty_id, atty, docket):
 
 
 class Command(VerboseCommand):
+    """Split attorneys that are on more than one docket."""
+
     help = "Split attorneys that are currently across multiple dockets."
 
     def add_arguments(self, parser):
+        """Add the option limiting how many attorneys to split."""
         parser.add_argument(
             "--count",
             type=int,
@@ -50,6 +59,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Clone each attorney with more than one role for every docket after their first."""
         super().handle(*args, **options)
 
         # Get attorneys that have roles on more than one docket

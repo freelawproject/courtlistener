@@ -1,3 +1,5 @@
+"""Helpers for the S3-backed Django cache."""
+
 from math import ceil
 
 from django.conf import settings

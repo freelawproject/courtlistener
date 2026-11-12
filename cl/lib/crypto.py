@@ -1,3 +1,5 @@
+"""Hashing and random key helpers."""
+
 # File roughly ordered by quality of hashing algo. Better ones further down.
 import hashlib
 import json

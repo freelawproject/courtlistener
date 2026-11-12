@@ -1,3 +1,5 @@
+"""General-purpose helpers shared across apps."""
+
 import datetime
 import re
 from collections.abc import Generator, Iterable
@@ -113,6 +115,7 @@ def previous_and_next[T](
 
 
 def is_iter(item: Any) -> TypeIs[Iterable]:
+    """Check if an item is iterable."""
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
@@ -637,6 +640,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
 
 
 def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
+    """Create a Chrome driver, remote if ``DOCKER_SELENIUM_HOST`` is set and headless if configured."""
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")

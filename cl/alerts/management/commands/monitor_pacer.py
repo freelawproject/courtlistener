@@ -1,3 +1,5 @@
+"""Poll a PACER bankruptcy case query and email when it returns results."""
+
 import asyncio
 import datetime
 
@@ -13,6 +15,7 @@ from cl.lib.pacer_session import ProxyPacerSession
 
 
 def send_emails(report, recipients):
+    """Email the report's results to the recipients."""
     subject = "The PG&E Bankruptcy is Posted"
     template = loader.get_template("pacer_alert_email.txt")
     context = {"report": report}
@@ -25,9 +28,12 @@ def send_emails(report, recipients):
 
 
 class Command(VerboseCommand):
+    """Monitor a PACER report and send emails when there are results."""
+
     help = "Monitor a PACER report and send emails when there are results."
 
     def add_arguments(self, parser):
+        """Add the sleep interval and recipient list options."""
         parser.add_argument(
             "--sleep",
             required=True,
@@ -41,6 +47,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Monitor the report until it has results."""
         super().handle(*args, **options)
 
         recipients = options["recipients"].split(",")

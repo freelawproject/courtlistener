@@ -1,3 +1,5 @@
+"""Link opinion authors and cluster panels to judges from their text fields."""
+
 from asgiref.sync import async_to_sync
 from juriscraper.lib.string_utils import titlecase
 
@@ -77,11 +79,14 @@ def normalize_panel_in_opinioncluster():
 
 
 class Command(VerboseCommand):
+    """Populate opinion authors and cluster panels from their text fields."""
+
     help = (
         "Populate author field in opinions using author_str field and "
         "populate panel in opinion clusters using judges field. "
     )
 
     def handle(self, *args, **options):
+        """Normalize opinion authors, then opinion cluster panels."""
         normalize_authors_in_opinions()
         normalize_panel_in_opinioncluster()

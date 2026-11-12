@@ -25,6 +25,11 @@ Application = get_application_model()
 def enforce_redirect_uri_policy(
     sender: type, instance: Any, **kwargs: Any
 ) -> None:
+    """Check an application's redirect URIs against the policy before saving.
+
+    Raises:
+        ValidationError: If any redirect URI fails the policy.
+    """
     if not instance.redirect_uris:
         return
     for uri in instance.redirect_uris.split():

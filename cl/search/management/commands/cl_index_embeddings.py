@@ -1,3 +1,5 @@
+"""Queue tasks to index opinion embeddings from S3 into Elasticsearch."""
+
 import csv
 import re
 import time
@@ -27,9 +29,12 @@ def compose_redis_key() -> str:
 
 
 class Command(VerboseCommand):
+    """Queue embedding indexing for opinions from the database or an S3 inventory CSV."""
+
     help = "Retrieve opinion embeddings from S3 and index them into ES."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle or queues set yet."""
         super().__init__(*args, **kwargs)
         self.throttle = None
         self.retrieval_queue = None
@@ -38,6 +43,7 @@ class Command(VerboseCommand):
         self.delay: float
 
     def add_arguments(self, parser):
+        """Add the batch, start, resume, count, queue, throttle, inventory, and delay options."""
         parser.add_argument(
             "--batch-size",
             type=int,
@@ -140,6 +146,16 @@ class Command(VerboseCommand):
             log_last_document_indexed(opinion_id, compose_redis_key())
 
     def handle(self, *args, **options):
+        """Queue embedding indexing in chunks for the selected opinions.
+
+        Opinion IDs come from the inventory CSV's rows if one is given,
+        otherwise from the database starting at ``--start-id``, or at the
+        last processed ID when auto-resuming.
+
+        Raises:
+            CommandError: If an inventory file is given without
+                ``--inventory-rows`` or doesn't exist.
+        """
         self.retrieval_queue = options["retrieval_queue"]
         self.indexing_queue = options["indexing_queue"]
         self.batch_size = options["batch_size"]

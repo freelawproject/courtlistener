@@ -1,3 +1,5 @@
+"""Custom URL path converters."""
+
 from django.urls.converters import StringConverter
 
 

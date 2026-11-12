@@ -1,3 +1,5 @@
+"""Helpers for blocking opinions from search engines and anonymizing text."""
+
 import re
 from datetime import timedelta
 

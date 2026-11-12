@@ -1,3 +1,5 @@
+"""Views for managing, disabling, and enabling search and docket alerts."""
+
 from http import HTTPStatus
 
 from asgiref.sync import sync_to_async
@@ -43,6 +45,11 @@ def edit_alert_redirect(request, pk):
 
 @login_required
 def delete_alert(request, pk):
+    """Delete one of the user's search alerts and redirect.
+
+    Redirects to the alert's search results if ``redirect_to_search_page``
+    is posted, otherwise to the user's alert list.
+    """
     try:
         pk = int(pk)
     except ValueError:
@@ -66,6 +73,7 @@ def delete_alert(request, pk):
 
 @login_required
 def delete_alert_confirm(request, pk):
+    """Render the confirmation page for deleting a search alert."""
     return render(
         request,
         "delete_confirm.html",
@@ -191,6 +199,11 @@ def disable_alert_list(request: HttpRequest):
 
 @ratelimit_deny_list
 def enable_alert(request, secret_key):
+    """Set a search alert's rate from the ``rate`` query parameter.
+
+    The alert is found by its secret key. The rendered page reports whether
+    the rate was missing or unknown.
+    """
     alert = get_object_or_404(Alert, secret_key=secret_key)
     rate = request.GET.get("rate")
     if not rate:

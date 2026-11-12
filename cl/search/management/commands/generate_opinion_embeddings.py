@@ -1,3 +1,5 @@
+"""Queue tasks to generate opinion text embeddings and save them to S3."""
+
 from celery import chain
 from django.conf import settings
 
@@ -21,13 +23,17 @@ def compose_redis_key() -> str:
 
 
 class Command(VerboseCommand):
+    """Queue embedding generation for opinions in batches limited by token count."""
+
     help = "Gets text embeddings for opinions and stores them in S3."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
         self.throttle = None
 
     def add_arguments(self, parser):
+        """Add the database, token, start, resume, count, queue, throttle, device, and opinion ID options."""
         parser.add_argument(
             "--database",
             type=str,
@@ -118,6 +124,13 @@ class Command(VerboseCommand):
         ).apply_async()
 
     def handle(self, *args, **options):
+        """Queue embedding of the selected opinions in batches under the token limit.
+
+        Opinions that aren't versions of another opinion are selected by ID
+        or from ``--start-id``. Opinions shorter than ``MIN_OPINION_SIZE``
+        tokens are skipped, and opinions over the token limit are logged and
+        skipped.
+        """
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]

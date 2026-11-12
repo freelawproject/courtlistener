@@ -1,3 +1,5 @@
+"""URL routes for financial disclosure pages."""
+
 from django.urls import path
 
 from cl.disclosures.views import (

@@ -1,3 +1,5 @@
+"""Celery tasks for importing PACER, state, and archival data and uploading to the Internet Archive."""
+
 from __future__ import annotations
 
 import asyncio
@@ -237,6 +239,7 @@ env = environ.FileAwareEnv()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
+    """Increment and save the object's Internet Archive upload failure count."""
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -387,6 +390,11 @@ async def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
+    """Download a RECAP item to ``MEDIA_ROOT/recap/<filename>``.
+
+    Existing files are kept unless ``clobber`` is set. Timeouts, HTTP errors,
+    and an existing file are logged rather than raised.
+    """
     logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
@@ -868,11 +876,16 @@ def get_and_process_free_pdf(
 
 
 class OverloadedException(Exception):
-    pass
+    """Raised when the Internet Archive's S3 API is overloaded."""
 
 
 @app.task(bind=True)
 def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
+    """Upload a RECAP document's PDF to the Internet Archive.
+
+    On success, the archive URL is saved on the document and its failure
+    count is cleared. On failure, its failure count is incremented.
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
     file_name = get_document_filename(
@@ -1041,6 +1054,11 @@ def upload_to_ia(
 
 @app.task
 def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+    """Set a free document log's status and completion date.
+
+    Returns:
+        The status, or None if the log doesn't exist.
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
@@ -1055,6 +1073,11 @@ def mark_court_done_on_date(log_id: int, status: int) -> int | None:
 
 @app.task(ignore_result=True)
 def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
+    """Delete a free document row, if it still exists.
+
+    Returns:
+        A list holding the RECAP document PK from ``data``.
+    """
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -3078,6 +3101,7 @@ def make_csv_file(
 
 
 def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
+    """Make the key for a docket's enqueued list of creditors query."""
     return f"list.creditors.enqueued:{court_id}-{d_number_file_name}"
 
 
@@ -4828,6 +4852,7 @@ def is_texas_appellate_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasCourtOfAppealsDocket]:
+    """Check if a Texas docket is from an appellate court."""
     return d["court_type"] == CourtType.APPELLATE.value
 
 
@@ -4836,6 +4861,7 @@ def is_texas_supreme_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
+    """Check if a Texas docket's court type is ``CourtType.SUPREME``."""
     return d["court_type"] == CourtType.SUPREME.value
 
 

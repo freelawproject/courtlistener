@@ -1,3 +1,5 @@
+"""REST API permission classes for Neon webhooks."""
+
 from django.conf import settings
 from rest_framework import exceptions, permissions
 
@@ -6,6 +8,14 @@ class AllowNeonWebhook(permissions.BasePermission):
     """Validates requests received from Neon by verifying the included signature against a configured secret token."""
 
     def has_permission(self, request, view):
+        """Allow requests whose webhook token matches the configured token.
+
+        All requests are allowed in development.
+
+        Raises:
+            exceptions.ParseError: If the request has no data.
+            exceptions.PermissionDenied: If the token is missing or invalid.
+        """
         if settings.DEVELOPMENT:
             return True
 

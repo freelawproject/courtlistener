@@ -1,3 +1,5 @@
+"""Mergers for scraped Florida appellate dockets."""
+
 import logging
 from collections.abc import Iterable
 from datetime import date, datetime
@@ -82,6 +84,8 @@ def _florida_representative_role(
 class FloridaRoleMerger(
     RoleMerger[FloridaPartyRepresentative, RelatedParams[None]]
 ):
+    """Role merger that marks a party's primary representative as lead attorney."""
+
     role: int = Attribute(_florida_representative_role)
 
 
@@ -92,6 +96,8 @@ def _florida_pro_se(party: FloridaParty, params: None) -> int:
 class FloridaPartyTypeMerger(
     PartyTypeMerger[FloridaParty, RelatedParams[None]]
 ):
+    """Party type merger that records whether a Florida party is pro se."""
+
     pro_se: int = Attribute(_florida_pro_se)
 
 
@@ -112,6 +118,7 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
     extra_info: str = Attribute(_florida_party_uuid)
 
     def query(self) -> QuerySet[Party]:
+        """Find matching parties on the docket, oldest first."""
         return super().query().order_by("date_created")
 
     def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
@@ -147,6 +154,12 @@ class FloridaDocumentMerger(
         FloridaDocument,
     ]
 ):
+    """Merger for a scraped Florida attachment into a ``FloridaDocument``.
+
+    Documents are matched by link UUID, falling back to a uniquely named
+    document whose link UUID is no longer in the scrape.
+    """
+
     model: ClassVar[type[Model]] = FloridaDocument
     key: ClassVar[Iterable[str]] = ["link_uuid"]
 
@@ -284,6 +297,12 @@ class FloridaDocketEntryMerger(
         FloridaDocketEntry,
     ]
 ):
+    """Merger for a scraped Florida docket entry and its attachments.
+
+    Entries are matched by UUID, and their attachments replace the entry's
+    stored documents.
+    """
+
     model: ClassVar[type[Model]] = FloridaDocketEntry
     key: ClassVar[Iterable[str]] = ["docket_entry_uuid"]
 
@@ -348,6 +367,8 @@ class FloridaOriginatingCourtInformationMerger(
         OriginatingCourtInformation,
     ]
 ):
+    """Merger for a Florida originating case's docket number."""
+
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
     docket_number: str = Attribute(
@@ -358,6 +379,7 @@ class FloridaOriginatingCourtInformationMerger(
     )
 
     def query(self) -> QuerySet[OriginatingCourtInformation]:
+        """Match no existing rows, so a new row is always created."""
         return OriginatingCourtInformation.objects.none()
 
 
@@ -382,6 +404,8 @@ def _origin_court_id(transfer: DocketTransfer, params: Any) -> str | None:
 
 
 class FloridaCaseTransferMerger(CaseTransferMerger[DocketTransfer, None]):
+    """Case transfer merger that maps the Florida origin court to its CourtListener ID."""
+
     origin_court_id: str = Attribute(_origin_court_id, strategy=overwrite)
 
 
@@ -422,6 +446,12 @@ def _florida_transfers(
 class FloridaDocketMerger(
     DocketMerger[FloridaCase, list[ScrapeFloridaDocketEntry]]
 ):
+    """Merger for a scraped Florida case into a ``Docket``.
+
+    Also merges the case's parties, docket entries, inbound transfers, and,
+    for Supreme Court cases, originating court information.
+    """
+
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
@@ -509,6 +539,7 @@ class FloridaDocketMerger(
 
     @staticmethod
     def validate(scrape: FloridaCase) -> bool:
+        """Check that the case's court is a known Florida court, logging an error if not."""
         if scrape.court_id not in FLORIDA_COURT_ID_MAP:
             logger.error("Unknown court id: %s", scrape.court_id)
             return False

@@ -1,3 +1,5 @@
+"""URL routes for managing search and docket alerts."""
+
 from django.urls import path, re_path
 
 from cl.alerts.views import (

@@ -1,3 +1,5 @@
+"""Signal handlers that keep search alerts in sync with their percolator index."""
+
 from functools import partial
 
 from django.conf import settings

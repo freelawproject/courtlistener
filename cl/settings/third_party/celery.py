@@ -1,3 +1,5 @@
+"""Settings for Celery."""
+
 import environ
 
 from .redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT

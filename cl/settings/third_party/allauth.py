@@ -1,3 +1,5 @@
+"""Settings for django-allauth single sign-on."""
+
 # django-allauth provides single sign-on (OIDC and SAML) and nothing else.
 # CourtListener keeps its own sign-in, registration, email confirmation and
 # password reset views, so these settings switch off every allauth behavior

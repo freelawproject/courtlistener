@@ -1,3 +1,5 @@
+"""String cleanup and conversion helpers."""
+
 import re
 
 import tiktoken

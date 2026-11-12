@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+"""Resolve citations found by eyecite to the opinions they cite."""
+
 from collections.abc import Iterable
 from typing import no_type_check
 
@@ -44,6 +46,12 @@ def filter_by_matching_antecedent(
     opinion_candidates: Iterable[Opinion],
     antecedent_guess: str | None,
 ) -> Opinion | None:
+    """Pick the one candidate whose case name contains the antecedent guess.
+
+    Returns:
+        The only distinct matching candidate, or None if there is no guess
+        or not exactly one match.
+    """
     if not antecedent_guess:
         return None
 
@@ -62,6 +70,15 @@ def filter_by_matching_antecedent(
 def resolve_fullcase_citation(
     full_citation: FullCaseCitation,
 ) -> MatchedResourceType:
+    """Resolve a full citation to the opinion it cites.
+
+    Only case citations are resolved. Citations with several matches are
+    flagged as ambiguous.
+
+    Returns:
+        The cited opinion, ``MULTIPLE_MATCHES_RESOURCE`` if several
+        opinions match, or ``NO_MATCH_RESOURCE`` if none do.
+    """
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
         db_search_results: list[Hit]
@@ -135,6 +152,11 @@ def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
     resolved_full_cites: ResolvedFullCites,
 ) -> Opinion | None:
+    """Resolve a short citation to one of the already resolved full citations.
+
+    Matches on reporter and volume, falling back to the antecedent guess if
+    that leaves several candidates.
+    """
     candidates: list[Opinion] = []
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
@@ -165,6 +187,7 @@ def resolve_supra_citation(
     supra_citation: SupraCitation,
     resolved_full_cites: ResolvedFullCites,
 ) -> Opinion | None:
+    """Resolve a supra citation to an already resolved opinion by its antecedent guess."""
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]
@@ -177,6 +200,15 @@ def resolve_supra_citation(
 def do_resolve_citations(
     citations: list[CitationBase], citing_object: Opinion | RECAPDocument
 ) -> dict[MatchedResourceType, list[SupportedCitationType]]:
+    """Resolve citations from an opinion or RECAP document to what they cite.
+
+    Returns:
+        The citations grouped by the resource they resolved to.
+
+    Raises:
+        TypeError: If there are full case citations and the citing object
+            is neither an opinion nor a RECAP document.
+    """
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:

@@ -1,3 +1,5 @@
+"""Daemon that retries failed webhook events and cleans up old ones."""
+
 import sys
 import time
 from datetime import timedelta
@@ -135,6 +137,11 @@ class Command(VerboseCommand):
     DELAY_BETWEEN_ITERATIONS = 1 * 60  # One minute
 
     def handle(self, *args, **options):
+        """Retry failed webhook events once a minute, forever.
+
+        Each iteration may also delete old webhook events and notify users
+        whose webhooks are still disabled.
+        """
         super().handle(*args, **options)
 
         # Execute it continuously with a delay of one minute between iterations

@@ -1,3 +1,5 @@
+"""Settings for Django REST Framework and V3 API access."""
+
 import sys
 
 import environ

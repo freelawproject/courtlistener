@@ -1,3 +1,5 @@
+"""Celery tasks for crawling PACER RSS feeds and merging their contents."""
+
 import bz2
 import errno
 import json
@@ -348,10 +350,12 @@ async def cache_hash(item_hash: str) -> bool:
 
 
 def rss_cache_prefix() -> str:
+    """Get the prefix of the Redis keys for claimed RSS items."""
     return "rss_hash"
 
 
 def get_rss_cache_key(item_hash: str) -> str:
+    """Make the Redis key for a claimed RSS item's hash."""
     return f"{rss_cache_prefix()}:{item_hash}"
 
 
@@ -457,6 +461,7 @@ def merge_rss_feed_contents(
     queue=settings.CELERY_FEEDS_QUEUE,
 )
 def mark_status_successful(self: Task, feed_status_pk: int) -> None:
+    """Mark a feed status as successfully processed."""
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)

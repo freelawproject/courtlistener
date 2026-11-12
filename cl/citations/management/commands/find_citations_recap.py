@@ -1,3 +1,5 @@
+"""Queue tasks to find citations in RECAP documents."""
+
 import sys
 import time
 from collections.abc import Iterable
@@ -16,9 +18,12 @@ from cl.search.models import RECAPDocument
 
 
 class Command(VerboseCommand):
+    """Find citations in a selection of available RECAP documents."""
+
     help = "Parse citations from court filings we have stored through RECAP"
 
     def add_arguments(self, parser: CommandParser) -> None:
+        """Add the document selection and queue options."""
         parser.add_argument(
             "--doc-ids",
             type=int,
@@ -64,6 +69,10 @@ class Command(VerboseCommand):
         )
 
     def log_progress(self, processed_count: int, last_pk: int):
+        """Write the percent done, rate, and last ID to stdout.
+
+        The rate is updated every 1,000 items.
+        """
         if processed_count % 1000 == 1:
             self.t1 = time.time()
         if processed_count % 1000 == 0:
@@ -91,6 +100,7 @@ class Command(VerboseCommand):
         sys.stdout.flush()
 
     def update_documents(self, docs: Iterable, queue_name: str):
+        """Queue citation-finding tasks for the documents in chunks of 25, throttling the queue."""
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
@@ -115,6 +125,11 @@ class Command(VerboseCommand):
             self.log_progress(processed_count, doc.pk)
 
     def handle(self, *args, **options) -> None:
+        """Select the available RECAP documents to process and queue them.
+
+        Raises:
+            CommandError: If the selection options conflict.
+        """
         super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None

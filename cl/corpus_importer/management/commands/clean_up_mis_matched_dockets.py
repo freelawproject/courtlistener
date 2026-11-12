@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Find and fix opinion dockets mis-matched by the Harvard importer."""
 
 import requests
 from django.db.utils import OperationalError
@@ -158,9 +159,12 @@ def find_and_fix_mis_matched_dockets(fix: bool) -> list[Docket]:
 
 
 class Command(VerboseCommand):
+    """Report mis-matched dockets, fixing them if requested."""
+
     help = "Find mis matched opinions/dockets and fix them."
 
     def add_arguments(self, parser):
+        """Add the ``--fix`` flag."""
         parser.add_argument(
             "--fix",
             action="store_true",
@@ -169,6 +173,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Find mis-matched dockets, fixing them only with ``--fix``."""
         if options["fix"]:
             find_and_fix_mis_matched_dockets(fix=True)
         else:

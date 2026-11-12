@@ -1,3 +1,5 @@
+"""Helpers for gathering homepage statistics."""
+
 from datetime import UTC, datetime, timedelta
 
 from cache_memoize import cache_memoize

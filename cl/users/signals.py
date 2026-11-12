@@ -1,3 +1,5 @@
+"""Signal handlers for SES bounces and complaints, and for new users, profiles, and webhooks."""
+
 import json
 import logging
 import random
@@ -31,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 class SESEventType(StrEnum):
+    """The SES notification event types that are handled."""
+
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -165,6 +169,7 @@ def complaint_handler(
     dispatch_uid="create_auth_token",
 )
 def create_auth_token(sender, instance=None, created=False, **kwargs):
+    """Create an API token for each new user and count the new account."""
     if created:
         Token.objects.create(user=instance)
         accounts_created_total.inc()
@@ -176,6 +181,7 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
     dispatch_uid="create_superuser_profile_object",
 )
 def superuser_creation(sender, instance, created, **kwargs):
+    """Create a confirmed profile for each new superuser."""
     # Create a profile whenever createsuperuser is run
     if created and instance.is_superuser:
         UserProfile.objects.create(
@@ -188,6 +194,7 @@ def superuser_creation(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
 def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+    """Give each new profile a unique ``@recap.email`` address."""
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()

@@ -1,3 +1,5 @@
+"""Find and download Judge Buchwald's SDNY cases."""
+
 import os
 from argparse import RawTextHelpFormatter
 
@@ -111,6 +113,8 @@ def get_dockets(options):
 
 
 class Command(VerboseCommand):
+    """Run the Buchwald project's iquery or docket download task."""
+
     help = """Get all relevant cases by a Judge Buchwald in SDNY
 
 1. Start with the earliest case in 2013 (13-cv-00001, pacer_case_id 405990)
@@ -132,11 +136,13 @@ Limitations:
 """
 
     def create_parser(self, *args, **kwargs):
+        """Create a parser that keeps the help text's formatting."""
         parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -164,6 +170,7 @@ Limitations:
         )
 
     def handle(self, *args, **options):
+        """Run the ``iquery`` or ``dockets`` task, printing a message for unknown tasks."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "iquery":
             # Run iquery for all of the cases in the district during the time

@@ -1,3 +1,5 @@
+"""Factories for users, their profiles, and sent emails."""
+
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.utils.text import slugify
@@ -16,6 +18,8 @@ from cl.users.models import EmailSent, UserProfile
 
 
 class UserFactory(DjangoModelFactory):
+    """Make an active, non-staff user with a unique username and email and the password "password"."""
+
     class Meta:
         model = User
 
@@ -43,6 +47,8 @@ class UserFactory(DjangoModelFactory):
 
 
 class UserWithChildProfileFactory(UserFactory):
+    """Make a user with a profile."""
+
     profile = RelatedFactory(
         "cl.users.factories.UserProfileFactory",
         factory_related_name="user",
@@ -50,11 +56,15 @@ class UserWithChildProfileFactory(UserFactory):
 
 
 class EmailSentFactory(DjangoModelFactory):
+    """Make a stored sent email."""
+
     class Meta:
         model = EmailSent
 
 
 class UserProfileFactory(DjangoModelFactory):
+    """Make a confirmed profile, without a user, whose key expires later this year."""
+
     class Meta:
         model = UserProfile
 
@@ -75,4 +85,6 @@ class UserProfileFactory(DjangoModelFactory):
 
 
 class UserProfileWithParentsFactory(UserProfileFactory):
+    """Make a profile with a new user."""
+
     user = SubFactory(UserFactory)

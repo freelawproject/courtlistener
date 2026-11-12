@@ -1,3 +1,5 @@
+"""Factories for single sign-on organizations, domains, connections, and memberships."""
+
 from typing import Any
 
 import factory

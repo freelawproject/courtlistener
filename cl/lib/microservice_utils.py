@@ -1,3 +1,5 @@
+"""Helpers for calling the document processing microservices."""
+
 import json
 import logging
 from contextlib import nullcontext

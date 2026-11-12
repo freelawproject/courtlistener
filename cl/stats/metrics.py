@@ -1,3 +1,5 @@
+"""Prometheus metrics and collectors for CourtListener."""
+
 import logging
 
 from django.conf import settings
@@ -61,6 +63,7 @@ class CeleryQueueCollector:
     """
 
     def collect(self):
+        """Yield a gauge of each Celery queue's length, reporting failed lookups to Sentry."""
         gauge = GaugeMetricFamily(
             "cl_celery_queue_length",
             "Number of tasks in Celery queue",
@@ -79,9 +82,11 @@ class StatMetricsCollector:
     """Collects tally_stat metrics from Redis for Prometheus."""
 
     def describe(self):
+        """Describe no metrics up front."""
         return []
 
     def collect(self):
+        """Yield a counter for each stat metric stored in Redis, with its label values."""
         r = get_redis_interface("STATS")
 
         # Collect all keys first, then fetch values in a single pipeline

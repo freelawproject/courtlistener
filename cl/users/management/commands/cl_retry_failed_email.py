@@ -1,3 +1,5 @@
+"""Retry failed emails to recipients that have become deliverable again."""
+
 import sys
 from datetime import timedelta
 
@@ -83,6 +85,7 @@ class Command(VerboseCommand):
     help = "Check email recipients' deliverability and send failed emails."
 
     def handle(self, *args, **options):
+        """Retry the failed emails that are due and report how many were sent."""
         super().handle(*args, **options)
         sys.stdout.write("Sending failed email...")
         email_sent = handle_failing_emails()

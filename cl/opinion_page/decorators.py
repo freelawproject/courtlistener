@@ -1,3 +1,5 @@
+"""Decorators for views of opinion clusters."""
+
 from collections.abc import Coroutine
 from functools import wraps
 from http import HTTPStatus

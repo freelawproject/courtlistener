@@ -1,3 +1,5 @@
+"""OAuth2 request validator for CourtListener."""
+
 from collections.abc import Callable
 from typing import Any
 

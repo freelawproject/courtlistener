@@ -1,3 +1,5 @@
+"""Detect requests from bots by their user agent."""
+
 from django.http import HttpRequest
 
 

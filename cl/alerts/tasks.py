@@ -1,3 +1,5 @@
+"""Celery tasks and helpers for sending docket and search alerts."""
+
 import copy
 from dataclasses import dataclass
 from datetime import datetime
@@ -70,6 +72,7 @@ es_document_module = import_module("cl.search.documents")
 
 
 def make_alert_key(d_pk: int) -> str:
+    """Make the Redis key marking a docket's alert as enqueued."""
     return f"docket.alert.enqueued:{d_pk}"
 
 
@@ -81,6 +84,8 @@ def enqueue_docket_alert(d_pk: int) -> bool:
 
 @dataclass
 class DocketAlertRecipient:
+    """A user to email about a docket alert."""
+
     email_address: str
     secret_key: str
     auto_subscribe: bool

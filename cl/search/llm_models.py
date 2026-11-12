@@ -1,7 +1,11 @@
+"""Pydantic models for structured LLM docket number cleaning responses."""
+
 from pydantic import BaseModel, Field, constr
 
 
 class DocketItem(BaseModel):
+    """The cleaned docket numbers for one case."""
+
     unique_id: constr(max_length=20) = Field(
         ..., description="Unique identifier for the case."
     )
@@ -14,6 +18,8 @@ class DocketItem(BaseModel):
 
 
 class CleanDocketNumber(BaseModel):
+    """An LLM response with the cleaned docket numbers for several cases."""
+
     docket_numbers: list[DocketItem] = Field(
         ..., description="A list of extracted items."
     )

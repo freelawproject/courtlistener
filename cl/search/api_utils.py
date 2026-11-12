@@ -1,3 +1,5 @@
+"""Run and paginate Elasticsearch queries for the search API."""
+
 import logging
 import pickle
 import time
@@ -109,6 +111,11 @@ class ESList:
     def __init__(
         self, request, main_query, offset, page_size, type, length=None
     ):
+        """Build the list over ``main_query`` for a search type.
+
+        ``length`` is computed with a count query when first needed if not
+        given.
+        """
         super().__init__()
         self.request = request
         self.main_query = main_query
@@ -229,6 +236,7 @@ class CursorESList:
         clean_data,
         request,
     ):
+        """Build the list over the main and child document queries, with no cursor."""
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
@@ -241,6 +249,7 @@ class CursorESList:
         self.page_int = None
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
+        """Set the cursor and page size, fetching one extra result to detect more pages."""
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse
@@ -253,6 +262,17 @@ class CursorESList:
         self.page_size = page_size + 1
 
     def perform_es_query(self):
+        """Run the page query and its cardinality count queries, and log the search.
+
+        Returns:
+            The main results, the main cardinality count response, and the
+            child cardinality count response for RECAP searches with a child
+            query, otherwise None.
+
+        Raises:
+            ElasticServerError: If Elasticsearch fails.
+            ElasticBadRequestError: If Elasticsearch can't parse the query.
+        """
         if self.search_after:
             self.main_query = self.main_query.extra(
                 search_after=self.search_after
@@ -509,13 +529,17 @@ class CursorESList:
 
 
 class ResultObject:
+    """A dict wrapper whose missing attributes read as None."""
+
     def __init__(self, initial=None):
+        """Wrap ``initial``, or an empty dict if ``initial`` is falsy."""
         self.__dict__["_data"] = initial or {}
 
     def __getattr__(self, key):
         return self._data.get(key, None)
 
     def to_dict(self):
+        """Return the wrapped dict."""
         return self._data
 
 

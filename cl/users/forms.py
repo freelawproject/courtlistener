@@ -1,3 +1,5 @@
+"""Forms for user profiles, registration, passwords, and webhooks."""
+
 import re
 from collections.abc import Iterator
 
@@ -33,6 +35,8 @@ from cl.users.utils import emails
 # https://html.spec.whatwg.org/multipage/forms.html#autofill, and enables them
 # to be autofilled in various ways.
 class ProfileForm(ModelForm):
+    """Form for editing a user's profile settings and address."""
+
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
@@ -96,7 +100,15 @@ class ProfileForm(ModelForm):
 
 
 class CleanEmailMixin:
+    """Form mixin that rejects emails from blocked domains."""
+
     def clean_email(self):
+        """Validate that the email's domain isn't blocked.
+
+        Raises:
+            forms.ValidationError: If the domain is a disposable email
+                provider or in ``BLOCKED_DOMAINS``.
+        """
         email = self.cleaned_data.get("email")
         user_part, domain_part = email.rsplit("@", 1)
         blocklist.update(settings.BLOCKED_DOMAINS)
@@ -109,6 +121,8 @@ class CleanEmailMixin:
 
 
 class UserForm(ModelForm, CleanEmailMixin):
+    """Form for editing a user's name and email."""
+
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
@@ -187,6 +201,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     email_taken: bool
 
     def __init__(self, *args, **kwargs):
+        """Build the form with stricter username validation, labels, and widget attributes."""
         super().__init__(*args, **kwargs)
         self.email_taken = False
         self.fields["username"].validators = [
@@ -275,6 +290,12 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         return email
 
     def clean_first_name(self):
+        """Validate that the first name has no special characters.
+
+        Raises:
+            forms.ValidationError: If the first name contains special
+                characters such as ``!``, ``@``, or ``.``.
+        """
         first_name = self.cleaned_data.get("first_name")
         if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
             raise forms.ValidationError(
@@ -284,6 +305,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
 
 
 class EmailConfirmationForm(forms.Form):
+    """Form for requesting an email confirmation link."""
+
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
@@ -298,6 +321,8 @@ class EmailConfirmationForm(forms.Form):
 
 
 class OptInConsentForm(forms.Form):
+    """Captcha-protected form for agreeing to the terms when creating an account."""
+
     consent = forms.BooleanField(
         error_messages={
             "required": "To create a new account, you must agree below.",
@@ -333,6 +358,15 @@ class PasswordConfirmForm(forms.Form):
         super().__init__(*args, **kwargs)
 
     def clean_password(self) -> dict[str, str]:
+        """Validate that the password, if given, is the logged-in user's.
+
+        Returns:
+            The form's cleaned data.
+
+        Raises:
+            ValidationError: If the password doesn't authenticate the
+                logged-in user.
+        """
         password = self.cleaned_data["password"]
 
         if password:
@@ -385,6 +419,7 @@ class CustomPasswordResetForm(PasswordResetForm):
     """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, *args, **kwargs):
+        """Build the form with an empty account cache and styled email widget."""
         super().__init__(*args, **kwargs)
         # Set by accounts_at_address(), which is asked the same question more
         # than once per request.
@@ -509,6 +544,7 @@ class CustomSetPasswordForm(SetPasswordForm):
     """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, user, *args, **kwargs):
+        """Build the form with styled password widgets."""
         super().__init__(user, *args, **kwargs)
 
         self.fields["new_password1"].widget.attrs.update(
@@ -524,7 +560,15 @@ class CustomSetPasswordForm(SetPasswordForm):
 
 
 class WebhookForm(ModelForm):
+    """Form for creating or updating a webhook."""
+
     def __init__(self, update=None, request_user=None, *args, **kwargs):
+        """Build the form, limiting the event type and version choices.
+
+        When updating, only the webhook's current event type and version are
+        offered, read-only. When creating, only event types that the user
+        doesn't yet have a webhook for in every version are offered.
+        """
         super().__init__(*args, **kwargs)
 
         # Determine the webhook type options to show accordingly.

@@ -1,4 +1,6 @@
 # !/usr/bin/python
+"""Find and fix the referred and assigned judges of dockets."""
+
 import time
 from functools import lru_cache
 
@@ -87,9 +89,12 @@ def find_and_fix_docket_judges(
 
 
 class Command(VerboseCommand):
+    """Find and fix the referred and assigned judges of dockets."""
+
     help = "Find and fix Dockets referred and assigned judges."
 
     def add_arguments(self, parser):
+        """Add the iteration wait and testing-mode options."""
         parser.add_argument(
             "--iteration-wait",
             type=float,
@@ -103,6 +108,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Fix the judges of every docket that has one."""
         testing_mode = options.get("testing_mode", False)
         iteration_wait = options.get("iteration_wait", 0.1)
         find_and_fix_docket_judges(iteration_wait, testing_mode)

@@ -1,3 +1,5 @@
+"""URL routes for OAuth client registration, server metadata, and the OAuth and OIDC endpoints."""
+
 from django.conf import settings
 from django.urls import include, path
 from django.views.decorators.csp import csp_override

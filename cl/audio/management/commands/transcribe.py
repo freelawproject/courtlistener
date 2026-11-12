@@ -1,3 +1,5 @@
+"""Transcribe oral argument audio with a speech-to-text model."""
+
 import argparse
 import time
 
@@ -98,6 +100,8 @@ def handle_open_ai_transcriptions(options) -> None:
 
 
 class Command(VerboseCommand):
+    """Queue audio files with a given transcription status for transcription."""
+
     help = "Transcribe audio files using a Speech to Text model"
     status_choices = [
         code for code, _ in Audio.STT_STATUSES if code != Audio.STT_COMPLETE
@@ -107,6 +111,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the model, rate limit, status, limit, queue, retry, and duration options."""
         parser.add_argument(
             "--model",
             choices=[
@@ -156,6 +161,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Queue the matching audio for transcription with the chosen model."""
         super().handle(*args, **options)
 
         if options["model"] == "open-ai-api":

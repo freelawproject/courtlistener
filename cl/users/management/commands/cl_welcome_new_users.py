@@ -1,3 +1,5 @@
+"""Send a welcome email to the users who signed up in the last day."""
+
 import sys
 from datetime import datetime, timedelta
 
@@ -38,6 +40,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the simulate flag."""
         parser.add_argument(
             "--simulate",
             action="store_true",
@@ -46,6 +49,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Email the users who joined in the last day, if there are any."""
         super().handle(*args, **options)
         self.options = options
         time_now = datetime.now()

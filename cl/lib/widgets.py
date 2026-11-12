@@ -1,3 +1,5 @@
+"""Form widgets with CourtListener's new-stack defaults."""
+
 from typing import Any
 
 from django import forms

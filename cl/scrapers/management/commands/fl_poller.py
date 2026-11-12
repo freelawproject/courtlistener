@@ -1,3 +1,5 @@
+"""Poll Florida ACIS for new and updated cases and queue them for ingestion."""
+
 import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
@@ -34,6 +36,8 @@ from cl.search.state.florida.models import FloridaDocument
 
 
 class FloridaUpdate(BaseModel):
+    """A case reported by an ACIS search, identified by its UUID and court."""
+
     # Frozen so instances are hashable for deduplication
     model_config = ConfigDict(frozen=True)
 
@@ -46,6 +50,8 @@ class FloridaUpdate(BaseModel):
 
 
 class FloridaDocumentUpdate(FloridaUpdate):
+    """A case reported by an ACIS docket entry document search, with the document's link UUID."""
+
     link_uuid: UUID4 = Field(validation_alias="documentLinkUUID")
 
 
@@ -56,22 +62,30 @@ DOCKET_ENDPOINT = "https://acis-api.flcourts.gov/courts/cms/cases"
 
 
 class FloridaCasePollParser(FloridaPaginatedResultsParser[FloridaUpdate]):
+    """Parse a page of ACIS case search results into updates."""
+
     def parse_full(self, i: str) -> FloridaPaginatedResults[FloridaUpdate]:
+        """Parse a JSON page of case search results."""
         return FloridaPaginatedResults[FloridaUpdate].model_validate_json(i)
 
 
 class FloridaDocumentPollParser(
     FloridaPaginatedResultsParser[FloridaDocumentUpdate]
 ):
+    """Parse a page of ACIS docket entry document results into updates."""
+
     def parse_full(
         self, i: str
     ) -> FloridaPaginatedResults[FloridaDocumentUpdate]:
+        """Parse a JSON page of docket entry document results."""
         return FloridaPaginatedResults[
             FloridaDocumentUpdate
         ].model_validate_json(i)
 
 
 class Command(FLScrapeCommand, StatePollCommand):
+    """Continuously poll Florida ACIS for new and updated cases."""
+
     help = "Continuously polls Florida ACIS for new cases and backfills when new entries are detected."
 
     checkpoint_tracker: ClassVar[ScraperCheckpointTracker] = (
@@ -79,6 +93,7 @@ class Command(FLScrapeCommand, StatePollCommand):
     )
 
     def add_arguments(self, parser: CommandParser):
+        """Add the attachment download and auto-resume flags."""
         super().add_arguments(parser)
 
         parser.add_argument(
@@ -110,6 +125,11 @@ class Command(FLScrapeCommand, StatePollCommand):
         auto_resume: bool,
         **options,
     ):
+        """Poll the courts forever.
+
+        Starts from the saved checkpoint when ``auto_resume`` is set and a
+        checkpoint exists, otherwise from ``case_backfill_days`` ago.
+        """
         court_ids = self.parse_court_ids(courts)
 
         throttle, scraper, cache = self.throttle_scraper_and_cache(
@@ -164,6 +184,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         queue_name: str,
         download_attachments: bool,
     ):
+        """Queue a task to ingest a case's docket, waiting on the throttle first."""
         throttle.maybe_wait()
         # We don't have access to the bucket here, but it should only be used for logging in fl_ingest_docket_task so
         # this is fine.
@@ -183,6 +204,12 @@ class Command(FLScrapeCommand, StatePollCommand):
         queue_name: str,
         download_attachments: bool,
     ):
+        """Fetch, archive, and queue every new or updated case, then sleep and repeat forever.
+
+        Each cycle looks back ``case_backfill_days`` from the end of the last
+        cycle and saves that end date as the checkpoint. Cases that fail to
+        fetch are logged and skipped.
+        """
         scraper_courts = await scraper.courts
         external_id_map = {
             metadata.court.external_identifier: court
@@ -295,6 +322,10 @@ class Command(FLScrapeCommand, StatePollCommand):
         courts: list[FloridaCourtID],
         start: datetime,
     ) -> AsyncGenerator[FloridaUpdate]:
+        """Yield cases filed since ``start`` that have no docket yet.
+
+        Pages that fail to load are logged and skipped.
+        """
         logger.info("Checking for cases since %s", start)
         for court_id in courts:
             parser = FloridaCasePollParser(court_id=court_id.value)
@@ -336,6 +367,10 @@ class Command(FLScrapeCommand, StatePollCommand):
         courts: list[FloridaCourtID],
         start: datetime,
     ) -> AsyncGenerator[FloridaUpdate]:
+        """Yield docket entry documents filed since ``start`` that aren't saved yet.
+
+        Pages that fail to load are logged and skipped.
+        """
         parser = FloridaDocumentPollParser(court_id="fl")
         logger.info(
             "Checking docketentrydocuments endpoint for new entries since %s",

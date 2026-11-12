@@ -1,3 +1,5 @@
+"""LLM prompts for cleaning federal docket numbers."""
+
 F_EXAMPLES = """
 - "no. 8,' -> ['8']
 - 'Case Nos. 15 - 3751_1, et al.' -> ['15-3751']

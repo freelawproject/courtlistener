@@ -1,3 +1,5 @@
+"""Queue financial disclosures from a JSON file for import."""
+
 import json
 
 from cl.disclosures.models import FinancialDisclosure
@@ -40,9 +42,12 @@ def import_financial_disclosures(
 
 
 class Command(VerboseCommand):
+    """Queue financial disclosures listed in a JSON file for import."""
+
     help = "Add financial disclosures to CL database."
 
     def add_arguments(self, parser):
+        """Add the file path, skip-until, and queue options."""
         parser.add_argument(
             "--filepath",
             required=True,
@@ -64,6 +69,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue the file's disclosures for import."""
         super().handle(*args, **options)
         import_financial_disclosures(
             filepath=options["filepath"],

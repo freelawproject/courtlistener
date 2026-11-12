@@ -1,3 +1,5 @@
+"""Celery tasks for checking prayed-for documents on PACER."""
+
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from django.conf import settings

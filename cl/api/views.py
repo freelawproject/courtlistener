@@ -1,3 +1,5 @@
+"""API views for the court index, wiki coverage data, result counts, and usage reporting."""
+
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -163,6 +165,7 @@ async def get_result_count(request, version, day_count):
 
 
 async def deprecated_api(request, v):
+    """Respond with 410 Gone and a message to upgrade to the newest API version."""
     return JsonResponse(
         {
             "meta": {
@@ -529,6 +532,7 @@ class ApiUsageViewSet(ViewSet):
         return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
+        """Report the user's current throttle usage, recent usage, and membership."""
         # IsAuthenticated permission class rules out AnonymousUser at runtime.
         user = cast(User, request.user)
         return Response(

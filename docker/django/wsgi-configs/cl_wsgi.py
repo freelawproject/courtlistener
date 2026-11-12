@@ -1,3 +1,5 @@
+"""WSGI entry point for CourtListener."""
+
 import os
 import sys
 

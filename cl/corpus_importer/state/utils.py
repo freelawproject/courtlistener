@@ -1,3 +1,5 @@
+"""Results of merging scraped state data, with the files each merge handled."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -109,14 +111,17 @@ class MergeResult[T = int]:
 
     @property
     def success(self) -> bool:
+        """Whether the merge recorded no failures."""
         return not self.failures
 
     @property
     def update(self) -> bool:
+        """Whether the merge updated anything."""
         return bool(self.updates)
 
     @property
     def create(self) -> bool:
+        """Whether the merge created anything."""
         return bool(self.creates)
 
     @staticmethod

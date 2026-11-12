@@ -661,8 +661,7 @@ class RenamedLegacyTemplateTest(unittest.TestCase):
     def _main(
         self, name_status: str, files: dict[str, str]
     ) -> tuple[int, str]:
-        """Run ``main()`` on a temp repo holding ``files``; return its exit
-        code and output."""
+        """Run ``main()`` on a temp repo holding ``files``; return its exit code and output."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for rel_path, content in files.items():
@@ -780,8 +779,7 @@ class VendoredJsReadmeTest(unittest.TestCase):
 
 
 class VendoredJsReadmeMainTest(unittest.TestCase):
-    """``main()`` reads renames from ``--name-status`` and runs the check
-    even when no template or CSS file changed."""
+    """``main()`` reads renames from ``--name-status`` and runs the check even when no template or CSS file changed."""
 
     def _main(self, name_status: str) -> int:
         with tempfile.TemporaryDirectory() as tmp:

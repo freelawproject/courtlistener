@@ -1,3 +1,5 @@
+"""Factories for scraper models."""
+
 from factory import Faker
 from factory.django import DjangoModelFactory
 
@@ -5,6 +7,8 @@ from cl.scrapers.models import PACERFreeDocumentRow
 
 
 class PACERFreeDocumentRowFactory(DjangoModelFactory):
+    """Make a PACER free document report row with fake data."""
+
     class Meta:
         model = PACERFreeDocumentRow
 

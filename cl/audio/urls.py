@@ -1,3 +1,5 @@
+"""URL routes for oral argument audio pages and podcasts."""
+
 from django.urls import path, re_path
 
 from cl.audio.feeds import (

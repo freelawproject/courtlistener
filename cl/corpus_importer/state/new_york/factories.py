@@ -136,6 +136,8 @@ _ISSUES: tuple[str, ...] = (
 
 
 class NYCoAFileFactory(Factory):
+    """A downloaded appellant brief attached to a filing."""
+
     class Meta:
         model = NYCoAFile
 
@@ -220,6 +222,8 @@ class NYCoAFilingFactory(Factory):
 
 
 class NYCoAAttorneyFactory(Factory):
+    """An attorney representing a party on a Court-PASS docket."""
+
     class Meta:
         model = NYCoAAttorney
 
@@ -251,6 +255,8 @@ class NYCoAPartyFactory(Factory):
 
 
 class NYCoACaseFactory(Factory):
+    """An undecided Court of Appeals case with one issue and one filing, and no transfers."""
+
     class Meta:
         model = NYCoACase
 

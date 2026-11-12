@@ -1,3 +1,5 @@
+"""Helpers for managing Celery queues and throttling tasks."""
+
 import functools
 import inspect
 import time

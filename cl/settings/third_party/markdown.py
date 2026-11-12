@@ -1,3 +1,5 @@
+"""Settings for Markdown rendering styles."""
+
 import re
 
 MARKDOWN_DEUX_STYLES = {

@@ -1,3 +1,5 @@
+"""Factories for RECAP queues, the FJC IDB, and fake parsed PACER data."""
+
 import string
 
 from factory import DictFactory, Faker, List, SubFactory
@@ -19,6 +21,8 @@ Faker.add_provider(LegalProvider)
 
 
 class FjcIntegratedDatabaseFactory(DjangoModelFactory):
+    """Make an FJC Integrated Database row with new circuit and district courts."""
+
     class Meta:
         model = FjcIntegratedDatabase
 
@@ -28,6 +32,8 @@ class FjcIntegratedDatabaseFactory(DjangoModelFactory):
 
 
 class ProcessingQueueFactory(DjangoModelFactory):
+    """Make a RECAP upload queue item with a random upload type and an HTML file."""
+
     class Meta:
         model = ProcessingQueue
 
@@ -37,6 +43,8 @@ class ProcessingQueueFactory(DjangoModelFactory):
 
 
 class PacerFetchQueueFactory(DjangoModelFactory):
+    """Make a PACER fetch request with a random request type."""
+
     class Meta:
         model = PacerFetchQueue
 
@@ -45,6 +53,8 @@ class PacerFetchQueueFactory(DjangoModelFactory):
 
 
 class AppellateAttachmentFactory(DictFactory):
+    """Make a dict of fake appellate attachment data."""
+
     attachment_number = Faker("pyint", min_value=1, max_value=100)
     description = Faker("text", max_nb_chars=20)
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
@@ -52,6 +62,8 @@ class AppellateAttachmentFactory(DictFactory):
 
 
 class AppellateAttachmentPageFactory(DictFactory):
+    """Make a dict of fake appellate attachment page data."""
+
     attachments = List([SubFactory(AppellateAttachmentFactory)])
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
@@ -59,6 +71,8 @@ class AppellateAttachmentPageFactory(DictFactory):
 
 
 class ACMSAttachmentFactory(AppellateAttachmentFactory):
+    """Make a dict of fake ACMS attachment data."""
+
     acms_document_guid = Faker("random_id_string")
     cost = FuzzyFloat(0.1, 3.0)
     permission = Faker("text", max_nb_chars=20)
@@ -67,6 +81,8 @@ class ACMSAttachmentFactory(AppellateAttachmentFactory):
 
 
 class ACMSAttachmentPageFactory(AppellateAttachmentPageFactory):
+    """Make a dict of fake ACMS attachment page data."""
+
     entry_number = Faker("pyint", min_value=0, max_value=100)
     description = Faker("text", max_nb_chars=20)
     date_filed = Faker("date_object")
@@ -74,6 +90,8 @@ class ACMSAttachmentPageFactory(AppellateAttachmentPageFactory):
 
 
 class DocketEntryDataFactory(DictFactory):
+    """Make a dict of fake docket entry data."""
+
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=75)
     document_number = Faker("pyint", min_value=1, max_value=100)
@@ -81,10 +99,14 @@ class DocketEntryDataFactory(DictFactory):
 
 
 class DocketEntriesDataFactory(DictFactory):
+    """Make a dict holding a list of fake docket entries."""
+
     docket_entries = List([SubFactory(DocketEntryDataFactory)])
 
 
 class RECAPEmailDocketEntryDataFactory(DictFactory):
+    """Make a dict of fake docket entry data from a recap.email notification."""
+
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=75)
     document_number = Faker("pyint", min_value=1, max_value=100)
@@ -97,6 +119,8 @@ class RECAPEmailDocketEntryDataFactory(DictFactory):
 
 
 class RECAPEmailDocketDataFactory(DictFactory):
+    """Make a dict of fake docket data from a recap.email notification."""
+
     case_name = Faker("case_name")
     date_filed = Faker("date_object")
     docket_entries = List([SubFactory(RECAPEmailDocketEntryDataFactory)])
@@ -104,11 +128,15 @@ class RECAPEmailDocketDataFactory(DictFactory):
 
 
 class RECAPEmailRecipientsDataFactory(DictFactory):
+    """Make a dict of fake recap.email recipient data."""
+
     email_addresses = List([Faker("email")])
     name = Faker("name_female")
 
 
 class RECAPEmailNotificationDataFactory(DictFactory):
+    """Make a dict of fake recap.email notification data."""
+
     acms = False
     appellate = Faker("boolean")
     contains_attachments = Faker("boolean")
@@ -118,6 +146,8 @@ class RECAPEmailNotificationDataFactory(DictFactory):
 
 
 class MinuteDocketEntryDataFactory(DictFactory):
+    """Make a dict of fake minute entry data, which has no document number."""
+
     date_entered = Faker("date_object")
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=75)
@@ -128,6 +158,8 @@ class MinuteDocketEntryDataFactory(DictFactory):
 
 
 class DocketDataFactory(DictFactory):
+    """Make a dict of fake docket data with minute entries."""
+
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     case_name = Faker("case_name")
     docket_entries = List([SubFactory(MinuteDocketEntryDataFactory)])
@@ -146,6 +178,8 @@ class DocketDataFactory(DictFactory):
 
 
 class DocketWithBankruptcyDataFactory(DictFactory):
+    """Make a dict of fake docket data with bankruptcy fields."""
+
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     case_name = Faker("case_name")
     docket_number = Faker("federal_district_docket_number")
@@ -156,14 +190,20 @@ class DocketWithBankruptcyDataFactory(DictFactory):
 
 
 class DocketEntryWithAttachmentsDataFactory(MinuteDocketEntryDataFactory):
+    """Make a dict of fake minute entry data with attachment pages."""
+
     attachments = List([SubFactory(AppellateAttachmentPageFactory)])
 
 
 class DocketDataWithAttachmentsFactory(DocketDataFactory):
+    """Make a dict of fake docket data whose entries have attachment pages."""
+
     docket_entries = List([SubFactory(DocketEntryWithAttachmentsDataFactory)])
 
 
 class OriginatingCourtInformationDataFactory(DictFactory):
+    """Make a dict of fake originating court information."""
+
     assigned_to = Faker("name")
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     ordering_judge = Faker("name")

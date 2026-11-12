@@ -1,3 +1,5 @@
+"""Store unmatched citations and update their status."""
+
 import logging
 from collections.abc import Sequence
 from typing import TypeGuard

@@ -1,3 +1,5 @@
+"""Factories for OAuth applications."""
+
 from factory import Faker
 from factory.django import DjangoModelFactory
 from oauth2_provider.models import get_application_model

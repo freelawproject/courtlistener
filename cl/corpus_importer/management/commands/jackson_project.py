@@ -1,3 +1,5 @@
+"""Download the PACER dockets of Judge Ketanji Jackson's D.D.C. cases."""
+
 import os
 
 from asgiref.sync import async_to_sync
@@ -55,9 +57,12 @@ def get_dockets(options):
 
 
 class Command(VerboseCommand):
+    """Queue PACER docket downloads for Judge Jackson's cases."""
+
     help = """Get all relevant cases by a Judge Ketanji Jackson"""
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, and limit options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -79,6 +84,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue the docket downloads."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         # Get dockets for all of the relevant cases
         get_dockets(options)

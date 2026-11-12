@@ -1,3 +1,5 @@
+"""URL routes for monitoring and health check views."""
+
 from django.urls import include, path
 
 from cl.stats.views import (

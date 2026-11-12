@@ -1,3 +1,5 @@
+"""Models for citations from opinions and RECAP documents that couldn't be resolved."""
+
 import re
 from typing import Self
 
@@ -116,6 +118,8 @@ class BaseUnmatchedCitation(BaseCitation):
 
 
 class UnmatchedCitation(BaseUnmatchedCitation):
+    """A citation from an opinion that couldn't be matched."""
+
     citing_opinion: models.ForeignKey = models.ForeignKey(
         Opinion,
         help_text="The opinion citing this citation",
@@ -160,6 +164,8 @@ class UnmatchedCitation(BaseUnmatchedCitation):
 
 
 class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
+    """A citation from a RECAP document that couldn't be matched."""
+
     citing_recapdocument: models.ForeignKey = models.ForeignKey(
         RECAPDocument,
         help_text="The RECAPDocument citing this unmatched citation",

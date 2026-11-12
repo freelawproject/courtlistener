@@ -1,3 +1,5 @@
+"""Pydantic model for structured LLM case name extraction responses."""
+
 from pydantic import BaseModel
 
 

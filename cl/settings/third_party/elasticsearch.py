@@ -1,3 +1,5 @@
+"""Settings for Elasticsearch connections, indices, analysis, and search alerts."""
+
 import environ
 
 from ..django import TESTING

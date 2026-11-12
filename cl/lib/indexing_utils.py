@@ -1,3 +1,5 @@
+"""Helpers for tracking Elasticsearch indexing progress."""
+
 from collections.abc import Mapping
 from datetime import datetime
 

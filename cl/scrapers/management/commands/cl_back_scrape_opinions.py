@@ -1,3 +1,5 @@
+"""Back-scrape opinions from court sites over a range."""
+
 import asyncio
 from types import ModuleType
 
@@ -41,7 +43,10 @@ def add_backscraper_arguments(parser) -> None:
 
 
 class Command(cl_scrape_opinions.Command):
+    """Scrape opinions by walking each site's back-scrape iterable."""
+
     def add_arguments(self, parser):
+        """Add the opinion scraper options plus the back-scrape range options."""
         super().add_arguments(parser)
         add_backscraper_arguments(parser)
 
@@ -87,4 +92,5 @@ class Command(cl_scrape_opinions.Command):
                 await asyncio.sleep(wait)
 
     def save_everything(self, items, backscrape=True):
+        """Save the scraped items, marking them as back-scraped by default."""
         super().save_everything(items, backscrape)

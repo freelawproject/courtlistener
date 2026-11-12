@@ -1,3 +1,5 @@
+"""Form fields for partial dates and random sort orders."""
+
 import calendar
 import datetime
 import time
@@ -28,6 +30,8 @@ INPUT_FORMATS = [
 
 
 class ParseFloorDateMixin:
+    """Parse partial dates as the first day of the period they cover."""
+
     def _parse_floor_date(self, value):
         """Validates that the input can be converted to a date.
 
@@ -128,6 +132,7 @@ class FloorDateOrRelativeField(DateField, ParseFloorDateMixin):
     input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
+        """Parse the value as a floor date, returning unparsable values as is."""
         # Potential relative date format. It will be validated upstream.
         return self._parse_floor_date(value)
 
@@ -142,6 +147,12 @@ class FloorDateField(DateField, ParseFloorDateMixin):
     input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
+        """Parse the value as a floor date.
+
+        Raises:
+            ValidationError: If parsing gives a value that is neither None
+                nor a date.
+        """
         parsed = self._parse_floor_date(value)
         if parsed is not None and not isinstance(parsed, datetime.date):
             raise ValidationError(
@@ -160,6 +171,7 @@ class CeilingDateOrRelativeField(DateField, ParseCeilingDateMixin):
     input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
+        """Parse the value as a ceiling date, returning unparsable values as is."""
         # Potential relative date format. It will be validated upstream.
         return self._parse_ceiling_date(value)
 
@@ -174,6 +186,12 @@ class CeilingDateField(DateField, ParseCeilingDateMixin):
     input_formats = INPUT_FORMATS + formats.get_format("DATE_INPUT_FORMATS")
 
     def to_python(self, value):
+        """Parse the value as a ceiling date.
+
+        Raises:
+            ValidationError: If parsing gives a value that is neither None
+                nor a date.
+        """
         parsed = self._parse_ceiling_date(value)
         if parsed is not None and not isinstance(parsed, datetime.date):
             raise ValidationError(
@@ -186,6 +204,11 @@ class RandomChoiceField(ChoiceField):
     """A choice field, but it allows any value that starts with 'random_'."""
 
     def validate(self, value):
+        """Validate the value as a choice, also allowing values starting with ``random_``.
+
+        Raises:
+            ValidationError: If the value is invalid.
+        """
         super(ChoiceField, self).validate(value)
         if value and not self.valid_value(value):
             if value.startswith("random_"):

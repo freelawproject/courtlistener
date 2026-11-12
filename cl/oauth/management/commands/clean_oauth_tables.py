@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class Command(VerboseCommand):
+    """Clear expired OAuth grants and tokens."""
+
     help = "Clear expired OAuth grants and tokens."
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Clear expired grants and tokens and log how long it took."""
         super().handle(*args, **options)
         start = time.monotonic()
         clear_expired()

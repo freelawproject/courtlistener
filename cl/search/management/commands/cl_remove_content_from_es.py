@@ -1,3 +1,5 @@
+"""Remove non-RECAP dockets, or opinions in a date range, from Elasticsearch."""
+
 from collections.abc import Iterable
 from datetime import date, datetime
 
@@ -25,13 +27,17 @@ def compose_redis_key_remove_content() -> str:
 
 
 class Command(VerboseCommand):
+    """Run a removal action against the Elasticsearch indices."""
+
     help = "Remove content from an ES index."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the queue, chunk, resume, action, date range, testing, and rate options."""
         parser.add_argument(
             "--queue",
             type=str,
@@ -94,6 +100,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen removal action.
+
+        ``non-recap-dockets`` queues removal of dockets without a RECAP
+        source. ``opinions-removal`` schedules removal of opinions in the
+        date range, and does nothing without both dates. Without an action,
+        nothing is removed.
+        """
         super().handle(*args, **options)
         self.options = options
         start_date: date | None = options.get("start_date", None)

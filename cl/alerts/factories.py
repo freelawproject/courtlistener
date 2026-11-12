@@ -1,3 +1,5 @@
+"""Factories for search and docket alerts."""
+
 from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
@@ -8,6 +10,8 @@ from cl.users.factories import UserFactory
 
 
 class DocketAlertFactory(DjangoModelFactory):
+    """Make a docket alert for a new user."""
+
     class Meta:
         model = DocketAlert
 
@@ -27,6 +31,8 @@ class DocketAlertWithParentsFactory(DocketAlertFactory):
 
 
 class AlertFactory(DjangoModelFactory):
+    """Make a search alert with a random rate for a new user."""
+
     class Meta:
         model = Alert
 

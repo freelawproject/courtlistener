@@ -1,3 +1,5 @@
+"""New York court ID, docket number, and vocabulary code helpers."""
+
 import logging
 import re
 

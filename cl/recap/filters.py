@@ -1,3 +1,5 @@
+"""REST API filters for RECAP queues and the FJC Integrated Database."""
+
 from cl.api.utils import (
     BASIC_TEXT_LOOKUPS,
     DATE_LOOKUPS,
@@ -13,6 +15,8 @@ from cl.recap.models import (
 
 
 class ProcessingQueueFilter(NoEmptyFilterSet):
+    """Filter RECAP uploads by court, docket, case ID, status, type, and date."""
+
     class Meta:
         model = ProcessingQueue
         fields = {
@@ -26,6 +30,8 @@ class ProcessingQueueFilter(NoEmptyFilterSet):
 
 
 class EmailProcessingQueueFilter(NoEmptyFilterSet):
+    """Filter recap.email queue items by status, court, documents, and date."""
+
     class Meta:
         model = EmailProcessingQueue
         fields = {
@@ -37,6 +43,8 @@ class EmailProcessingQueueFilter(NoEmptyFilterSet):
 
 
 class PacerFetchQueueFilter(NoEmptyFilterSet):
+    """Filter PACER fetch requests by status, type, court, docket, and document."""
+
     class Meta:
         model = PacerFetchQueue
         fields = {
@@ -51,6 +59,8 @@ class PacerFetchQueueFilter(NoEmptyFilterSet):
 
 
 class FjcIntegratedDatabaseFilter(NoEmptyFilterSet):
+    """Filter FJC Integrated Database rows by their case fields."""
+
     class Meta:
         model = FjcIntegratedDatabase
         fields = {

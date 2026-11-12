@@ -1,3 +1,5 @@
+"""URL routes for visualization pages."""
+
 from django.urls import path, re_path
 
 from cl.visualizations.views import (

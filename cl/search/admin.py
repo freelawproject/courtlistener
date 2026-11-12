@@ -1,3 +1,5 @@
+"""Django admin configuration for search models."""
+
 from typing import Any
 
 from admin_cursor_paginator import CursorPaginatorAdmin
@@ -62,6 +64,8 @@ from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 
 @admin.register(Opinion)
 class OpinionAdmin(CursorPaginatorAdmin):
+    """Admin for opinions."""
+
     raw_id_fields = (
         "cluster",
         "author",
@@ -80,11 +84,14 @@ class OpinionAdmin(CursorPaginatorAdmin):
     )
 
     def get_queryset(self, request):
+        """Get the opinions with their clusters."""
         return super().get_queryset(request).select_related("cluster")
 
 
 @admin.register(OpinionContent)
 class OpinionContentAdmin(CursorPaginatorAdmin):
+    """Admin for opinion content."""
+
     raw_id_fields = ("opinion",)
     search_fields = ("content",)
     readonly_fields = (
@@ -97,6 +104,8 @@ class OpinionContentAdmin(CursorPaginatorAdmin):
 
 @admin.register(Citation)
 class CitationAdmin(CursorPaginatorAdmin):
+    """Admin for citations."""
+
     raw_id_fields = ("cluster",)
     list_display = (
         "__str__",
@@ -111,12 +120,16 @@ class CitationAdmin(CursorPaginatorAdmin):
 
 
 class CitationInline(admin.TabularInline):
+    """Inline for editing a cluster's citations."""
+
     model = Citation
     extra = 1
 
 
 @admin.register(OpinionCluster)
 class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
+    """Admin for opinion clusters, with their citations inline."""
+
     change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
@@ -331,6 +344,8 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
 
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
+    """Admin for courts."""
+
     list_display = (
         "full_name",
         "short_name",
@@ -353,6 +368,8 @@ class CourtAdmin(admin.ModelAdmin):
 
 @admin.register(Courthouse)
 class CourthouseAdmin(admin.ModelAdmin):
+    """Admin for courthouses."""
+
     list_display = (
         "court",
         "building_name",
@@ -367,28 +384,38 @@ class CourthouseAdmin(admin.ModelAdmin):
 
 
 class ClaimHistoryInline(admin.StackedInline):
+    """Inline for editing a claim's history."""
+
     model = ClaimHistory
     extra = 1
 
 
 @admin.register(Claim)
 class ClaimAdmin(CursorPaginatorAdmin):
+    """Admin for bankruptcy claims, with their history inline."""
+
     raw_id_fields = ("docket", "tags")
 
     inlines = (ClaimHistoryInline,)
 
 
 class BankruptcyInformationInline(admin.StackedInline):
+    """Inline for editing a docket's bankruptcy information."""
+
     model = BankruptcyInformation
 
 
 @admin.register(BankruptcyInformation)
 class BankruptcyInformationAdmin(admin.ModelAdmin):
+    """Admin for bankruptcy information."""
+
     raw_id_fields = ("docket",)
 
 
 @admin.register(CaseTransfer)
 class CaseTransferAdmin(CursorPaginatorAdmin):
+    """Admin for case transfers between dockets."""
+
     raw_id_fields = (
         "origin_court",
         "origin_docket",
@@ -422,6 +449,8 @@ class CaseTransferAdmin(CursorPaginatorAdmin):
 class RECAPDocumentAdmin(
     IndexedPkSearchMixin, SealableDocumentAdmin, CursorPaginatorAdmin
 ):
+    """Admin for RECAP documents, with actions to seal them."""
+
     change_form_template = "admin/change_form_with_custom_links.html"
     search_fields = (
         "pk",
@@ -443,14 +472,18 @@ class RECAPDocumentAdmin(
     seal_change_url_name = "admin:search_recapdocument_change"
 
     def get_seal_documents(self, obj):
+        """Seal just the document itself."""
         return [obj]
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Seal the selected documents and report the result."""
         self._seal_and_report(request, queryset=queryset)
 
 
 class RECAPDocumentInline(admin.StackedInline):
+    """Inline for editing a docket entry's RECAP documents."""
+
     model = RECAPDocument
     extra = 1
 
@@ -463,6 +496,8 @@ class RECAPDocumentInline(admin.StackedInline):
 
 @admin.register(DocketEntry)
 class DocketEntryAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+    """Admin for docket entries, with actions to seal their documents."""
+
     change_form_template = "admin/change_form_with_custom_links.html"
     inlines = (RECAPDocumentInline,)
     search_help_text = (
@@ -497,6 +532,7 @@ class DocketEntryAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
     seal_change_url_name = "admin:search_docketentry_change"
 
     def get_seal_documents(self, obj):
+        """Get all the entry's RECAP documents, ordered by document and attachment number."""
         return list(
             obj.recap_documents.all().order_by(
                 "document_number", "attachment_number"
@@ -507,20 +543,25 @@ class DocketEntryAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
     def seal_docket_entry_documents(
         self, request: HttpRequest, queryset: QuerySet
     ) -> None:
+        """Seal the RECAP documents of the selected entries and report the result."""
         docs = RECAPDocument.objects.filter(docket_entry__in=queryset)
         self._seal_and_report(request, queryset=docs)
 
     @admin.display(description="Docket entry")
     def get_pk(self, obj):
+        """Display the entry's primary key."""
         return obj.pk
 
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
+        """Display the entry's description truncated to 35 characters."""
         return trunc(obj.description, 35, ellipsis="...")
 
 
 @admin.register(OriginatingCourtInformation)
 class OriginatingCourtInformationAdmin(admin.ModelAdmin):
+    """Admin for originating court information."""
+
     raw_id_fields = (
         "assigned_to",
         "ordering_judge",
@@ -529,6 +570,8 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
+    """Admin for dockets, with their bankruptcy information inline."""
+
     change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     list_display = (
@@ -589,6 +632,8 @@ class DocketAdmin(CursorPaginatorAdmin):
 
 @admin.register(TrialCourtData)
 class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    """Admin for trial court data."""
+
     raw_id_fields = (
         "docket",
         "judge",
@@ -613,6 +658,8 @@ class TrialCourtDataAdmin(CursorPaginatorAdmin):
 
 @admin.register(OpinionsCited)
 class OpinionsCitedAdmin(CursorPaginatorAdmin):
+    """Admin for citations between opinions."""
+
     raw_id_fields = (
         "citing_opinion",
         "cited_opinion",
@@ -622,6 +669,8 @@ class OpinionsCitedAdmin(CursorPaginatorAdmin):
 
 @admin.register(Parenthetical)
 class ParentheticalAdmin(CursorPaginatorAdmin):
+    """Admin for parentheticals."""
+
     raw_id_fields = (
         "describing_opinion",
         "described_opinion",
@@ -632,6 +681,8 @@ class ParentheticalAdmin(CursorPaginatorAdmin):
 
 @admin.register(ParentheticalGroup)
 class ParentheticalGroupAdmin(CursorPaginatorAdmin):
+    """Admin for parenthetical groups."""
+
     raw_id_fields = (
         "opinion",
         "representative",
@@ -640,6 +691,8 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
 
 @admin.register(SearchQuery)
 class SearchQueryAdmin(CursorPaginatorAdmin):
+    """Admin for logged search queries."""
+
     raw_id_fields = ("user",)
     list_display = ("__str__", "engine", "source", "query_mode")
     list_filter = ("engine", "source", "query_mode")
@@ -648,6 +701,8 @@ class SearchQueryAdmin(CursorPaginatorAdmin):
 
 @admin.register(ClusterRedirection)
 class ClusterRedirectionAdmin(admin.ModelAdmin):
+    """Admin for redirections from deleted clusters, which can't be deleted here."""
+
     raw_id_fields = ("cluster",)
     list_display = (
         "pk",
@@ -673,11 +728,15 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 
 @admin.register(ScotusDocketMetadata)
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
+    """Admin for SCOTUS docket metadata."""
+
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
 
 
 class SCOTUSDocumentInline(admin.StackedInline):
+    """Inline for editing a SCOTUS docket entry's documents."""
+
     model = SCOTUSDocument
     extra = 1
 
@@ -689,6 +748,8 @@ class SCOTUSDocumentInline(admin.StackedInline):
 
 @admin.register(SCOTUSDocketEntry)
 class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
+    """Admin for SCOTUS docket entries, with their documents inline."""
+
     inlines = (SCOTUSDocumentInline,)
     search_help_text = (
         "Search SCOTUSDocketEntries by Docket ID or sequence number."
@@ -713,15 +774,19 @@ class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
 
     @admin.display(description="Docket entry")
     def get_pk(self, obj):
+        """Display the entry's primary key."""
         return obj.pk
 
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
+        """Display the entry's description truncated to 35 characters."""
         return trunc(obj.description, 35, ellipsis="...")
 
 
 @admin.register(SCOTUSDocument)
 class SCOTUSDocumentAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
+    """Admin for SCOTUS documents."""
+
     search_fields = (
         "pk",
     )  # Required for search box; actual search handled by IndexedPkSearchMixin
@@ -735,6 +800,8 @@ class SCOTUSDocumentAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
 
 
 class TexasDocumentInline(admin.StackedInline):
+    """Inline for editing a Texas docket entry's documents."""
+
     model = TexasDocument
     extra = 1
 
@@ -746,6 +813,8 @@ class TexasDocumentInline(admin.StackedInline):
 
 @admin.register(TexasDocument)
 class TexasDocumentAdmin(CursorPaginatorAdmin):
+    """Admin for Texas documents."""
+
     search_fields = ("media_version_id",)
     search_help_text = (
         "Search by Texas Document media version ID (exact match)."
@@ -760,6 +829,8 @@ class TexasDocumentAdmin(CursorPaginatorAdmin):
 
 @admin.register(TexasDocketEntry)
 class TexasDocketEntryAdmin(CursorPaginatorAdmin):
+    """Admin for Texas docket entries, with their documents inline."""
+
     inlines = (TexasDocumentInline,)
     search_help_text = (
         "Search TexasDocketEntries by Docket ID or sequence number."
@@ -787,18 +858,23 @@ class TexasDocketEntryAdmin(CursorPaginatorAdmin):
 
     @admin.display(description="Texas docket entry")
     def get_pk(self, obj):
+        """Display the entry's primary key."""
         return obj.pk
 
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
+        """Display the entry's description truncated to 35 characters."""
         return trunc(obj.description, 35, ellipsis="...")
 
     @admin.display(description="Remarks")
     def get_trunc_remarks(self, obj):
+        """Display the entry's remarks truncated to 35 characters."""
         return trunc(obj.remarks, 35, ellipsis="...")
 
 
 class FloridaDocumentInline(admin.StackedInline):
+    """Inline for editing a Florida docket entry's documents."""
+
     model = FloridaDocument
     extra = 1
 
@@ -810,6 +886,8 @@ class FloridaDocumentInline(admin.StackedInline):
 
 @admin.register(FloridaDocument)
 class FloridaDocumentAdmin(CursorPaginatorAdmin):
+    """Admin for Florida documents."""
+
     search_fields = ("link_uuid",)
     search_help_text = "Search by Florida Document link UUID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
@@ -822,6 +900,8 @@ class FloridaDocumentAdmin(CursorPaginatorAdmin):
 
 @admin.register(FloridaDocketEntry)
 class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
+    """Admin for Florida docket entries, with their documents inline."""
+
     inlines = (FloridaDocumentInline,)
     search_help_text = (
         "Search FloridaDocketEntries by Docket ID or docket entry UUID."
@@ -851,14 +931,18 @@ class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
 
     @admin.display(description="Florida docket entry")
     def get_pk(self, obj):
+        """Display the entry's primary key."""
         return obj.pk
 
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
+        """Display the entry's description, if any, truncated to 35 characters."""
         return trunc(obj.description or "", 35, ellipsis="...")
 
 
 class NYCoADocketIssueInline(admin.StackedInline):
+    """Inline for editing a NYCoAdocket's issues."""
+
     model = NYCoADocketIssue
     extra = 1
 
@@ -870,6 +954,8 @@ class NYCoADocketIssueInline(admin.StackedInline):
 
 @admin.register(NYCoADocketMetadata)
 class NYCoADocketMetadataAdmin(CursorPaginatorAdmin):
+    """Admin for NYCoAdocket metadata, with its issues inline."""
+
     inlines = (NYCoADocketIssueInline,)
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
@@ -880,6 +966,8 @@ class NYCoADocketMetadataAdmin(CursorPaginatorAdmin):
 
 
 class NYCoADocumentInline(admin.StackedInline):
+    """Inline for editing a NYCoAdocket entry's documents."""
+
     model = NYCoADocument
     extra = 1
 
@@ -891,6 +979,8 @@ class NYCoADocumentInline(admin.StackedInline):
 
 @admin.register(NYCoADocument)
 class NYCoADocumentAdmin(CursorPaginatorAdmin):
+    """Admin for NYCoAdocuments."""
+
     search_fields = ("file_name",)
     search_help_text = "Search by NYCoA Document file name."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
@@ -907,11 +997,14 @@ class NYCoADocumentAdmin(CursorPaginatorAdmin):
 
     @admin.display(description="NYCoA document")
     def get_pk(self, obj):
+        """Display the document's primary key."""
         return obj.pk
 
 
 @admin.register(NYCoADocketEntry)
 class NYCoADocketEntryAdmin(CursorPaginatorAdmin):
+    """Admin for NYCoAdocket entries, with their documents inline."""
+
     inlines = (NYCoADocumentInline,)
     search_help_text = (
         "Search NYCoADocketEntries by Docket ID or Court-PASS entry ID."
@@ -940,4 +1033,5 @@ class NYCoADocketEntryAdmin(CursorPaginatorAdmin):
 
     @admin.display(description="NYCoA docket entry")
     def get_pk(self, obj):
+        """Display the entry's primary key."""
         return obj.pk

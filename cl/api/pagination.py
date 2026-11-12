@@ -1,3 +1,5 @@
+"""REST API paginators for database and Elasticsearch results."""
+
 import datetime
 from base64 import b64decode, b64encode
 from collections import defaultdict
@@ -51,6 +53,7 @@ class VersionBasedPagination(PageNumberPagination):
     count = 0
 
     def __init__(self):
+        """Build the paginator with a cursor paginator of the same page size."""
         super().__init__()
         self.cursor_paginator = CursorPagination()
         self.cursor_paginator.page_size = self.page_size
@@ -112,6 +115,11 @@ class VersionBasedPagination(PageNumberPagination):
         )
 
     def get_paginated_response(self, data):
+        """Build the paginated response for the page.
+
+        Count requests get only the count. Cursor-paginated responses include
+        a URL for fetching the count.
+        """
         if self.is_count_request:
             return Response({"count": self.count})
 
@@ -244,11 +252,15 @@ class VersionBasedPagination(PageNumberPagination):
 
 
 class MediumAdjustablePagination(VersionBasedPagination):
+    """Pages of 50 results, adjustable with the ``page_size`` parameter."""
+
     page_size = 50
     page_size_query_param = "page_size"
 
 
 class BigPagination(VersionBasedPagination):
+    """Pages of 300 results."""
+
     page_size = 300
 
 
@@ -272,6 +284,11 @@ class ESCursorPagination(BasePagination):
     def initialize_context_from_request(
         self, request, search_type
     ) -> datetime.date:
+        """Set up the paginator's state from the request and its cursor.
+
+        Returns:
+            The request date from the cursor, or today on the first page.
+        """
         self.base_url = request.build_absolute_uri()
         self.request = request
         self.search_type = search_type

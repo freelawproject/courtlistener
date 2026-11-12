@@ -1,3 +1,5 @@
+"""Download dockets and attachment pages for the 760 project."""
+
 import argparse
 import csv
 import os
@@ -89,6 +91,7 @@ def get_dockets(options):
 
 
 def get_att_pages(options):
+    """Get the attachment pages of the project's district and bankruptcy documents."""
     rd_pks = RECAPDocument.objects.filter(
         tags__name=TAG,
         docket_entry__docket__court__jurisdiction__in=[
@@ -105,6 +108,8 @@ def get_att_pages(options):
 
 
 class Command(VerboseCommand):
+    """Run one of the 760 project's download tasks."""
+
     help = "Look up dockets from a spreadsheet for a client and download them."
 
     allowed_tasks = [
@@ -114,6 +119,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, task, and CSV file options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -147,6 +153,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task.
+
+        Raises:
+            argparse.ArgumentError: If a docket task is run without a file.
+        """
         super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] in ["district", "appellate"]:

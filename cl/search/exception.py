@@ -1,3 +1,5 @@
+"""Exceptions for invalid search queries and Elasticsearch errors."""
+
 from enum import Enum
 from http import HTTPStatus
 
@@ -7,15 +9,20 @@ from rest_framework.exceptions import APIException
 
 
 class QueryType(Enum):
+    """The part of a search where a syntax error was found."""
+
     QUERY_STRING = "QUERY_STRING"
     FILTER = "FILTER"
 
 
 class SyntaxQueryError(SerializationError):
+    """Base error for a search with invalid syntax."""
+
     QUERY_STRING = QueryType.QUERY_STRING
     FILTER = QueryType.QUERY_STRING.FILTER
 
     def __init__(self, error_type):
+        """Record the kind of error in the search."""
         self.error_type = error_type
 
 
