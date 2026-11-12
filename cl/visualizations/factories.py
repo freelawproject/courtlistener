@@ -1,3 +1,5 @@
+"""Factories for SCOTUS network visualizations and their JSON versions."""
+
 from factory import Faker, RelatedFactory, SubFactory
 from factory.django import DjangoModelFactory
 
@@ -7,6 +9,8 @@ from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
 class VisualizationFactory(DjangoModelFactory):
+    """Make a visualization with a new user, start and end clusters, and a JSON version."""
+
     class Meta:
         model = SCOTUSMap
 
@@ -27,5 +31,7 @@ class VisualizationFactory(DjangoModelFactory):
 
 
 class JSONVersionFactory(DjangoModelFactory):
+    """Make a visualization JSON version."""
+
     class Meta:
         model = JSONVersion
