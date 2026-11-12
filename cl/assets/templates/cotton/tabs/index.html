@@ -6,16 +6,29 @@
 <c-vars label="" tabs="" active_tab="" class="" />
 
 {% if tabs.0.url %}
-  <div class="w-full {{ class }}">
-    <nav aria-label="{{ label }}">
-      <ul role="list" class="flex gap-1">
-        {% for tab in tabs %}
-          <c-tabs.tab :tab="tab" :active_tab="active_tab" />
-        {% endfor %}
-      </ul>
-    </nav>
-    {{ slot }}
-  </div>
+  {% require_script "js/third_party/htmx" defer=True %}
+  {% with tabs_id=label|slugify|add:"-tabs" %}
+    <div
+      id="{{ tabs_id }}"
+      class="w-full {{ class }}"
+      hx-history="false"
+    >
+      <nav
+        aria-label="{{ label }}"
+        hx-boost="true"
+        hx-target="#{{ tabs_id }}"
+        hx-select="#{{ tabs_id }}"
+        hx-swap="outerHTML show:none"
+      >
+        <ul role="list" class="flex gap-1">
+          {% for tab in tabs %}
+            <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
+          {% endfor %}
+        </ul>
+      </nav>
+      {{ slot }}
+    </div>
+  {% endwith %}
 {% else %}
   <div x-data="tabsComponent" class="w-full {{ class }}">
     {# DESKTOP tabs #}

@@ -1,9 +1,14 @@
 {% load svg_tags %}
 
-<c-vars tab active_tab="" />
+<c-vars tab tabs_id="" active_tab="" />
 
 <li class="text-greyscale-600 {% if tab.key == active_tab %}border-b-2{% endif %}">
-  <a href="{{ tab.url }}" class="flex gap-2 pt-1 pb-3 py-[10px]"{% if tab.key == active_tab %} aria-current="page"{% endif %}>
+  <a
+    href="{{ tab.url }}"
+    class="flex gap-2 pt-1 pb-3 py-[10px]"
+    {% if tab.key == active_tab %} aria-current="page"{% endif %}
+    id="{{ tabs_id }}-tab-{{ tab.key }}"
+  >
     <span class="{% if tab.key == active_tab %}text-greyscale-900{% endif %}">{{ tab.label }}</span>
     {% if tab.icon %}
       {% svg tab.icon aria_hidden="true" %}
