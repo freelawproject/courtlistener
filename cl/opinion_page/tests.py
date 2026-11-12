@@ -94,6 +94,7 @@ from cl.opinion_page.utils import (
     es_get_cited_clusters_with_cache,
     es_get_related_clusters_with_cache,
     generate_docket_entries_csv_data,
+    is_source_hidden,
     make_docket_title,
 )
 from cl.opinion_page.views import (
@@ -2051,6 +2052,38 @@ class DocketSourceEmptyMessageTest(SimpleTestCase):
         for source in sources:
             with self.subTest(component=source.component):
                 self.assertTrue(source.empty_message.strip())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_is_source_hidden_waffle")
+class IsSourceHiddenTest(TestCase):
+    """Does is_source_hidden hide a source only while its own flag is off?"""
+
+    def setUp(self) -> None:
+        self.request = RequestFactory().get("/")
+        self.request.user = AnonymousUser()
+
+    def test_source_without_flag_is_never_hidden(self) -> None:
+        """Is a source with no launch_flag, like RECAP, always shown?"""
+        self.assertIsNone(docket_entry_sources.RECAP.launch_flag)
+        self.assertFalse(
+            async_to_sync(is_source_hidden)(
+                self.request, docket_entry_sources.RECAP
+            )
+        )
+
+    def test_source_with_flag_follows_the_flag(self) -> None:
+        """Is SCOTUS hidden while scotus_docket_page is off and shown once it's on?"""
+        for active in (False, True):
+            with (
+                self.subTest(flag_active=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                self.assertEqual(
+                    async_to_sync(is_source_hidden)(
+                        self.request, docket_entry_sources.SCOTUS
+                    ),
+                    not active,
+                )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")

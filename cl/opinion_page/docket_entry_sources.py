@@ -225,6 +225,11 @@ class DocketEntrySource:
     document under its entry. A source returns False for documents that
     only exist to index their entry, like SCOTUS placeholders.
 
+    ``launch_flag`` names the flag that hides this source's dockets until
+    launch, or None when they are public. While the flag is off for a
+    request, every docket and document page of the source returns a 404;
+    see ``is_source_hidden`` in cl.opinion_page.utils.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -267,6 +272,7 @@ class DocketEntrySource:
     metadata_sections: Callable[[Docket], list[MetadataSection]] = (
         _no_metadata_sections
     )
+    launch_flag: str | None = None
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -676,6 +682,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
         document="scotusdocument",
     ),
     admin_document_label="SCOTUS Document",
+    launch_flag="scotus_docket_page",
 )
 
 # Courts whose dockets use a source other than RECAP. source_for_court_id

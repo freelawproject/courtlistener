@@ -39,7 +39,6 @@ from cl.lib.model_helpers import choices_to_csv
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
-from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
@@ -831,6 +830,26 @@ class CoreDocketDataDict(TypedDict):
     tabs: list[dict[str, str]]
 
 
+async def is_source_hidden(
+    request: HttpRequest, source: DocketEntrySource
+) -> bool:
+    """Return whether a docket source is still hidden for this request.
+
+    Sources that haven't launched yet name a waffle flag in
+    ``DocketEntrySource.launch_flag``. Views MUST answer 404 for their
+    dockets and documents while this returns True.
+
+    Args:
+        request: The request being served.
+        source: The source of the docket being shown.
+    """
+    if not source.launch_flag:
+        return False
+    return not await sync_to_async(waffle.flag_is_active)(
+        request, source.launch_flag
+    )
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
@@ -842,14 +861,10 @@ async def core_docket_data(
     """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
-    is_scotus = source is docket_entry_sources.SCOTUS
 
-    # SCOTUS content is made available using a waffle flag:
-    # every docket-related view shares this helper, so access
-    # control resides here.
-    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
-        request, "scotus_docket_page"
-    ):
+    # Every docket-related view shares this helper, so access control for
+    # sources that haven't launched yet resides here.
+    if await is_source_hidden(request, source):
         raise Http404("Docket not found.")
 
     title = make_docket_title(docket)
