@@ -18,7 +18,7 @@ import logging
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Final
+from typing import Final
 
 from django.utils import timezone
 from redis import Redis
@@ -224,7 +224,7 @@ class LoadLedger:
         except Exception:
             logger.exception("Could not dispatch row %s to %s", row, self.key)
 
-    def merged(self, row: int, result: MergeResult[Any]) -> None:
+    def merged(self, row: int, result: MergeResult) -> None:
         """Record that `row` merged cleanly, and what its merge wrote.
 
         Args:
@@ -233,7 +233,7 @@ class LoadLedger:
         """
         self._settle(row, "merged", result)
 
-    def rejected(self, row: int, result: MergeResult[Any]) -> None:
+    def rejected(self, row: int, result: MergeResult) -> None:
         """Record that `row`'s merge failed.
 
         Args:
@@ -384,7 +384,7 @@ class LoadLedger:
         )
 
     def _settle(
-        self, row: int, outcome: str, result: MergeResult[Any] | None
+        self, row: int, outcome: str, result: MergeResult | None
     ) -> None:
         """Take `row` off the pending hash and count what its merge did."""
         try:

@@ -5523,7 +5523,7 @@ def fl_ingest_docket_task(
     task: Task,
     download_result: tuple[bytes | FloridaCase, str, str],
     download_attachments: bool = True,
-) -> MergeResult[Any]:
+) -> MergeResult:
     """Task to parse and merge a Florida docket.
 
     Args:

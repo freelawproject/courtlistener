@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from django.db.models import Model
 from juriscraper.state.docket import (
@@ -12,13 +12,18 @@ from juriscraper.state.docket import Party as ScrapeParty
 from cl.corpus_importer.state.common.docket_entry import DocketEntryMerger
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Constant,
+    Fn,
     ManyStrategy,
     ManyToManyRelation,
     Merger,
     OneToManyRelation,
+    Params,
+    Scrape,
+    WithStrategy,
     overwrite,
 )
+from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Party
 from cl.search.models import Docket
 
@@ -55,7 +60,10 @@ def PartyRelation(
     existing links and roles.
     """
     return ManyToManyRelation(
-        merger, party_type, transform, strategy=ManyStrategy.DISASSOCIATE
+        merger,
+        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        party_type,
+        strategy=ManyStrategy.DISASSOCIATE,
     )
 
 
@@ -67,7 +75,7 @@ def DocketEntryRelation(
 ) -> list[Any]:
     return OneToManyRelation(
         merger,
-        transform,
+        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
         strategy=strategy,
     )
 
@@ -79,29 +87,21 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
 
     atomic = True
 
-    source: int = Attribute(
-        lambda _, params: Docket.SCRAPER,
-        strategy=add_scraper_source,
+    source: int = WithStrategy(Constant(Docket.SCRAPER), add_scraper_source)
+    date_filed: date | None = WithStrategy(
+        Scrape(ScrapeDocket).date_filed, overwrite
     )
-    date_filed: date | None = Attribute(
-        lambda d, params: d.date_filed,
-        strategy=overwrite,
+    case_name: str = WithStrategy(Scrape(ScrapeDocket).case_name, overwrite)
+    case_name_full: str = WithStrategy(
+        Scrape(ScrapeDocket).case_name_full, overwrite
     )
-    case_name: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
+    case_name_short: str = WithStrategy(
+        Scrape(ScrapeDocket).case_name_short, overwrite
     )
-    case_name_full: str = Attribute(
-        lambda d, params: d.case_name_full,
-        strategy=overwrite,
+    docket_number: str | None = WithStrategy(
+        Scrape(ScrapeDocket).docket_number, overwrite
     )
-    case_name_short: str = Attribute(
-        lambda d, params: d.case_name_short, strategy=overwrite
-    )
-    docket_number: str = Attribute(
-        lambda d, params: d.docket_number,
-        strategy=overwrite,
-    )
-    docket_number_raw: str = Attribute(
-        lambda d, params: d.docket_number, strategy=overwrite
+    docket_number_raw: str = WithStrategy(
+        Scrape(ScrapeDocket).docket_number, overwrite
     )
     parties: list[Party] = PartyRelation()
