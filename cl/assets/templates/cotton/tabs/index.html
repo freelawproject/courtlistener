@@ -14,6 +14,9 @@
       x-data="tabsComponent"
       x-on:htmx:before-request="startRequest"
       x-on:htmx:after-request="endRequest"
+      x-on:htmx:send-error="handleSendError"
+      x-on:htmx:response-error="handleResponseError"
+      x-on:htmx:before-swap="handleBeforeSwap"
       hx-history="false"
     >
       <nav
