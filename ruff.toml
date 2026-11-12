@@ -54,8 +54,6 @@ docstring-code-format = true
 "**/bench_*.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/migrations/**" = ["D"]
 # Legacy undocumented code exempt from docstring rules; remove a file once it is documented.
-".github/scripts/frontend_checks.py" = ["D101", "D103", "D205", "D301"]
-".github/scripts/test_frontend_checks.py" = ["D205", "D209"]
 "cl/ai/admin.py" = ["D100", "D101", "D102"]
 "cl/ai/llm_providers/google.py" = ["D100"]
 "cl/ai/management/commands/check_gemini_batch_status.py" = ["D101", "D102"]
