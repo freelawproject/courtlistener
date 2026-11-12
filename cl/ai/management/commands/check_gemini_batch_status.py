@@ -1,5 +1,4 @@
-"""
-Check the status of in-progress Google Gemini batch jobs and download results when complete.
+"""Check the status of in-progress Google Gemini batch jobs and download results when complete.
 
 This command queries all LLMRequest objects for Google Gemini provider with status
 IN_PROGRESS and checks their batch job status with the Google GenAI API. When a
@@ -97,9 +96,10 @@ def process_succeeded_request(
 
     Wrapped in an atomic transaction so a partial failure rolls back cleanly.
 
-    :param wrapper: Google GenAI batch wrapper used to download results.
-    :param request: The LLMRequest whose batch job succeeded.
-    :param job: The batch job object returned by the provider API.
+    Args:
+        wrapper: Google GenAI batch wrapper used to download results.
+        request: The LLMRequest whose batch job succeeded.
+        job: The batch job object returned by the provider API.
     """
     jsonl_content = wrapper.download_results(job)
     processed_results = wrapper.process_results(jsonl_content)
@@ -174,9 +174,10 @@ def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
 
     Wrapped in an atomic transaction so all updates succeed or fail together.
 
-    :param request: The LLMRequest to mark as failed.
-    :param job_state_name: The terminal job state name (e.g.
-        ``JOB_STATE_FAILED``) included in task error messages.
+    Args:
+        request: The LLMRequest to mark as failed.
+        job_state_name: The terminal job state name (e.g.
+            ``JOB_STATE_FAILED``) included in task error messages.
     """
     with transaction.atomic():
         request.tasks.all().update(
@@ -199,8 +200,9 @@ def handle_request(
     (reported to Sentry) to ensure one failing request doesn't stop
     processing of subsequent requests.
 
-    :param wrapper: Google GenAI batch wrapper used to query job status.
-    :param request: The in-progress LLMRequest to check.
+    Args:
+        wrapper: Google GenAI batch wrapper used to query job status.
+        request: The in-progress LLMRequest to check.
     """
     try:
         job = wrapper.get_job(request.batch_id)

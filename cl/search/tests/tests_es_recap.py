@@ -12,7 +12,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin, messages
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -27,6 +27,7 @@ from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     enrich_scotus_attachments,
 )
+from cl.favorites.factories import NoteFactory
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_search_feed_query,
@@ -92,6 +93,7 @@ from cl.search.es_docket_sources import (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
     SOURCE_BY_MODEL,
+    recap_search_courts,
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -133,6 +135,8 @@ from cl.search.signals import (
 from cl.search.tasks import (
     es_save_document,
     index_docket_parties_in_es,
+    index_parent_and_child_docs,
+    index_parent_or_child_docs_in_es,
     index_related_cites_fields,
     update_children_docs_by_query,
     update_es_document,
@@ -150,9 +154,7 @@ from cl.tests.cases import (
 
 
 class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
-    """
-    RECAP Search Tests
-    """
+    """RECAP Search Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -358,7 +360,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     def test_child_and_parent_filter_queries(self) -> None:
         """Test has_child filters method."""
-
         # Filter by parent field, court.
         cd = {
             "type": SEARCH_TYPES.RECAP,
@@ -425,8 +426,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     async def test_recap_dockets_search_type(self) -> None:
-        """Confirm dockets search type works properly"""
-
+        """Confirm dockets search type works properly."""
         # Perform a RECAP search type.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
         # Frontend
@@ -450,10 +450,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("View Additional Results for", r.content.decode())
 
     def test_frontend_docket_and_docket_entries_count(self) -> None:
-        """Assert RECAP search results counts in the fronted. Below and
-        above the estimation threshold.
-        """
+        """Assert RECAP search results counts in the fronted.
 
+        Below and above the estimation threshold.
+        """
         # Perform a RECAP match all search.
         params = {"type": SEARCH_TYPES.RECAP}
         # Frontend
@@ -518,8 +518,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
     async def test_phrase_plus_conjunction_search(self) -> None:
-        """Confirm phrase + conjunction search works properly"""
-
+        """Confirm phrase + conjunction search works properly."""
         params = {
             "q": "",
             "description": '"leave to file" AND amicus',
@@ -559,9 +558,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
 
     async def test_issue_727_doc_att_numbers(self) -> None:
-        """Can we send integers to the document number and attachment number
-        fields?
-        """
+        """Can we send integers to the document number and attachment number fields?"""
         r = await self.async_client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
@@ -574,8 +571,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_case_name_filter(self) -> None:
-        """Confirm case_name filter works properly"""
-
+        """Confirm case_name filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "SUBPOENAS SERVED OFF",
@@ -585,14 +581,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         await self._test_article_count(params, 1, "case_name")
 
     async def test_court_filter(self) -> None:
-        """Confirm court filter works properly"""
+        """Confirm court filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "court": "canb"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "court")
 
     async def test_document_description_filter(self) -> None:
-        """Confirm description filter works properly"""
+        """Confirm description filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "description": "MOTION for Leave to File Amicus Curiae Lorem",
@@ -602,8 +598,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         await self._test_article_count(params, 1, "description")
 
     def test_docket_number_filter(self) -> None:
-        """Confirm docket_number filter works properly"""
-
+        """Confirm docket_number filter works properly."""
         # Regular docket_number filtering.
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
@@ -670,21 +665,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         entry.docket.delete()
 
     async def test_attachment_number_filter(self) -> None:
-        """Confirm attachment number filter works properly"""
+        """Confirm attachment number filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "attachment_number": 2}
 
         # Frontend
         await self._test_article_count(params, 1, "attachment_number")
 
     async def test_assigned_to_judge_filter(self) -> None:
-        """Confirm assigned_to filter works properly"""
+        """Confirm assigned_to filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "assigned_to")
 
     async def test_referred_to_judge_filter(self) -> None:
-        """Confirm referred_to_judge filter works properly"""
+        """Confirm referred_to_judge filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "referred_to": "Persephone Sinclair",
@@ -694,28 +689,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         await self._test_article_count(params, 1, "referred_to")
 
     async def test_nature_of_suit_filter(self) -> None:
-        """Confirm nature_of_suit filter works properly"""
+        """Confirm nature_of_suit filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "nature_of_suit": "440"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "nature_of_suit")
 
     async def test_filed_after_filter(self) -> None:
-        """Confirm filed_after filter works properly"""
+        """Confirm filed_after filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "filed_after": "2016-08-16"}
 
         # Frontend
         await self._test_article_count(params, 1, "filed_after")
 
     async def test_filed_before_filter(self) -> None:
-        """Confirm filed_before filter works properly"""
+        """Confirm filed_before filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "filed_before": "2015-08-17"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "filed_before")
 
     async def test_entry_filed_after_filter(self) -> None:
-        """Confirm entry_filed_after filter works properly"""
+        """Confirm entry_filed_after filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "entry_date_filed_after": "2015-08-19",
@@ -726,7 +721,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn(self.de.description, r.content.decode())
 
     async def test_entry_filed_before_filter(self) -> None:
-        """Confirm entry_filed_before filter works properly"""
+        """Confirm entry_filed_before filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "entry_date_filed_before": "2014-07-05",
@@ -737,14 +732,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn(self.de_1.description, r.content.decode())
 
     async def test_document_number_filter(self) -> None:
-        """Confirm document number filter works properly"""
+        """Confirm document number filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
 
         # Frontend
         await self._test_article_count(params, 1, "document_number")
 
     def test_available_only_field(self) -> None:
-        """Confirm available only filter works properly"""
+        """Confirm available only filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
 
         # Frontend
@@ -822,7 +817,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
 
     def test_show_documents_when_combining_the_is_available_filter(self):
-        """Confirm documents are being shown properly when using the is_available filter"""
+        """Confirm documents are being shown properly when using the is_available filter."""
         # Add docket with available documents
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
@@ -980,8 +975,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket_3.delete()
 
     def test_filter_docket_with_no_documents(self) -> None:
-        """Confirm we can filter dockets with no documents"""
-
+        """Confirm we can filter dockets with no documents."""
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
@@ -1015,7 +1009,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket_2.delete()
 
     def test_cause_filter(self) -> None:
-        """Confirm cause filter works properly"""
+        """Confirm cause filter works properly."""
         # Confirm parties extracted from case_name are available in filters.
         with self.captureOnCommitCallbacks(execute=True):
             d = DocketFactory(
@@ -1054,8 +1048,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             d_2.delete()
 
     def test_party_name_filter(self) -> None:
-        """Confirm party_name filter works properly"""
-
+        """Confirm party_name filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "party_name": "Defendant Jane Roe",
@@ -1087,7 +1080,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         d.delete()
 
     def test_party_name_and_children_filter(self) -> None:
-        """Confirm dockets with children are shown when using the party filter"""
+        """Confirm dockets with children are shown when using the party filter."""
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
@@ -1500,14 +1493,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             empty_docket.delete()
 
     async def test_atty_name_filter(self) -> None:
-        """Confirm atty_name filter works properly"""
+        """Confirm atty_name filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
 
         # Frontend, 2 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "atty_name")
 
     async def test_combine_filters(self) -> None:
-        """Confirm that combining filters works properly"""
+        """Confirm that combining filters works properly."""
         # Get results for a broad filter
         params = {"type": SEARCH_TYPES.RECAP, "case_name": "SUBPOENAS SERVED"}
 
@@ -1545,7 +1538,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     @override_settings(VIEW_MORE_CHILD_HITS=6, RECAP_CHILD_HITS_PER_RESULT=5)
     def test_docket_child_documents(self) -> None:
-        """Confirm results contain the right number of child documents"""
+        """Confirm results contain the right number of child documents."""
         # Get results for a broad filter
         with self.captureOnCommitCallbacks(execute=True):
             rd_1 = RECAPDocumentFactory(
@@ -1655,7 +1648,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             rd_5.delete()
 
     async def test_advanced_queries(self) -> None:
-        """Confirm advance queries works properly"""
+        """Confirm advance queries works properly."""
         # Advanced query string, firm
         params = {"type": SEARCH_TYPES.RECAP, "q": "firm:(Associates LLP)"}
 
@@ -1734,8 +1727,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self._count_child_documents(0, r.content.decode(), 2, '"entry_number"')
 
     def test_advanced_query_cites(self) -> None:
-        """Confirm cites advance query works properly"""
-
+        """Confirm cites advance query works properly."""
         # Advanced query string, cites
         # Frontend
         params = {
@@ -1776,7 +1768,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             opinion_2.cluster.docket.delete()
 
     async def test_text_queries(self) -> None:
-        """Confirm text queries works properly"""
+        """Confirm text queries works properly."""
         # Text query case name.
         params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
 
@@ -1819,8 +1811,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     @override_settings(NO_MATCH_HL_SIZE=50)
     async def test_results_highlights(self) -> None:
-        """Confirm highlights are shown properly"""
-
+        """Confirm highlights are shown properly."""
         # Highlight case name.
         params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
 
@@ -2050,7 +2041,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     @override_settings(NO_MATCH_HL_SIZE=50)
     def test_phrase_search_stemming(self) -> None:
         """Confirm stemming doesn't affect a phrase search."""
-
         with self.captureOnCommitCallbacks(execute=True):
             rd_1 = RECAPDocumentFactory(
                 docket_entry=self.de,
@@ -2080,7 +2070,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     @override_settings(NO_MATCH_HL_SIZE=50)
     def test_phrase_search_duplicated_terms(self) -> None:
         """Confirm duplicated terms doesn't affect a phrase search."""
-
         with self.captureOnCommitCallbacks(execute=True):
             rd_1 = RECAPDocumentFactory(
                 docket_entry=self.de,
@@ -2138,7 +2127,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             rd_1.delete()
 
     def test_results_ordering(self) -> None:
-        """Confirm results ordering works properly"""
+        """Confirm results ordering works properly."""
         # Order by random order.
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -2435,7 +2424,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     async def test_fail_rd_type_gracefully_frontend(self) -> None:
         """Confirm that the rd type fails gracefully in the frontend."""
-
         params = {"type": SEARCH_TYPES.RECAP_DOCUMENT}
         # Frontend
         r = await self.async_client.get("/", params)
@@ -2443,9 +2431,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("encountered an error", r.content.decode())
 
     def test_initial_document_button(self) -> None:
-        """Confirm the initial document button is properly shown on different
-        scenarios"""
-
+        """Confirm the initial document button is properly shown on different scenarios."""
         district_court = CourtFactory(id="cand", jurisdiction="FD")
 
         dockets_to_remove = []
@@ -2737,9 +2723,119 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_initial_document_buttons_on_mixed_page"
+    )
+    def test_initial_document_buttons_on_mixed_page(self) -> None:
+        """Confirm a results page with RECAP and SCOTUS dockets gives each docket the initial document button of its own source."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+        dockets_to_remove = []
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem Mixed Page Recap",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+            scotus_docket = DocketFactory(
+                court=scotus_court, case_name="Lorem Mixed Page Scotus"
+            )
+            ScotusDocketMetadataFactory(docket=scotus_docket)
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket=scotus_docket,
+                docket_entry__date_filed=datetime.date(2024, 1, 1),
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-2/a.pdf",
+            )
+            dockets_to_remove.extend([recap_entry.docket, scotus_docket])
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Mixed Page"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "mixed page")
+        tree = html.fromstring(r.content.decode())
+        buttons = {}
+        for article in tree.xpath("//article"):
+            title = article.xpath("./h3/a")[0].text_content().strip()
+            button = article.xpath(
+                ".//a[contains(@class, 'initial-document')]"
+            )
+            buttons[title] = (
+                (button[0].get("href"), button[0].text_content().strip())
+                if button
+                else (None, None)
+            )
+        expected = {
+            "Lorem Mixed Page Recap": (
+                recap_document.pacer_url,
+                "Buy Initial Document",
+            ),
+            "Lorem Mixed Page Scotus": (
+                scotus_document.url,
+                "Initial Document",
+            ),
+        }
+        for case_name, expected_button in expected.items():
+            with self.subTest(case_name=case_name):
+                title = next(
+                    (t for t in buttons if t.startswith(case_name)), None
+                )
+                self.assertIsNotNone(title, f"{case_name} not in results")
+                self.assertEqual(expected_button, buttons[title])
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_docket_titles_have_no_empty_parentheses"
+    )
+    def test_scotus_docket_titles_have_no_empty_parentheses(self) -> None:
+        """Confirm SCOTUS docket titles hide the court citation: the year alone when the docket has a date, and no parentheses when it doesn't."""
+        scotus_court = CourtFactory(
+            id="scotus", jurisdiction="F", citation_string="SCOTUS"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            dated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Dated",
+                date_filed=datetime.date(2024, 3, 1),
+            )
+            undated_docket = DocketFactory(
+                court=scotus_court,
+                case_name="Lorem Title Undated",
+                date_filed=None,
+            )
+            # SCOTUS dockets are only indexed once they have metadata.
+            ScotusDocketMetadataFactory(docket=dated_docket)
+            ScotusDocketMetadataFactory(docket=undated_docket)
+        self.addCleanup(dated_docket.delete)
+        self.addCleanup(undated_docket.delete)
+
+        cd = {"type": SEARCH_TYPES.RECAP, "q": '"Lorem Title"'}
+        r = async_to_sync(self._test_article_count)(cd, 2, "scotus titles")
+        tree = html.fromstring(r.content.decode())
+        # Collapse the template's line breaks and &nbsp; into spaces.
+        titles = {
+            " ".join(a.text_content().split())
+            for a in tree.xpath("//article/h3/a")
+        }
+        self.assertEqual(
+            titles, {"Lorem Title Dated (2024)", "Lorem Title Undated"}
+        )
+
     async def test_get_results_from_paginator(self) -> None:
         """Assert Paginator Page objects are handled as expected."""
-
         # Make basic paginator with 50 elements, 10 per page
         num_items = 50
         per_page = 10
@@ -2788,10 +2884,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     async def test_enrich_search_results(self) -> None:
         """Assert Paginator Page objects are enriched as expected.
-        Ideally, this would validate each step of the enrichment,
-        but those tests do not appear to exist yet
-        """
 
+        Ideally, this would validate each step of the enrichment, but those
+        tests do not appear to exist yet.
+        """
         # Create empty paginator
         paginator = Paginator([], 1)
         page = paginator.page(1)
@@ -2816,7 +2912,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self, mock_fetch_es, mock_cache_key
     ) -> None:
         """Assert micro-cache for search results behaves properly."""
-
         # Clean search_results_cache before starting the test.
         self._clean_micro_cache()
 
@@ -2953,10 +3048,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     async def test_search_micro_cache_ignore_invalid_params(
         self, mock_fetch_es, mock_cache_key
     ) -> None:
-        """Confirm that invalid search parameters are ignored when caching a
-        Search Frontend request.
-        """
-
+        """Confirm that invalid search parameters are ignored when caching a Search Frontend request."""
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
         )
@@ -2993,10 +3085,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self._clean_micro_cache()
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
-        """Confirm that stemming and synonyms are disabled on the case_name
-        filter and text query.
-        """
-
+        """Confirm that stemming and synonyms are disabled on the case_name filter and text query."""
         with self.captureOnCommitCallbacks(execute=True):
             de = DocketEntryFactory(
                 docket=DocketFactory(
@@ -3128,8 +3217,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         docket_2.delete()
 
     def test_timestamp_filtering(self) -> None:
-        """Confirm the timestamp fielded filter works properly"""
-
+        """Confirm the timestamp fielded filter works properly."""
         # Add docket with no document
         mock_date = now().replace(
             day=28, hour=0, minute=0, second=0, microsecond=0
@@ -3226,10 +3314,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         docket.delete()
 
     def test_relative_dates_filtering(self):
-        """Confirm that the relative date filter works properly by returning
-        the expected documents within the requested range.
-        """
-
+        """Confirm that the relative date filter works properly by returning the expected documents within the requested range."""
         today = now().replace(hour=23, minute=59, second=0, microsecond=0)
         with (
             time_machine.travel(today, tick=False),
@@ -3298,11 +3383,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         d_3.delete()
 
     def test_relative_dates_entry_filed_filtering(self):
-        """Confirm that the relative date filter works properly for the
-        entry_date_filed  field by returning the expected documents within
-        the requested range.
-        """
-
+        """Confirm that the relative date filter works properly for the entry_date_filed  field by returning the expected documents within the requested range."""
         today = now().replace(hour=23, minute=59, second=0, microsecond=0)
         with (
             time_machine.travel(today, tick=False),
@@ -3382,9 +3463,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         de_3.docket.delete()
 
     def test_invalid_relative_date_syntax(self):
-        """Confirm that a custom error is displayed to users when they enter an
-        invalid relative date syntax.
-        """
+        """Confirm that a custom error is displayed to users when they enter an invalid relative date syntax."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "Ipsum SUBPOENAS Lorem",
@@ -3405,9 +3484,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 class RECAPSearchDecayRelevancyTest(
     AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
-    """
-    RECAP Search Decay Relevancy  Tests
-    """
+    """RECAP Search Decay Relevancy  Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3693,8 +3770,7 @@ class RECAPSearchDecayRelevancyTest(
         ]
 
     def test_relevancy_decay_scoring_frontend(self) -> None:
-        """Test relevancy decay scoring for RECAP search Frontend"""
-
+        """Test relevancy decay scoring for RECAP search Frontend."""
         for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
@@ -3707,8 +3783,7 @@ class RECAPSearchDecayRelevancyTest(
                 )
 
     def test_relevancy_decay_scoring_v4_api(self) -> None:
-        """Test relevancy decay scoring for RECAP search V4 API"""
-
+        """Test relevancy decay scoring for RECAP search V4 API."""
         search_types = [
             SEARCH_TYPES.RECAP,
             SEARCH_TYPES.DOCKETS,
@@ -3720,8 +3795,7 @@ class RECAPSearchDecayRelevancyTest(
                 self._test_results_ordering(test, "docket_id", version="v4")
 
     def test_relevancy_decay_scoring_v3_api(self) -> None:
-        """Test relevancy decay scoring for RECAP search V4 API"""
-
+        """Test relevancy decay scoring for RECAP search V4 API."""
         search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         for search_type in search_types:
             for test in self.test_cases:
@@ -3841,7 +3915,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_case_name_filter(self) -> None:
-        """Confirm case_name filter works properly"""
+        """Confirm case_name filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "SUBPOENAS SERVED OFF",
@@ -3852,7 +3926,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_court_filter(self) -> None:
-        """Confirm court filter works properly"""
+        """Confirm court filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "court": "canb"}
 
         # Double the results expected in v3 since the results are not grouped.
@@ -3861,7 +3935,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_document_description_filter(self) -> None:
-        """Confirm description filter works properly"""
+        """Confirm description filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "description": "MOTION for Leave to File Amicus Curiae Lorem",
@@ -3874,7 +3948,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_docket_number_filter(self) -> None:
-        """Confirm docket_number filter works properly"""
+        """Confirm docket_number filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
         # # More results expected in v3 since the results are not grouped.
@@ -3885,14 +3959,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_attachment_number_filter(self) -> None:
-        """Confirm attachment number filter works properly"""
+        """Confirm attachment number filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "attachment_number": 2}
 
         await self._test_api_results_count(params, 1, "attachment_number")
 
     @skip_if_common_tests_skipped
     async def test_assigned_to_judge_filter(self) -> None:
-        """Confirm assigned_to filter works properly"""
+        """Confirm assigned_to filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
 
         # # More results expected in v3 since the results are not grouped.
@@ -3903,7 +3977,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_referred_to_judge_filter(self) -> None:
-        """Confirm referred_to_judge filter works properly"""
+        """Confirm referred_to_judge filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "referred_to": "Persephone Sinclair",
@@ -3917,7 +3991,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_nature_of_suit_filter(self) -> None:
-        """Confirm nature_of_suit filter works properly"""
+        """Confirm nature_of_suit filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "nature_of_suit": "440"}
 
         # # More results expected in v3 since the results are not grouped.
@@ -3928,14 +4002,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_filed_after_filter(self) -> None:
-        """Confirm filed_after filter works properly"""
+        """Confirm filed_after filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "filed_after": "2016-08-16"}
 
         await self._test_api_results_count(params, 1, "filed_after")
 
     @skip_if_common_tests_skipped
     async def test_filed_before_filter(self) -> None:
-        """Confirm filed_before filter works properly"""
+        """Confirm filed_before filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "filed_before": "2015-08-17"}
 
         # # More results expected in v3 since the results are not grouped.
@@ -3946,7 +4020,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_entry_filed_after_filter(self) -> None:
-        """Confirm entry_filed_after filter works properly"""
+        """Confirm entry_filed_after filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "entry_date_filed_after": "2020-08-19",
@@ -3959,7 +4033,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_entry_filed_before_filter(self) -> None:
-        """Confirm entry_filed_before filter works properly"""
+        """Confirm entry_filed_before filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "entry_date_filed_before": "2014-07-05",
@@ -3972,14 +4046,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
-        """Confirm document number filter works properly"""
+        """Confirm document number filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
 
         await self._test_api_results_count(params, 1, "document_number")
 
     @skip_if_common_tests_skipped
     async def test_available_only_field(self) -> None:
-        """Confirm available only filter works properly"""
+        """Confirm available only filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
 
         # API
@@ -3987,7 +4061,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_combine_filters(self) -> None:
-        """Confirm that combining filters works properly"""
+        """Confirm that combining filters works properly."""
         # Get results for a broad filter
         params = {"type": SEARCH_TYPES.RECAP, "case_name": "SUBPOENAS SERVED"}
 
@@ -4026,7 +4100,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_text_queries(self) -> None:
-        """Confirm text queries works properly"""
+        """Confirm text queries works properly."""
         # Text query case name.
         params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
         # API
@@ -4060,9 +4134,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 class RECAPSearchAPIV3Test(
     RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):
-    """
-    RECAP Search API V3 Tests
-    """
+    """RECAP Search API V3 Tests."""
 
     skip_common_tests = False
 
@@ -4080,7 +4152,7 @@ class RECAPSearchAPIV3Test(
             )
 
     async def test_party_name_filter(self) -> None:
-        """Confirm party_name filter works properly"""
+        """Confirm party_name filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "party_name": "Defendant Jane Roe",
@@ -4090,14 +4162,14 @@ class RECAPSearchAPIV3Test(
         await self._test_api_results_count(params, 2, "party_name")
 
     async def test_atty_name_filter(self) -> None:
-        """Confirm atty_name filter works properly"""
+        """Confirm atty_name filter works properly."""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
 
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 2, "atty_name")
 
     def test_docket_child_documents(self) -> None:
-        """Confirm results contain the right number of child documents"""
+        """Confirm results contain the right number of child documents."""
         # Get results for a broad filter
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -4142,7 +4214,7 @@ class RECAPSearchAPIV3Test(
         rd_4.delete()
 
     async def test_advanced_queries(self) -> None:
-        """Confirm advance queries works properly"""
+        """Confirm advance queries works properly."""
         # Advanced query string, firm AND short_description
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -4279,7 +4351,7 @@ class RECAPSearchAPIV3Test(
         )
 
     async def test_results_ordering(self) -> None:
-        """Confirm results ordering works properly"""
+        """Confirm results ordering works properly."""
         # Order by random order.
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -4336,9 +4408,10 @@ class RECAPSearchAPIV3Test(
 
     async def test_api_results_date_filed_ordering(self) -> None:
         """Confirm api results date_filed ordering works properly.
-        In the RECAP search type, the dateFiled sorting is converted to entry_date_filed
-        """
 
+        In the RECAP search type, the dateFiled sorting is converted to
+        entry_date_filed.
+        """
         # Order by dateFiled desc
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -4387,10 +4460,7 @@ class RECAPSearchAPIV3Test(
         )
 
     async def test_api_d_type(self) -> None:
-        """Confirm the DOCKETS search type works properly in the V3 API grouping
-        results by docket_id.
-        """
-
+        """Confirm the DOCKETS search type works properly in the V3 API grouping results by docket_id."""
         # Order by dateFiled desc
         params = {
             "type": SEARCH_TYPES.DOCKETS,
@@ -4413,8 +4483,9 @@ class RECAPSearchAPIV3Test(
 
 
 class DocketESResultSerializerTest(DocketESResultSerializer):
-    """The serializer class for testing DOCKETS search type results. Includes a
-    test_score field for testing purposes.
+    """The serializer class for testing DOCKETS search type results.
+
+    Includes a test_score field for testing purposes.
     """
 
     test_score = CharField(read_only=True)
@@ -4422,6 +4493,7 @@ class DocketESResultSerializerTest(DocketESResultSerializer):
 
 class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
     """The serializer class for testing RECAP_DOCUMENT search type results.
+
     Includes a test_score field for testing purposes.
     """
 
@@ -4429,8 +4501,9 @@ class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
 
 
 class RECAPESResultSerializerTest(RECAPESResultSerializer):
-    """The serializer class for resting RECAP search type results. Includes a
-    test_score field for testing purposes.
+    """The serializer class for resting RECAP search type results.
+
+    Includes a test_score field for testing purposes.
     """
 
     test_score = CharField(read_only=True)
@@ -4443,9 +4516,7 @@ class RECAPSearchAPIV4Test(
     TestCase,
     V4SearchAPIAssertions,
 ):
-    """
-    RECAP Search API V4 Tests
-    """
+    """RECAP Search API V4 Tests."""
 
     version_api = "v4"
     skip_common_tests = False
@@ -4476,19 +4547,14 @@ class RECAPSearchAPIV4Test(
 
     @staticmethod
     def mock_merge_unavailable_fields_on_parent_document(*args, **kwargs):
-        """Mock function that first deletes a specific RECAPDocument
-        and then calls the original merge function with the provided arguments.
-        """
-
+        """Mock function that first deletes a specific RECAPDocument and then calls the original merge function with the provided arguments."""
         rd = RECAPDocument.objects.get(pacer_doc_id="rd_to_delete")
         rd.delete()
         return merge_unavailable_fields_on_parent_document(*args, **kwargs)
 
     @staticmethod
     def mock_set_results_highlights(results, search_type):
-        """Intercepts set_results_highlights as a helper to append the
-        test_score for testing purposes.
-        """
+        """Intercepts set_results_highlights as a helper to append the test_score for testing purposes."""
         set_results_highlights(results, search_type)
         for result in results:
             if hasattr(result.meta, "sort"):
@@ -4513,7 +4579,7 @@ class RECAPSearchAPIV4Test(
         return r
 
     async def test_case_name_filter(self) -> None:
-        """Confirm case_name filter works properly"""
+        """Confirm case_name filter works properly."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "SUBPOENAS SERVED OFF",
@@ -4543,9 +4609,10 @@ class RECAPSearchAPIV4Test(
         )
 
     async def test_capital_case_not_in_api_results(self) -> None:
-        """capital_case isn't exposed in V4 RECAP results yet: not on the
-        docket, its nested documents, or RECAP document results. The SCOTUS
-        search API (#8153) adds it."""
+        """capital_case isn't exposed in V4 RECAP results yet: not on the docket, its nested documents, or RECAP document results.
+
+        The SCOTUS search API (#8153) adds it.
+        """
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "q": f"id:{self.rd_api.pk}",
@@ -4561,7 +4628,6 @@ class RECAPSearchAPIV4Test(
 
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
-
         # Confirm expected values for empty fields.
         search_params = {
             "type": SEARCH_TYPES.RECAP,
@@ -4758,9 +4824,7 @@ class RECAPSearchAPIV4Test(
         )
 
     def test_date_filed_sorting_function_score(self) -> None:
-        """Test if the function score used for the dateFiled sorting in the V4
-        of the RECAP Search API works as expected."""
-
+        """Test if the function score used for the dateFiled sorting in the V4 of the RECAP Search API works as expected."""
         with self.captureOnCommitCallbacks(execute=True):
             # This Docket will be matched only by its RECAPDocument.
             docket_entry_recent = DocketEntryFactory(
@@ -4939,11 +5003,7 @@ class RECAPSearchAPIV4Test(
     def test_stable_scores_date_sort(
         self, mock_set_results_highlights
     ) -> None:
-        """Test if the function's score remains stable when used for sorting by
-        dateFiled asc and entry_date_filed asc across pagination, avoiding
-        the impact of time running on the scores.
-        """
-
+        """Test if the function's score remains stable when used for sorting by dateFiled asc and entry_date_filed asc across pagination, avoiding the impact of time running on the scores."""
         # Query string, order by dateFiled desc
         search_params = {
             "q": "SUBPOENAS SERVED",
@@ -5088,11 +5148,7 @@ class RECAPSearchAPIV4Test(
     def test_stable_results_decay_relevance_score_sorting(
         self, mock_set_results_highlights
     ) -> None:
-        """Test whether result scores remain stable across pagination when
-        using the custom decay relevance function, avoiding the impact of time
-        on the scores.
-        """
-
+        """Test whether result scores remain stable across pagination when using the custom decay relevance function, avoiding the impact of time on the scores."""
         # Query string, order by score desc
         search_params = {
             "q": "SUBPOENAS SERVED",
@@ -5193,7 +5249,6 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:
         """Test cursor pagination for V4 RECAP Search API."""
-
         created_dockets = []
         dockets_to_create = 20
         with self.captureOnCommitCallbacks(execute=True):
@@ -5338,7 +5393,6 @@ class RECAPSearchAPIV4Test(
 
     def test_recap_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 RECAP Search API."""
-
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "order_by": "score desc",
@@ -5453,7 +5507,6 @@ class RECAPSearchAPIV4Test(
 
     def test_recap_cursor_api_pagination_next_and_previous_page(self) -> None:
         """Test cursor pagination previous_page for V4 RECAP Search API."""
-
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "order_by": "score desc",
@@ -5496,9 +5549,7 @@ class RECAPSearchAPIV4Test(
             )
 
     def test_recap_cursor_results_equals_page_size(self) -> None:
-        """Test cursor pagination previous and next page when the number of
-        equals the page_size."""
-
+        """Test cursor pagination previous and next page when the number of equals the page_size."""
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(source=Docket.RECAP)
 
@@ -5542,9 +5593,7 @@ class RECAPSearchAPIV4Test(
 
     @override_settings(SEARCH_API_PAGE_SIZE=2)
     def test_recap_cursor_results_consistency(self) -> None:
-        """Test cursor pagination results consistency when documents are indexed
-        or removed."""
-
+        """Test cursor pagination results consistency when documents are indexed or removed."""
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
@@ -5658,7 +5707,6 @@ class RECAPSearchAPIV4Test(
         self, mock_es_query, mock_cache_key
     ) -> None:
         """Assert micro-cache for search API results behaves properly."""
-
         self._clean_micro_cache()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -5809,9 +5857,7 @@ class RECAPSearchAPIV4Test(
     def test_search_micro_cache_ignore_invalid_params(
         self, mock_es_query, mock_cache_key
     ) -> None:
-        """Confirm that invalid search parameters are ignored when caching a
-        Search API request.
-        """
+        """Confirm that invalid search parameters are ignored when caching a Search API request."""
         self._clean_micro_cache()
 
         # Initial request.
@@ -5857,9 +5903,7 @@ class RECAPSearchAPIV4Test(
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
-        """Test the more_docs fields to be shown properly when a docket has
-        more than 5 RECAPDocuments matched."""
-
+        """Test the more_docs fields to be shown properly when a docket has more than 5 RECAPDocuments matched."""
         rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
             docket_entry = DocketEntryFactory(
@@ -5919,7 +5963,6 @@ class RECAPSearchAPIV4Test(
 
     async def test_results_fields_for_d_type(self) -> None:
         """Confirm fields in V4 RECAP Search API results for the d type."""
-
         search_params = {
             "type": SEARCH_TYPES.DOCKETS,
             "q": f"docket_id:{self.rd_api.docket_entry.docket.pk}",
@@ -5939,7 +5982,6 @@ class RECAPSearchAPIV4Test(
 
     async def test_results_fields_for_rd_type(self) -> None:
         """Confirm fields in V4 RECAP Search API results for the rd type."""
-
         search_params = {
             "type": SEARCH_TYPES.RECAP_DOCUMENT,
             "q": f"id:{self.rd_api.pk}",
@@ -5956,14 +5998,12 @@ class RECAPSearchAPIV4Test(
         )
 
     def test_render_missing_fields_from_es_document(self) -> None:
-        """Confirm that missing fields from an ES document can be properly
-        rendered in the API response.
+        """Confirm that missing fields from an ES document can be properly rendered in the API response.
 
         This can occur when fields are added to the document mapping but have
         not yet been indexed in the document because a document reindex is
         required.
         """
-
         with self.captureOnCommitCallbacks(execute=True):
             de_no_cites = DocketEntryFactory(
                 docket=DocketFactory(
@@ -6005,10 +6045,7 @@ class RECAPSearchAPIV4Test(
             de_no_cites.docket.delete()
 
     def test_handle_missing_documents_merging_values_from_db(self) -> None:
-        """Confirm that we can gracefully handle documents returned by ES on a
-        page that have been removed from the DB.
-        """
-
+        """Confirm that we can gracefully handle documents returned by ES on a page that have been removed from the DB."""
         with self.captureOnCommitCallbacks(execute=True):
             docket_entry = DocketEntryFactory(
                 docket=DocketFactory(
@@ -6045,10 +6082,7 @@ class RECAPSearchAPIV4Test(
             docket_entry.docket.delete()
 
     def test_dates_sorting_function_score_for_rd_type(self) -> None:
-        """Test if the function score used for the dateFiled and entry_date_filed
-        sorting in the V4 of the RECAP Search API works as expected for the RD type.
-        """
-
+        """Test if the function score used for the dateFiled and entry_date_filed sorting in the V4 of the RECAP Search API works as expected for the RD type."""
         with self.captureOnCommitCallbacks(execute=True):
             latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
@@ -6190,7 +6224,6 @@ class RECAPSearchAPIV4Test(
     @override_settings(SEARCH_API_PAGE_SIZE=4)
     def test_recap_results_cursor_api_pagination_rd(self) -> None:
         """Test cursor pagination for V4 RECAP Search API."""
-
         created_dockets = []
         dockets_to_create = 10
         with self.captureOnCommitCallbacks(execute=True):
@@ -6322,10 +6355,7 @@ class RECAPSearchAPIV4Test(
                 created_docket.delete()
 
     def test_invalid_pagination_cursor(self) -> None:
-        """Test to confirm that an invalid cursor error message is sent when
-        an invalid cursor or incompatible search type to the cursor is
-        requested in the V4 RECAP Search API."""
-
+        """Test to confirm that an invalid cursor error message is sent when an invalid cursor or incompatible search type to the cursor is requested in the V4 RECAP Search API."""
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "order_by": "score desc",
@@ -6355,10 +6385,7 @@ class RECAPSearchAPIV4Test(
             self.assertEqual(r.data["detail"], "Invalid cursor")
 
     def test_verify_empty_lists_type_fields_after_partial_update(self):
-        """Verify that list fields related to foreign keys are returned as
-        empty lists after a partial update that removes the related instance
-        and empties the list field.
-        """
+        """Verify that list fields related to foreign keys are returned as empty lists after a partial update that removes the related instance and empties the list field."""
         with self.captureOnCommitCallbacks(execute=True):
             d = DocketFactory(
                 case_name="Lorem Ipsum",
@@ -6417,10 +6444,7 @@ class RECAPSearchAPIV4Test(
             d.delete()
 
     def test_relative_dates_filtering(self):
-        """Confirm that the relative date filter in the API works properly by returning
-        the expected documents within the requested range.
-        """
-
+        """Confirm that the relative date filter in the API works properly by returning the expected documents within the requested range."""
         today = now().replace(hour=23, minute=59, second=0, microsecond=0)
         with (
             time_machine.travel(today, tick=False),
@@ -6509,11 +6533,7 @@ class RECAPSearchAPIV4Test(
         d_3.delete()
 
     def test_relative_dates_entry_filed_filtering(self):
-        """Confirm that the relative date filter works properly for the
-        entry_date_filed  field by returning the expected documents within
-        the requested range.
-        """
-
+        """Confirm that the relative date filter works properly for the entry_date_filed  field by returning the expected documents within the requested range."""
         today = now().replace(hour=23, minute=59, second=0, microsecond=0)
         with (
             time_machine.travel(today, tick=False),
@@ -6600,9 +6620,7 @@ class RECAPSearchAPIV4Test(
         de_3.docket.delete()
 
     def test_invalid_relative_date_syntax(self):
-        """Confirm that a custom error is displayed to users when they enter an
-        invalid relative date syntax.
-        """
+        """Confirm that a custom error is displayed to users when they enter an invalid relative date syntax."""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "Ipsum SUBPOENAS Lorem",
@@ -6622,15 +6640,13 @@ class RECAPSearchAPIV4Test(
 
 
 class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
-    """Confirm DocketDocument/ESRECAPDocument.prepare() stay compatible
-    with SCOTUS content (no RECAPDocument/DocketEntry rows)."""
+    """Confirm DocketDocument/ESRECAPDocument.prepare() stay compatible with SCOTUS content (no RECAPDocument/DocketEntry rows)."""
 
     def setUp(self) -> None:
         self.court = CourtFactory(id="scotus", jurisdiction="F")
 
     def test_capital_case_true_on_scotus_document_and_docket(self) -> None:
-        """A SCOTUS docket flagged as a capital case surfaces `True` at
-        both the Docket and RECAPDocument ES-document levels."""
+        """A SCOTUS docket flagged as a capital case surfaces `True` at both the Docket and RECAPDocument ES-document levels."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court
         )
@@ -6655,8 +6671,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared_docket["docketNumber"], docket.docket_number)
 
     def test_capital_case_false_is_not_confused_with_absent(self) -> None:
-        """`capital_case=False` (a real SCOTUS case that isn't capital)
-        must come back as `False`, not `None` (no SCOTUS metadata)."""
+        """`capital_case=False` (a real SCOTUS case that isn't capital) must come back as `False`, not `None` (no SCOTUS metadata)."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court
         )
@@ -6676,8 +6691,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_capital_case_none_without_scotus_metadata(self) -> None:
-        """A SCOTUS docket with no ScotusDocketMetadata row yet
-        reports `None`, not a crash."""
+        """A SCOTUS docket with no ScotusDocketMetadata row yet reports `None`, not a crash."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court
         )
@@ -6696,8 +6710,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_capital_case_none_on_plain_recap_docket(self) -> None:
-        """A regular RECAP docket also reports `None` for capital_case,
-        not a crash."""
+        """A regular RECAP docket also reports `None` for capital_case, not a crash."""
         rd = RECAPDocumentFactory(docket_entry=DocketEntryFactory())
         docket = rd.docket_entry.docket
 
@@ -6713,8 +6726,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared_docket["caseName"], docket.case_name)
 
     def test_scotus_document_type_and_cites_do_not_crash(self) -> None:
-        """SCOTUS documents have no document_type and no
-        citation attributes; prepare() shouldn't raise AttributeError."""
+        """SCOTUS documents have no document_type and no citation attributes; prepare() shouldn't raise AttributeError."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court
         )
@@ -6733,9 +6745,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["docket_id"], docket.pk)
 
     def test_recap_document_type_and_cites_regression(self) -> None:
-        """A regular RECAPDocument still gets its real document_type and
-        cites values - the SCOTUS compatibility guards must not swallow
-        the existing PACER behavior."""
+        """A regular RECAPDocument still gets its real document_type and cites values - the SCOTUS compatibility guards must not swallow the existing PACER behavior."""
         rd = RECAPDocumentFactory(
             docket_entry=DocketEntryFactory(),
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -6753,8 +6763,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         self.assertEqual(prepared["docket_id"], docket.pk)
 
     def test_es_id_and_uid_share_the_source_namespace(self) -> None:
-        """Each source's ES _id comes from its own ES_CHILD_ID property, and
-        SCOTUS's _id prefix is its uid_namespace plus "d" (for document)."""
+        """Each source's ES _id comes from its own ES_CHILD_ID property, and SCOTUS's _id prefix is its uid_namespace plus "d" (for document)."""
         child_ids = [
             getattr(ES_CHILD_ID(42), source.child_id_property)
             for source in ALL_ES_SOURCES
@@ -6766,9 +6775,7 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
         )
 
     def test_ids_are_namespaced_for_scotus_only(self) -> None:
-        """RECAP documents keep the integer id and docket_entry_id; SCOTUS
-        documents leave them empty and use the namespaced uid fields, so the
-        two sources' pks can't collide."""
+        """RECAP documents keep the integer id and docket_entry_id; SCOTUS documents leave them empty and use the namespaced uid fields, so the two sources' pks can't collide."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court
         )
@@ -6793,14 +6800,10 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
 
 
 class SCOTUSFieldTrackerTest(SimpleTestCase):
-    """Confirm the FieldTrackers added for #8020 track exactly the fields
-    the SCOTUS ES signal mappings depend on.
-    """
+    """Confirm the FieldTrackers added for #8020 track exactly the fields the SCOTUS ES signal mappings depend on."""
 
     def test_trackers_match_the_es_signal_mappings(self) -> None:
-        """A mapped field missing from its tracker would never trigger an
-        ES update, and a tracked field missing from the mapping is dead
-        weight."""
+        """A mapped field missing from its tracker would never trigger an ES update, and a tracked field missing from the mapping is dead weight."""
         cases = [
             (
                 SCOTUSDocument,
@@ -6827,27 +6830,40 @@ class SCOTUSFieldTrackerTest(SimpleTestCase):
 
 
 class ESDocketSourcesTest(TestCase):
-    """Confirm the per-source ES docket configuration added for #8020
-    (cl.search.es_docket_sources) is internally consistent.
-    """
+    """Confirm the per-source ES docket configuration added for #8020 (cl.search.es_docket_sources) is internally consistent."""
 
     def test_all_sources_resolve_back_to_themselves_in_source_by_model(
         self,
     ) -> None:
-        """Every source's document_model (and metadata_model, if any)
-        must map back to that exact source."""
+        """Every source's document_model (and metadata_model, if any) must map back to that exact source."""
         for source in ALL_ES_SOURCES:
             self.assertIs(SOURCE_BY_MODEL[source.document_model], source)
             if source.metadata_model is not None:
                 self.assertIs(SOURCE_BY_MODEL[source.metadata_model], source)
 
+    def test_sources_meet_the_shared_indexing_assumptions(self) -> None:
+        """Names and child _id prefixes must be unique, each prefix must exist on ES_CHILD_ID, and each document must reach its Docket through docket_entry, as bulk indexing routes children that way."""
+        names = [source.name for source in ALL_ES_SOURCES]
+        self.assertEqual(len(names), len(set(names)))
+        # Compare the generated ids, not the property names: two properties
+        # returning the same prefix would overwrite each other in ES.
+        child_ids = [
+            getattr(ES_CHILD_ID(1), source.child_id_property)
+            for source in ALL_ES_SOURCES
+        ]
+        self.assertEqual(len(child_ids), len(set(child_ids)))
+        for source in ALL_ES_SOURCES:
+            with self.subTest(source=source.name):
+                entry_model = source.document_model._meta.get_field(
+                    "docket_entry"
+                ).related_model
+                self.assertIs(
+                    entry_model._meta.get_field("docket").related_model,
+                    Docket,
+                )
+
     def test_docket_belongs_distinguishes_recap_from_scotus(self) -> None:
-        """Each source's docket_belongs checks the field it actually
-        relies on: Docket.source for RECAP, the _index_in_es flag or
-        ScotusDocketMetadata for SCOTUS. A RECAP docket and a real
-        SCOTUS docket each belong to exactly one source -- and a
-        scotus-court docket with neither the flag nor metadata (one
-        created only to hold a scraped Opinion) belongs to neither."""
+        """Each source's docket_belongs checks the field it actually relies on: Docket.source for RECAP, the _index_in_es flag or ScotusDocketMetadata for SCOTUS. A RECAP docket and a real SCOTUS docket each belong to exactly one source -- and a scotus-court docket with neither the flag nor metadata (one created only to hold a scraped Opinion) belongs to neither."""
         recap_docket = DocketFactory(
             source=Docket.RECAP,
             pacer_case_id="12345",
@@ -6877,9 +6893,7 @@ class ESDocketSourcesTest(TestCase):
         self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(scotus_docket))
 
     def test_has_entries_skips_the_query_for_other_courts(self) -> None:
-        """has_entries rules out Dockets from courts outside the source's
-        court_ids without a query, so the SCOTUS processor adds no query
-        to RECAP Docket saves, while still finding real entries."""
+        """has_entries rules out Dockets from courts outside the source's court_ids without a query, so the SCOTUS processor adds no query to RECAP Docket saves, while still finding real entries."""
         recap_entry = DocketEntryFactory(
             docket=DocketFactory(court=CourtFactory(), source=Docket.RECAP)
         )
@@ -6900,10 +6914,7 @@ class ESDocketSourcesTest(TestCase):
     def test_scotus_docket_belongs_via_flag_before_any_content(
         self,
     ) -> None:
-        """A scotus-court Docket with the _index_in_es flag set, but
-        no SCOTUSDocketEntry/ScotusDocketMetadata yet, already belongs
-        -- this is the moment merge_scotus_docket first saves a brand
-        new Docket, before its metadata exists."""
+        """A scotus-court Docket with the _index_in_es flag set, but no SCOTUSDocketEntry/ScotusDocketMetadata yet, already belongs -- this is the moment merge_scotus_docket first saves a brand new Docket, before its metadata exists."""
         scotus_court = CourtFactory(id="scotus", jurisdiction="F")
         docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
         docket._index_in_es = True
@@ -6911,9 +6922,7 @@ class ESDocketSourcesTest(TestCase):
         self.assertTrue(SCOTUS_ES_SOURCE.docket_belongs(docket))
 
     def test_scotus_ready_to_index_requires_metadata(self) -> None:
-        """ready_to_index is False until ScotusDocketMetadata exists,
-        even if the Docket already belongs via the flag -- this is
-        what defers the first ES write to a single, complete one."""
+        """ready_to_index is False until ScotusDocketMetadata exists, even if the Docket already belongs via the flag -- this is what defers the first ES write to a single, complete one."""
         scotus_court = CourtFactory(id="scotus", jurisdiction="F")
         docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
         docket._index_in_es = True
@@ -6926,13 +6935,88 @@ class ESDocketSourcesTest(TestCase):
         self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
 
 
+class RECAPSearchCourtsTest(TestCase):
+    """recap_search_courts() offers the PACER courts plus the courts the other docket sources add, such as SCOTUS."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create PACER, SCOTUS and state courts."""
+        for court_id, jurisdiction in [
+            ("scotus", Court.FEDERAL_APPELLATE),
+            ("ca1", Court.FEDERAL_APPELLATE),
+            ("cand", Court.FEDERAL_DISTRICT),
+            ("ohio", Court.STATE_SUPREME),
+        ]:
+            CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
+
+    def test_recap_search_courts_add_source_courts(self) -> None:
+        """SCOTUS joins the PACER courts in the search list only when the search can include it, courts that are neither PACER nor claimed by a source stay out, and all_pacer_courts(), used by PACER scrapers and uploads, keeps excluding SCOTUS."""
+        search_ids = set(
+            recap_search_courts(include_scotus=True).values_list(
+                "pk", flat=True
+            )
+        )
+        self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
+        self.assertNotIn("ohio", search_ids)
+        self.assertNotIn(
+            "scotus",
+            recap_search_courts(include_scotus=False).values_list(
+                "pk", flat=True
+            ),
+        )
+        self.assertNotIn(
+            "scotus",
+            Court.federal_courts.all_pacer_courts().values_list(
+                "pk", flat=True
+            ),
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")
+class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
+    """The RECAP search pages render SCOTUS in the court picker only behind the scotus_docket_page flag."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Build the Docket index the results page searches."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create SCOTUS and a circuit court for the Federal Appellate tab."""
+        for court_id in ["scotus", "ca1"]:
+            CourtFactory(
+                id=court_id,
+                jurisdiction=Court.FEDERAL_APPELLATE,
+                end_date=None,
+            )
+
+    def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
+        """Both the RECAP results page and the RECAP advanced search page render a SCOTUS checkbox in the Federal Appellate tab with the scotus_docket_page flag, and leave it out without it."""
+        urls = [
+            f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
+            reverse("advanced_r"),
+        ]
+        for url, active in product(urls, [True, False]):
+            with (
+                self.subTest(url=url, flag=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                r = self.client.get(url)
+
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                federal_ids = {c.pk for c in r.context["courts"]["federal"]}
+                self.assertEqual("scotus" in federal_ids, active)
+                self.assertEqual(
+                    'id="id_scotus"' in r.content.decode(), active
+                )
+
+
 class SCOTUSESIndexingSignalTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
-    """Confirm the ES signal-processing wiring added for #8020 actually
-    indexes/updates/deletes SCOTUS content automatically, via real Django
-    signals and real Elasticsearch writes.
-    """
+    """Confirm the ES signal-processing wiring added for #8020 actually indexes/updates/deletes SCOTUS content automatically, via real Django signals and real Elasticsearch writes."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -6946,10 +7030,7 @@ class SCOTUSESIndexingSignalTest(
         super().setUp()
 
     def test_scotus_document_create_and_delete(self) -> None:
-        """Creating a SCOTUSDocument indexes it into ESRECAPDocument
-        automatically, with the right fields; deleting it removes it
-        from ES in turn, using its own scotusd_-prefixed _id.
-        """
+        """Creating a SCOTUSDocument indexes it into ESRECAPDocument automatically, with the right fields; deleting it removes it from ES in turn, using its own scotusd_-prefixed _id."""
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -6984,12 +7065,7 @@ class SCOTUSESIndexingSignalTest(
         )
 
     def test_docket_creation_with_metadata_is_a_single_write(self) -> None:
-        """Simulates merge_scotus_docket's real order: the Docket's own
-        save (with the _index_in_es flag, before metadata exists)
-        shouldn't trigger any ES write -- only the ScotusDocketMetadata
-        creation right after does, and that one write already includes
-        capital_case, instead of an incomplete first write followed by
-        a second one to add it."""
+        """Simulates merge_scotus_docket's real order: the Docket's own save (with the _index_in_es flag, before metadata exists) shouldn't trigger any ES write -- only the ScotusDocketMetadata creation right after does, and that one write already includes capital_case, instead of an incomplete first write followed by a second one to add it."""
         docket = DocketFactory.build(
             court=self.court, source=Docket.SCRAPER, appeal_from=None
         )
@@ -7029,11 +7105,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertIs(hit.capital_case, True)
 
     def test_capital_case_create_update_delete_propagates(self) -> None:
-        """Creating, updating, and deleting ScotusDocketMetadata each
-        propagate capital_case correctly to the Docket-level ES document
-        and every SCOTUSDocument-level ES document under it -- create
-        also fans out to multiple documents, confirming the bulk
-        cascade."""
+        """Creating, updating, and deleting ScotusDocketMetadata each propagate capital_case correctly to the Docket-level ES document and every SCOTUSDocument-level ES document under it -- create also fans out to multiple documents, confirming the bulk cascade."""
         entry = SCOTUSDocketEntryFactory(docket__court=self.court)
         doc_a = SCOTUSDocumentFactory(
             docket_entry=entry, document_number=1, attachment_number=1
@@ -7130,9 +7202,7 @@ class SCOTUSESIndexingSignalTest(
     def test_docket_entry_field_change_propagates_to_documents(
         self,
     ) -> None:
-        """A SCOTUSDocketEntry's own field change propagates to its child
-        SCOTUSDocument's ES entry -- checked for every field in the
-        entry's mapping (description, entry_number, date_filed)."""
+        """A SCOTUSDocketEntry's own field change propagates to its child SCOTUSDocument's ES entry -- checked for every field in the entry's mapping (description, entry_number, date_filed)."""
         entry = SCOTUSDocketEntryFactory(
             docket__court=self.court, entry_number=1
         )
@@ -7174,9 +7244,7 @@ class SCOTUSESIndexingSignalTest(
     def test_entry_without_attachments_is_indexed_through_placeholder(
         self,
     ) -> None:
-        """An entry merged without attachments is indexed in ES through its
-        placeholder document, so its description can be searched. Once the
-        entry has an attachment, the same ES document gets its fields."""
+        """An entry merged without attachments is indexed in ES through its placeholder document, so its description can be searched. Once the entry has an attachment, the same ES document gets its fields."""
         docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
         ScotusDocketMetadataFactory(docket=docket)
 
@@ -7226,8 +7294,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.entry_number, 7)
 
     def test_scotus_docket_entry_delete_cascades_to_documents(self) -> None:
-        """Deleting a SCOTUSDocketEntry cascades (on_delete=CASCADE) to
-        its SCOTUSDocument children, each removed from ES in turn."""
+        """Deleting a SCOTUSDocketEntry cascades (on_delete=CASCADE) to its SCOTUSDocument children, each removed from ES in turn."""
         entry = SCOTUSDocketEntryFactory(docket__court=self.court)
         doc_a = SCOTUSDocumentFactory(docket_entry=entry, attachment_number=1)
         doc_b = SCOTUSDocumentFactory(docket_entry=entry, attachment_number=2)
@@ -7267,8 +7334,7 @@ class SCOTUSESIndexingSignalTest(
     def test_entry_change_leaves_recap_document_with_same_pk_alone(
         self,
     ) -> None:
-        """A SCOTUSDocketEntry change updates its SCOTUSDocument's ES
-        entry, not the RECAPDocument's that shares its pk."""
+        """A SCOTUSDocketEntry change updates its SCOTUSDocument's ES entry, not the RECAPDocument's that shares its pk."""
         rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
         entry = scotus_document.docket_entry
 
@@ -7283,8 +7349,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(rd_hit.description, rd.docket_entry.description)
 
     def test_delete_leaves_recap_document_with_same_pk_alone(self) -> None:
-        """Deleting a SCOTUSDocument removes its own ES entry, not the
-        RECAPDocument's that shares its pk."""
+        """Deleting a SCOTUSDocument removes its own ES entry, not the RECAPDocument's that shares its pk."""
         rd, scotus_document = self._recap_and_scotus_documents_sharing_a_pk()
 
         scotus_document.delete()
@@ -7293,9 +7358,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
 
     def test_scotus_dockets_are_not_sent_to_the_percolator(self) -> None:
-        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES
-        save or update returns nothing to percolate, unlike a RECAP
-        Docket's."""
+        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES save or update returns nothing to percolate, unlike a RECAP Docket's."""
         # Not indexed yet: es_save_document only percolates a first write.
         with override_settings(ELASTICSEARCH_DISABLED=True):
             scotus_docket = ScotusDocketMetadataFactory(
@@ -7326,10 +7389,7 @@ class SCOTUSESIndexingSignalTest(
                 self.assertEqual(updated is not None, percolates)
 
     def test_docket_entry_id_change_triggers_full_reprepare(self) -> None:
-        """Reparenting a SCOTUSDocument to a SCOTUSDocketEntry on a
-        different Docket triggers a full re-.prepare() via the
-        "prepare" sentinel in the mapping.
-        """
+        """Reparenting a SCOTUSDocument to a SCOTUSDocketEntry on a different Docket triggers a full re-.prepare() via the "prepare" sentinel in the mapping."""
         entry_a = SCOTUSDocketEntryFactory(docket__court=self.court)
         entry_b = SCOTUSDocketEntryFactory(docket__court=self.court)
         scotus_document = SCOTUSDocumentFactory(docket_entry=entry_a)
@@ -7351,8 +7411,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit_after.caseName, entry_b.docket.case_name)
 
     def test_document_field_change_updates_in_place(self) -> None:
-        """A SCOTUSDocument's own field change (description) updates that
-        document's ES entry directly"""
+        """A SCOTUSDocument's own field change (description) updates that document's ES entry directly."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court,
             description="original",
@@ -7373,9 +7432,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.short_description, "updated")
 
     def test_filepath_local_change_updates_is_available(self) -> None:
-        """Setting filepath_local on an existing SCOTUSDocument updates
-        both filepath_local and the derived is_available field in ES.
-        """
+        """Setting filepath_local on an existing SCOTUSDocument updates both filepath_local and the derived is_available field in ES."""
         scotus_document = SCOTUSDocumentFactory(
             docket_entry__docket__court=self.court,
             filepath_local=None,
@@ -7406,12 +7463,7 @@ class SCOTUSESIndexingSignalTest(
     def test_docket_own_field_change_indexes_for_non_recap_source(
         self,
     ) -> None:
-        """A Docket whose source isn't RECAP but has a
-        ScotusDocketMetadata row still indexes on edit -- contrasted
-        with a scotus-court Docket with no metadata and no
-        _index_in_es flag (e.g. one created only to hold a scraped
-        Opinion), and with an equally non-RECAP docket whose court_id
-        isn't "scotus" either, both of which stay correctly skipped."""
+        """A Docket whose source isn't RECAP but has a ScotusDocketMetadata row still indexes on edit -- contrasted with a scotus-court Docket with no metadata and no _index_in_es flag (e.g. one created only to hold a scraped Opinion), and with an equally non-RECAP docket whose court_id isn't "scotus" either, both of which stay correctly skipped."""
         docket = ScotusDocketMetadataFactory(
             docket__court=self.court, docket__source=Docket.SCRAPER
         ).docket
@@ -7476,10 +7528,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertFalse(DocketDocument.exists(other_docket.pk))
 
     def test_bankruptcy_information_cascade_still_works(self) -> None:
-        """Regression: BankruptcyInformation's cascade to the Docket and
-        its RECAPDocuments (chapter, trustee_str) still works after
-        generalizing the reverse-metadata dispatch for multiple
-        sources."""
+        """Regression: BankruptcyInformation's cascade to the Docket and its RECAPDocuments (chapter, trustee_str) still works after generalizing the reverse-metadata dispatch for multiple sources."""
         bankr_court = CourtFactory(id="recapbankr", jurisdiction="FB")
         de = DocketEntryFactory(
             docket__court=bankr_court, docket__source=Docket.RECAP
@@ -7515,9 +7564,7 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.trustee_str, "Jane Trustee")
 
     def test_docket_own_field_change_cascades_to_documents(self) -> None:
-        """A Docket's own field change (case_name) cascades to its child
-        SCOTUSDocument's ES entry, not just the DocketDocument itself.
-        """
+        """A Docket's own field change (case_name) cascades to its child SCOTUSDocument's ES entry, not just the DocketDocument itself."""
         entry = SCOTUSDocketEntryFactory(docket__court=self.court)
         scotus_document = SCOTUSDocumentFactory(docket_entry=entry)
         docket_id = entry.docket_id
@@ -7542,12 +7589,11 @@ class SCOTUSESIndexingSignalTest(
 class SCOTUSRECAPSearchTest(
     AuthenticatedClientMixin, ESIndexTestCase, TestCase
 ):
-    """Confirm RECAP search shows SCOTUS content only behind its flag."""
+    """Confirm RECAP search shows SCOTUS content only behind its flag, and that the search page's counts include SCOTUS documents, which have a uid instead of an id."""
 
     @classmethod
     def setUpTestData(cls) -> None:
-        """Index one dated SCOTUS docket and one dated RECAP docket, each
-        with a document matching "Tied"."""
+        """Index one dated SCOTUS docket and one dated RECAP docket, each with a document matching "Tied"."""
         cls.rebuild_index("search.Docket")
         # The RSS feed skips entries without a filing date, and the alert
         # estimate counts by filing date, so both need dates.
@@ -7567,14 +7613,22 @@ class SCOTUSRECAPSearchTest(
             # Every docket and document URL of a docket starts with this.
             cls.scotus_docket_path = f"/docket/{scotus_entry.docket_id}/"
             cls.recap_docket_path = f"/docket/{recap_entry.docket_id}/"
-            SCOTUSDocumentFactory(
-                docket_entry=scotus_entry, description="Tied"
+            # Several SCOTUS documents, so the counts tests can tell them
+            # apart from a docket count.
+            cls.scotus_documents = [
+                SCOTUSDocumentFactory(
+                    docket_entry=scotus_entry,
+                    attachment_number=n,
+                    description="Tied",
+                )
+                for n in range(1, 6)
+            ]
+            cls.recap_document = RECAPDocumentFactory(
+                docket_entry=recap_entry, description="Tied"
             )
-            RECAPDocumentFactory(docket_entry=recap_entry, description="Tied")
 
     def test_search_frontend_shows_scotus_only_with_the_flag(self) -> None:
-        """Until launch, the search page and the RSS search feed show
-        SCOTUS content only to requests with the scotus_docket_page flag."""
+        """Until launch, the search page and the RSS search feed show SCOTUS content only to requests with the scotus_docket_page flag."""
         feed = reverse("search_feed", args=["search"])
         endpoints = [
             ("search page", reverse("show_results")),
@@ -7593,12 +7647,8 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, hidden)
                 self.assertIn(self.scotus_docket_path, shown)
 
-    def test_search_feed_links_numberless_documents_to_their_entry(
-        self,
-    ) -> None:
-        """RSS search feed items for RECAP and SCOTUS documents without a
-        number, which have no page of their own, link to their entry on the
-        docket page instead of the homepage."""
+    def _create_numberless_documents(self) -> list[str]:
+        """Create RECAP and SCOTUS documents without a number, matching the query "Numberless", and return the links to their entries on the docket page that search results should use for them."""
         filed = datetime.date(2024, 1, 3)
         with self.captureOnCommitCallbacks(execute=True):
             recap_minute_entry = DocketEntryFactory(
@@ -7634,6 +7684,20 @@ class SCOTUSRECAPSearchTest(
             ]:
                 document.save()
 
+        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
+        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
+        return [
+            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
+            f"{scotus_docket_url}#entry-7",
+            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
+        ]
+
+    def test_search_feed_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """RSS search feed items for RECAP and SCOTUS documents without a number, which have no page of their own, link to their entry on the docket page instead of the homepage."""
+        expected = self._create_numberless_documents()
+
         r = self.client.get(
             reverse("search_feed", args=["search"]),
             {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
@@ -7644,13 +7708,6 @@ class SCOTUSRECAPSearchTest(
         hrefs = tree.xpath(
             "//atom:entry/atom:link/@href", namespaces=namespaces
         )
-        recap_docket_url = recap_minute_entry.docket.get_absolute_url()
-        scotus_docket_url = scotus_numbered_entry.docket.get_absolute_url()
-        expected = [
-            f"{recap_docket_url}#minute-entry-{recap_minute_entry.pk}",
-            f"{scotus_docket_url}#entry-7",
-            f"{scotus_docket_url}#minute-entry-{scotus_minute_entry.pk}",
-        ]
         # The feed makes item links absolute; compare their path and anchor.
         links = [
             urllib.parse.urlsplit(href)._replace(scheme="", netloc="").geturl()
@@ -7666,9 +7723,24 @@ class SCOTUSRECAPSearchTest(
         ]
         self.assertCountEqual(summary_links, expected)
 
+    def test_search_page_links_numberless_documents_to_their_entry(
+        self,
+    ) -> None:
+        """Search page results for RECAP and SCOTUS documents without a number link to their entry on the docket page, the same as the RSS search feed."""
+        expected = self._create_numberless_documents()
+
+        r = self.client.get(
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.RECAP, "q": "Numberless"},
+        )
+
+        links = html.fromstring(r.content.decode()).xpath(
+            "//a[contains(@href, 'entry-')]/@href"
+        )
+        self.assertCountEqual(links, expected)
+
     def test_search_apis_never_show_scotus(self) -> None:
-        """The v3 and v4 search APIs leave SCOTUS out even for requests
-        with the scotus_docket_page flag, until their own launch."""
+        """The v3 and v4 search APIs leave SCOTUS out even for requests with the scotus_docket_page flag, until their own launch."""
         api_v3 = reverse("search-list", kwargs={"version": "v3"})
         api_v4 = reverse("search-list", kwargs={"version": "v4"})
         endpoints = [
@@ -7687,9 +7759,7 @@ class SCOTUSRECAPSearchTest(
                 self.assertNotIn(self.scotus_docket_path, r.content.decode())
 
     def test_alert_estimate_counts_scotus_only_with_the_flag(self) -> None:
-        """The create-alert modal's estimate counts SCOTUS content only
-        for requests with the scotus_docket_page flag, like the search
-        page it belongs to."""
+        """The create-alert modal's estimate counts SCOTUS content only for requests with the scotus_docket_page flag, like the search page it belongs to."""
         url = reverse(
             "alert_frequency", kwargs={"version": "4", "day_count": 100}
         )
@@ -7707,8 +7777,7 @@ class SCOTUSRECAPSearchTest(
         self.assertEqual(shown["count_case_only"], 2)
 
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
-        """clean_count_query still strips the has_child inner_hits from a
-        query that leaves SCOTUS out."""
+        """clean_count_query still strips the has_child inner_hits from a query that leaves SCOTUS out."""
         search_query, *_ = build_es_main_query(
             DocketDocument.search(),
             {"type": SEARCH_TYPES.RECAP, "q": "Tied"},
@@ -7732,8 +7801,7 @@ class SCOTUSRECAPSearchTest(
     def test_search_page_cache_is_separate_per_flag(
         self, _mock: mock.MagicMock
     ) -> None:
-        """A search page cached for one scotus_docket_page value is never
-        served to a request with the other value."""
+        """A search page cached for one scotus_docket_page value is never served to a request with the other value."""
         r = get_redis_interface("CACHE")
         params = {"type": SEARCH_TYPES.RECAP, "q": "Tied"}
         for first_flag in [True, False]:
@@ -7752,9 +7820,53 @@ class SCOTUSRECAPSearchTest(
                     not first_flag,
                 )
 
+    @override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=1)
+    def test_document_counts_include_scotus_only_on_the_search_page(
+        self,
+    ) -> None:
+        """The search page's document count includes SCOTUS documents. The API counts leave them out, like the API results, until the API launch. ELASTICSEARCH_MAX_RESULT_COUNT=1 makes the type=rd API use its approximate count."""
+        params = {"q": "Tied", "court": "scotus"}
+
+        page = self.client.get(
+            reverse("show_results"), {"type": SEARCH_TYPES.RECAP, **params}
+        )
+        api_r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.RECAP, **params},
+        )
+        api_rd = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.RECAP_DOCUMENT, **params},
+        )
+
+        # results_details is [query time, parent count, limit, child count].
+        self.assertEqual(page.context["results_details"][3], 5)
+        self.assertEqual(api_r.data["document_count"], 0)
+        self.assertEqual(api_rd.data["count"], 0)
+
+    def test_notes_search_url_finds_the_noted_documents(self) -> None:
+        """The "Search Notes" link for documents finds the noted RECAP and SCOTUS documents, and none of the other SCOTUS documents."""
+        for document in [self.scotus_documents[0], self.recap_document]:
+            NoteFactory(content_object=document, user=self.api_user)
+        search_url = self.client.get(reverse("profile_notes")).context[
+            "recap_search_url"
+        ]
+        # Users replace the "xxx" placeholder with their own terms.
+        params = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(search_url.replace("xxx", "Tied")).query
+        )
+
+        r = self.client.get(reverse("show_results"), params)
+
+        # results_details is [query time, parent count, limit, child count].
+        self.assertEqual(r.context["results_details"][3], 2)
+        content = r.content.decode()
+        self.assertIn(self.recap_docket_path, content)
+        self.assertIn(self.scotus_docket_path, content)
+
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
-    """Tests for RECAP Search Feed"""
+    """Tests for RECAP Search Feed."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -7962,9 +8074,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_cleanup_control_characters_for_xml_rendering(self) -> None:
-        """Can we remove control characters in the plain_text for a proper XML
-        rendering?
-        """
+        """Can we remove control characters in the plain_text for a proper XML rendering?"""
         with (
             mock.patch(
                 "cl.search.documents.escape",
@@ -8017,7 +8127,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empty feed?"""
-
         # Bad syntax error.
         params = {
             "q": "Leave /:",
@@ -8054,9 +8163,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
     @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
     def test_recap_feed_cache_hit(self, mock_build_query: mock.Mock) -> None:
-        """Can we cache RECAP feed results and retrieve them on subsequent
-        requests?
-        """
+        """Can we cache RECAP feed results and retrieve them on subsequent requests?"""
         mock_build_query.side_effect = build_search_feed_query
 
         params = {
@@ -8101,7 +8208,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self, mock_build_query: mock.Mock
     ) -> None:
         """Does cache miss when parameters change?"""
-
         # Set up the mock to call the real function
         mock_build_query.side_effect = build_search_feed_query
 
@@ -8144,9 +8250,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     def test_recap_feed_no_cache_when_disabled(
         self, mock_build_query: mock.Mock
     ) -> None:
-        """Does caching not occur when ELASTICSEARCH_API_MICRO_CACHE_ENABLED
-        is False?
-        """
+        """Does caching not occur when ELASTICSEARCH_API_MICRO_CACHE_ENABLED is False?"""
         # Set up the mock to call the real function
         mock_build_query.side_effect = build_search_feed_query
 
@@ -8190,7 +8294,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 class IndexDocketRECAPDocumentsCommandTest(
     ESIndexTestCase, TransactionTestCase
 ):
-    """cl_index_parent_and_child_docs command tests for Elasticsearch"""
+    """cl_index_parent_and_child_docs command tests for Elasticsearch."""
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -8248,9 +8352,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             self.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
-        """Confirm the command can properly index Dockets and their
-        RECAPDocuments into the ES."""
-
+        """Confirm the command can properly index Dockets and their RECAPDocuments into the ES."""
         s = DocketDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
         # Call cl_index_parent_and_child_docs command.
@@ -8296,7 +8398,6 @@ class IndexDocketRECAPDocumentsCommandTest(
 
     def test_log_and_get_last_document_id(self):
         """Can we log and get the last docket indexed to/from redis?"""
-
         last_values = log_last_document_indexed(
             1001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
@@ -8317,10 +8418,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             self.r.delete(*keys)
 
     def test_index_dockets_in_bulk_task(self):
-        """Confirm the command can properly index dockets in bulk from the
-        ready_mix_cases_project command.
-        """
-
+        """Confirm the command can properly index dockets in bulk from the ready_mix_cases_project command."""
         court = CourtFactory(id="canb", jurisdiction="FB")
         d_1 = DocketFactory(
             court=court,
@@ -8372,9 +8470,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_4.delete()
 
     def test_cl_index_only_parent_or_child_documents_command(self):
-        """Confirm the command can properly index only RECAPDocuments or only
-        Dockets into ES."""
-
+        """Confirm the command can properly index only RECAPDocuments or only Dockets into ES."""
         s = DocketDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
         # Call cl_index_parent_and_child_docs command for dockets.
@@ -8433,11 +8529,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         )
 
     def test_index_only_child_docs_when_parent_docs_are_missed(self):
-        """Confirm that the command can index only RECAP Documents when the
-        parent Docket is missed. Afterward, when the Docket is indexed, the
-        RDs are properly linked to the Docket.
-        """
-
+        """Confirm that the command can index only RECAP Documents when the parent Docket is missed. Afterward, when the Docket is indexed, the RDs are properly linked to the Docket."""
         s = DocketDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
         # Call cl_index_parent_and_child_docs command for RECAPDocuments.
@@ -8510,9 +8602,7 @@ class IndexDocketRECAPDocumentsCommandTest(
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
-        """Test cl_re_index_rds_sealed to confirm that it properly re-indexes
-        sealed RECAPDocuments from the provided start_date."""
-
+        """Test cl_re_index_rds_sealed to confirm that it properly re-indexes sealed RECAPDocuments from the provided start_date."""
         rd_1 = RECAPDocumentFactory(
             docket_entry=self.de,
             document_number="1",
@@ -8595,6 +8685,391 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
 
 
+class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
+    """cl_index_parent_and_child_docs --source tests: indexing a non-RECAP docket source (SCOTUS) must pick the same Dockets and documents the ES signal processor would."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create one SCOTUS Docket per data shape the signals index or skip, plus a RECAP Docket to check sources don't leak into each other."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.full_docket = ScotusDocketMetadataFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        ).docket
+        entry = SCOTUSDocketEntryFactory(docket=cls.full_docket)
+        cls.sd_1 = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=1
+        )
+        cls.sd_2 = SCOTUSDocumentFactory(
+            docket_entry=entry, attachment_number=2
+        )
+        # Metadata but no entries, as merge_scotus_docket does for a docket
+        # without entries.
+        cls.metadata_only_docket = ScotusDocketMetadataFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        ).docket
+        # No metadata, but signals still index it through its document.
+        cls.sd_3 = SCOTUSDocumentFactory(
+            docket_entry__docket__court=court,
+            docket_entry__docket__source=Docket.SCRAPER,
+        )
+        cls.document_only_docket = cls.sd_3.docket_entry.docket
+        # A scotus Docket with no SCOTUS content (like one created only for a
+        # scraped opinion) and an entry-only one aren't indexed by signals.
+        DocketFactory(court=court, source=Docket.SCRAPER)
+        SCOTUSDocketEntryFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="canb", jurisdiction="FB"),
+                    source=Docket.RECAP,
+                )
+            )
+        )
+
+    def setUp(self) -> None:
+        """Start every test from an empty Docket index and no auto-resume offsets logged in Redis."""
+        # rebuild_index would populate the index from the DB.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+        self.r = get_redis_interface("CACHE")
+        self.redis_keys = [
+            compose_redis_key(SEARCH_TYPES.RECAP),
+            *[
+                compose_redis_key(
+                    SEARCH_TYPES.RECAP,
+                    source_name="scotus",
+                    document_type=document_type,
+                )
+                for document_type in [None, "parent", "child"]
+            ],
+        ]
+        self.r.delete(*self.redis_keys)
+
+    def tearDown(self) -> None:
+        """Remove the auto-resume offsets the test logged in Redis."""
+        self.r.delete(*self.redis_keys)
+        super().tearDown()
+
+    def _index(self, source: str = "scotus", **options) -> None:
+        """Run the command for a docket source with the given options."""
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            source=source,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+            **options,
+        )
+
+    def _indexed_docket_ids(self) -> set[int]:
+        """Return the pks of the Dockets currently in the index."""
+        s = DocketDocument.search().query(Q("match", docket_child="docket"))
+        return {hit.docket_id for hit in s.extra(size=100).execute()}
+
+    def assertSCOTUSDocumentsIndexed(self) -> None:
+        """Assert every SCOTUSDocument is indexed under its scotusd_ id with its uid fields instead of the RECAP-only ids, routed and joined to its own Docket, and that no RECAPDocument was indexed."""
+        for sd in [self.sd_1, self.sd_2, self.sd_3]:
+            docket_id = sd.docket_entry.docket_id
+            with self.subTest(sd=sd.pk):
+                doc = ESRECAPDocument.get(
+                    id=ES_CHILD_ID(sd.pk).SCOTUS, routing=docket_id
+                )
+                self.assertIsNone(doc.id)
+                self.assertIsNone(doc.docket_entry_id)
+                self.assertEqual(doc.uid, f"scotus_{sd.pk}")
+                self.assertEqual(
+                    doc.docket_entry_uid, f"scotus_{sd.docket_entry_id}"
+                )
+                self.assertEqual(doc.meta.routing, str(docket_id))
+                self.assertEqual(doc.docket_child.parent, docket_id)
+        s = DocketDocument.search().query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(s.count(), 3)
+
+    def test_parent_then_child(self) -> None:
+        """Dockets with metadata or a document are indexed, opinion-only and entry-only ones aren't, and children land under their parents."""
+        self._index(document_type="parent")
+        self.assertEqual(
+            self._indexed_docket_ids(),
+            {
+                self.full_docket.pk,
+                self.metadata_only_docket.pk,
+                self.document_only_docket.pk,
+            },
+        )
+
+        self._index(document_type="child")
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_child_only(self) -> None:
+        """Children can be indexed before their parents, routed by their own docket."""
+        self._index(document_type="child")
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_recap_source_is_unchanged(self) -> None:
+        """The default source still indexes only RECAP content."""
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+        self.assertEqual(
+            self._indexed_docket_ids(), {self.rd.docket_entry.docket_id}
+        )
+        self.assertTrue(
+            ESRECAPDocument.exists(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        )
+        # The RECAPDocument is the only child: no SCOTUSDocument leaked in.
+        s = DocketDocument.search().query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(s.count(), 1)
+
+    def test_auto_resume_uses_its_own_redis_key(self) -> None:
+        """A SCOTUS run resumes from the SCOTUS key, not from RECAP's, and the RECAP key keeps its existing name."""
+        self.assertEqual(
+            compose_redis_key(SEARCH_TYPES.RECAP), "es_r_indexing:log"
+        )
+        self.assertEqual(
+            compose_redis_key(SEARCH_TYPES.RECAP, source_name="scotus"),
+            "es_r_scotus_indexing:log",
+        )
+        self.assertEqual(
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+            "es_r_scotus_parent_indexing:log",
+        )
+        log_last_document_indexed(
+            10_000_000, compose_redis_key(SEARCH_TYPES.RECAP)
+        )
+        log_last_document_indexed(
+            self.document_only_docket.pk,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+        )
+
+        self._index(document_type="parent", auto_resume=True)
+
+        # full_docket and metadata_only_docket were created before it, so
+        # they're below the logged offset.
+        self.assertEqual(
+            self._indexed_docket_ids(), {self.document_only_docket.pk}
+        )
+
+    def test_child_auto_resume_ignores_the_parent_offset(self) -> None:
+        """A child run doesn't resume from a parent run's offset: parent runs log Docket pks, child runs walk document pks."""
+        log_last_document_indexed(
+            10_000_000,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+        )
+
+        self._index(document_type="child", auto_resume=True)
+
+        self.assertSCOTUSDocumentsIndexed()
+
+    def test_each_scotus_mode_logs_and_resumes_from_its_own_key(
+        self,
+    ) -> None:
+        """Every SCOTUS mode logs its progress to its own Redis key once it reaches the 1,000-item logging point, and a resumed run starts from the logged pk."""
+        court = Court.objects.get(pk="scotus")
+        # The command only logs every 1,000 items, so add enough Dockets and
+        # documents for every mode to reach that point. bulk_create skips the
+        # ES signals, and the tasks are mocked below.
+        new_dockets = Docket.objects.bulk_create(
+            DocketFactory.build(
+                court=court, appeal_from=None, source=Docket.SCRAPER
+            )
+            for _ in range(1000)
+        )
+        ScotusDocketMetadata.objects.bulk_create(
+            ScotusDocketMetadataFactory.build(docket=docket)
+            for docket in new_dockets
+        )
+        entry = SCOTUSDocketEntryFactory(docket=self.full_docket)
+        new_documents = SCOTUSDocument.objects.bulk_create(
+            SCOTUSDocumentFactory.build(
+                docket_entry=entry, document_number=1, attachment_number=i
+            )
+            for i in range(1, 1001)
+        )
+        docket_pks = sorted(
+            [
+                self.full_docket.pk,
+                self.metadata_only_docket.pk,
+                self.document_only_docket.pk,
+                *[docket.pk for docket in new_dockets],
+            ]
+        )
+        document_pks = sorted(
+            [
+                self.sd_1.pk,
+                self.sd_2.pk,
+                self.sd_3.pk,
+                *[document.pk for document in new_documents],
+            ]
+        )
+        cases = [
+            (None, index_parent_and_child_docs, docket_pks),
+            ("parent", index_parent_or_child_docs_in_es, docket_pks),
+            ("child", index_parent_or_child_docs_in_es, document_pks),
+        ]
+        for document_type, task, pks in cases:
+            with self.subTest(document_type=document_type):
+                self.r.delete(*self.redis_keys)
+                key = compose_redis_key(
+                    SEARCH_TYPES.RECAP,
+                    source_name="scotus",
+                    document_type=document_type,
+                )
+
+                with mock.patch.object(task, "si"):
+                    self._index(document_type=document_type)
+
+                # The 1,000th pk is logged, to this mode's key only.
+                self.assertEqual(
+                    [k for k in self.redis_keys if self.r.exists(k)], [key]
+                )
+                self.assertEqual(
+                    get_last_parent_document_id_processed(key), pks[999]
+                )
+
+                with mock.patch.object(task, "si") as mock_si:
+                    self._index(document_type=document_type, auto_resume=True)
+
+                scheduled = [
+                    pk
+                    for call in mock_si.call_args_list
+                    for pk in call.args[0]
+                ]
+                self.assertEqual(scheduled, pks[999:])
+
+    def test_missing_checks_each_source_document_id(self) -> None:
+        """--missing looks documents up by their source's _id prefix, so only the one actually missing from ES is scheduled again, with its source passed to the task."""
+        cases = [
+            ("recap", self.rd, ES_CHILD_ID(self.rd.pk).RECAP),
+            ("scotus", self.sd_2, ES_CHILD_ID(self.sd_2.pk).SCOTUS),
+        ]
+        for source, document, es_id in cases:
+            with self.subTest(source=source):
+                self._index(source=source)
+                ESRECAPDocument.get(
+                    id=es_id, routing=document.docket_entry.docket_id
+                ).delete(refresh=True)
+
+                with mock.patch.object(
+                    index_parent_or_child_docs_in_es, "si"
+                ) as mock_si:
+                    self._index(
+                        source=source, document_type="child", missing=True
+                    )
+
+                scheduled = [
+                    pk
+                    for call in mock_si.call_args_list
+                    for pk in call.args[0]
+                ]
+                self.assertEqual(scheduled, [document.pk])
+                self.assertEqual(
+                    {
+                        call.kwargs.get("source_name")
+                        for call in mock_si.call_args_list
+                    },
+                    {source},
+                )
+
+    def test_rejects_unsupported_combinations(self) -> None:
+        """Unknown sources are rejected, and non-RECAP sources only work with the RECAP search type and without the event-table mode."""
+        cases = [
+            {"source": "texas", "search_type": SEARCH_TYPES.RECAP},
+            {"source": "scotus", "search_type": SEARCH_TYPES.OPINION},
+            {
+                "source": "scotus",
+                "search_type": SEARCH_TYPES.RECAP,
+                "update_from_event_tables": EventTable.DOCKET,
+            },
+        ]
+        for options in cases:
+            with (
+                self.subTest(options=options),
+                self.assertRaises(CommandError),
+            ):
+                call_command(
+                    "cl_index_parent_and_child_docs", queue="celery", **options
+                )
+
+
+class SCOTUSIndexingParityTest(ESIndexTestCase, TestCase):
+    """A backfill with cl_index_parent_and_child_docs must index exactly what the ES signal processor indexes for the same SCOTUS data."""
+
+    def _indexed_docs(self) -> dict[str, tuple[str | None, dict]]:
+        """Return every document in the index as {_id: (_routing, _source)}, without the indexing timestamp, which differs between runs."""
+        hits = DocketDocument.search().extra(size=100).execute()
+        return {
+            hit.meta.id: (
+                getattr(hit.meta, "routing", None),
+                {k: v for k, v in hit.to_dict().items() if k != "timestamp"},
+            )
+            for hit in hits
+        }
+
+    def test_command_indexes_what_signals_index(self) -> None:
+        """For every real SCOTUS data shape, both a single run and a parent then child run index the same documents, with the same routing and content, as the signals."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        with self.captureOnCommitCallbacks(execute=True):
+            # capital_case=True, so its propagation to the Docket and its
+            # documents is compared too.
+            full_docket = ScotusDocketMetadataFactory(
+                docket__court=court,
+                docket__source=Docket.SCRAPER,
+                capital_case=True,
+            ).docket
+            SCOTUSDocumentFactory(docket_entry__docket=full_docket)
+            ScotusDocketMetadataFactory(
+                docket__court=court, docket__source=Docket.SCRAPER
+            )
+            SCOTUSDocumentFactory(
+                docket_entry__docket__court=court,
+                docket_entry__docket__source=Docket.SCRAPER,
+            )
+            DocketFactory(court=court, source=Docket.SCRAPER)
+            SCOTUSDocketEntryFactory(
+                docket__court=court, docket__source=Docket.SCRAPER
+            )
+        signal_docs = self._indexed_docs()
+
+        for document_types in [[None], ["parent", "child"]]:
+            with self.subTest(document_types=document_types):
+                self.delete_index("search.Docket")
+                self.create_index("search.Docket")
+                for document_type in document_types:
+                    call_command(
+                        "cl_index_parent_and_child_docs",
+                        search_type=SEARCH_TYPES.RECAP,
+                        source="scotus",
+                        document_type=document_type,
+                        queue="celery",
+                        pk_offset=0,
+                        testing_mode=True,
+                    )
+                self.assertEqual(self._indexed_docs(), signal_docs)
+
+
 class RECAPIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
@@ -8646,7 +9121,6 @@ class RECAPIndexingTest(
 
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
-
         de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
@@ -8665,9 +9139,7 @@ class RECAPIndexingTest(
         de_1.docket.delete()
 
     def test_unnumbered_entry_indexing(self) -> None:
-        """Confirm an unnumbered entry which uses the pacer_doc_id as number
-        can be properly indexed."""
-
+        """Confirm an unnumbered entry which uses the pacer_doc_id as number can be properly indexed."""
         de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
@@ -8686,8 +9158,7 @@ class RECAPIndexingTest(
         de_1.docket.delete()
 
     def test_index_recap_parent_and_child_objects(self) -> None:
-        """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
-
+        """Confirm Dockets and RECAPDocuments are properly indexed in ES."""
         non_recap_docket = DocketFactory(
             court=self.court,
             case_name="SUBPOENAS SERVED ON",
@@ -8776,7 +9247,6 @@ class RECAPIndexingTest(
 
     def test_update_and_remove_parent_child_objects_in_es(self) -> None:
         """Confirm child documents can be updated and removed properly."""
-
         non_recap_docket = DocketFactory(
             court=self.court,
             date_filed=datetime.date(2013, 8, 16),
@@ -9054,10 +9524,7 @@ class RECAPIndexingTest(
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
     def test_update_docket_fields_in_recap_documents(self) -> None:
-        """Confirm all the docket fields in RECAPDocuments that belong to a
-        case are updated in bulk when the docket changes.
-        """
-
+        """Confirm all the docket fields in RECAPDocuments that belong to a case are updated in bulk when the docket changes."""
         judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
         judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
@@ -9293,10 +9760,7 @@ class RECAPIndexingTest(
             )
 
     def test_docket_indexing_and_tasks_count(self) -> None:
-        """Confirm a Docket is properly indexed in ES with the right number of
-        indexing tasks.
-        """
-
+        """Confirm a Docket is properly indexed in ES with the right number of indexing tasks."""
         # Avoid calling es_save_document for a non-recap docket.
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
@@ -9456,10 +9920,7 @@ class RECAPIndexingTest(
         docket_2.delete()
 
     def test_recap_document_indexing_and_tasks_count(self) -> None:
-        """Confirm a RECAPDocument is properly indexed in ES with the right
-        number of indexing tasks.
-        """
-
+        """Confirm a RECAPDocument is properly indexed in ES with the right number of indexing tasks."""
         docket = DocketFactory(
             court=self.court,
             pacer_case_id="asdf",
@@ -9695,9 +10156,7 @@ class RECAPIndexingTest(
         docket_2.delete()
 
     def test_search_pagination_results_limit(self) -> None:
-        """Confirm that the last page in the pagination is properly computed
-        based on the number of results returned by Elasticsearch.
-        """
+        """Confirm that the last page in the pagination is properly computed based on the number of results returned by Elasticsearch."""
         # Test pagination requests.
         search_params = {
             "type": SEARCH_TYPES.RECAP,
@@ -9766,7 +10225,6 @@ class RECAPIndexingTest(
 
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
-
         de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2024, 8, 19),
@@ -9785,7 +10243,6 @@ class RECAPIndexingTest(
 
     def test_prepare_parties(self) -> None:
         """Confirm prepare_parties return the expected values."""
-
         d = docket = DocketFactory(court=self.court, source=Docket.RECAP)
         firm = AttorneyOrganizationFactory(
             lookup_key="00kingofprussiaroadradnorkesslertopazmeltzercheck1908",
@@ -9873,9 +10330,7 @@ class RECAPIndexingTest(
     def test_index_party_from_bankr_case_name(
         self, mock_party_parser_task, mock_party_parser_document
     ):
-        """Confirm that the party field is populated by splitting the case_name
-        of a bankruptcy case when a valid separator is present.
-        """
+        """Confirm that the party field is populated by splitting the case_name of a bankruptcy case when a valid separator is present."""
         docket_with_no_parties = DocketFactory(
             court=self.court,
             case_name="Lorem v. Dolor",
@@ -9908,9 +10363,7 @@ class RECAPIndexingTest(
     def test_index_party_from_case_name_when_parties_are_not_available(
         self, mock_party_parser_task, mock_party_parser_document
     ) -> None:
-        """Confirm that the party field is populated by splitting the case_name
-        when a valid separator is present.
-        """
+        """Confirm that the party field is populated by splitting the case_name when a valid separator is present."""
         district_court = CourtFactory(id="akd", jurisdiction="FD")
         docket_with_parties = DocketFactory(
             court=district_court,
@@ -10038,10 +10491,7 @@ class RECAPHistoryTablesIndexingTest(
             self.r.delete(*keys)
 
     def test_docket_history_table_indexing(self) -> None:
-        """Confirm that dockets and their child documents are properly updated
-        based on events from their history tables.
-        """
-
+        """Confirm that dockets and their child documents are properly updated based on events from their history tables."""
         # Trigger docket events based on changes.
         docket_instance = self.de.docket
         docket_instance.case_name = "SUBPOENAS SERVED LOREM"
@@ -10164,9 +10614,7 @@ class RECAPHistoryTablesIndexingTest(
             self.r.delete(*keys)
 
     def test_docket_entry_history_table_indexing(self) -> None:
-        """Confirm that docket entries changes are properly updated into
-        ESRECAPDocuments based on events from their history tables."""
-
+        """Confirm that docket entries changes are properly updated into ESRECAPDocuments based on events from their history tables."""
         # Trigger docket entry events based on changes.
         de_instance = self.de
         de_instance.description = "Hearing for Leave to File Amicus"
@@ -10256,9 +10704,7 @@ class RECAPHistoryTablesIndexingTest(
             self.r.delete(*keys)
 
     def test_recap_history_table_indexing(self) -> None:
-        """Confirm that RECAPDocument changes are properly updated into
-        ESRECAPDocuments based on events from their history tables."""
-
+        """Confirm that RECAPDocument changes are properly updated into ESRECAPDocuments based on events from their history tables."""
         # Trigger RECAPDocument events based on changes.
         rd_instance = self.rd
         rd_instance.description = "Leave to File Amicus"
@@ -10456,15 +10902,12 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
         )
 
     def test_get_docket_events_and_docket_to_fix(self) -> None:
-        """Confirm that get_docket_events_and_slug_count can effectively
-        retrieve the slug count for dockets that match the cut_off_date and
-        ensure that their related slugs are properly annotated.
+        """Confirm that get_docket_events_and_slug_count can effectively retrieve the slug count for dockets that match the cut_off_date and ensure that their related slugs are properly annotated.
 
         Also, confirm that get_dockets_to_fix correctly filters out dockets
         that need to be fixed based on the slug count and the slugs in the
         Docket and DocketEvent tables.
         """
-
         # Change slug with two different values.
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
@@ -10548,10 +10991,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
 
     @mock.patch("cl.search.management.commands.fix_rd_broken_links.logger")
     def test_fix_broken_recap_document_links(self, mock_logger) -> None:
-        """Confirm fix_rd_broken_links properly fixes broken RECAPDocuments
-        links.
-        """
-
+        """Confirm fix_rd_broken_links properly fixes broken RECAPDocuments links."""
         self.docket_2.case_name = "Dolor Ipsum"
         self.docket_2.save()
 

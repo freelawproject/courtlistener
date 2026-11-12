@@ -46,8 +46,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     def test_returns_empty_list_when_query_with_error(self) -> None:
-        """Confirms the search helper returns an empty list when provided with
-        invalid query parameters."""
+        """Confirms the search helper returns an empty list when provided with invalid query parameters."""
         for description, query in self.errors:
             with self.subTest(description):
                 results, error_flag = fetch_es_results_for_csv(
@@ -58,10 +57,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 self.assertTrue(error_flag)
 
     def test_limit_number_of_search_results(self) -> None:
-        """Checks hat `fetch_es_results_for_csv` returns a list with a size
-        equal to MAX_SEARCH_RESULTS_EXPORTED or the actual number of search
-        results (if it's less than `MAX_SEARCH_RESULTS_EXPORTED`)
-        """
+        """Checks hat `fetch_es_results_for_csv` returns a list with a size equal to MAX_SEARCH_RESULTS_EXPORTED or the actual number of search results (if it's less than `MAX_SEARCH_RESULTS_EXPORTED`)."""
         # This query should match all 5 judges indexed for this test
         query = "q=gender:Female&type=p"
         for i in range(6):
@@ -79,8 +75,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 self.assertEqual(len(results), expected_result_count)
 
     def test_can_flatten_nested_results(self) -> None:
-        """checks `fetch_es_results_for_csv` correctly handles and flattens
-        nested results."""
+        """Checks `fetch_es_results_for_csv` correctly handles and flattens nested results."""
         # This query matches both docket records from RECAPSearchTestCase.
         # Using "SUBPOENAS SERVED" which is unique to the test factory data
         # (case_name="SUBPOENAS SERVED ON" and "SUBPOENAS SERVED OFF").
@@ -108,7 +103,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(len(results), 2)
 
     def test_avoids_sending_email_for_query_with_error(self) -> None:
-        "Confirms we don't send emails when provided with invalid query"
+        """Confirms we don't send emails when provided with invalid query."""
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )
@@ -120,8 +115,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 self.assertEqual(len(mail.outbox), 0)
 
     def test_do_not_send_empty_emails(self) -> None:
-        """Confirms that no emails are sent when the search query returns no
-        results"""
+        """Confirms that no emails are sent when the search query returns no results."""
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )
@@ -131,7 +125,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_can_send_email_with_docket_no_child(self) -> None:
-        "Confirms we can send emails when the document has no child"
+        """Confirms we can send emails when the document has no child."""
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )
@@ -161,7 +155,7 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     )
 
     def test_sends_email_with_attachment(self) -> None:
-        "Confirms we can send emails when the query is correct"
+        """Confirms we can send emails when the query is correct."""
         self.client.login(
             username=self.user_profile.user.username, password="password"
         )

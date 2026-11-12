@@ -22,18 +22,25 @@ NYCOA_DN_RE = re.compile(r"[A-Z]{2,4}-\d{4}-\d{3,6}")
 def is_nycoa_court(court_id: str) -> bool:
     """Check if the given `court_id` belongs to the New York Court of Appeals.
 
-    :param court_id: The court ID to check.
-    :return: Whether the ID belongs to the New York Court of Appeals."""
+    Args:
+        court_id: The court ID to check.
 
+    Returns:
+        Whether the ID belongs to the New York Court of Appeals.
+    """
     return court_id == NYCOA_COURT_ID
 
 
 def make_docket_number_core(docket_number: str, /) -> str:
     """Normalize a New York Court of Appeals docket number.
 
-    :param docket_number: The docket number to normalize.
-    :return: The normalized docket number, or an empty string when the input
-        holds no recognizable Court of Appeals docket number."""
+    Args:
+        docket_number: The docket number to normalize.
+
+    Returns:
+        The normalized docket number, or an empty string when the input
+        holds no recognizable Court of Appeals docket number.
+    """
     dn_clean = normalize_dashes(docket_number.strip().upper())
     if not dn_clean:
         return ""
@@ -67,15 +74,17 @@ RESERVED_CODES: dict[Unclassified, int] = {
 def mirrored_code(
     mirror: type[IntegerChoices], member: CourtVocabulary | Unclassified
 ) -> int:
-    """The code CourtListener stores for a reading of a Juriscraper vocabulary
-    it mirrors.
+    """The code CourtListener stores for a reading of a Juriscraper vocabulary it mirrors.
 
     Both kinds of reading map by name, since every mirror defines `UNKNOWN` and
     `UNASSIGNED` under the names `Unclassified` uses.
 
-    :param mirror: CourtListener's mirror of the vocabulary.
-    :param member: What the scrape schema classified the field as.
-    :return: The mirrored code, or `UNASSIGNED` for a member not yet mirrored.
+    Args:
+        mirror: CourtListener's mirror of the vocabulary.
+        member: What the scrape schema classified the field as.
+
+    Returns:
+        The mirrored code, or `UNASSIGNED` for a member not yet mirrored.
     """
     try:
         return int(mirror[member.name].value)
@@ -92,15 +101,17 @@ def mirrored_code(
 
 
 def issue_code(member: CourtVocabulary | Unclassified) -> int:
-    """The code CourtListener stores for a reading of one of the two issue
-    vocabularies.
+    """The code CourtListener stores for a reading of one of the two issue vocabularies.
 
     Those two are too large to mirror, so their codes are Juriscraper's own
     rather than a mirror's; see `cl.search.state.new_york.vocabularies`.
 
-    :param member: What the scrape schema classified the category or subcategory
-        as.
-    :return: The published code, or the reserved one for a reading that names no
+    Args:
+        member: What the scrape schema classified the category or subcategory
+            as.
+
+    Returns:
+        The published code, or the reserved one for a reading that names no
         member.
     """
     if isinstance(member, Unclassified):

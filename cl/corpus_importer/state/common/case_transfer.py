@@ -43,11 +43,15 @@ TRANSFER_REASON_MAP: dict[TransferReason, int] = {
 def inbound_transfers[TransferType: DocketTransfer](
     docket_data: ScrapeDocket[TransferType, Any, Any], params: Any
 ) -> list[TransferType]:
-    """Filter a docket's transfers down to the ones a `CaseTransfer` can be
-    created for. Skipped transfers are logged but do not fail the merge.
+    """Filter a docket's transfers down to the ones a `CaseTransfer` can be created for. Skipped transfers are logged but do not fail the merge.
 
-    :param docket_data: The scraped docket.
-    :return: The transfers to merge."""
+    Args:
+        docket_data: The scraped docket.
+        params: Unused.
+
+    Returns:
+        The transfers to merge.
+    """
     transfers = []
     for transfer in docket_data.transfers:
         if transfer.direction is not TransferDirection.INBOUND:
@@ -115,7 +119,8 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     The destination fields come from the parent docket and the origin docket
     number and transfer type from the scraped transfer; subclasses must
     define the ``origin_court_id`` attribute to translate the transfer's
-    Juriscraper court ID to a CourtListener one."""
+    Juriscraper court ID to a CourtListener one.
+    """
 
     model: ClassVar[type[Model]] = CaseTransfer
     # Both ends are identified by court and docket number rather than by FK so
@@ -155,7 +160,9 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         can be filled in (see `update_existing`); otherwise match a transfer
         already attached to the parent docket.
 
-        :return: The queryset to find the transfer."""
+        Returns:
+            The queryset to find the transfer.
+        """
         # `super().query()` can't be used here. For a related merger
         # `self.manager` is the parent docket's reverse FK manager, so it would
         # constrain the lookup to `destination_docket = parent` and hide the

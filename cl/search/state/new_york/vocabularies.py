@@ -192,13 +192,15 @@ class FilingDocType(models.IntegerChoices):
 def _choices(
     vocabulary: type[CourtVocabulary],
 ) -> list[tuple[int, str]]:
-    """Django choices for one Juriscraper vocabulary, bracketed by the two
-    reserved codes.
+    """Django choices for one Juriscraper vocabulary, bracketed by the two reserved codes.
 
     Only for the vocabularies too large to mirror; see the module docstring.
 
-    :param vocabulary: The Juriscraper vocabulary to generate choices from.
-    :return: The choices, in the vocabulary's own order.
+    Args:
+        vocabulary: The Juriscraper vocabulary to generate choices from.
+
+    Returns:
+        The choices, in the vocabulary's own order.
     """
     return [
         (UNKNOWN, "Unknown"),

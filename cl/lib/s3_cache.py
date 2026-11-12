@@ -14,8 +14,11 @@ def get_s3_cache(fallback_cache: str = "db_cache") -> BaseCache:
     returns the specified fallback cache to avoid requiring S3 access
     for local development or to allow quick rollback if issues arise.
 
-    :param fallback_cache: Cache alias to use in dev/test (default: "db_cache")
-    :return: Django cache backend instance
+    Args:
+        fallback_cache: Cache alias to use in dev/test (default: "db_cache")
+
+    Returns:
+        Django cache backend instance
     """
     is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
     if is_dev_or_test or not switch_is_active("enable-s3-cache"):
@@ -32,9 +35,12 @@ def make_s3_cache_key(base_key: str, timeout_seconds: int | None) -> str:
     returns the key unchanged to maintain compatibility with existing
     cache behavior.
 
-    :param base_key: The base cache key (e.g., "clusters-mlt-es:123")
-    :param timeout_seconds: Cache timeout in seconds, or None for persistent
-    :return: Cache key with time-based prefix (production) or unchanged (dev/test)
+    Args:
+        base_key: The base cache key (e.g., "clusters-mlt-es:123")
+        timeout_seconds: Cache timeout in seconds, or None for persistent
+
+    Returns:
+        Cache key with time-based prefix (production) or unchanged (dev/test)
     """
     is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
     if is_dev_or_test or not switch_is_active("enable-s3-cache"):

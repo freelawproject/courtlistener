@@ -20,7 +20,7 @@ NAIVE_SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS}
 
 @keep_lazy_text
 def slugify_reporter(reporter: str) -> str:
-    """Slugify reporters preventing slug collision
+    """Slugify reporters preventing slug collision.
 
     Some different reporter abbreviations may have their naive slug collide
     Examples where  one is the state reporter, the other a neutral reporter
@@ -30,8 +30,11 @@ def slugify_reporter(reporter: str) -> str:
     Others: 'CIT' 'C.I.T.'; 'Day.' 'Day'; 'MSPB' 'M.S.P.B.'; 'Me.' 'ME';
     'ND' 'N.D.'; 'NM' 'N.M.'; 'Pa.' 'PA'; 'SD' 'S.D.'
 
-    :param reporter: the reporter abbreviation, or a slug, or an user input
-    :return: the collision-aware slug
+    Args:
+        reporter: the reporter abbreviation, or a slug, or an user input
+
+    Returns:
+        the collision-aware slug
     """
     slug = str(slugify(reporter))
     if slug == reporter:
@@ -60,10 +63,13 @@ SLUGIFIED_EDITIONS = {slugify_reporter(item): item for item in EDITIONS}
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
-    """Map a citation type from the reporters DB to CL Citation type
+    """Map a citation type from the reporters DB to CL Citation type.
 
-    :param citation_type: A value from REPORTERS['some-key']['cite_type']
-    :return: A value from the search.models.Citation object
+    Args:
+        citation_type: A value from REPORTERS['some-key']['cite_type']
+
+    Returns:
+        A value from the search.models.Citation object
     """
     Citation = apps.get_model("search.Citation")
     citation_map = {
@@ -83,14 +89,14 @@ def map_reporter_db_cite_type(citation_type: str) -> int:
 async def get_citation_depth_between_clusters(
     citing_cluster_pk: int, cited_cluster_pk: int
 ) -> int:
-    """OpinionsCited objects exist as relationships between Opinion objects,
-    but we often want access to citation depth information between
-    OpinionCluster objects. This helper method assists in doing the necessary
-    DB lookup.
+    """OpinionsCited objects exist as relationships between Opinion objects, but we often want access to citation depth information between OpinionCluster objects. This helper method assists in doing the necessary DB lookup.
 
-    :param citing_cluster_pk: The primary key of the citing OpinionCluster
-    :param cited_cluster_pk: The primary key of the cited OpinionCluster
-    :return: The sum of all the depth fields of the OpinionsCited objects
+    Args:
+        citing_cluster_pk: The primary key of the citing OpinionCluster
+        cited_cluster_pk: The primary key of the cited OpinionCluster
+
+    Returns:
+        The sum of all the depth fields of the OpinionsCited objects
         associated with the Opinion objects associated with the given
         OpinionCited objects
     """
@@ -105,7 +111,7 @@ async def get_citation_depth_between_clusters(
 def get_years_from_reporter(
     citation: FullCaseCitation,
 ) -> tuple[int, int]:
-    """Given a citation object, try to look it its dates in the reporter DB"""
+    """Given a citation object, try to look it its dates in the reporter DB."""
     start_year = 1750
     end_year = date.today().year
 
@@ -133,8 +139,7 @@ def make_name_param(
 
 
 def get_canonicals_from_reporter(reporter_or_slug: str) -> list[str]:
-    """
-    Disambiguates a reporter slug using a list of variations.
+    """Disambiguates a reporter slug using a list of variations.
 
     The list of variations is a dictionary that maps each variation
     to a list of reporters that it could be possibly referring to.
@@ -159,8 +164,7 @@ def get_canonicals_from_reporter(reporter_or_slug: str) -> list[str]:
 def filter_out_non_case_law_citations(
     citations: list[CitationBase],
 ) -> list[FullCaseCitation | ShortCaseCitation]:
-    """
-    Filters out all non-case law citations from a list of citations.
+    """Filters out all non-case law citations from a list of citations.
 
     Args:
         citations (list[CitationBase]): List of citation
@@ -178,9 +182,7 @@ def filter_out_non_case_law_citations(
 def filter_out_non_case_law_and_non_valid_citations(
     citations: list[CitationBase],
 ) -> list[FullCaseCitation | ShortCaseCitation]:
-    """
-    Filters out all non-case law citations and citations with no volume or page
-    from a list of citations.
+    """Filters out all non-case law citations and citations with no volume or page from a list of citations.
 
     Args:
         citations (list[CitationBase]): List of citation
@@ -198,11 +200,14 @@ def filter_out_non_case_law_and_non_valid_citations(
 
 
 def chunk_text(text: str, chunk_size: int):
-    """Chunk text with overlapping chunks to avoid misses
+    """Chunk text with overlapping chunks to avoid misses.
 
-    :param text: Text to chunk
-    :param chunk_size: The chunk size
-    :return: Chunks of text
+    Args:
+        text: Text to chunk
+        chunk_size: The chunk size
+
+    Returns:
+        Chunks of text
     """
     if len(text) <= chunk_size:
         yield text
@@ -220,14 +225,17 @@ def chunk_text(text: str, chunk_size: int):
 def make_get_citations_kwargs(
     document: "RECAPDocument | Opinion", chunk_size: int = 200_000
 ) -> list[dict]:
-    """Prepare markup kwargs for `get_citations` - chunked
+    """Prepare markup kwargs for `get_citations` - chunked.
 
     This is done outside `get_citations` because it uses specific Opinion
     attributes used are set in Courtlistener, not in eyecite.
 
-    :param document: The Opinion or RECAPDocument whose text should be parsed
-    :param chunk_size: The chunk size
-    :return: a list dict kwargs for `get_citations`
+    Args:
+        document: The Opinion or RECAPDocument whose text should be parsed
+        chunk_size: The chunk size
+
+    Returns:
+        a list dict kwargs for `get_citations`
     """
     segments = []
     for attr in [
@@ -261,15 +269,17 @@ def make_get_citations_kwargs(
 def get_cited_clusters_ids_to_update(
     resolutions, citing_opinion_id: int
 ) -> list[int]:
-    """Get ids for clusters that need their `citation_count` updated
+    """Get ids for clusters that need their `citation_count` updated.
 
     Increase the citation count for the cluster of each matched opinion
     if that cluster has not already been cited by this opinion.
 
-    :param resolutions: an iterable of opinion objects
-    :param citing_opinion_id: the citing opinion
+    Args:
+        resolutions: an iterable of opinion objects
+        citing_opinion_id: the citing opinion
 
-    :return: the list of OpinionCluster ids for update
+    Returns:
+        the list of OpinionCluster ids for update
     """
     # prevent circular imports
     OpinionsCited = apps.get_model("search.OpinionsCited")

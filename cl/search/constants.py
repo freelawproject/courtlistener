@@ -3,6 +3,12 @@ import re
 
 from cl.search.models import SEARCH_TYPES, Court, Opinion
 
+# Courts served by each docket source other than RECAP, declared once and
+# read by cl.opinion_page.docket_entry_sources and
+# cl.search.es_docket_sources. Future sources may cover many courts, and
+# listing them in both modules makes it easy to miss one.
+SCOTUS_COURT_IDS: frozenset[str] = frozenset({"scotus"})
+
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,
@@ -271,6 +277,13 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PEOPLE: "id",
     SEARCH_TYPES.ORAL_ARGUMENT: "id",
     SEARCH_TYPES.PARENTHETICAL: "id",
+}
+
+# SCOTUS documents have no id (it's RECAP-only), so the search page's
+# document counts also count their uid. The search APIs don't show SCOTUS
+# yet, so they count id only.
+cardinality_query_extra_unique_ids = {
+    SEARCH_TYPES.RECAP_DOCUMENT: "uid",
 }
 
 
