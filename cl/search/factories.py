@@ -193,7 +193,7 @@ class OpinionContentFactory(DjangoModelFactory):
     opinion = SubFactory(OpinionWithParentsFactory)
     content = Faker("text", max_nb_chars=2000)
     source = OpinionContent.FLP_SCANNING
-    extraction_type = OpinionContent.OCR
+    extraction_type = OpinionContent.OCR_ENSEMBLE
     is_main_version = True
 
 

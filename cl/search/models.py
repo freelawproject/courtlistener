@@ -3438,12 +3438,17 @@ class OpinionContent(AbstractDateTimeModel):
     DEFAULT = 0
     OCR = 1
     LLM = 2
+    OCR_ENSEMBLE = 3
     EXTRACTION_METHOD = (
         (DEFAULT, "Extracted by opening the document and getting the text"),
         (OCR, "Extracted via OCR"),
         (
             LLM,
             "Extracted via LLM",
+        ),
+        (
+            OCR_ENSEMBLE,
+            "Extracted via the FLP Scanning Project's ensemble of OCR engines",
         ),
     )
     opinion = models.ForeignKey(
