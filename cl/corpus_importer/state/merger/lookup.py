@@ -45,8 +45,7 @@ class SiblingLookup[M: Model](ABC):
     Every merger of the group has to be created before any of them is merged:
     a merger's lookup only sees the claims made before it runs.
 
-    Whatever a lookup queries for, it loads along with everything the mergers
-    of the related objects will look for in turn."""
+    Whatever a lookup queries for, it loads as `Merger.loading` has it."""
 
     def __init__(self, merger: type[Merger[Any, Any, M]]) -> None:
         """
@@ -124,11 +123,7 @@ class KeyLookup[M: Model](SiblingLookup[M]):
             operator.or_, [Q(**key.filters) for key, _ in self._unfetched]
         )
         self._unfetched = []
-        self._rows.extend(
-            manager.filter(matching).prefetch_related(
-                *self._merger.config.registry.prefetch
-            )
-        )
+        self._rows.extend(self._merger.loading(manager.filter(matching)))
         self._index(key)
 
 
@@ -159,9 +154,7 @@ class RelationLookup[M: Model](SiblingLookup[M]):
             return
         self._related = None
         if related._result_cache is None:
-            related = related.prefetch_related(
-                *self._merger.config.registry.prefetch
-            )
+            related = self._merger.loading(related)
         self._rows.extend(related)
 
     @override

@@ -450,7 +450,9 @@ class NYCoADocketEntryMerger[ParamType](
             return
         if any(file.available for file in scrape.attachments):
             return
-        _ = entry.documents.all().delete()
+        # Not through `entry.documents`: the documents the entry was loaded
+        # with are missing fields the deletion signals read.
+        _ = NYCoADocument.objects.filter(docket_entry=entry).delete()
 
 
 class ScrapedAttorney(NYCoAAttorney):
@@ -684,7 +686,7 @@ class NYCoAIssueMerger[ParamType](
             The candidate rows, oldest first, so that `resolve` is
             deterministic.
         """
-        candidates = self.manager.filter(
+        candidates = self.stored.filter(
             category=self.category,
             subcategory=self.subcategory,
         )

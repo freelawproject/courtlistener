@@ -26,7 +26,9 @@ from django.db.models import (
     ForeignObjectRel,
     Model,
     OneToOneRel,
+    Prefetch,
     QuerySet,
+    prefetch_related_objects,
 )
 
 from cl.corpus_importer.state.utils import MergeResult
@@ -590,15 +592,19 @@ class RelatedMerger[
         return errors
 
     @property
-    def prefetch(self) -> list[str]:
+    def prefetch(self) -> list[Prefetch]:
         """The `prefetch_related` lookups, relative to the parent's model,
         loading everything that merging this relation looks for."""
         return [
-            self._name,
-            *[
-                f"{self._name}__{path}"
-                for path in self.merger.config.registry.prefetch
-            ],
+            Prefetch(
+                self._name,
+                self.merger.loading(
+                    cast(
+                        QuerySet[RM],
+                        self.merger.config.model._default_manager.all(),
+                    )
+                ),
+            )
         ]
 
     @abstractmethod
@@ -664,6 +670,17 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
                 return MergeResult.failed(self.merger.config.model.__name__)
             db_obj = None
         else:
+            # Reading the relation off the parent would load the whole
+            # object; this is skipped for one that is already loaded.
+            prefetch_related_objects(
+                [parent],
+                Prefetch(
+                    self._name,
+                    self.merger.config.model._default_manager.only(
+                        *self.merger.config.fields
+                    ),
+                ),
+            )
             try:
                 db_obj = cast(RM | None, getattr(parent, self._name))
             except ObjectDoesNotExist:
@@ -770,7 +787,12 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
                 if len(related_objects) == len(child_mergers):
                     to_keep = {r.pk for r in related_objects}
                     if stale := {o.pk for o in children.existing()} - to_keep:
-                        _ = related_manager.filter(pk__in=stale).delete()
+                        # Not through `related_manager`: what a parent was
+                        # loaded with is missing fields, which the deletion
+                        # signals are entitled to.
+                        _ = self.merger.config.model._default_manager.filter(
+                            pk__in=stale
+                        ).delete()
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
             # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
@@ -871,7 +893,7 @@ class ManyToManyMerger[
 
     @property
     @override
-    def prefetch(self) -> list[str]:
+    def prefetch(self) -> list[Prefetch]:
         if self.through is not None:
             # The related objects are looked up among every object of their
             # model rather than among those the parent already holds.

@@ -212,7 +212,7 @@ class FloridaDocumentMerger(
         RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
         FloridaDocument,
     ]:
-        by_uuid = self.manager.filter(link_uuid=self.link_uuid)[:2]
+        by_uuid = self.stored.filter(link_uuid=self.link_uuid)[:2]
         if len(list(by_uuid)) > 0:
             return state.resolve(by_uuid)
 
@@ -232,7 +232,7 @@ class FloridaDocumentMerger(
         # those attachments (even if they were renamed), so they can't be the
         # one replaced. Excluding them also keeps the candidates stable while
         # sibling attachments merge.
-        candidates = self.manager.filter(
+        candidates = self.stored.filter(
             document_name=state.scrape.document_name
         ).exclude(
             link_uuid__in=[

@@ -8,7 +8,7 @@ target model are per-state).
 
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
@@ -18,6 +18,7 @@ from cl.corpus_importer.state.merger import (
     Fn,
     ManyStrategy,
     Merger,
+    MergerConfig,
     MergerState,
     OneToManyRelation,
     Params,
@@ -42,6 +43,14 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
+    """Merges a scraped document's URL, and clears what was stored for the
+    old one when it changes."""
+
+    config: ClassVar[MergerConfig[AbstractStateDocument]] = MergerConfig(
+        model=AbstractStateDocument,
+        reads=("filepath_local", "processing_error"),
+    )
+
     url: str = Scrape(ScrapeDocument).url
 
     @override

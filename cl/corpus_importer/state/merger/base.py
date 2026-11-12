@@ -21,6 +21,7 @@ from typing import (
 
 from django.db.models import (
     Model,
+    Prefetch,
     QuerySet,
 )
 from django.db.models.manager import Manager
@@ -112,7 +113,7 @@ class MergerSpecRegistry[Scrape, Params]:
         ]
 
     @cached_property
-    def prefetch(self) -> tuple[str, ...]:
+    def prefetch(self) -> tuple[Prefetch, ...]:
         """The `prefetch_related` lookups, relative to the merger's model,
         loading everything the mergers of its relations look for."""
         return tuple(
@@ -194,14 +195,25 @@ class MergerConfig[M: Model]:
     :ivar model: The model the merger applies to.
     :ivar key: A natural key to use for looking up objects in the DB; used in
         the default `lookup` implementation.
+    :ivar reads: The model fields read off the object being merged into that
+        no spec is declared for, such as those a `pre_update` hook or the
+        model's `save` looks at. A field that is neither declared nor listed
+        here is not loaded with the object, so reading it costs a query. A
+        merger also loads the fields the mergers it subclasses list here,
+        abstract ones included.
     :ivar registry: The specs declared on the merger. Filled in when the
-        merger class is created, so it should not be passed."""
+        merger class is created, so it should not be passed.
+    :ivar fields: The model fields loaded of an object read to be merged
+        into; every other field is deferred. Filled in when the merger class
+        is created, so it should not be passed."""
 
     model: Final[type[M]]
     key: Final[Iterable[str]] = ()
+    reads: Final[Iterable[str]] = ()
     registry: MergerSpecRegistry[Any, Any] = field(
         default_factory=MergerSpecRegistry
     )
+    fields: tuple[str, ...] = ()
 
 
 class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
@@ -237,7 +249,32 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
         errors = registry.validate(cls)
 
-        cls.config = MergerConfig(cls.config.model, cls.config.key, registry)
+        model = cls.config.model
+        reads = tuple(
+            dict.fromkeys(
+                chain.from_iterable(
+                    config.reads
+                    for base in cls.__mro__
+                    if (config := vars(base).get("config")) is not None
+                )
+            )
+        )
+        # Django reads a row's foreign keys to tie it to the objects it is
+        # related to, so deferring one costs a query per row.
+        foreign_keys = [
+            f.attname for f in model._meta.concrete_fields if f.is_relation
+        ]
+        cls.config = MergerConfig(
+            model,
+            cls.config.key,
+            reads,
+            registry,
+            tuple(
+                dict.fromkeys(
+                    chain(registry.attr, cls.config.key, reads, foreign_keys)
+                )
+            ),
+        )
 
         if errors:
             raise TypeError(
@@ -370,11 +407,38 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             ),
         )
 
+    @classmethod
+    def loading(cls, objects: QuerySet[M]) -> QuerySet[M]:
+        """Have a query load what merging its objects takes and no more: the
+        fields this merger uses, and everything the mergers of its relations
+        look for.
+
+        The related objects come without their other fields too, and so does
+        anything queried through the relation they were loaded into. Deleting
+        through such a relation hands the deletion signals objects with
+        fields missing; delete through the model's manager instead.
+
+        Args:
+            objects: A query for objects of this merger's model.
+
+        Returns:
+            The narrowed query."""
+        return objects.only(*cls.config.fields).prefetch_related(
+            *cls.config.registry.prefetch
+        )
+
+    @property
+    def stored(self) -> QuerySet[M]:
+        """The objects this merger can merge into, loaded with only the
+        fields it uses. A lookup that evaluates its own query should build it
+        from this rather than from `manager`."""
+        return self.manager.only(*self.config.fields)
+
     def _key_query(
         self, state: MergerState.Lookup[Scrape, Params, M]
     ) -> QuerySet[M]:
         """The objects matching this merger's natural key."""
-        return self.manager.filter(**self.natural_key(state).filters)
+        return self.stored.filter(**self.natural_key(state).filters)
 
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
@@ -419,7 +483,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         results: Sequence[M]
         if isinstance(state.candidates, QuerySet):
             if state.candidates._result_cache is None:
-                qs = state.candidates[:2]
+                qs = state.candidates.only(*self.config.fields)[:2]
             else:
                 qs = state.candidates
 

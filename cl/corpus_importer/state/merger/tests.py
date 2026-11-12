@@ -3,6 +3,8 @@ from typing import Any, ClassVar, cast, override
 
 from django.db import connection
 from django.db.models import Model, QuerySet
+from django.db.models.signals import post_delete
+from django.test.utils import CaptureQueriesContext
 
 from cl.corpus_importer.state.common.docket import (
     DocketEntryRelation,
@@ -23,6 +25,7 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     Scrape,
     ThroughParameters,
+    Update,
 )
 from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.factories import PersonFactory
@@ -104,6 +107,15 @@ def merger_test[**P, R](
     return decorator
 
 
+DOCKET_SAVE_READS = (
+    "case_name",
+    "slug",
+    "docket_number_raw",
+    "docket_number_core",
+)
+"""The fields saving a docket that has a case name reads."""
+
+
 class BaseMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -163,7 +175,9 @@ class BaseMergerTest(TestCase):
         start_docket_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, reads=DOCKET_SAVE_READS
+            )
 
             court_id: str = Constant(self.court.id)
             source: int = Constant(DocketSources.SCRAPER)
@@ -309,7 +323,9 @@ class BaseMergerTest(TestCase):
             docket_number_trial: str = Scrape(dict)["dn"]
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, reads=DOCKET_SAVE_READS
+            )
 
             court: Court = Constant(tc.court)
             source: int = Constant(DocketSources.SCRAPER)
@@ -352,7 +368,9 @@ class BaseMergerTest(TestCase):
             docket_number_trial: str = Scrape(dict)["dn"]
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, reads=DOCKET_SAVE_READS
+            )
 
             court: Court = Constant(tc.court)
             source: int = Constant(DocketSources.SCRAPER)
@@ -1084,6 +1102,195 @@ class SiblingLookupTest(TestCase):
             ),
             ["First", "Second", "Third"],
         )
+
+
+class LoadedFieldsTest(TestCase):
+    """Which fields a merger loads of the objects it merges into."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            source=DocketSources.SCRAPER,
+            docket_number="LOADED-1",
+        )
+        for description in ("First", "Second"):
+            DocketEntryFactory.create(
+                docket=cls.docket, description=description
+            )
+        cls.scrape = {
+            "docket_number": cls.docket.docket_number,
+            "entries": [{"description": "First"}, {"description": "Second"}],
+        }
+
+    def merged(self, merger: Merger[Any, Any, Any]) -> Any:
+        """Run a merge that is expected to succeed.
+
+        :return: The object merged into."""
+        merger.merge()
+        state = merger.state
+        if not isinstance(state, MergerState.Complete):
+            self.fail(f"The merge did not complete: {state}")
+        return state.output
+
+    def test_lookup_loads_only_used_fields(self) -> None:
+        """Does a lookup leave out the fields no spec uses, both of the
+        objects it finds and of the related objects it loads with them?"""
+        court = self.merged(
+            KeyedCourtMerger(
+                {"id": self.court.pk, "dockets": [self.scrape]}, params=None
+            )
+        )
+        [docket] = court.dockets.all()
+        entries = docket.docket_entries.all()
+
+        self.assertIn("full_name", court.get_deferred_fields())
+        self.assertIn("case_name", docket.get_deferred_fields())
+        self.assertNotIn("docket_number", docket.get_deferred_fields())
+        self.assertEqual(len(entries), 2)
+        for entry in entries:
+            self.assertIn("entry_number", entry.get_deferred_fields())
+            self.assertNotIn("description", entry.get_deferred_fields())
+
+    def test_relation_loads_only_used_fields(self) -> None:
+        """Are the objects a parent holds read without the fields no spec
+        uses, in a single query?"""
+        merger = KeyedDocketMerger(
+            self.scrape, params=None, existing=Update(self.docket)
+        )
+        with CaptureQueriesContext(connection) as queries:
+            merger.merge()
+
+        self.assertEqual(len(queries), 1, queries.captured_queries)
+        selected = queries[0]["sql"].partition(" FROM ")[0]
+        self.assertIn('"description"', selected)
+        self.assertNotIn('"entry_number"', selected)
+
+    def test_one_to_one_loads_only_used_fields(self) -> None:
+        """Is the object on the other side of a one-to-one relation read
+        without the fields no spec uses?"""
+        origin = OriginatingCourtInformation.objects.create(
+            docket_number="ORIGIN-1"
+        )
+        self.docket.originating_court_information = origin
+        self.docket.save()
+
+        class OriginMerger(
+            Merger[dict[str, str], Any, OriginatingCourtInformation]
+        ):
+            config: ClassVar[MergerConfig[OriginatingCourtInformation]] = (
+                MergerConfig(model=OriginatingCourtInformation)
+            )
+
+            docket_number: str = Scrape(dict)["docket_number"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            docket_number: str = Scrape(dict)["docket_number"]
+            originating_court_information: OriginatingCourtInformation = (
+                OneToOneRelation(OriginMerger, Scrape(dict)["origin"])
+            )
+
+        docket = Docket.objects.get(pk=self.docket.pk)
+        self.merged(
+            TestMerger(
+                {
+                    "docket_number": docket.docket_number,
+                    "origin": {"docket_number": "ORIGIN-1"},
+                },
+                params=None,
+                existing=Update(docket),
+            )
+        )
+
+        loaded = docket.originating_court_information
+        if loaded is None:
+            self.fail("The docket lost its originating court information.")
+        self.assertIn("court_reporter", loaded.get_deferred_fields())
+        self.assertNotIn("docket_number", loaded.get_deferred_fields())
+
+    def test_overridden_lookup_loads_only_used_fields(self) -> None:
+        """Are the candidates of a lookup that runs its own query read
+        without the fields no spec uses?"""
+
+        class TestMerger(KeyedDocketMerger):
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[Any, Any, Docket]
+            ) -> MergerState.LookupOutput[Any, Any, Docket]:
+                return state.resolve(
+                    Docket.objects.filter(docket_number=self.docket_number)
+                )
+
+        docket = self.merged(TestMerger(self.scrape, params=None))
+
+        self.assertEqual(docket.pk, self.docket.pk)
+        self.assertIn("case_name", docket.get_deferred_fields())
+        self.assertNotIn("docket_number", docket.get_deferred_fields())
+
+    def test_stored_loads_only_used_fields(self) -> None:
+        """Does a query a merger builds for itself leave out the fields no
+        spec uses?"""
+        docket = KeyedDocketMerger(self.scrape, params=None).stored.get()
+
+        self.assertIn("case_name", docket.get_deferred_fields())
+        self.assertNotIn("docket_number", docket.get_deferred_fields())
+
+    def test_pruned_objects_are_deleted_whole(self) -> None:
+        """Does a deletion signal get every field of a pruned object, though
+        the lookup that found it loaded only some?"""
+        deferred: list[set[str]] = []
+
+        def record(instance: DocketEntry, **kwargs: Any) -> None:
+            """Note which fields a deleted entry was loaded without."""
+            deferred.append(instance.get_deferred_fields())
+
+        post_delete.connect(record, sender=DocketEntry)
+        self.addCleanup(post_delete.disconnect, record, sender=DocketEntry)
+
+        self.merged(
+            KeyedDocketMerger(
+                self.scrape | {"entries": [{"description": "First"}]},
+                params=None,
+            )
+        )
+
+        self.assertEqual(deferred, [set()])
+
+    def test_declared_reads_are_loaded(self) -> None:
+        """Is a field a merger says it reads loaded although no spec uses
+        it?"""
+
+        class TestMerger(KeyedDocketMerger):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, key=("docket_number",), reads=("case_name",)
+            )
+
+        docket = self.merged(TestMerger(self.scrape, params=None))
+
+        self.assertNotIn("case_name", docket.get_deferred_fields())
+        self.assertIn("case_name_full", docket.get_deferred_fields())
+
+    def test_reads_extend_inherited_reads(self) -> None:
+        """Does a merger that declares reads of its own still load the ones
+        its parent declared?"""
+
+        class ParentMerger(KeyedDocketMerger):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, key=("docket_number",), reads=("case_name",)
+            )
+
+        class ChildMerger(ParentMerger):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, key=("docket_number",), reads=("slug",)
+            )
+
+        docket = self.merged(ChildMerger(self.scrape, params=None))
+
+        self.assertNotIn("case_name", docket.get_deferred_fields())
+        self.assertNotIn("slug", docket.get_deferred_fields())
 
 
 class EntryMerger(Merger[dict[str, str], Any, DocketEntry]):
