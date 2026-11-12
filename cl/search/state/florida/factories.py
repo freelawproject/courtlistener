@@ -28,8 +28,7 @@ class FloridaDocketEntryFactory(DjangoModelFactory):
     @post_generation
     # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
     def submitted_by(obj: FloridaDocketEntry, create, extracted, **kwargs):
-        """Attach a submitting party tied to the entry's docket, since
-        PartyFactory's default attorney requires a docket."""
+        """Attach a submitting party tied to the entry's docket, since PartyFactory's default attorney requires a docket."""
         if not create:
             return
         obj.submitted_by = extracted or PartyFactory(docket=obj.docket)

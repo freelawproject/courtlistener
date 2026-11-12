@@ -50,8 +50,7 @@ class StopPolling(Exception):
 
 
 def make_court_metadata(external_id: int) -> CourtMetadata:
-    """Build a CourtMetadata carrying only the fields the poller reads (the
-    court's external identifier and resource UUID)."""
+    """Build a CourtMetadata carrying only the fields the poller reads (the court's external identifier and resource UUID)."""
     return CourtMetadata(
         court=FloridaCourt.model_construct(
             external_identifier=external_id, resource_id=uuid4()
@@ -153,9 +152,7 @@ class FloridaDocumentPollParserTest(SimpleTestCase):
     """Unit test for the poll-endpoint results parser."""
 
     def test_parse_full_extracts_case_identifiers(self):
-        """The parser must pull the case UUID and court external ID out of
-        each result's caseHeader and the document link UUID out of the
-        result."""
+        """The parser must pull the case UUID and court external ID out of each result's caseHeader and the document link UUID out of the result."""
         case_uuid = uuid4()
         link_uuid = uuid4()
         payload = json.dumps(
@@ -233,9 +230,11 @@ class FlPollerPollTest(TestCase):
         case_backfill_days: int = 0,
         between_cycles: Callable[[], None] = lambda: None,
     ) -> None:
-        """Run poll for the given number of cycles. The inter-cycle sleep is
-        mocked to call `between_cycles`, then raise after the last cycle since
-        the loop has no other exit."""
+        """Run poll for the given number of cycles.
+
+        The inter-cycle sleep is mocked to call `between_cycles`, then raise
+        after the last cycle since the loop has no other exit.
+        """
         remaining = iterations
 
         async def sleep(_seconds: float) -> None:
@@ -262,8 +261,7 @@ class FlPollerPollTest(TestCase):
             )
 
     def test_new_cases_are_archived_and_dispatched(self):
-        """Every discovered case must be archived to S3, handed to the Celery
-        ingestion task on the requested queue."""
+        """Every discovered case must be archived to S3, handed to the Celery ingestion task on the requested queue."""
         case_a = FloridaCaseFactory()
         case_b = FloridaCaseFactory()
         update_a = make_update()
@@ -328,9 +326,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_cycle_archives_under_hourly_prefix(self):
-        """Raw responses and parsed cases from a cycle must be archived under
-        a prefix for the hour the cycle started, so later cycles don't
-        overwrite them."""
+        """Raw responses and parsed cases from a cycle must be archived under a prefix for the hour the cycle started, so later cycles don't overwrite them."""
         case = FloridaCaseFactory()
         update = make_update()
         scraper = FakeFloridaScraper(
@@ -345,8 +341,7 @@ class FlPollerPollTest(TestCase):
         self.assertEqual(self.mock_save.call_args.args[0], CYCLE_BASE)
 
     def test_each_cycle_gets_its_own_prefix(self):
-        """A cycle in a later hour must archive under that hour's prefix
-        rather than reusing the first cycle's."""
+        """A cycle in a later hour must archive under that hour's prefix rather than reusing the first cycle's."""
         case = FloridaCaseFactory()
         update = make_update()
         scraper = FakeFloridaScraper(
@@ -372,9 +367,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_duplicate_updates_are_ingested_once(self):
-        """A case surfaced more than once in a cycle, whether by both
-        endpoints or by several of its documents, must be fetched and
-        ingested only once."""
+        """A case surfaced more than once in a cycle, whether by both endpoints or by several of its documents, must be fetched and ingested only once."""
         case = FloridaCaseFactory()
         case_update = make_update()
         document_updates = [
@@ -410,8 +403,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_fetch_failures_are_skipped(self):
-        """A fetch that raises, returns an Exception, or returns errors must
-        be skipped without aborting the cycle; later updates still ingest."""
+        """A fetch that raises, returns an Exception, or returns errors must be skipped without aborting the cycle; later updates still ingest."""
         raising = make_update()
         returns_exc = make_update()
         has_errors = make_update()
@@ -452,8 +444,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_pagination_failure_is_logged_and_polling_continues(self):
-        """A PaginationFailed page must be logged as an error while updates
-        from surviving pages are still processed."""
+        """A PaginationFailed page must be logged as an error while updates from surviving pages are still processed."""
         case = FloridaCaseFactory()
         update = make_update()
         scraper = FakeFloridaScraper(
@@ -481,9 +472,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_poll_queries_both_endpoints_and_advances_window(self):
-        """Each cycle must query both poll endpoints for the court, starting
-        from the provided start date and, on later cycles, from one minute
-        before the previous cycle's poll time."""
+        """Each cycle must query both poll endpoints for the court, starting from the provided start date and, on later cycles, from one minute before the previous cycle's poll time."""
         scraper = FakeFloridaScraper(self.courts)
 
         self.run_poll(scraper, iterations=2)
@@ -521,8 +510,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_checkpoint_advances_after_each_cycle(self):
-        """The checkpoint must be saved once a cycle finishes, at the date of
-        that cycle's poll time."""
+        """The checkpoint must be saved once a cycle finishes, at the date of that cycle's poll time."""
         scraper = FakeFloridaScraper(self.courts)
 
         self.run_poll(scraper)
@@ -532,8 +520,7 @@ class FlPollerPollTest(TestCase):
         )
 
     def test_case_backfill_days_widens_query_window(self):
-        """Both endpoints must be queried from --case-backfill-days before the
-        start of the cycle, so late-arriving updates aren't missed."""
+        """Both endpoints must be queried from --case-backfill-days before the start of the cycle, so late-arriving updates aren't missed."""
         scraper = FakeFloridaScraper(self.courts)
 
         self.run_poll(scraper, case_backfill_days=2)
@@ -549,8 +536,7 @@ class FlPollerPollTest(TestCase):
                 self.assertEqual(date_param, expected)
 
     def test_known_dockets_are_skipped(self):
-        """A new-case result whose docket is already stored must not be
-        fetched or ingested again, while an unknown one still is."""
+        """A new-case result whose docket is already stored must not be fetched or ingested again, while an unknown one still is."""
         court = CourtFactory(id="fla")
         known = make_update()
         DocketFactory(court=court, pacer_case_id=str(known.case_uuid))
@@ -571,8 +557,7 @@ class FlPollerPollTest(TestCase):
         self.mock_ingest.si.assert_called_once()
 
     def test_known_documents_are_skipped(self):
-        """A docket-entry document whose link UUID is already stored must not
-        trigger a refetch of its case, while an unknown one does."""
+        """A docket-entry document whose link UUID is already stored must not trigger a refetch of its case, while an unknown one does."""
         known = make_document_update()
         FloridaDocumentFactory(link_uuid=known.link_uuid)
         unknown = make_document_update()
@@ -592,8 +577,7 @@ class FlPollerPollTest(TestCase):
         self.mock_ingest.si.assert_called_once()
 
     def test_download_attachments_flag_reaches_ingestion_task(self):
-        """The download_attachments flag must be forwarded to the ingestion
-        task."""
+        """The download_attachments flag must be forwarded to the ingestion task."""
         case = FloridaCaseFactory()
         update = make_update()
         scraper = FakeFloridaScraper(
@@ -618,8 +602,7 @@ class FlPollerPollTest(TestCase):
 @mock.patch.object(Command, "checkpoint_tracker", CMD_TRACKER)
 @mock.patch.object(Command, "poll", new_callable=mock.AsyncMock)
 class FlPollerCommandTest(SimpleTestCase):
-    """Coverage for handle(): court parsing, start-date resolution, and
-    checkpoint auto-resume. poll itself is mocked out."""
+    """Coverage for handle(): court parsing, start-date resolution, and checkpoint auto-resume. poll itself is mocked out."""
 
     def setUp(self):
         super().setUp()
@@ -631,8 +614,7 @@ class FlPollerCommandTest(SimpleTestCase):
         super().tearDown()
 
     def test_start_defaults_to_backfill_window(self, mock_poll):
-        """Without auto-resume, polling must start --case-backfill-days ago
-        and only the requested courts must be polled."""
+        """Without auto-resume, polling must start --case-backfill-days ago and only the requested courts must be polled."""
         call_command("fl_poller", courts="fla", case_backfill_days=3)
 
         (
@@ -652,8 +634,7 @@ class FlPollerCommandTest(SimpleTestCase):
         self.assertTrue(download_attachments)
 
     def test_auto_resume_starts_from_checkpoint(self, mock_poll):
-        """With --auto-resume and a stored checkpoint, polling must start at
-        the checkpoint date."""
+        """With --auto-resume and a stored checkpoint, polling must start at the checkpoint date."""
         CMD_TRACKER.set(date(2026, 8, 1))
 
         call_command("fl_poller", auto_resume=True)
@@ -661,8 +642,7 @@ class FlPollerCommandTest(SimpleTestCase):
         self.assertEqual(mock_poll.call_args.args[6], datetime(2026, 8, 1))
 
     def test_auto_resume_without_checkpoint_falls_back(self, mock_poll):
-        """With --auto-resume but no stored checkpoint, the command must warn
-        and fall back to the --case-backfill-days window."""
+        """With --auto-resume but no stored checkpoint, the command must warn and fall back to the --case-backfill-days window."""
         with mock.patch.object(fl_cmd_module.logger, "warning") as mock_warn:
             call_command("fl_poller", auto_resume=True, case_backfill_days=2)
 
@@ -677,9 +657,7 @@ class FlPollerCommandTest(SimpleTestCase):
     def test_use_cache_and_archive_responses_reach_cache_handler(
         self, mock_poll
     ):
-        """--use-cache and --archive-responses must be forwarded to the S3
-        cache handler, and the cache must be off by default so updates aren't
-        served stale."""
+        """--use-cache and --archive-responses must be forwarded to the S3 cache handler, and the cache must be off by default so updates aren't served stale."""
         for options, expected in (
             ({}, (False, False)),
             ({"use_cache": True}, (True, False)),
@@ -697,8 +675,7 @@ class FlPollerCommandTest(SimpleTestCase):
                 self.assertEqual((use_cache, archive_responses), expected)
 
     def test_no_download_attachments_option(self, mock_poll):
-        """--no-download-attachments must disable attachment downloads in the
-        dispatched ingestion tasks."""
+        """--no-download-attachments must disable attachment downloads in the dispatched ingestion tasks."""
         call_command("fl_poller", no_download_attachments=True)
 
         self.assertFalse(mock_poll.call_args.args[8])

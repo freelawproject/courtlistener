@@ -242,8 +242,11 @@ class ScanCase:
 def xml_file_paths(path: str) -> list[str]:
     """List the XML files to import, sorted the way humans expect.
 
-    :param path: A single XML file, or a directory searched recursively.
-    :return: A list of XML file paths.
+    Args:
+        path: A single XML file, or a directory searched recursively.
+
+    Returns:
+        A list of XML file paths.
     """
     if os.path.isfile(path):
         return [path]
@@ -257,11 +260,14 @@ def s3_xml_keys(
 ) -> list[str]:
     """List the keys of the final XML files to import from the bucket.
 
-    :param storage: The scanning portal's bucket.
-    :param scan_ids: The scans to import. When empty, every scan with an
-        exported XML.
-    :param opinion_id: A single opinion of the only scan in `scan_ids`.
-    :return: A list of S3 keys, e.g. "export/15343/3.xml".
+    Args:
+        storage: The scanning portal's bucket.
+        scan_ids: The scans to import. When empty, every scan with an
+            exported XML.
+        opinion_id: A single opinion of the only scan in `scan_ids`.
+
+    Returns:
+        A list of S3 keys, e.g. "export/15343/3.xml".
     """
     if opinion_id and scan_ids:
         return [f"{FINAL_XML_PREFIX}{scan_ids[0]}/{opinion_id}.xml"]
@@ -281,9 +287,12 @@ def s3_xml_keys(
 def read_s3_xml(storage: ScanningFinalXmlStorage, key: str) -> str:
     """Read a final XML file from the scanning portal's bucket.
 
-    :param storage: The scanning portal's bucket.
-    :param key: The S3 key of the file.
-    :return: The XML content.
+    Args:
+        storage: The scanning portal's bucket.
+        key: The S3 key of the file.
+
+    Returns:
+        The XML content.
     """
     with storage.open(key) as f:
         return f.read().decode("utf-8")
@@ -292,8 +301,11 @@ def read_s3_xml(storage: ScanningFinalXmlStorage, key: str) -> str:
 def read_local_xml(file_path: str) -> str:
     """Read a final XML file from the local disk.
 
-    :param file_path: The path of the file.
-    :return: The XML content.
+    Args:
+        file_path: The path of the file.
+
+    Returns:
+        The XML content.
     """
     with open(file_path, encoding="utf-8") as f:
         return f.read()
@@ -302,8 +314,11 @@ def read_local_xml(file_path: str) -> str:
 def get_citation_strings(soup: BeautifulSoup) -> list[str]:
     """Get the citations of a scanned opinion from its `<citation>` elements.
 
-    :param soup: The parsed XML.
-    :return: A list of citation strings.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        A list of citation strings.
     """
     return [
         cite
@@ -321,9 +336,12 @@ def parse_citations(
     variation eyecite doesn't know, so it can be added. Such a part is left
     out of the citations.
 
-    :param cite_strings: The texts of the `<citation>` elements.
-    :param file_path: The path of the XML file, used for logging.
-    :return: The parsed citations.
+    Args:
+        cite_strings: The texts of the `<citation>` elements.
+        file_path: The path of the XML file, used for logging.
+
+    Returns:
+        The parsed citations.
     """
     cites = []
     for cite_str in cite_strings:
@@ -352,10 +370,13 @@ def parse_citations(
 def get_element_text(soup: BeautifulSoup, selector: str, sep: str) -> str:
     """Join the text of all elements matching a selector.
 
-    :param soup: The parsed XML.
-    :param selector: CSS selector of the elements.
-    :param sep: The separator used to join the texts of multiple elements.
-    :return: The joined text, or an empty string.
+    Args:
+        soup: The parsed XML.
+        selector: CSS selector of the elements.
+        sep: The separator used to join the texts of multiple elements.
+
+    Returns:
+        The joined text, or an empty string.
     """
     texts = [e.get_text(" ", strip=True) for e in soup.select(selector)]
     return sep.join(t for t in texts if t)
@@ -367,8 +388,11 @@ def get_docket_number(soup: BeautifulSoup) -> str:
     e.g. "No. 4D2023-2459." becomes "4D2023-2459", which is the format
     scrapers store, so existing dockets can be found.
 
-    :param soup: The parsed XML.
-    :return: The docket numbers joined by "; ", or an empty string.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The docket numbers joined by "; ", or an empty string.
     """
     numbers = [
         DOCKET_NUMBER_PREFIX_RE.sub("", e.get_text(" ", strip=True)).strip(
@@ -385,8 +409,11 @@ def _capitalize_caps_word(word: str) -> str:
     e.g. "O'BRIEN" -> "O'Brien", "SMITH-JONES," -> "Smith-Jones,",
     "STATE'S" -> "State's"
 
-    :param word: A word in capital letters.
-    :return: The capitalized word.
+    Args:
+        word: A word in capital letters.
+
+    Returns:
+        The capitalized word.
     """
     word = re.sub(r"[^\W\d_]+", lambda m: m.group().capitalize(), word)
     return re.sub(r"'S\b", "'s", word)
@@ -403,8 +430,11 @@ def normalize_case_name_caps(case_name: str) -> str:
     vowels (LLC) or is in CASE_NAME_ACRONYMS, so other acronyms like "ABC"
     become "Abc".
 
-    :param case_name: The case name.
-    :return: The case name with normalized capitalization.
+    Args:
+        case_name: The case name.
+
+    Returns:
+        The case name with normalized capitalization.
     """
     words = []
     for word in case_name.split():
@@ -439,8 +469,11 @@ def get_party_sides(soup: BeautifulSoup) -> tuple[list[str], list[str]]:
     the portal can put a caption in a `<p>`, or split it between a `<p>`
     and `<parties>`.
 
-    :param soup: The parsed XML.
-    :return: The texts of the parties before and after the separator.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The texts of the parties before and after the separator.
     """
     sides: tuple[list[str], list[str]] = ([], [])
     side = 0
@@ -462,8 +495,11 @@ def get_party_name(party: str) -> str:
     "STATE of Oklahoma, EX REL. OKLAHOMA BAR ASSOCIATION, Complainant," ->
     "STATE of Oklahoma, EX REL. OKLAHOMA BAR ASSOCIATION"
 
-    :param party: The text of a `<party>` element.
-    :return: The party's name, without its role or description.
+    Args:
+        party: The text of a `<party>` element.
+
+    Returns:
+        The party's name, without its role or description.
     """
     first = re.sub(r"\([^)]*\)", "", party.split(";")[0])
     name, *parts = [part.strip() for part in first.split(",")]
@@ -480,8 +516,11 @@ def get_case_names(soup: BeautifulSoup) -> tuple[str, str]:
     The case name uses the first party on each side, e.g. "Cheri Lynn
     Marler v. State of Wyoming"; the full name is the whole caption.
 
-    :param soup: The parsed XML.
-    :return: The case name and the full case name, or empty strings when
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The case name and the full case name, or empty strings when
         the XML has no parties.
     """
     left, right = get_party_sides(soup)
@@ -506,8 +545,11 @@ def get_headmatter(soup: BeautifulSoup) -> str:
     Caveat: call it before `parse_extra_fields`, which removes the page
     numbers from the elements it reads.
 
-    :param soup: The parsed XML.
-    :return: The head matter XML, or an empty string if there is none.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The head matter XML, or an empty string if there is none.
     """
     if (casebody := soup.select_one("casebody")) is None:
         return ""
@@ -534,9 +576,12 @@ def get_precedential_status(
     Caveat: a notice deep in the opinion is not found, so that a
     published opinion citing an "unpublished opinion" stays published.
 
-    :param soup: The parsed XML.
-    :param citations: The parsed citations of the opinion.
-    :return: A PRECEDENTIAL_STATUS value.
+    Args:
+        soup: The parsed XML.
+        citations: The parsed citations of the opinion.
+
+    Returns:
+        A PRECEDENTIAL_STATUS value.
     """
     if any(c.corrected_reporter() in UNPUBLISHED_REPORTERS for c in citations):
         return PRECEDENTIAL_STATUS.UNPUBLISHED
@@ -563,8 +608,11 @@ def get_date_filed(soup: BeautifulSoup) -> date | None:
     their first complete date. Partial dates like "May 2024" are rejected
     instead of guessing the missing day.
 
-    :param soup: The parsed XML.
-    :return: The decision date, or None if it can't be parsed.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The decision date, or None if it can't be parsed.
     """
     texts = [e.get_text(" ") for e in soup.select("decisiondate")]
     for date_re, group in (
@@ -587,8 +635,11 @@ def get_date_filed(soup: BeautifulSoup) -> date | None:
 def get_page_count(soup: BeautifulSoup) -> int | None:
     """Get the number of printed pages of the casebody.
 
-    :param soup: The parsed XML.
-    :return: The page count, or None if the page attributes are missing.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        The page count, or None if the page attributes are missing.
     """
     casebody = soup.select_one("casebody")
     if not casebody:
@@ -607,8 +658,11 @@ def get_page_count(soup: BeautifulSoup) -> int | None:
 def get_judges(soup: BeautifulSoup) -> str:
     """Get the judges names from the `judges` and `author` elements.
 
-    :param soup: The parsed XML.
-    :return: A comma separated, deduplicated and sorted list of last names.
+    Args:
+        soup: The parsed XML.
+
+    Returns:
+        A comma separated, deduplicated and sorted list of last names.
     """
     names = [
         extract_judge_last_name(e.get_text(" ", strip=True))
@@ -629,11 +683,14 @@ def parse_scan_xml(
     Logs a warning and returns None when the XML lacks data required to
     import it: opinion, parties, date, court or citation.
 
-    :param xml: The XML content.
-    :param file_path: The path of the XML file, used for logging.
-    :param court_id: The CL court id. When None, it is looked up with
-        courts-db from the `court` element.
-    :return: A ScanCase, or None if the file can't be imported.
+    Args:
+        xml: The XML content.
+        file_path: The path of the XML file, used for logging.
+        court_id: The CL court id. When None, it is looked up with
+            courts-db from the `court` element.
+
+    Returns:
+        A ScanCase, or None if the file can't be imported.
     """
     soup = BeautifulSoup(xml, "lxml-xml")
 
@@ -768,8 +825,11 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     clusters have it, an error is logged for review and the lowest id is
     returned, so no further cluster is created.
 
-    :param scan_case: The parsed scanned opinion.
-    :return: The cluster id, or None if it was not imported yet.
+    Args:
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The cluster id, or None if it was not imported yet.
     """
     citations = Q()
     for cite in scan_case.parsed_citations:
@@ -803,8 +863,11 @@ def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
     Uses the Harvard importer's matching: first by citation, then by court
     and date, comparing case names, docket numbers and opinion text.
 
-    :param scan_case: The parsed scanned opinion.
-    :return: The matching cluster, or None.
+    Args:
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The matching cluster, or None.
     """
     # `find_previously_imported_cases` expects Harvard-shaped data
     data = {
@@ -825,9 +888,12 @@ def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
 def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     """Build an unsaved Opinion from an `<opinion>` element.
 
-    :param op: The opinion element.
-    :param cluster_id: The id of the cluster the opinion belongs to.
-    :return: The unsaved Opinion.
+    Args:
+        op: The opinion element.
+        cluster_id: The id of the cluster the opinion belongs to.
+
+    Returns:
+        The unsaved Opinion.
     """
     opinion_xml = str(op)
     author_str = ""
@@ -876,8 +942,8 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
     The import is committed when the task is queued, so a failure to queue
     it is logged with the opinion ids instead of failing the import.
 
-    :param opinion_pks: The ids of the imported opinions.
-    :return: None
+    Args:
+        opinion_pks: The ids of the imported opinions.
     """
 
     def queue() -> None:
@@ -906,10 +972,10 @@ def store_scan_xml(
     cluster save that stores its path, so the file is deleted if that save
     fails, and no orphan is left.
 
-    :param cluster: A cluster with a pk.
-    :param scan_case: The parsed scanned opinion.
-    :param update_fields: The other cluster fields to save with the path.
-    :return: None
+    Args:
+        cluster: A cluster with a pk.
+        scan_case: The parsed scanned opinion.
+        update_fields: The other cluster fields to save with the path.
     """
     cluster.filepath_xml_scan.save(
         scan_case.file_name,
@@ -931,9 +997,12 @@ def add_opinion_content(
     The XML is also kept in `Opinion.xml_scan` until the site reads from
     OpinionContent.
 
-    :param opinion: The saved scanned opinion.
-    :param scan_case: The parsed scanned opinion.
-    :return: The new OpinionContent, its main version.
+    Args:
+        opinion: The saved scanned opinion.
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The new OpinionContent, its main version.
     """
     return OpinionContent.objects.create(
         opinion=opinion,
@@ -996,8 +1065,11 @@ class OpinionMergePlan:
 def get_lead_opinion(opinions: list[Opinion]) -> Opinion:
     """Get the main writing of a case among its opinions.
 
-    :param opinions: The opinions, in the order they are printed.
-    :return: The first lead-type opinion, or the first opinion.
+    Args:
+        opinions: The opinions, in the order they are printed.
+
+    Returns:
+        The first lead-type opinion, or the first opinion.
     """
     return next(
         (o for o in opinions if o.type in LEAD_OPINION_TYPES), opinions[0]
@@ -1009,8 +1081,11 @@ def get_author_names(opinion: Opinion) -> set[str]:
 
     Per curiam opinions are named "per curiam", so they match each other.
 
-    :param opinion: The opinion.
-    :return: The names from `author_str`, or from `author`, or an empty set.
+    Args:
+        opinion: The opinion.
+
+    Returns:
+        The names from `author_str`, or from `author`, or an empty set.
     """
     if opinion.per_curiam or PER_CURIAM_RE.search(opinion.author_str):
         return {"per curiam"}
@@ -1024,8 +1099,11 @@ def get_author_names(opinion: Opinion) -> set[str]:
 def get_opinion_words(opinion: Opinion) -> str:
     """Get the words of an opinion's text, to compare it with another one.
 
-    :param opinion: The opinion.
-    :return: Its first text field with content, without markup, lowercased
+    Args:
+        opinion: The opinion.
+
+    Returns:
+        Its first text field with content, without markup, lowercased
         and with single spaces.
     """
     text = next(
@@ -1047,9 +1125,12 @@ def is_same_writing(cl_opinion: Opinion, scan_opinion: Opinion) -> bool:
     loose thresholds of `merge_opinion_versions`, since OCR and court text
     differ in punctuation, page numbers and headers.
 
-    :param cl_opinion: A cluster opinion.
-    :param scan_opinion: An unsaved scanned opinion.
-    :return: True if they are the same writing.
+    Args:
+        cl_opinion: A cluster opinion.
+        scan_opinion: An unsaved scanned opinion.
+
+    Returns:
+        True if they are the same writing.
     """
     authors = get_author_names(cl_opinion)
     if not (authors and authors & get_author_names(scan_opinion)):
@@ -1064,8 +1145,11 @@ def is_same_writing(cl_opinion: Opinion, scan_opinion: Opinion) -> bool:
 def describe_opinions(opinions: list[Opinion]) -> str:
     """Describe opinions for the logs, e.g. "[Lead Opinion (Gerber)]".
 
-    :param opinions: The opinions.
-    :return: Their types and authors.
+    Args:
+        opinions: The opinions.
+
+    Returns:
+        Their types and authors.
     """
     return "[{}]".format(
         ", ".join(
@@ -1083,9 +1167,12 @@ def pair_opinions(
     Each pair must be the same writing (see `is_same_writing`), and each
     cluster opinion must pair with exactly one scanned opinion.
 
-    :param cl_opinions: The cluster's main-version opinions.
-    :param scan_opinions: The unsaved scanned opinions.
-    :return: The (cluster opinion, scanned opinion) pairs, or None unless
+    Args:
+        cl_opinions: The cluster's main-version opinions.
+        scan_opinions: The unsaved scanned opinions.
+
+    Returns:
+        The (cluster opinion, scanned opinion) pairs, or None unless
         every opinion pairs one-to-one.
     """
     if len(cl_opinions) != len(scan_opinions):
@@ -1118,9 +1205,12 @@ def plan_opinion_merge(
     Caveat: it reads the scanned opinions with `make_opinion`, which
     removes the page numbers from their `<author>` elements.
 
-    :param cluster: The matching cluster.
-    :param scan_case: The parsed scanned opinion.
-    :return: The plan, or None if the cluster has no opinions or its
+    Args:
+        cluster: The matching cluster.
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The plan, or None if the cluster has no opinions or its
         opinions can't be paired.
     """
     cl_opinions = list(
@@ -1150,9 +1240,9 @@ def make_version(version: Opinion, main_opinion: Opinion) -> None:
     RECAP documents say about the version moves to the main opinion, since
     they refer to the same case: their citations and parentheticals.
 
-    :param version: The saved opinion that becomes a version.
-    :param main_opinion: The saved opinion it is a version of.
-    :return: None
+    Args:
+        version: The saved opinion that becomes a version.
+        main_opinion: The saved opinion it is a version of.
     """
     update_referencing_objects(main_opinion, version)
     # delete_version_related_objects deletes what refers to the version,
@@ -1199,9 +1289,9 @@ def fill_from_version(opinion: Opinion, version: Opinion) -> None:
     doesn't override the printed byline. The texts of the version, like its
     HTML, stay on the version, so the scanned text is the one shown.
 
-    :param opinion: The unsaved scanned opinion.
-    :param version: The cluster opinion that becomes its version.
-    :return: None
+    Args:
+        opinion: The unsaved scanned opinion.
+        version: The cluster opinion that becomes its version.
     """
     if (
         not opinion.author
@@ -1224,10 +1314,13 @@ def add_scanned_opinions(
 ) -> list[Opinion]:
     """Create the plan's scanned opinions, and make its versions point to them.
 
-    :param cluster: The cluster.
-    :param plan: The merge plan.
-    :param scan_case: The parsed scanned opinion.
-    :return: The created opinions.
+    Args:
+        cluster: The cluster.
+        plan: The merge plan.
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The created opinions.
     """
     # The ordering key is unique in the cluster, versions included, and the
     # new opinions take 1 to N
@@ -1254,11 +1347,11 @@ def merge_into_cluster(
     opinions and makes the cluster's opinions their versions as the plan
     says, stores the XML, and updates the cluster and docket sources.
 
-    :param cluster: The matching cluster.
-    :param plan: How the scanned opinions go into the cluster, from
-        `plan_opinion_merge`.
-    :param scan_case: The parsed scanned opinion.
-    :return: None
+    Args:
+        cluster: The matching cluster.
+        plan: How the scanned opinions go into the cluster, from
+            `plan_opinion_merge`.
+        scan_case: The parsed scanned opinion.
     """
     with transaction.atomic():
         add_citations_to_cluster(scan_case.citations, cluster.id)
@@ -1310,8 +1403,11 @@ def merge_into_cluster(
 def add_new_case(scan_case: ScanCase) -> OpinionCluster:
     """Create the docket, cluster, citations and opinions of a scanned case.
 
-    :param scan_case: The parsed scanned opinion.
-    :return: The new cluster.
+    Args:
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The new cluster.
     """
     with transaction.atomic():
         docket = update_or_create_docket(
@@ -1384,13 +1480,13 @@ def import_scanned_opinion(
     a matching cluster from another source when one exists; otherwise
     creates a new docket, cluster, citations and opinions.
 
-    :param xml: The XML content.
-    :param file_path: The local path or the S3 key of the XML, used for
-        logging.
-    :param court_id: The CL court id, or None to look it up in the XML.
-    :param dry_run: Only log whether the opinion would be skipped, merged or
-        added, without writing to the database or uploading files.
-    :return: None
+    Args:
+        xml: The XML content.
+        file_path: The local path or the S3 key of the XML, used for
+            logging.
+        court_id: The CL court id, or None to look it up in the XML.
+        dry_run: Only log whether the opinion would be skipped, merged or
+            added, without writing to the database or uploading files.
     """
     logger.info("Processing %s", file_path)
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
@@ -1490,8 +1586,8 @@ class Command(VerboseCommand):
     def add_arguments(self, parser: CommandParser) -> None:
         """Add the command arguments.
 
-        :param parser: The command parser.
-        :return: None
+        Args:
+            parser: The command parser.
         """
         source = parser.add_mutually_exclusive_group(required=True)
         source.add_argument(
@@ -1531,10 +1627,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        """Import every XML file found in the given path.
-
-        :return: None
-        """
+        """Import every XML file found in the given path."""
         super().handle(*args, **options)
         scan_ids, opinion_id = options["scan_id"], options["opinion_id"]
         if opinion_id and (not scan_ids or len(scan_ids) != 1):

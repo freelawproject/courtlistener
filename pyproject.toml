@@ -142,35 +142,3 @@ dev = [
   "unittest-xml-reporting>=4.0.0",
   "pytest-benchmark>=5.3.1",
 ]
-
-[tool.ruff]
-line-length = 79
-lint.extend-safe-fixes = [
-  # non-pep585-annotation
-  "UP006",
-]
-lint.select = [
-  # pycodestyle
-  "E",
-  # Pyflakes errors
-  "F",
-  # isort
-  "I",
-  # pyupgrade
-  "UP",
-  # Pyflakes warnings
-  "W",
-]
-lint.ignore = [
-  # flake8-bugbear opinionated rules
-  "B9",
-  # line-too-long
-  "E501",
-  # suppressible-exception
-  "SIM105",
-  # if-else-block-instead-of-if-exp
-  "SIM108",
-]
-# Django reads settings as module attributes, so the settings package
-# aggregates its submodules with star imports.
-lint.per-file-ignores."cl/settings/__init__.py" = ["F403"]

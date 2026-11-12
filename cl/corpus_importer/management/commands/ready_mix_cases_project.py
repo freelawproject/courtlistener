@@ -72,8 +72,11 @@ def confirm_es_indexing(options):
 def get_bankruptcy_courts(court_ids: list[str]) -> list[str]:
     """Retrieve a list of bankruptcy courts IDS from database.
 
-    :param court_ids: A list of court ids or all.
-    :return: A list of Court IDs.
+    Args:
+        court_ids: A list of court ids or all.
+
+    Returns:
+        A list of Court IDs.
     """
     bankr_courts = (
         Court.federal_courts.bankruptcy_pacer_courts().all().only("pk")
@@ -87,8 +90,11 @@ def get_bankruptcy_courts(court_ids: list[str]) -> list[str]:
 def get_district_courts(court_ids: list[str]) -> list[str]:
     """Retrieve a list of district courts IDS from database.
 
-    :param court_ids: A list of court ids or all.
-    :return: A list of Court IDs.
+    Args:
+        court_ids: A list of court ids or all.
+
+    Returns:
+        A list of Court IDs.
     """
     district_courts = Court.federal_courts.district_courts().all().only("pk")
     if court_ids != ["all"]:
@@ -98,14 +104,15 @@ def get_district_courts(court_ids: list[str]) -> list[str]:
 
 
 def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
-    """Retrieve a list of district,  bankruptcy or all courts IDS
-    (district + bankruptcy)  from database.
+    """Retrieve a list of district,  bankruptcy or all courts IDS (district + bankruptcy)  from database.
 
-    :param court_type: The court type.
-    :param court_ids: A list of court ids or all.
-    :return: A list of Court IDs.
+    Args:
+        court_type: The court type.
+        court_ids: A list of court ids or all.
+
+    Returns:
+        A list of Court IDs.
     """
-
     court_ids_to_scrape = (
         get_iquery_pacer_courts_to_scrape()
         if court_type == "all"
@@ -125,11 +132,13 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
 def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
     """Fetch the latest pacer_case_id for a specific court and date_filed.
 
-    :param court_id: The court ID.
-    :param date_filed: The date_filed for which to find the latest pacer_case_id.
-    :return: The latest pacer_case_id if found, otherwise None.
-    """
+    Args:
+        court_id: The court ID.
+        date_filed: The date_filed for which to find the latest pacer_case_id.
 
+    Returns:
+        The latest pacer_case_id if found, otherwise None.
+    """
     latest_docket = (
         Docket.objects.filter(
             court_id=court_id,
@@ -147,15 +156,13 @@ def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
 
 
 def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
-    """Get the starting pacer_case_id based on the provided date_filed and
-    store it in Redis for each court.
+    """Get the starting pacer_case_id based on the provided date_filed and store it in Redis for each court.
 
-    :param options: The options from the handle method
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :return None
+    Args:
+        options: The options from the handle method
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
     """
-
     court_ids = get_courts_to_scrape(options["court_type"], options["courts"])
     for court_id in court_ids:
         latest_pacer_case_id = get_latest_pacer_case_id(
@@ -179,9 +186,9 @@ def get_absolute_latest_pacer_case_id(
 ) -> str | None:
     """Get the most recent pacer_case_id up to today for each court.
 
-    :param database: The database to use.
-    :param court_id: The court ID.
-    :return None
+    Args:
+        database: The database to use.
+        court_id: The court ID.
     """
     today = date.today()
     latest_docket = (
@@ -202,11 +209,10 @@ def get_absolute_latest_pacer_case_id(
 def get_and_store_latest_case_ids(options, r: Redis) -> None:
     """Get the absolute pacer_case_ids for each court and store it in Redis.
 
-    :param options: The options from the handle method
-    :param r: The Redis DB to connect.
-    :return None
+    Args:
+        options: The options from the handle method
+        r: The Redis DB to connect.
     """
-
     court_ids = get_iquery_pacer_courts_to_scrape()
     database = options["database"]
     for court_id in court_ids:
@@ -224,10 +230,10 @@ def get_and_store_latest_case_ids(options, r: Redis) -> None:
 
 def query_results_in_es(options):
     """Query results in ES.
-    :param options: The options from the handle method
-    :return None
-    """
 
+    Args:
+        options: The options from the handle method
+    """
     court_ids = get_bankruptcy_courts(["all"])
     # The params to perform the query.
     cd = {
@@ -277,10 +283,11 @@ def query_results_in_es(options):
 
 def add_bank_cases_to_cl(options: OptionsType, r) -> None:
     """Iterate over courts and gather iquery results from them.
-    :param options: The options from the handle method
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :return None
+
+    Args:
+        options: The options from the handle method
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
     """
     q = options["queue"]
     stop_threshold = options["stop_threshold"]

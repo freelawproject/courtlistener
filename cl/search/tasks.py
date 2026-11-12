@@ -93,7 +93,13 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.es_docket_sources import SOURCE_BY_MODEL, skips_percolation
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    ES_SOURCE_BY_NAME,
+    RECAP_ES_SOURCE,
+    SOURCE_BY_MODEL,
+    skips_percolation,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
@@ -127,11 +133,10 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
     It creates a parent document for the person and indexes each non-judiciary
     position as a child document.
 
-    :param parent_id: The ID of the Person.
-    :param position: A Position instance.
-    :return: None
+    Args:
+        parent_id: The ID of the Person.
+        position: A Position instance.
     """
-
     # Create the parent document if it does not exist yet in ES
     person_doc = PersonDocument()
     doc = person_doc.prepare(position.person)
@@ -168,11 +173,13 @@ def get_instance_from_db[ModelT: ESModelType](
 ) -> ModelT | None:
     """Get a model instance from DB or return None if it doesn't exist.
 
-    :param instance_id: The primary key of the parent instance.
-    :param model: The model class of the instance.
-    :return: The object instance or None if it doesn't exist.
-    """
+    Args:
+        instance_id: The primary key of the parent instance.
+        model: The model class of the instance.
 
+    Returns:
+        The object instance or None if it doesn't exist.
+    """
     try:
         return model.objects.get(pk=instance_id)
     except ObjectDoesNotExist:
@@ -204,18 +211,20 @@ def es_save_document(
 ) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
-    :param self: The celery task
-    :param instance_id: The instance ID of the document to save.
-    :param app_label: The app label and model that belongs to the document
-    being added.
-    :param es_document_name: A Elasticsearch DSL document name.
-    :param skip_percolator_request: Whether to skip the subsequent percolator
-    request.
-    :return: `SaveESDocumentReturn` object containing the ID of the document
-    saved in the ES index, the content of the document and the app label
-    associated with the document or None.
-    """
+    Args:
+        self: The celery task
+        instance_id: The instance ID of the document to save.
+        app_label: The app label and model that belongs to the document
+            being added.
+        es_document_name: A Elasticsearch DSL document name.
+        skip_percolator_request: Whether to skip the subsequent percolator
+            request.
 
+    Returns:
+        `SaveESDocumentReturn` object containing the ID of the document
+        saved in the ES index, the content of the document and the app label
+        associated with the document or None.
+    """
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
 
@@ -321,20 +330,21 @@ def document_fields_to_update(
     related_instance: ESModelType | None,
     fields_map: dict | None,
 ) -> dict[str, Any]:
-    """Generate a dictionary of fields and values to update based on a
-     provided map and an instance.
+    """Generate a dictionary of fields and values to update based on a provided map and an instance.
 
-    :param es_document: The Elasticsearch DSL document class.
-    :param main_instance: The main instance to update, this is the instance
-    that's directly related to the document mapping.
-    :param affected_fields: A list of field names that need to be updated.
-    :param related_instance: The related instance which is not directly
-    connected to the document mapping, although some of its fields are used to
-    populate the document.
-    :param fields_map: A map from which ES field names are to be extracted.
-    :return: A dictionary with fields and values to update.
+    Args:
+        es_document: The Elasticsearch DSL document class.
+        main_instance: The main instance to update, this is the instance
+            that's directly related to the document mapping.
+        affected_fields: A list of field names that need to be updated.
+        related_instance: The related instance which is not directly
+            connected to the document mapping, although some of its fields are used to
+            populate the document.
+        fields_map: A map from which ES field names are to be extracted.
+
+    Returns:
+        A dictionary with fields and values to update.
     """
-
     fields_to_update = {}
 
     if fields_map and related_instance:
@@ -414,8 +424,10 @@ def document_fields_to_update(
 def email_search_results(self: Task, user_id: int, query: str):
     """Sends an email to the user with their search results as a CSV attachment.
 
-    :param user_id: The ID of the user to send the email to.
-    :param query: The user's search query string.
+    Args:
+        self: The bound Celery task.
+        user_id: The ID of the user to send the email to.
+        query: The user's search query string.
     """
     user = User.objects.get(pk=user_id)
     # Parse the query string into a dictionary
@@ -518,24 +530,27 @@ def update_es_document(
     should_check_for_embeddings: bool = False,
 ) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
-    :param self: The celery task
-    :param es_document_name: The Elasticsearch document type name.
-    :param fields_to_update: A list containing the fields to update.
-    :param main_instance_data: A two tuple, the main instance app label and the
-    main instance ID to update.
-    :param related_instance_data: A two-tuple: the related instance's app label
-    and the related instance ID from which to extract field values. None if the
-    update doesn't involve a related instance.
-    :param fields_map: A dict containing fields that can be updated or None if
-    mapping is not required for the update.
-    :param skip_percolator_request: Whether to skip the subsequent percolator request
-    :param should_check_for_embeddings: If True and the document is an OpinionDocument,
-    attempts to fetch cached embeddings and include them in the document update.
-    :return: `SaveESDocumentReturn` object containing the ID of the document
-    saved in the ES index, the content of the document and the app label
-    associated with the document or None
-    """
 
+    Args:
+        self: The celery task
+        es_document_name: The Elasticsearch document type name.
+        fields_to_update: A list containing the fields to update.
+        main_instance_data: A two tuple, the main instance app label and the
+            main instance ID to update.
+        related_instance_data: A two-tuple: the related instance's app label
+            and the related instance ID from which to extract field values. None if the
+            update doesn't involve a related instance.
+        fields_map: A dict containing fields that can be updated or None if
+            mapping is not required for the update.
+        skip_percolator_request: Whether to skip the subsequent percolator request
+        should_check_for_embeddings: If True and the document is an OpinionDocument,
+            attempts to fetch cached embeddings and include them in the document update.
+
+    Returns:
+        `SaveESDocumentReturn` object containing the ID of the document
+        saved in the ES index, the content of the document and the app label
+        associated with the document or None.
+    """
     es_document = getattr(es_document_module, es_document_name)
     main_app_label, main_instance_id = main_instance_data
     # Get the main instance from DB, to extract the latest values.
@@ -627,15 +642,16 @@ def update_es_document(
 def get_es_doc_id_and_parent_id(
     es_document: type[ESDocumentType], instance: ESModelType
 ) -> tuple[int | str, int | None]:
-    """Retrieve the Elasticsearch document ID and parent ID for a given
-     ES document type and DB instance.
+    """Retrieve the Elasticsearch document ID and parent ID for a given ES document type and DB instance.
 
-    :param es_document: The ES document class type.
-    :param instance: The DB instance related to the ES document.
-    :return: A two-tuple containing the Elasticsearch document ID and the
-    parent ID.
+    Args:
+        es_document: The ES document class type.
+        instance: The DB instance related to the ES document.
+
+    Returns:
+        A two-tuple containing the Elasticsearch document ID and the
+        parent ID.
     """
-
     if es_document is PositionDocument:
         doc_id = ES_CHILD_ID(instance.pk).POSITION
         parent_id = getattr(instance, "person_id", None)
@@ -660,11 +676,14 @@ def get_doc_from_es[DocumentT: ESDocumentType](
     instance: ESModelType,
 ) -> DocumentT | None:
     """Get a document in Elasticsearch.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance of the document to retrieve.
-    :return: An Elasticsearch document if found, otherwise None.
-    """
 
+    Args:
+        es_document: The Elasticsearch document type.
+        instance: The instance of the document to retrieve.
+
+    Returns:
+        An Elasticsearch document if found, otherwise None.
+    """
     # Get doc_id and routing for parent and child documents.
     instance_id, parent_id = get_es_doc_id_and_parent_id(es_document, instance)
     get_args: dict[str, int | str] = (
@@ -713,16 +732,14 @@ def handle_ubq_retries(
     ),
     count_query=QuerySet | None,
 ) -> None:
-    """Handles the retry logic for update_children_docs_by_query task based on
-    the exception received and number of documents to update.
+    """Handles the retry logic for update_children_docs_by_query task based on the exception received and number of documents to update.
 
-    :param self: The celery task
-    :param exc: The exception that triggered the retry.
-    :param count_query: Optional a Queryset to retrieve the number of docs to
-    update.
-    :return: None
+    Args:
+        self: The celery task
+        exc: The exception that triggered the retry.
+        count_query: Optional a Queryset to retrieve the number of docs to
+            update.
     """
-
     # If this is an ApiError exception, confirm the error type is
     # search_context_missing_exception, so it can be retried. Otherwise, raise
     # the error.
@@ -770,18 +787,16 @@ def update_children_docs_by_query(
     fields_map: dict[str, str] | None = None,
     event_table: EventTable | None = None,
 ) -> None:
-    """Update child documents in Elasticsearch in bulk using the UpdateByQuery
-    API.
+    """Update child documents in Elasticsearch in bulk using the UpdateByQuery API.
 
-    :param self: The celery task
-    :param es_document_name: The Elasticsearch Document type name to update.
-    :param parent_instance_id: The parent instance ID containing the fields to update.
-    :param fields_to_update: List of field names to be updated.
-    :param fields_map: A mapping from model fields to Elasticsearch document fields.
-    :param event_table: Optional, the EventTable type that triggered the action
-    :return: None
+    Args:
+        self: The celery task
+        es_document_name: The Elasticsearch Document type name to update.
+        parent_instance_id: The parent instance ID containing the fields to update.
+        fields_to_update: List of field names to be updated.
+        fields_map: A mapping from model fields to Elasticsearch document fields.
+        event_table: Optional, the EventTable type that triggered the action
     """
-
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     if es_document is PositionDocument:
@@ -916,12 +931,12 @@ def index_docket_parties_in_es(
     self: Task, docket_id: int, percolate_parties: bool = True
 ) -> None:
     """Update a document in Elasticsearch.
-    :param self: The celery task
-    :param docket_id: The docket ID to update in ES.
-    :param percolate_parties: Whether percolate parties.
-    :return: None
-    """
 
+    Args:
+        self: The celery task
+        docket_id: The docket ID to update in ES.
+        percolate_parties: Whether percolate parties.
+    """
     docket = get_instance_from_db(docket_id, Docket)
     if not docket:
         return
@@ -968,20 +983,29 @@ def bulk_indexing_generator(
 ) -> Generator[ESDictDocument]:
     """Generate ES documents for bulk indexing.
 
-    :param docs_query_set: The queryset of model instances to be indexed.
-    :param es_document: The Elasticsearch document class corresponding to
-    the instance model.
-    :param child_id_property: Optional, the property to be used for generating
-     ES child document ID.
-    :param parent_id: Optional, the parent instance ID used for routing in ES.
-    This parameter must only be provided when indexing documents that belong to
-    the same parent document.
-    :param base_doc: The base ES document fields.
-    :return: Yields ES child documents for bulk indexing.
-    """
+    Args:
+        docs_query_set: The queryset of model instances to be indexed.
+        es_document: The Elasticsearch document class corresponding to
+            the instance model.
+        child_id_property: Optional, the property to be used for generating
+            ES child document ID.
+        parent_id: Optional, the parent instance ID used for routing in ES.
+            This parameter must only be provided when indexing documents that belong to
+            the same parent document.
+        base_doc: The base ES document fields.
 
+    Returns:
+        Yields ES child documents for bulk indexing.
+    """
     parent_id_mappings = {
-        "RECAP": lambda document: document.docket_entry.docket_id,
+        # Every docket source's documents reach their Docket through
+        # docket_entry, the same assumption es_save_document makes.
+        **{
+            source.child_id_property: lambda document: (
+                document.docket_entry.docket_id
+            )
+            for source in ALL_ES_SOURCES
+        },
         "OPINION": lambda document: document.cluster_id,
     }
     for doc in docs_query_set.iterator():
@@ -1018,25 +1042,29 @@ def index_documents_in_bulk_from_queryset(
     parent_instance_id: int | None = None,
     use_streaming_bulk: bool = False,
 ) -> list[str]:
-    """Index documents in bulk from a queryset into ES. Indexes documents
-    using either streaming or parallel bulk  operations, depending on the mode.
+    """Index documents in bulk from a queryset into ES.
 
-    :param docs_queryset: A queryset containing the documents to index.
-    :param es_document: The Elasticsearch document class corresponding to
-    the instance model.
-    :param child_id_property: Optional, the property to be used for generating
-     ES child document ID.
-    :param base_doc: The base ES document fields.
-    :param parent_instance_id: Optional, the parent instance ID used for
-    routing in ES.
-    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-     Or force the use of streaming_bulk to reduce memory usage.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: A list of IDs of documents that failed to index.
+    Indexes documents using either streaming or parallel bulk  operations,
+    depending on the mode.
+
+    Args:
+        docs_queryset: A queryset containing the documents to index.
+        es_document: The Elasticsearch document class corresponding to
+            the instance model.
+        child_id_property: Optional, the property to be used for generating
+            ES child document ID.
+        base_doc: The base ES document fields.
+        parent_instance_id: Optional, the parent instance ID used for
+            routing in ES.
+        use_streaming_bulk: Set to True to enable streaming bulk, which is used in
+            TestCase-based tests because parallel_bulk is incompatible with them.
+            Or force the use of streaming_bulk to reduce memory usage.
+            https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+            Default is False.
+
+    Returns:
+        A list of IDs of documents that failed to index.
     """
-
     client = connections.get_connection()
     failed_child_docs = []
 
@@ -1089,20 +1117,24 @@ def index_parent_and_child_docs(
     instance_ids: list[int],
     search_type: str,
     use_streaming_bulk: bool = False,
+    source_name: str = RECAP_ES_SOURCE.name,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
-    :param self: The Celery task instance
-    :param instance_ids: The parent instance IDs to index.
-    :param search_type: The Search Type to index parent and child docs.
-    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-     Or force the use of streaming_bulk to reduce memory usage.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: None
+    Args:
+        self: The Celery task instance
+        instance_ids: The parent instance IDs to index.
+        search_type: The Search Type to index parent and child docs.
+        use_streaming_bulk: Set to True to enable streaming bulk, which is used in
+            TestCase-based tests because parallel_bulk is incompatible with them.
+            Or force the use of streaming_bulk to reduce memory usage.
+            https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+            Default is False.
+        source_name: The name of a registered ESDocketSource. For the
+            RECAP search type, its documents are indexed as children; other
+            search types don't use it.
     """
-
+    source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.PEOPLE:
             parent_es_document = PersonDocument
@@ -1111,7 +1143,7 @@ def index_parent_and_child_docs(
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
-            child_id_property = "RECAP"
+            child_id_property = source.child_id_property
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
             child_es_document = OpinionDocument
@@ -1128,7 +1160,7 @@ def index_parent_and_child_docs(
             child_docs = instance.positions.all()
         elif search_type == SEARCH_TYPES.RECAP:
             instance = Docket.objects.get(pk=instance_id)
-            child_docs = RECAPDocument.objects.filter(
+            child_docs = source.document_model.objects.filter(
                 docket_entry__docket=instance
             )
         elif search_type == SEARCH_TYPES.OPINION:
@@ -1199,32 +1231,36 @@ def index_parent_or_child_docs_in_es(
     search_type: str,
     document_type: str | None,
     use_streaming_bulk: bool = False,
+    source_name: str = RECAP_ES_SOURCE.name,
 ) -> None:
     """Index parent or child documents in Elasticsearch.
 
-    :param self: The Celery task instance
-    :param instance_ids: The parent instance IDs to index.
-    :param search_type: The Search Type to index parent and child docs.
-    :param document_type: The document type to index, 'parent' or 'child' documents
-    :param use_streaming_bulk: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-     Or force the use of streaming_bulk to reduce memory usage.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: None
+    Args:
+        self: The Celery task instance
+        instance_ids: The parent instance IDs to index.
+        search_type: The Search Type to index parent and child docs.
+        document_type: The document type to index, 'parent' or 'child' documents
+        use_streaming_bulk: Set to True to enable streaming bulk, which is used in
+            TestCase-based tests because parallel_bulk is incompatible with them.
+            Or force the use of streaming_bulk to reduce memory usage.
+            https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+            Default is False.
+        source_name: The name of a registered ESDocketSource. For the
+            RECAP search type, child instance_ids are its documents; other
+            search types don't use it.
     """
-
     parent_instances = QuerySet()
     child_instances = QuerySet()
+    source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
-            child_id_property = "RECAP"
+            child_id_property = source.child_id_property
             if document_type == "parent":
                 parent_instances = Docket.objects.filter(pk__in=instance_ids)
             elif document_type == "child":
-                child_instances = RECAPDocument.objects.filter(
+                child_instances = source.document_model.objects.filter(
                     pk__in=instance_ids
                 )
         case SEARCH_TYPES.OPINION:
@@ -1259,7 +1295,9 @@ def index_parent_or_child_docs_in_es(
         )
 
         if failed_docs:
-            model_label = child_es_document.Django.model.__name__.capitalize()
+            # The ES document class is shared by every docket source, so
+            # name the failing model from the queryset instead.
+            model_label = child_instances.model.__name__.capitalize()
             logger.error(
                 "Error indexing documents from %s, Failed Doc IDs are: %s",
                 model_label,
@@ -1305,14 +1343,13 @@ def remove_document_from_es_index(
 ) -> None:
     """Remove a document from an Elasticsearch index.
 
-    :param self: The celery task
-    :param es_document_name: The Elasticsearch document type name.
-    :param instance_id: The ID of the instance to be removed from the
-    Elasticsearch index.
-    :param routing: The routing value used to look up the document.
-    :return: None
+    Args:
+        self: The celery task
+        es_document_name: The Elasticsearch document type name.
+        instance_id: The ID of the instance to be removed from the
+            Elasticsearch index.
+        routing: The routing value used to look up the document.
     """
-
     es_document = getattr(es_document_module, es_document_name)
     delete_args: dict[str, int | str] = {
         "index": es_document._index._name,
@@ -1347,15 +1384,14 @@ def index_dockets_in_bulk(
 ) -> None:
     """Index dockets in bulk in Elasticsearch.
 
-    :param self: The Celery task instance
-    :param instance_ids: The Docket IDs to index.
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: None
+    Args:
+        self: The Celery task instance
+        instance_ids: The Docket IDs to index.
+        testing_mode: Set to True to enable streaming bulk, which is used in
+            TestCase-based tests because parallel_bulk is incompatible with them.
+            https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+            Default is False.
     """
-
     dockets = Docket.objects.filter(pk__in=instance_ids)
     # Index dockets in bulk.
     client = connections.get_connection()
@@ -1408,14 +1444,16 @@ def build_bulk_cites_doc[ModelT: ESModelType](
 ) -> tuple[ESDictDocument, ModelT | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
-    :param es_child_doc_class: The ES child document class to update.
-    :param child_id: The child document ID to update.
-    :param child_doc_model: The child document to update model class.
-    :return: A two-tuple: a dictionary representing the ES update operation if
-    the document exists; otherwise an empty dictionary and the related
-    document’s instance if available.
-    """
+    Args:
+        es_child_doc_class: The ES child document class to update.
+        child_id: The child document ID to update.
+        child_doc_model: The child document to update model class.
 
+    Returns:
+        A two-tuple: a dictionary representing the ES update operation if
+        the document exists; otherwise an empty dictionary and the related
+        document’s instance if available.
+    """
     child_instance = get_instance_from_db(child_id, child_doc_model)
     if not child_instance:
         return {}, None
@@ -1455,10 +1493,10 @@ def percolate_document(
 ) -> None:
     """Percolate a document by preparing it and sending it for alert matching.
 
-    :param es_doc_class: The ES document class used to prepare the document.
-    :param document_id: The ID of the document in DB.
-    :param instance: The model instance to be prepared and percolated.
-    :return: None
+    Args:
+        es_doc_class: The ES document class used to prepare the document.
+        document_id: The ID of the document in DB.
+        instance: The model instance to be prepared and percolated.
     """
     doc = es_doc_class().prepare(instance)
     chain(
@@ -1484,12 +1522,14 @@ class _CiteCountUpdateDict(TypedDict):
 def build_cite_count_update(
     cluster_ids_to_update: list[int],
 ) -> list[_CiteCountUpdateDict]:
-    """Create update documents for OpinionClusterDocument.citeCount
+    """Create update documents for OpinionClusterDocument.citeCount.
 
-    :param cluster_ids_to_update: the cluster ids to update
-    :return: the dicts / documents defining the updates
+    Args:
+        cluster_ids_to_update: the cluster ids to update
+
+    Returns:
+        the dicts / documents defining the updates
     """
-
     # Query all clusters to update and retrieve only their sub_opinions
     # with the necessary fields.
     prefetch = Prefetch("sub_opinions", queryset=Opinion.objects.only("pk"))
@@ -1570,14 +1610,15 @@ def index_related_cites_fields(
     percolate_opinion: bool = False,
 ) -> None:
     """Index 'cites' and 'citeCount' fields in ES documents in a one request.
-    :param self: The Celery task instance.
-    :param model_name: The model name that originated the request.
-    :param child_id: The child document ID to update with the cites.
-    :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
-    should be updated.
-    :param percolate_opinion: Whether to percolate the related opinion document in
-    order to trigger search alerts.
-    :return: None.
+
+    Args:
+        self: The Celery task instance.
+        model_name: The model name that originated the request.
+        child_id: The child document ID to update with the cites.
+        cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
+            should be updated.
+        percolate_opinion: Whether to percolate the related opinion document in
+            order to trigger search alerts.
     """
     documents_to_update = []
     cites_doc_to_update = {}
@@ -1653,15 +1694,14 @@ def remove_parent_and_child_docs_by_query(
     main_instance_ids: list[int],
     event_table: EventTable | None = None,
 ) -> None:
-    """Remove documents in Elasticsearch by query using the delete_by_query API
+    """Remove documents in Elasticsearch by query using the delete_by_query API.
 
-    :param self: The celery task
-    :param es_document_name: The Elasticsearch Document type name to delete.
-    :param main_instance_ids: The main instance IDs to remove.
-    :param event_table: Optional, the EventTable type that triggered the action
-    :return: None
+    Args:
+        self: The celery task
+        es_document_name: The Elasticsearch Document type name to delete.
+        main_instance_ids: The main instance IDs to remove.
+        event_table: Optional, the EventTable type that triggered the action
     """
-
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     # For EventTable.DOCKET and EventTable.DOCKET_ENTRY, main_instance_ids is
@@ -1741,19 +1781,21 @@ def remove_documents_by_query(
     This method deletes documents from a specified ES document type based on a
     combination of criteria such as document IDs, and a date range.
 
-    :param self: The Celery task instance.
-    :param es_document_name: The Elasticsearch Document type name to delete.
-    :param instance_ids: Optional, a list of document IDs to delete. If None,
-    deletion is based on the date range.
-    :param start_date: Optional, the start date of the date range for document deletion.
-    :param end_date: Optional, the end date of the date range for document deletion.
-    :param testing_mode: Optional, if True, performs the removal synchronously.
-    :param requests_per_second: Optional, the target number of sub-requests per
-    second for a delete by query operation.
-    :param max_docs: Optional, maximum number of documents to process.
-    :return: The ES request response, or None for unsupported removal actions.
-    """
+    Args:
+        self: The Celery task instance.
+        es_document_name: The Elasticsearch Document type name to delete.
+        instance_ids: Optional, a list of document IDs to delete. If None,
+            deletion is based on the date range.
+        start_date: Optional, the start date of the date range for document deletion.
+        end_date: Optional, the end date of the date range for document deletion.
+        testing_mode: Optional, if True, performs the removal synchronously.
+        requests_per_second: Optional, the target number of sub-requests per
+            second for a delete by query operation.
+        max_docs: Optional, maximum number of documents to process.
 
+    Returns:
+        The ES request response, or None for unsupported removal actions.
+    """
     optional_params: dict[str, str | int] = {}
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
@@ -1813,8 +1855,10 @@ def request_embeddings_for_batch(batch: dict, service_name: str) -> list[dict]:
         "text": The content of the opinion.
     param service_name: The name of the Inception microservice to use, e.g.,
         "inception-batch" or "inception-cpu-batch".
-    :return: A list of dictionaries, each containing the embeddings for the
-    corresponding opinion document as returned  by the inception microservice.
+
+    Returns:
+        A list of dictionaries, each containing the embeddings for the
+        corresponding opinion document as returned  by the inception microservice.
     """
     data = json.dumps(batch)
     response = asyncio.run(
@@ -1860,8 +1904,7 @@ def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
     retry_backoff=10,
 )
 def compute_single_opinion_embeddings(self, pk: int) -> None:
-    """
-    Celery task to compute and cache text embeddings for a single opinion.
+    """Celery task to compute and cache text embeddings for a single opinion.
 
     This task fetches the opinion record, extracts its best available text,
     and sends it to the `inception-text` microservice to generate embeddings.
@@ -1871,8 +1914,9 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     Automatically retries up to 5 times with exponential backoff (10s base)
     in case of network or protocol-related errors.
 
-    :param self: The Celery task.
-    :param pk: The primary key of the opinion to process.
+    Args:
+        self: The Celery task.
+        pk: The primary key of the opinion to process.
     """
     opinion = Opinion.objects.filter(id=pk).with_best_text().first()
     if not opinion:
@@ -1926,12 +1970,15 @@ def create_opinion_text_embeddings(
 ) -> str | None:
     """Get embeddings for Opinion texts from inception.
 
-    :param self: The Celery task.
-    :param batch: A list of Opinion IDs representing the batch to process.
-    :param database: The database to be used during processing.
-    :param device: The device to run the embedding generation on (e.g., 'cpu'
-        or 'gpu'). Defaults to 'cpu'.
-    :return: The cache key used to temporarily store embeddings.
+    Args:
+        self: The Celery task.
+        batch: A list of Opinion IDs representing the batch to process.
+        database: The database to be used during processing.
+        device: The device to run the embedding generation on (e.g., 'cpu'
+            or 'gpu'). Defaults to 'cpu'.
+
+    Returns:
+        The cache key used to temporarily store embeddings.
     """
     opinions = (
         Opinion.objects.filter(id__in=batch).with_best_text().using(database)
@@ -2011,12 +2058,11 @@ def save_embeddings(
     For example, if uploading a batch of opinion embeddings, each file will
     be stored embeddings/opinions/freelawproject/modernbert-embed-base_finetune_512/{opinion_id}.json
 
-    :param self: The Celery task.
-    :param cache_key: The cache key used to temporarily store the embeddings.
-    :param directory: The directory where the embeddings will be stored.
-    :return: None.
+    Args:
+        self: The Celery task.
+        cache_key: The cache key used to temporarily store the embeddings.
+        directory: The directory where the embeddings will be stored.
     """
-
     embeddings = cache.get(cache_key, None)
     if embeddings is None:
         batch_range = cache_key.rsplit("-", 1)[-1]
@@ -2053,10 +2099,13 @@ def download_embedding(
 ) -> list[dict] | None:
     """Download a single embedding from S3.
 
-    :param storage: Storage backend instance.
-    :param pk: The record ID.
-    :param directory: Directory where the embedding is stored.
-    :return: The embedding data as a dict, or None if not found.
+    Args:
+        storage: Storage backend instance.
+        pk: The record ID.
+        directory: Directory where the embedding is stored.
+
+    Returns:
+        The embedding data as a dict, or None if not found.
     """
     file_path = str(
         PurePosixPath(
@@ -2094,10 +2143,13 @@ def retrieve_embeddings(
 ) -> list[dict] | None:
     """Download opinion embeddings from S3 for the given opinion IDs.
 
-    :param self: The Celery task instance.
-    :param opinion_ids: A list of opinion IDs for which to retrieve embeddings.
-    :param directory: The directory where the embeddings are stored.
-    :return: A list of dictionaries containing the embeddings.
+    Args:
+        self: The Celery task instance.
+        opinion_ids: A list of opinion IDs for which to retrieve embeddings.
+        directory: The directory where the embeddings are stored.
+
+    Returns:
+        A list of dictionaries containing the embeddings.
     """
     storage = AWSMediaStorage()
     embeddings: list[dict] = []
@@ -2129,12 +2181,14 @@ def index_embeddings(
 ) -> None:
     """Update opinion documents in bulk with embeddings.
 
-    :param self: The Celery task instance.
-    :param embeddings: A list of dictionaries, each containing the opinion ID
-    and its corresponding embeddings to update.
-    :return: None if there are no documents to update.
-    """
+    Args:
+        self: The Celery task instance.
+        embeddings: A list of dictionaries, each containing the opinion ID
+            and its corresponding embeddings to update.
 
+    Returns:
+        None if there are no documents to update.
+    """
     base_doc = {
         "_op_type": "update",
         "_index": OpinionClusterDocument._index._name,
@@ -2192,8 +2246,7 @@ def clean_docket_number_by_court(
     start_timestamp: datetime,
     r: Redis | None = None,
 ) -> None:
-    """
-    Cleans docket numbers for the respective court_mapping using cascading model passes.
+    """Cleans docket numbers for the respective court_mapping using cascading model passes.
 
     The cleaning process involves:
     1. Running two mini models to find consensus on cleaned docket numbers.
@@ -2201,9 +2254,12 @@ def clean_docket_number_by_court(
     3. For remaining ties, using a tie-breaker model to finalize the cleaned docket numbers.
     4. Updating the docket numbers in the database with the cleaned results.
 
-    :param court_batch: A batch of court records with docket IDs and numbers.
-    :param court_mapping: Identifier for the court mapping used in model prompts.
-    :param start_timestamp: Timestamp marking the start of the daemon job.
+    Args:
+        self: The bound Celery task.
+        court_batch: A batch of court records with docket IDs and numbers.
+        court_mapping: Identifier for the court mapping used in model prompts.
+        start_timestamp: Timestamp marking the start of the daemon job.
+        r: A Redis connection. Defaults to the cache connection.
     """
     if r is None:
         r = get_redis_interface("CACHE")

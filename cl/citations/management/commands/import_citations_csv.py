@@ -1,5 +1,4 @@
-"""
-Import citations from csv file
+"""Import citations from csv file.
 
 The csv file must have the following structure, the file should not have a header row:
 
@@ -36,12 +35,14 @@ from cl.search.models import OpinionCluster
 
 
 def load_citations_file(options: dict) -> DataFrame:
-    """Load csv file from absolute path
+    """Load csv file from absolute path.
 
-    :param options: options passed to command
-    :return: loaded data
+    Args:
+        options: options passed to command
+
+    Returns:
+        loaded data
     """
-
     end_row = None
 
     # Use string dtype specifiers ("int"/"str") rather than the builtin type
@@ -77,14 +78,13 @@ def load_citations_file(options: dict) -> DataFrame:
 
 
 def process_csv_data(data: DataFrame, delay_s: float, reindex: bool) -> None:
-    """Process citations from csv file
+    """Process citations from csv file.
 
-    :param data: rows from csv file
-    :param delay_s: how long to wait to add each citation
-    :param reindex: force reindex of citations
-    :return: None
+    Args:
+        data: rows from csv file
+        delay_s: how long to wait to add each citation
+        reindex: force reindex of citations
     """
-
     for index, row in data.iterrows():
         cluster_id = row.get("cluster_id")
         citation_to_add = row.get("citation_to_add")
@@ -105,10 +105,13 @@ class Command(BaseCommand):
         super().__init__(*args, **kwargs)
 
     def existing_path_type(self, path: str):
-        """Validate file path exists
+        """Validate file path exists.
 
-        :param path: path to validate
-        :return: valid path
+        Args:
+            path: path to validate
+
+        Returns:
+            valid path
         """
         if not os.path.exists(path):
             raise argparse.ArgumentTypeError(

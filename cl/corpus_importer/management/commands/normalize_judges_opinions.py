@@ -11,8 +11,7 @@ from cl.search.models import Opinion, OpinionCluster
 
 
 def normalize_authors_in_opinions():
-    """Normalize author_str in opinions"""
-
+    """Normalize author_str in opinions."""
     # Get opinions that have no author object and have author_str
     opinions_with_author_str = Opinion.objects.exclude(
         author__isnull=False
@@ -38,8 +37,7 @@ def normalize_authors_in_opinions():
 
 
 def normalize_panel_in_opinioncluster():
-    """Normalize panel in opinion cluster object"""
-
+    """Normalize panel in opinion cluster object."""
     # Get opinion cluster that have no panel objects and have judges_str
     opinion_clusters_with_judges_str = OpinionCluster.objects.exclude(
         panel__isnull=False
