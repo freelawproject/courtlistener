@@ -1,3 +1,5 @@
+"""Constants for building search queries, highlighting, boosts, and scopes."""
+
 # fields that are used for highlighting or other output in the search results
 import re
 

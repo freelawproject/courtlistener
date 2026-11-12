@@ -13,6 +13,8 @@ from cl.search.state.shared import DocketEntryType
 
 
 class FloridaDocketEntryFactory(DjangoModelFactory):
+    """Make a Florida docket entry on a new docket."""
+
     docket = SubFactory(DocketFactory)
     date_filed = Faker("date_time", tzinfo=UTC)
     date_submitted = Faker("date_time", tzinfo=UTC)
@@ -39,6 +41,8 @@ class FloridaDocketEntryFactory(DjangoModelFactory):
 
 
 class FloridaDocumentFactory(DjangoModelFactory):
+    """Make a Florida PDF document on a new docket entry."""
+
     docket_entry = SubFactory(FloridaDocketEntryFactory)
     content_type = "application/pdf"
     document_name = Faker("text", max_nb_chars=25)

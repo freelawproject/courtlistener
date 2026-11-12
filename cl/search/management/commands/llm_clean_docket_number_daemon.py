@@ -1,3 +1,5 @@
+"""Daemon that queues LLM cleaning of docket numbers batched in Redis."""
+
 import time
 from datetime import datetime
 
@@ -16,13 +18,17 @@ from cl.search.tasks import clean_docket_number_by_court
 
 
 class Command(VerboseCommand):
+    """Periodically queue LLM cleaning tasks for the dockets batched in Redis."""
+
     help = """Run the docket number cleaning daemon."""
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
         self.throttle = None
 
     def add_arguments(self, parser):
+        """Add the testing iterations, queue, and throttle options."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -65,6 +71,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue a cleaning task per court mapping for the batched dockets, repeatedly.
+
+        Runs while docket number cleaning is enabled in settings, stopping
+        after ``--testing-iterations`` iterations when that is set.
+        """
         super().handle(*args, **options)
 
         celery_queue = options["celery_queue"]

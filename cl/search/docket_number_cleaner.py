@@ -1,3 +1,5 @@
+"""Clean raw docket numbers with regexes and, for hard cases, LLMs."""
+
 import logging
 import re
 from collections import defaultdict
@@ -488,6 +490,11 @@ def call_models_and_compare_results(
 def clean_docket_number_raw_and_update_redis_cache(
     docket: Docket, r: Redis | None = None
 ):
+    """Clean a docket's raw docket number and save the result.
+
+    A cleaned docket number is saved on the docket. Dockets that need LLM
+    cleaning are added to the Redis LLM batch set.
+    """
     if r is None:
         r = get_redis_interface("CACHE")
 

@@ -1,3 +1,5 @@
+"""Models for Florida docket entries and documents, and the ALTCHA challenge types for Florida's site."""
+
 import base64
 import hashlib
 import logging

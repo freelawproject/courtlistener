@@ -1,3 +1,5 @@
+"""Bulk fetch RECAP documents from PACER, rate limited per court."""
+
 import os
 import time
 from collections.abc import Collection
@@ -25,6 +27,8 @@ from cl.search.models import Court, RECAPDocument
 
 
 class SkipReason(Enum):
+    """Why a court is skipped during a fetch iteration."""
+
     FAILED = 0
     MAX_RETRIES = 1
     FETCH_IN_PROGRESS = 2
@@ -33,6 +37,8 @@ class SkipReason(Enum):
 
 @dataclass
 class SkipStatus:
+    """Whether to skip a court, why, and its fetch queue if any."""
+
     should_skip: bool
     reason: SkipReason | None = None
     fetch_queue: PacerFetchQueue | None = None
@@ -42,6 +48,7 @@ class MinimumWait:
     """Tracks the minimum time to wait during an iteration."""
 
     def __init__(self):
+        """Start with no minimum."""
         self.min_value = None
 
     def add(self, num: int) -> None:
@@ -102,9 +109,12 @@ def is_retry_interval_elapsed(
 
 
 class Command(VerboseCommand):
+    """Fetch RECAP documents from PACER with per-court rate limiting, or process fetched ones."""
+
     help = "Download multiple documents from PACER with rate limiting"
 
     def __init__(self, *args, **kwargs):
+        """Build the command with default limits and PACER credentials from the environment or settings."""
         super().__init__(*args, **kwargs)
         self.options = None
         self.user = None
@@ -129,6 +139,7 @@ class Command(VerboseCommand):
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 
     def add_arguments(self, parser) -> None:
+        """Add the interval, backoff, page count, username, queue, testing, and stage options."""
         parser.add_argument(
             "--interval",
             type=int,
@@ -572,6 +583,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Run the fetch or process stage.
+
+        Raises:
+            CommandError: If the stage is invalid, or the fetch stage is run
+                without ``--min-page-count``.
+        """
         self.options = options
         self.queue_name = options["queue_name"]
         self.setup_celery()

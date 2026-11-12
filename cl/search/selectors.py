@@ -1,3 +1,5 @@
+"""Database queries for table size estimates and citation lookups."""
+
 import natsort
 from django.db import connection
 from django.db.models import Q, QuerySet
@@ -6,6 +8,7 @@ from cl.search.models import Citation, OpinionCluster
 
 
 def get_total_estimate_count(table_name: str) -> int:
+    """Get Postgres's estimate of a public table's row count, or 0 if it has none."""
     full_name = f"public.{table_name}"
     with connection.cursor() as cursor:
         cursor.execute(
