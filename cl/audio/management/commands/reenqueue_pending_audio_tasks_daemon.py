@@ -50,6 +50,8 @@ def _interruptible_sleep(total_seconds: int) -> None:
 
 
 class Command(VerboseCommand):
+    """Run re-enqueue cycles for pending audio until shut down or disabled."""
+
     help = (
         "Long-running daemon that periodically dispatches audios needing "
         "standardization or transcription. Acts as the cluster-wide rate "
@@ -60,6 +62,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the iteration limit, age window, and per-sweep cap options."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -96,6 +99,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Run re-enqueue cycles, sleeping between them.
+
+        Stops on SIGTERM or SIGINT, when the daemon is disabled in settings,
+        or after ``--testing-iterations`` cycles. A failed cycle is logged
+        and reported without stopping the daemon.
+        """
         super().handle(*args, **options)
 
         signal.signal(signal.SIGTERM, _request_shutdown)

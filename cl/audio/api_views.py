@@ -1,3 +1,5 @@
+"""REST API viewsets for oral argument audio."""
+
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions
 
@@ -9,6 +11,8 @@ from cl.audio.models import Audio
 
 
 class AudioViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for oral argument audio."""
+
     serializer_class = AudioSerializer
     filterset_class = AudioFilter
     permission_classes = [
