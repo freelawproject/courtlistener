@@ -46,6 +46,7 @@ from cl.search.es_docket_sources import (
 from cl.search.models import (
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     ParentheticalGroup,
@@ -377,7 +378,14 @@ def update_es_documents(
                             (instance._meta.label, instance.pk),
                             fields_map,
                         )
-                        if type(main_object) not in SOURCE_BY_MODEL:
+                        # RECAP documents are never percolated on docket entry
+                        # changes, since the RECAPDocument itself is the
+                        # percolated unit, so skip the percolation chain.
+                        is_recap_entry = isinstance(instance, DocketEntry)
+                        if (
+                            type(main_object) not in SOURCE_BY_MODEL
+                            or is_recap_entry
+                        ):
                             transaction.on_commit(
                                 partial(update_es_document.delay, *update_args)
                             )
