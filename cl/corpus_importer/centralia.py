@@ -1,4 +1,5 @@
-# Code for importing Centralia structured opinion extractions into the DB
+"""Import Centralia structured opinion extractions into the DB."""
+
 import logging
 from enum import StrEnum
 from typing import Any

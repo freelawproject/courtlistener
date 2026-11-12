@@ -25,8 +25,11 @@ def get_bucket_name(court: str, pacer_case_id: str | int | None) -> str:
 def format_path_date(value: date | None) -> str:
     """Render a filing date as a storage path segment.
 
-    :param value: The filing date, or None when the entry is undated.
-    :return: The ISO date (YYYY-MM-DD), or `UNDATED_PATH_SEGMENT` when None.
+    Args:
+        value: The filing date, or None when the entry is undated.
+
+    Returns:
+        The ISO date (YYYY-MM-DD), or `UNDATED_PATH_SEGMENT` when None.
     """
     return value.isoformat() if value else UNDATED_PATH_SEGMENT
 
@@ -45,13 +48,16 @@ def make_recap_style_path(
 
         recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<segments...><ext>
 
-    :param court_id: The court the docket belongs to.
-    :param docket_id: The CourtListener docket id.
-    :param segments: The dot-separated segments that follow the bucket name in
-        the filename, e.g. the filing date and document number.
-    :param ext: The file extension, including the leading dot.
-    :param thumbs: Whether to build the thumbnail path instead.
-    :return: The path, relative to the bucket root.
+    Args:
+        court_id: The court the docket belongs to.
+        docket_id: The CourtListener docket id.
+        segments: The dot-separated segments that follow the bucket name in
+            the filename, e.g. the filing date and document number.
+        ext: The file extension, including the leading dot.
+        thumbs: Whether to build the thumbnail path instead.
+
+    Returns:
+        The path, relative to the bucket root.
     """
     root = "recap-thumbnails" if thumbs else "recap"
     bucket = get_bucket_name(court_id, docket_id)
@@ -70,10 +76,13 @@ def scotus_document_number_segments(
     segment and a missing attachment number becomes `0`. Either is unexpected
     for SCOTUS documents, so both are logged as errors for follow-up.
 
-    :param document_number: The document number on the SCOTUS docket page.
-    :param attachment_number: The attachment number on the SCOTUS docket page.
-    :param document_pk: The SCOTUSDocument pk, for the log message.
-    :return: The two segments, document number first.
+    Args:
+        document_number: The document number on the SCOTUS docket page.
+        attachment_number: The attachment number on the SCOTUS docket page.
+        document_pk: The SCOTUSDocument pk, for the log message.
+
+    Returns:
+        The two segments, document number first.
     """
     if document_number is None:
         logger.error(
@@ -181,8 +190,11 @@ PAGINATION_OF: re.Pattern[str] = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 def is_page_line(line: str) -> bool:
     """Detect if a line is a page-number marker.
 
-    :param line: A single textual line extracted from a PDF.
-    :return: True if the line matches "Page X of Y" or "Page: X"; False otherwise.
+    Args:
+        line: A single textual line extracted from a PDF.
+
+    Returns:
+        True if the line matches "Page X of Y" or "Page: X"; False otherwise.
     """
     return bool(
         PAGINATION_RE.search(line)
@@ -195,9 +207,12 @@ def is_page_line(line: str) -> bool:
 def is_doc_common_header(line: str) -> bool:
     """Identify common header/footer lines that should be ignored.
 
-    :param line: A line extracted from a PDF.
-    :return: True if the line is empty, begins with common header starters, or
-    matches pagination, filing, date/time, or "Received" patterns. False otherwise.
+    Args:
+        line: A line extracted from a PDF.
+
+    Returns:
+        True if the line is empty, begins with common header starters, or
+        matches pagination, filing, date/time, or "Received" patterns. False otherwise.
     """
     bad_starters = (
         "Appellate",
@@ -277,9 +292,12 @@ def needs_ocr(content: str, page_count: int | None = None) -> bool:
     As a fallback it removes these common headers so that if no text remains,
     we can be sure that the PDF needs OCR.
 
-    :param content: The text content to check if OCR is needed.
-    :param page_count: The number of pages of the document.
-    :return: True if OCR is needed, False otherwise.
+    Args:
+        content: The text content to check if OCR is needed.
+        page_count: The number of pages of the document.
+
+    Returns:
+        True if OCR is needed, False otherwise.
     """
     lines = (ln.strip() for ln in content.splitlines())
     in_page = False

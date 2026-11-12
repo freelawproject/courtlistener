@@ -85,9 +85,11 @@ class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
     name: str = Attribute(_party_name)
 
     def query(self) -> QuerySet[Party]:
-        """Find the party by its natural key within the parent docket. The
-        default key is the name, like the RECAP mergers use; a source that
-        identifies parties more reliably sets `key` to that field instead."""
+        """Find the party by its natural key within the parent docket.
+
+        The default key is the name, like the RECAP mergers use; a source that
+        identifies parties more reliably sets `key` to that field instead.
+        """
         docket = cast(Docket, self.params.parent)
         return super().query().filter(party_types__docket=docket).distinct()
 

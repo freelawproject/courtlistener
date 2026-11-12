@@ -260,11 +260,13 @@ IS_JUDGE = {"wu", "re", "du", "de"}
 
 
 def find_all_judges(judge_text: str) -> list[str]:
-    """Find all judges
-    This method is used to extract out multiple judge names from a text input
-    from the harvard merger/import.
-    :param judge_text: Harvard text input from judges tags
-    :return: List of judges names or empty list
+    """Find all judges This method is used to extract out multiple judge names from a text input from the harvard merger/import.
+
+    Args:
+        judge_text: Harvard text input from judges tags
+
+    Returns:
+        List of judges names or empty list.
     """
     cleaned_text = unidecode(judge_text).replace("\n", " ")
     cleaned_text = wrap_text(100, cleaned_text).strip()
@@ -297,13 +299,16 @@ def find_all_judges(judge_text: str) -> list[str]:
 
 
 def find_just_name(text: str) -> str:
-    """Extract the first surname appearing in the Harvard text
+    """Extract the first surname appearing in the Harvard text.
 
     This is designed specifically for the Harvard merger and its particular
     brand of OCR.
 
-    :param text: string to analyze
-    :return: surname or empty string
+    Args:
+        text: string to analyze
+
+    Returns:
+        surname or empty string
     """
     # Crop the text - on the off chance the text is incorrectly long to avoid
     # searching the text way down.
@@ -361,10 +366,13 @@ def extract_judge_last_name(
 ) -> list[str]:
     """Find judge last names in a string of text.
 
-    :param text: The text you wish to extract names from.
-    :param keep_letter_case: True if you want to keep letter case from text
-    :param require_capital: True if you want to keep words that start with a capital letter
-    :return: last names of judges in `text`.
+    Args:
+        text: The text you wish to extract names from.
+        keep_letter_case: True if you want to keep letter case from text
+        require_capital: True if you want to keep words that start with a capital letter
+
+    Returns:
+        last names of judges in `text`.
     """
     if require_capital:
         text = " ".join([x for x in text.split() if x[0].isupper()])
@@ -430,20 +438,23 @@ async def lookup_judge_by_full_name(
 ) -> Person | None:
     """Uniquely identifies a judge by both name and metadata.
 
-    :param name: The judge's name, either as a str of the full name or as
-    a HumanName object. Do NOT provide just the last name of the judge. If you
-    do, it will be considered the judge's first name. You MUST provide their
-    full name or a HumanName object. To look up a judge by last name, see the
-    look_up_judge_by_last_name function. The str parsing used here is the
-    heuristic approach used by nameparser.HumanName.
-    :param court_id: The court where the judge did something
-    :param event_date: The date when the judge did something
-    :param require_living_judge: Whether to ensure that the judge found was
-    born before the event date and died after it. In order to keep code simple,
-    there's some slop in here to allow for date fields with low granularity
-    (like those with DATE_GRANULARITY = "%Y").
-    :return Either the judge that matched the name in the court at the right
-    time, or None.
+    Args:
+        name: The judge's name, either as a str of the full name or as
+            a HumanName object. Do NOT provide just the last name of the judge. If you
+            do, it will be considered the judge's first name. You MUST provide their
+            full name or a HumanName object. To look up a judge by last name, see the
+            look_up_judge_by_last_name function. The str parsing used here is the
+            heuristic approach used by nameparser.HumanName.
+        court_id: The court where the judge did something
+        event_date: The date when the judge did something
+        require_living_judge: Whether to ensure that the judge found was
+            born before the event date and died after it. In order to keep code simple,
+            there's some slop in here to allow for date fields with low granularity
+            (like those with DATE_GRANULARITY = "%Y").
+
+    Returns:
+        Either the judge that matched the name in the court at the right
+        time, or None.
     """
     if isinstance(name, str):
         name = HumanName(name)
@@ -558,16 +569,16 @@ async def lookup_judge_by_full_name_and_set_attr(
     event_date: date | None,
     require_living_judge: bool = True,
 ) -> None:
-    """Lookup a judge by the attribute of an object
+    """Lookup a judge by the attribute of an object.
 
-    :param item: The object containing the attribute you want to look up
-    :param target_field: The field on the attribute you want to look up
-    :param full_name: The full name of the judge to look up
-    :param court_id: The court where the judge did something
-    :param event_date: The date the judge did something
-    :param require_living_judge: Whether to ensure that the judge found was
-    born before the event date and died after it.
-    :return None
+    Args:
+        item: The object containing the attribute you want to look up
+        target_field: The field on the attribute you want to look up
+        full_name: The full name of the judge to look up
+        court_id: The court where the judge did something
+        event_date: The date the judge did something
+        require_living_judge: Whether to ensure that the judge found was
+            born before the event date and died after it.
     """
     if not full_name:
         return None
@@ -583,7 +594,7 @@ async def lookup_judge_by_last_name(
     event_date: date | None = None,
     require_living_judge: bool = True,
 ) -> Person | None:
-    """Look up the judge using their last name, a date and court"""
+    """Look up the judge using their last name, a date and court."""
     hn = HumanName()
     hn.last = last_name
     return await lookup_judge_by_full_name(
@@ -597,7 +608,7 @@ async def lookup_judges_by_last_name_list(
     event_date: date | None = None,
     require_living_judge: bool = True,
 ) -> list[Person]:
-    """Look up a group of judges by list of last names, a date, and a court"""
+    """Look up a group of judges by list of last names, a date, and a court."""
     found_people = []
     for last_name in last_names:
         hn = HumanName()
@@ -615,9 +626,7 @@ async def lookup_judges_by_messy_str(
     court_id: str,
     event_date: date | None = None,
 ) -> list[Person]:
-    """Look up a group of judges by a messy string that might contain their
-    names. (This is the least accurate way to look up judges.)
-    """
+    """Look up a group of judges by a messy string that might contain their names. (This is the least accurate way to look up judges.)."""
     last_names = extract_judge_last_name(s)
     return await lookup_judges_by_last_name_list(
         last_names, court_id, event_date

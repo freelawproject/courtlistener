@@ -17,15 +17,17 @@ def walk_juriscraper() -> Iterator[ModuleInfo]:
 def get_scraper_object_by_name(
     court_id: str, juriscraper_module: str = ""
 ) -> AbstractSite | None:
-    """Identify and instantiate a Site() object given the name of a court
+    """Identify and instantiate a Site() object given the name of a court.
 
-    :param court_id: The ID of a site; must correspond with the name of a
-    module without the underscore suffix.
-    :param juriscraper_module: full module name. Helps avoiding conflicts when
-        there is more than 1 scraper for the same court id. For example,
-        those on the united_states_backscrapers folders
-    :return: An instantiated Site() object from the module requested
-    :rtype: juriscraper.AbstractSite.AbstractSite
+    Args:
+        court_id: The ID of a site; must correspond with the name of a
+            module without the underscore suffix.
+        juriscraper_module: full module name. Helps avoiding conflicts when
+            there is more than 1 scraper for the same court id. For example,
+            those on the united_states_backscrapers folders
+
+    Returns:
+        juriscraper.AbstractSite.AbstractSite: An instantiated Site() object from the module requested
     """
     if juriscraper_module:
         if re.search(r"\.del$", juriscraper_module):
@@ -55,7 +57,7 @@ def get_scraper_object_by_name(
 
 
 def get_module_by_court_id(court_id: str, module_type: str) -> str:
-    """Given a `court_id` return a juriscraper module path
+    """Given a `court_id` return a juriscraper module path.
 
     Some court_ids match multiple scraper files. These will force the user
     to use the full module path. For example, "lactapp_1" and "lactapp_5"
@@ -63,12 +65,16 @@ def get_module_by_court_id(court_id: str, module_type: str) -> str:
     their Site objects are expected to have different `extract_from_text`
     behavior
 
-    :param court_id: court id to look for
-    :param module_type: 'opinions' or 'oral_args'. Without this, some
-        court_ids may match the 2 classes of scrapers
+    Args:
+        court_id: court id to look for
+        module_type: 'opinions' or 'oral_args'. Without this, some
+            court_ids may match the 2 classes of scrapers
 
-    :raises: ValueError if there is no match or there is more than 1 match
-    :return: the full module path
+    Returns:
+        the full module path
+
+    Raises:
+        ValueError: if there is no match or there is more than 1 match
     """
     if module_type not in ["opinions", "oral_args"]:
         raise ValueError(

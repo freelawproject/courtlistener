@@ -16,7 +16,9 @@ from cl.search.tasks import index_parent_or_child_docs_in_es
 
 def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for indexing log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "es_re_index_rd_sealed:log"
 
@@ -99,17 +101,15 @@ class Command(VerboseCommand):
         count: int,
         pk_offset: int,
     ) -> None:
-        """Process a queryset and execute tasks based on the specified celery
-        task_to_use.
+        """Process a queryset and execute tasks based on the specified celery task_to_use.
 
-        :param items: Iterable of items to process. Items can be a simple
-        iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
-        field changes.
-        :param count: Total number of items expected to process.
-        :param pk_offset:
-        :return: None
+        Args:
+            items: Iterable of items to process. Items can be a simple
+                iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
+                field changes.
+            count: Total number of items expected to process.
+            pk_offset: The pk the run started from, for logging.
         """
-
         queue = self.options["queue"]
         testing_mode = self.options["testing_mode"]
         chunk_size = self.options["chunk_size"]

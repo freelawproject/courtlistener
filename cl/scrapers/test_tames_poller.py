@@ -154,8 +154,7 @@ class TamesPollerTest(SimpleTestCase):
         MockTAMES: MagicMock,
         MockRM: MagicMock,
     ) -> None:
-        """When fresh URLs are not in the Redis cache, the poller should
-        backfill and dispatch a celery chain for every returned case."""
+        """When fresh URLs are not in the Redis cache, the poller should backfill and dispatch a celery chain for every returned case."""
         fresh_cases = make_search_rows(25)
         backfill_cases = make_search_rows(5)
 
@@ -186,8 +185,7 @@ class TamesPollerTest(SimpleTestCase):
         MockTAMES: MagicMock,
         MockRM: MagicMock,
     ) -> None:
-        """When every fresh URL already exists in the Redis cache, the
-        poller should skip backfill entirely."""
+        """When every fresh URL already exists in the Redis cache, the poller should skip backfill entirely."""
         cases = make_search_rows(25)
 
         # Only the freshness-check scraper is needed (no backfill).
@@ -216,9 +214,7 @@ class TamesPollerTest(SimpleTestCase):
         MockTAMES: MagicMock,
         MockRM: MagicMock,
     ) -> None:
-        """With --case-backfill-days the backfill scraper should receive
-        a date range spanning that many days from today, and every case
-        yielded within that window should be dispatched."""
+        """With --case-backfill-days the backfill scraper should receive a date range spanning that many days from today, and every case yielded within that window should be dispatched."""
         backfill_days = 5
         fresh_cases = make_search_rows(25)
         backfill_cases = make_search_rows(3)
@@ -257,8 +253,7 @@ class TamesPollerTest(SimpleTestCase):
         MockTAMES: MagicMock,
         MockRM: MagicMock,
     ) -> None:
-        """When the backfill encounters a URL already in the Redis cache,
-        it should stop ingesting further cases."""
+        """When the backfill encounters a URL already in the Redis cache, it should stop ingesting further cases."""
         fresh_cases = make_search_rows(25, start=50)
         # Backfill yields 10 cases; cases 1-5 are new, 6-10 overlap cache
         old_cases = make_search_rows(5, start=1)
@@ -512,8 +507,7 @@ class SubscribePendingCasesTest(TestCase):
 
     @responses.activate
     def test_unverified_subscription_not_counted(self) -> None:
-        """When CaseMail returns an unexpected message, the case stays
-        pending and is not counted as succeeded."""
+        """When CaseMail returns an unexpected message, the case stays pending and is not counted as succeeded."""
         case = json.dumps(
             {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
             sort_keys=True,

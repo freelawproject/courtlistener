@@ -47,10 +47,11 @@ class _Filing(NamedTuple):
     `FILING_TYPE_MAP` is not part of its published API, hence the handful
     repeated here.
 
-    :ivar filing_type: The filing type, whose value is the Court's own wording.
-    :ivar role: The party role the filing type implies.
-    :ivar doctype: The document type the filing type implies.
-    :ivar entry_type: The standard docket entry type for the filing.
+    Attributes:
+        filing_type: The filing type, whose value is the Court's own wording.
+        role: The party role the filing type implies.
+        doctype: The document type the filing type implies.
+        entry_type: The standard docket entry type for the filing.
     """
 
     filing_type: FilingType
@@ -102,8 +103,9 @@ _FILINGS: tuple[_Filing, ...] = (
 class _PartyRole(NamedTuple):
     """A party role Court-PASS states, with the standard type it maps to.
 
-    :ivar raw: The role exactly as the ATTORNEY DETAILS section states it.
-    :ivar party_type: The standard party type the role maps to.
+    Attributes:
+        raw: The role exactly as the ATTORNEY DETAILS section states it.
+        party_type: The standard party type the role maps to.
     """
 
     raw: str

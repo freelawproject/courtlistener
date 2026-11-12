@@ -1,6 +1,4 @@
-"""
-Unit tests for Visualizations
-"""
+"""Unit tests for Visualizations."""
 
 import datetime
 from http import HTTPStatus
@@ -79,7 +77,7 @@ def create_scotus_test_clusters() -> tuple[OpinionCluster, OpinionCluster]:
 
 
 class TestVizUtils(TestCase):
-    """Tests for Visualization app utils"""
+    """Tests for Visualization app utils."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -89,10 +87,7 @@ class TestVizUtils(TestCase):
     async def test_reverse_endpoints_does_not_reverse_good_inputs(
         self,
     ) -> None:
-        """
-        Test the utility function does not change the order of endpoints that
-        are already in correct order
-        """
+        """Test the utility function does not change the order of endpoints that are already in correct order."""
         start = await OpinionCluster.objects.aget(
             case_name="Marsh v. Chambers"
         )
@@ -104,10 +99,7 @@ class TestVizUtils(TestCase):
         self.assertEqual(new_end, end)
 
     async def test_reverse_endpoints_reverses_backwards_inputs(self) -> None:
-        """
-        Test the utility function for properly ordering visualization
-        endpoints.
-        """
+        """Test the utility function for properly ordering visualization endpoints."""
         real_end = await OpinionCluster.objects.aget(
             case_name="Town of Greece v. Galloway"
         )
@@ -122,7 +114,7 @@ class TestVizUtils(TestCase):
 
 
 class TestVizModels(TestCase):
-    """Tests for Visualization models"""
+    """Tests for Visualization models."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -130,7 +122,7 @@ class TestVizModels(TestCase):
         create_scotus_test_clusters()
 
     async def test_SCOTUSMap_builds_nx_digraph(self) -> None:
-        """Tests build_nx_digraph method to see how it works"""
+        """Tests build_nx_digraph method to see how it works."""
         start = await OpinionCluster.objects.aget(
             case_name="Marsh v. Chambers"
         )
@@ -155,9 +147,7 @@ class TestVizModels(TestCase):
         self.assertTrue(len(g.edges()) > 0)
 
     def test_SCOTUSMap_deletes_cascade(self) -> None:
-        """
-        Make sure we delete JSONVersion instances when deleted SCOTUSMaps
-        """
+        """Make sure we delete JSONVersion instances when deleted SCOTUSMaps."""
         viz = VisualizationFactory.create(
             title="Test SCOTUSMap",
             notes="Test Notes",
@@ -168,9 +158,7 @@ class TestVizModels(TestCase):
         self.assertIsNone(viz.pk, None)
 
     async def test_embed_view_escapes_json_data(self) -> None:
-        """Is json_data safely escaped in the embed view, even for a
-        private visualization loaded by a non-owner (GHSA-cvh7-rv7v-wx2j)?
-        """
+        """Is json_data safely escaped in the embed view, even for a private visualization loaded by a non-owner (GHSA-cvh7-rv7v-wx2j)?"""
         payload = "</script><script>alert(1)</script>"
         viz = await sync_to_async(VisualizationFactory.create)(
             title="Test SCOTUSMap",
@@ -381,9 +369,7 @@ class APIVisualizationTestCase(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
     async def test_json_data_is_read_only(self) -> None:
-        """Is the visualization JSON API read-only, for owners and
-        non-owners alike (GHSA-cvh7-rv7v-wx2j)?
-        """
+        """Is the visualization JSON API read-only, for owners and non-owners alike (GHSA-cvh7-rv7v-wx2j)?"""
         response = await self.make_good_visualization("some title")
         j = response.json()
         json_path = j["json_versions"][0]["resource_uri"]

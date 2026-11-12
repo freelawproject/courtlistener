@@ -1,5 +1,6 @@
-"""Per-source configuration for the shared Elasticsearch signal-processing
-machinery in cl.lib.es_signal_processor and the ES indexing tasks in
+"""Per-source configuration for the shared Elasticsearch signal-processing machinery.
+
+Used by cl.lib.es_signal_processor and the ES indexing tasks in
 cl.search.tasks. Each source's court_ids also feed the RECAP search court
 picker.
 """
@@ -28,9 +29,10 @@ type SourceDocument = RECAPDocument | SCOTUSDocument
 
 @dataclass(frozen=True)
 class ESDocketSource:
-    """Describes how one docket source's RECAP-style content (docket
-    entries, documents, and an optional docket-level metadata model) plugs
-    into the shared Elasticsearch signal-processing code.
+    """Describes how one docket source's RECAP-style content plugs into the shared Elasticsearch signal-processing code.
+
+    That content is docket entries, documents, and an optional docket-level
+    metadata model.
 
     ``name`` identifies the source where a plain string is needed, e.g.
     the ``--source`` option of cl_index_parent_and_child_docs.
@@ -96,10 +98,7 @@ class ESDocketSource:
 
 
 def _scotus_docket_belongs(docket: Docket) -> bool:
-    """True for a court_id="scotus" Docket that is real SCOTUS content,
-    not one created only to hold a scraped Opinion. merge_scotus_docket
-    uses the same source=SCRAPER value cl_scrape_opinions sets for every
-    scraped Opinion, so source alone can't tell the two apart.
+    """True for a court_id="scotus" Docket that is real SCOTUS content, not one created only to hold a scraped Opinion. merge_scotus_docket uses the same source=SCRAPER value cl_scrape_opinions sets for every scraped Opinion, so source alone can't tell the two apart.
 
     True if the Docket was explicitly marked at save time
     (merge_scotus_docket sets `docket._index_in_es` before its first
@@ -116,12 +115,7 @@ def _scotus_docket_belongs(docket: Docket) -> bool:
 
 
 def _scotus_docket_filter() -> Q:
-    """Select court_id="scotus" Dockets with a ScotusDocketMetadata row or
-    at least one SCOTUSDocument. _index_in_es only exists in memory, so it
-    can't be matched in SQL; Dockets with a document are included because
-    es_save_document indexes a document's Docket along with it when the
-    Docket isn't indexed yet.
-    """
+    """Select court_id="scotus" Dockets with a ScotusDocketMetadata row or at least one SCOTUSDocument. _index_in_es only exists in memory, so it can't be matched in SQL; Dockets with a document are included because es_save_document indexes a document's Docket along with it when the Docket isn't indexed yet."""
     # The court filter wraps both branches so the query can use the court
     # index instead of checking every Docket.
     return Q(court_id="scotus") & (
@@ -137,11 +131,7 @@ def _scotus_docket_filter() -> Q:
 
 
 def _scotus_ready_to_index(docket: Docket) -> bool:
-    """True once the Docket has a ScotusDocketMetadata row. capital_case
-    lives there, so waiting for it means the Docket's first ES write
-    already has every field, instead of an incomplete first write
-    followed by a second one once the metadata arrives.
-    """
+    """True once the Docket has a ScotusDocketMetadata row. capital_case lives there, so waiting for it means the Docket's first ES write already has every field, instead of an incomplete first write followed by a second one once the metadata arrives."""
     return getattr(docket, "scotus_metadata", None) is not None
 
 
@@ -194,10 +184,7 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
 
 
 def es_uid(model: type[models.Model], pk: int) -> str | None:
-    """Return the ES uid of a source's object, its pk prefixed with the
-    source's uid_namespace, e.g. "scotus_123". It's what ESRECAPDocument's
-    uid and docket_entry_uid fields hold, so it can be used to match those
-    documents in a search query.
+    """Return the ES uid of a source's object, its pk prefixed with the source's uid_namespace, e.g. "scotus_123". It's what ESRECAPDocument's uid and docket_entry_uid fields hold, so it can be used to match those documents in a search query.
 
     :param model: The document model whose source namespaces the uid. For
     docket_entry_uid, pass the document model with the docket entry's pk.
@@ -212,19 +199,14 @@ def es_uid(model: type[models.Model], pk: int) -> str | None:
 
 
 def skips_percolation(instance: models.Model) -> bool:
-    """True for a SCOTUS Docket, so callers must skip its percolator
-    request. Temporary: remove once search alerts support SCOTUS.
-    """
+    """True for a SCOTUS Docket, so callers must skip its percolator request. Temporary: remove once search alerts support SCOTUS."""
     return isinstance(instance, Docket) and SCOTUS_ES_SOURCE.docket_belongs(
         instance
     )
 
 
 def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:
-    """Return the courts offered in the RECAP search court picker: the
-    PACER courts plus the ones every other registered source adds. Use it
-    only for search; PACER-specific code (scrapers, uploads) must keep
-    using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
+    """Return the courts offered in the RECAP search court picker: the PACER courts plus the ones every other registered source adds. Use it only for search; PACER-specific code (scrapers, uploads) must keep using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
 
     :param include_scotus: Whether the search can return SCOTUS content
     (see scotus_frontend_search_enabled). Without it, only the PACER

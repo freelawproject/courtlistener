@@ -35,12 +35,6 @@ def handle_hard_bounce(
 ) -> None:
     """Ban any email address that receives a hard bounce.
 
-    :param notification_subtype: the notification event subtype determined
-    by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-    to whom the bounce notification pertains
-    :return: None
-
     Hard bounce subtypes are General, NoEmail, Suppressed and
     OnAccountSuppressionList.
 
@@ -49,8 +43,13 @@ def handle_hard_bounce(
     We don't expect Suppressed and OnAccountSuppressionList bounces because
     we aren't going to use SES suppression list, if we receive one of these
     we are going to log a warning and also ban the email address.
-    """
 
+    Args:
+        notification_subtype: the notification event subtype determined
+            by Amazon SES
+        recipient_emails: a list of email addresses one per recipient
+            to whom the bounce notification pertains
+    """
     unexpected_events = ["Suppressed", "OnAccountSuppressionList"]
     recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
@@ -76,14 +75,7 @@ def handle_hard_bounce(
 def handle_soft_bounce(
     message_id: str, notification_subtype: str, recipient_emails: list[str]
 ) -> None:
-    """Handle a soft bounce notification received from SNS
-
-    :param message_id: The unique message id assigned by Amazon SES
-    :param notification_subtype: The subtype of the bounce, as determined
-     by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the bounce notification pertains
-    :return: None
+    """Handle a soft bounce notification received from SNS.
 
     There are different soft bounce subtypes: General, MailboxFull
     MessageTooLarge, ContentRejected and AttachmentRejected, we perform
@@ -105,8 +97,14 @@ def handle_soft_bounce(
     after the 5º retry, the email address is banned.
 
     For unexpected bounce types, like: ContentRejected, we log a warning.
-    """
 
+    Args:
+        message_id: The unique message id assigned by Amazon SES
+        notification_subtype: The subtype of the bounce, as determined
+            by Amazon SES
+        recipient_emails: a list of email addresses one per recipient
+            to whom the bounce notification pertains
+    """
     back_off_events = ["Undetermined", "General", "MailboxFull"]
 
     MAX_RETRY_COUNTER = 5
@@ -215,14 +213,13 @@ def handle_soft_bounce(
 
 
 def handle_complaint(recipient_emails: list[str]) -> None:
-    """Handle a complaint notification received from SNS
+    """Handle a complaint notification received from SNS.
 
     Ban email addresses that received a complaint.
 
-    :param message_id: The unique message id assigned by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the complaint notification pertains
-    :return: None
+    Args:
+        recipient_emails: a list of email addresses one per recipient
+            to whom the complaint notification pertains
     """
     recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
@@ -237,12 +234,14 @@ def handle_complaint(recipient_emails: list[str]) -> None:
 def get_email_body(
     message: message.EmailMessage,
 ) -> tuple[str, str]:
-    """Function to retrieve html and plain body content of an email
+    """Function to retrieve html and plain body content of an email.
 
-    :param message: the message to extract the body content
-    :return: plaintext_body and html_body strings
+    Args:
+        message: the message to extract the body content
+
+    Returns:
+        plaintext_body and html_body strings
     """
-
     plaintext_body = ""
     html_body = ""
     for part in message.walk():
@@ -263,15 +262,14 @@ def get_email_body(
 
 
 def normalize_addresses(email_list: Sequence[str]) -> list[str]:
-    """Takes a collection of email addresses and returns a list of the
-    normalized email addresses.
-    e.g: ["Admin User <success@simulator.amazonses.com>"] turns to
-    ["success@simulator.amazonses.com"]
+    """Takes a collection of email addresses and returns a list of the normalized email addresses. e.g: ["Admin User <success@simulator.amazonses.com>"] turns to ["success@simulator.amazonses.com"].
 
-    :param email_list: A collection of email addresses (tuple, list, etc)
-    :return list[str]: A list with the normalized email addresses
+    Args:
+        email_list: A collection of email addresses (tuple, list, etc)
+
+    Returns:
+        list[str]: A list with the normalized email addresses
     """
-
     normalized_addresses = []
     for email in email_list:
         raw_address = parseaddr(email)
@@ -293,19 +291,19 @@ def set_surrogateescape_clean_text_content(
     params=None,
     headers=None,
 ):
-    """Modifies set_text_content behavior to clean surrogateescape
-    from any strings by doing a round trip encode/decode of the string.
+    """Modifies set_text_content behavior to clean surrogateescape from any strings by doing a round trip encode/decode of the string.
 
-    :param msg: The EmailMessage object
-    :param string: The string content to set
-    :param subtype: The EmailMessage content type
-    :param charset: The EmailMessage charset
-    :param cte: The EmailMessage cte encoding
-    :param disposition: The EmailMessage Content-Disposition
-    :param filename: The EmailMessage filename parameter
-    :param cid: The EmailMessage Content-ID
-    :param params: The EmailMessage params
-    :param headers: The EmailMessage headers
+    Args:
+        msg: The EmailMessage object
+        string: The string content to set
+        subtype: The EmailMessage content type
+        charset: The EmailMessage charset
+        cte: The EmailMessage cte encoding
+        disposition: The EmailMessage Content-Disposition
+        filename: The EmailMessage filename parameter
+        cid: The EmailMessage Content-ID
+        params: The EmailMessage params
+        headers: The EmailMessage headers
     """
     set_text_content(
         msg,
@@ -322,12 +320,14 @@ def set_surrogateescape_clean_text_content(
 
 
 def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
-    """Stores an email message and returns its message_id
+    """Stores an email message and returns its message_id.
 
-    :param message: The multipart message to store
-    :return message_id: The unique email message identifier
+    Args:
+        message: The multipart message to store
+
+    Returns:
+        message_id: The unique email message identifier
     """
-
     subject = message.subject
     from_email = message.from_email
     to = normalize_addresses(message.to)
@@ -366,12 +366,14 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
 
 
 def under_backoff_waiting_period(email_address: str) -> bool:
-    """Returns True if the provided email address is under a backoff waiting
-    period, otherwise False.
+    """Returns True if the provided email address is under a backoff waiting period, otherwise False.
 
-    :param email_address: The email address to verify
-    :return bool: True if the email address is under a waiting period, if not
-    False
+    Args:
+        email_address: The email address to verify
+
+    Returns:
+        bool: True if the email address is under a waiting period, if not
+        False
     """
     backoff_event = EmailFlag.objects.filter(
         email_address=email_address,
@@ -383,11 +385,13 @@ def under_backoff_waiting_period(email_address: str) -> bool:
 
 
 def is_not_email_banned(email_address: str) -> bool:
-    """Returns True if the email address provided is not banned, otherwise
-    False.
+    """Returns True if the email address provided is not banned, otherwise False.
 
-    :param email_address: The email address to verify
-    :return bool: True if the email address is not banned, otherwise False
+    Args:
+        email_address: The email address to verify
+
+    Returns:
+        bool: True if the email address is not banned, otherwise False
     """
     banned_email = EmailFlag.objects.filter(
         email_address=email_address,
@@ -402,20 +406,22 @@ def add_bcc_random(
     message: EmailMessage | EmailMultiAlternatives,
     bcc_rate: float,
 ) -> EmailMessage | EmailMultiAlternatives:
-    """This function uses randint() to obtain the probability of BCC a message
-    based on the bcc_rate which is a float value from 0 to 1.
+    """This function uses randint() to obtain the probability of BCC a message based on the bcc_rate which is a float value from 0 to 1.
 
     e.g: if we want to bcc to the 10% of messages we should use a bcc_rate
     of 0.1, so we'd have a normalized_bcc_rate of 10, so it'll check if the
     random returned value by randint(1,100) is <= 10, which means, in theory,
     a probability of 1/10.
 
-    :param bcc_rate: The email bcc copy rate, a float value between 0-1 that
-    represent the percentage of messages that we want to add a BCC
-    :return EmailMessage | EmailMultiAlternatives: Returns the message with a
-    BCC added or not.
-    """
+    Args:
+        message: The message to possibly add a BCC to.
+        bcc_rate: The email bcc copy rate, a float value between 0-1 that
+            represent the percentage of messages that we want to add a BCC
 
+    Returns:
+        EmailMessage | EmailMultiAlternatives: Returns the message with a
+        BCC added or not.
+    """
     returned_value = random.randint(1, 100)
     normalized_bcc_rate = int(bcc_rate * 100)
     if returned_value <= normalized_bcc_rate:
@@ -424,14 +430,15 @@ def add_bcc_random(
 
 
 def get_next_retry_date(recipient: str) -> datetime:
-    """Returns the next retry datetime to schedule a message based on the
-    recipient backoff event next retry date time.
+    """Returns the next retry datetime to schedule a message based on the recipient backoff event next retry date time.
 
-    :param recipient: The email address to look for a backoff event next retry
-    datetime.
-    :return datatime: The next retry datetime.
+    Args:
+        recipient: The email address to look for a backoff event next retry
+            datetime.
+
+    Returns:
+        datatime: The next retry datetime.
     """
-
     backoff_event = EmailFlag.objects.filter(
         email_address=recipient,
         flag_type=FLAG_TYPES.BACKOFF,
@@ -456,8 +463,11 @@ def get_next_retry_date(recipient: str) -> datetime:
 def is_message_stored(message_id: str) -> tuple[bool, int | None]:
     """Returns True if the message is stored in database.
 
-    :param message_id: The message unique identifier.
-    :return bool: True if the message is available in database, otherwise False
+    Args:
+        message_id: The message unique identifier.
+
+    Returns:
+        bool: True if the message is available in database, otherwise False
     """
     if message_id:
         stored_email = EmailSent.objects.filter(message_id=message_id)
@@ -467,14 +477,12 @@ def is_message_stored(message_id: str) -> tuple[bool, int | None]:
 
 
 def schedule_failed_email(recipient_email: str) -> None:
-    """Schedule recipient's waiting failed emails after verifying the recipient
-      is deliverable. It means the recipient's inbox is working again.
+    """Schedule recipient's waiting failed emails after verifying the recipient is deliverable. It means the recipient's inbox is working again.
 
-    :param recipient_email: The recipient's email address to schedule failed
-    emails.
-    :return: None
+    Args:
+        recipient_email: The recipient's email address to schedule failed
+            emails.
     """
-
     # Look for FailedEmail objects with WAITING status.
     failed_messages = FailedEmail.objects.filter(
         recipient=recipient_email, status=STATUS_TYPES.WAITING
@@ -489,14 +497,12 @@ def schedule_failed_email(recipient_email: str) -> None:
 
 
 def enqueue_email(recipients: list[str], message_id: str) -> None:
-    """Enqueue a message for a list of recipients, due to a soft bounce or if
-    the recipient is under a backoff event waiting period.
+    """Enqueue a message for a list of recipients, due to a soft bounce or if the recipient is under a backoff event waiting period.
 
-    :param recipients: The list of recipients to enqueue the message.
-    :param message_id: The message unique identifier.
-    :return None:
+    Args:
+        recipients: The list of recipients to enqueue the message.
+        message_id: The message unique identifier.
     """
-
     stored, stored_email_pk = is_message_stored(message_id)
 
     if not stored:

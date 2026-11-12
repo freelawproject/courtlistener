@@ -178,9 +178,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         self.assertTrue(Note.objects.filter(pk=unrelated_note.pk).exists())
 
     def test_duplicate_note_is_rejected(self) -> None:
-        """A second Note for the same (content_type, object_id, user)
-        is rejected.
-        """
+        """A second Note for the same (content_type, object_id, user) is rejected."""
         rd = RECAPDocumentFactory(docket_entry__docket=self.docket_1)
         NoteFactory(content_object=rd, user=self.user)
 
@@ -199,10 +197,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         )
 
     def test_form_rejects_a_dangling_object_id(self) -> None:
-        """object_id is a plain integer, not a real ForeignKey -- nothing
-        stops it from naming a row that doesn't exist unless
-        NoteForm.clean() checks it explicitly.
-        """
+        """object_id is a plain integer, not a real ForeignKey -- nothing stops it from naming a row that doesn't exist unless NoteForm.clean() checks it explicitly."""
         content_type = ContentType.objects.get_for_model(self.opinion_cluster)
         form = NoteForm(
             data={
@@ -219,11 +214,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
     def test_get_note_rejects_content_type_outside_noteable_models(
         self,
     ) -> None:
-        """A request naming a non-noteable model's ContentType
-        (here, User) must not resolve to a Note -- get_note() is the
-        only thing standing between a client-supplied content_type and
-        attaching a Note to an arbitrary model.
-        """
+        """A request naming a non-noteable model's ContentType (here, User) must not resolve to a Note -- get_note() is the only thing standing between a client-supplied content_type and attaching a Note to an arbitrary model."""
         user_content_type = ContentType.objects.get_for_model(User)
         request = RequestFactory().post(
             "/notes/create-or-update/",
@@ -234,9 +225,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         self.assertIsNone(get_note(request))
 
     def test_get_note_rejects_non_numeric_identifiers(self) -> None:
-        """content_type/object_id that aren't valid integers -- e.g. the
-        literal string "undefined" -- must return None, not raise.
-        """
+        """content_type/object_id that aren't valid integers -- e.g. the literal string "undefined" -- must return None, not raise."""
         request = RequestFactory().post(
             "/notes/create-or-update/",
             {"content_type": "undefined", "object_id": "undefined"},
@@ -247,10 +236,7 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
 
 
 class UserNotesTest(BaseSeleniumTest):
-    """
-    Functionally test all aspects of favoriting Opinions and Oral Arguments
-    including CRUD related operations of a user's notes.
-    """
+    """Functionally test all aspects of favoriting Opinions and Oral Arguments including CRUD related operations of a user's notes."""
 
     def setUp(self) -> None:
         self.opinion_cluster = OpinionClusterWithParentsFactory(
@@ -525,7 +511,7 @@ class UserNotesTest(BaseSeleniumTest):
 
 
 class FavoritesTest(TestCase):
-    """Fvorites app tests that don't require selenium"""
+    """Fvorites app tests that don't require selenium."""
 
     def test_revert_model_excluded_field(self) -> None:
         # We can't revert an object being tracked with django-pghistory with an
@@ -578,7 +564,7 @@ class FavoritesTest(TestCase):
 
 
 class APITests(APITestCase):
-    """Check that tags are created correctly and blocked correctly via APIs"""
+    """Check that tags are created correctly and blocked correctly via APIs."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -668,9 +654,7 @@ class APITests(APITestCase):
         self.assertEqual(tag.name, new_name)
 
     async def test_cannot_modify_or_delete_someone_elses_tag(self) -> None:
-        """Can another user deface, delete, or hijack ownership of a tag
-        they don't own (GHSA-4587-9786-r6vp)?
-        """
+        """Can another user deface, delete, or hijack ownership of a tag they don't own (GHSA-4587-9786-r6vp)?"""
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
         detail_path = reverse(
@@ -810,8 +794,7 @@ class APITests(APITestCase):
         )
 
     async def test_can_filter_tag_associations_using_docket_id(self) -> None:
-        """Test filter for the docket field in the docket-tags endpoint"""
-
+        """Test filter for the docket field in the docket-tags endpoint."""
         # create a tag and use it for docket #1 and #2
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
@@ -843,8 +826,7 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 2)
 
     async def test_can_filter_tag_associations_using_user_id(self) -> None:
-        """Test filter for the docket field in the docket-tags endpoint"""
-
+        """Test filter for the docket field in the docket-tags endpoint."""
         # create a two tags using client 1 and use them in docket #1
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
@@ -980,7 +962,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_create_prayer(self) -> None:
         """Does the create_prayer method work properly?"""
-
         # Prayer is not created if the document is already available.
         prayer_created = await create_prayer(self.user, self.rd_1)
         self.assertEqual(prayer_created, None)
@@ -995,7 +976,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_delete_prayer(self) -> None:
         """Does the delete_prayer method work properly?"""
-
         # Prayer is added, then deleted successfully
         await create_prayer(self.user, self.rd_2)
         prayer_deleted = await delete_prayer(self.user, self.rd_2)
@@ -1016,7 +996,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_number(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Test top documents based on prayers count.
         await create_prayer(self.user, self.rd_2)
         await create_prayer(self.user_2, self.rd_2)
@@ -1042,7 +1021,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Test top documents based on docket views.
         await GenericCount.objects.acreate(
             label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
@@ -1071,7 +1049,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Create prayers with different counts and views
         await GenericCount.objects.acreate(
             label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
@@ -1114,7 +1091,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_availability(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Test top documents based on document unavailability.
         await sync_to_async(PrayerAvailability.objects.create)(
             recap_document=self.rd_2,
@@ -1137,7 +1113,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_availability_last_checked(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Test top documents based on when document availability was last checked.
         d_2 = date(2024, 4, 15)
         dt_2 = datetime.combine(d_2, datetime.min.time())
@@ -1170,7 +1145,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_get_top_prayers_by_all(self) -> None:
         """Does the get_top_prayers method work properly?"""
-
         # Test top documents based on all factors.
         d_2 = date(2024, 4, 15)
         dt_2 = datetime.combine(d_2, datetime.min.time())
@@ -1403,7 +1377,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""
-
         rd_6 = await sync_to_async(RECAPDocumentFactory)(
             docket_entry__entry_number=6,
             docket_entry__date_filed=date(2015, 8, 16),
@@ -1543,7 +1516,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         )
 
     async def test_granting_prayers_clears_availability_checks(self) -> None:
-        """Tests that granting a prayer deletes prior PrayerAvailability records"""
+        """Tests that granting a prayer deletes prior PrayerAvailability records."""
         # Create a PrayerAvailability record to simulate a recent availability
         # check for this document 4.
         await PrayerAvailability.objects.acreate(recap_document=self.rd_4)
@@ -2139,9 +2112,7 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         mock_prayer_unavailable,
         mock_get_or_cache_cookie,
     ):
-        """
-        Make sure that the prayer check is only triggered once for available docs
-        """
+        """Make sure that the prayer check is only triggered once for available docs."""
         # Create a prayer for an available document.
         await create_prayer(self.user_3, self.rd_2)
 
@@ -2182,7 +2153,6 @@ class PrayerAPITests(PrayAndPayTestCase):
 
     async def test_make_a_prayer(self) -> None:
         """Can we make a prayer?"""
-
         prayer = Prayer.objects.all()
         response = await self.make_a_prayer(self.client, self.rd_1.pk)
         prayer_first = await prayer.afirst()
@@ -2191,16 +2161,13 @@ class PrayerAPITests(PrayAndPayTestCase):
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     async def test_duplicate_prayer_fails(self) -> None:
-        """Ensure a user can't create multiple prayers for the same document
-        and user.
-        """
+        """Ensure a user can't create multiple prayers for the same document and user."""
         await self.make_a_prayer(self.client, self.rd_1.pk)
         response = await self.make_a_prayer(self.client, self.rd_1.pk)
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_list_users_prayers(self) -> None:
         """Can we list user's own prayers?"""
-
         # Make two prayers for user_1
         await self.make_a_prayer(self.client, self.rd_1.pk)
         await self.make_a_prayer(self.client, self.rd_3.id)
@@ -2220,9 +2187,9 @@ class PrayerAPITests(PrayAndPayTestCase):
 
     async def test_delete_prayer(self) -> None:
         """Can we delete a prayer?
+
         Avoid users from deleting other users' prayers.
         """
-
         # Make two prayers for user_1
         prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
         prayer_2 = await self.make_a_prayer(self.client, self.rd_3.id)
@@ -2251,10 +2218,10 @@ class PrayerAPITests(PrayAndPayTestCase):
         self.assertEqual(await prayer.acount(), 1)
 
     async def test_prayer_detail(self) -> None:
-        """Can we get the detail for a prayer? Avoid users from getting other
-        users prayers.
-        """
+        """Can we get the detail for a prayer?
 
+        Avoid users from getting other users prayers.
+        """
         # Make one prayer for user_1
         prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
         prayer = Prayer.objects.all()
@@ -2274,7 +2241,6 @@ class PrayerAPITests(PrayAndPayTestCase):
 
     async def test_prayer_update_fails(self) -> None:
         """PUT AND PATCH methods are restricted."""
-
         # Make one prayer for user_1
         prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
         prayer_1_path_detail = reverse(

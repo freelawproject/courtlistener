@@ -50,8 +50,11 @@ NOTEABLE_MODELS: dict[type[models.Model], str] = {
 def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     """Return the Notes attached to a given object, across all users.
 
-    :param obj: A noteable model instance (see NOTEABLE_MODELS).
-    :return: A queryset of matching Note rows.
+    Args:
+        obj: A noteable model instance (see NOTEABLE_MODELS).
+
+    Returns:
+        A queryset of matching Note rows.
     """
     content_type = ContentType.objects.get_for_model(type(obj))
     return Note.objects.filter(content_type=content_type, object_id=obj.pk)
@@ -69,10 +72,10 @@ def repoint_notes(
     version's Note is left pointed at version_object, to be cleaned up by
     delete_orphaned_notes when it's deleted.
 
-    :param main_object: The noteable object absorbing version_object's
-        Notes.
-    :param version_object: The noteable object about to be deleted.
-    :return: None
+    Args:
+        main_object: The noteable object absorbing version_object's
+            Notes.
+        version_object: The noteable object about to be deleted.
     """
     existing_user_ids = get_notes_for(main_object).values_list(
         "user_id", flat=True
@@ -90,13 +93,15 @@ def get_note_for_target(
     object_id: int | str,
     user: AnonymousUser | User,
 ) -> Note | None:
-    """Return the given user's Note for a noted object, identified by its
-    model class and pk, if any.
+    """Return the given user's Note for a noted object, identified by its model class and pk, if any.
 
-    :param model_class: The model class object_id belongs to.
-    :param object_id: The pk of the noted object.
-    :param user: The user requesting their Note, possibly anonymous.
-    :return: The user's Note for the object, or None if anonymous or not
+    Args:
+        model_class: The model class object_id belongs to.
+        object_id: The pk of the noted object.
+        user: The user requesting their Note, possibly anonymous.
+
+    Returns:
+        The user's Note for the object, or None if anonymous or not
         found.
     """
     if not user.is_authenticated:
@@ -149,11 +154,13 @@ async def get_prayer_counts_in_bulk(
 ) -> dict[int, int]:
     """Retrieve the count of prayers with a status of "WAITING" for a list of recap documents.
 
-    :param recap_documents: A list of RECAPDocument instances to filter prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are the
-    count of "WAITING" prayers for each document.
-    """
+    Args:
+        recap_documents: A list of RECAPDocument instances to filter prayers.
 
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are the
+        count of "WAITING" prayers for each document.
+    """
     prayer_counts = (
         Prayer.objects.filter(
             recap_document__in=recap_documents, status=Prayer.WAITING
@@ -172,10 +179,13 @@ async def get_existing_prayers_in_bulk(
 ) -> dict[int, bool]:
     """Check if prayers exist for a user and a list of recap documents.
 
-    :param user: The user for whom to check prayer existence.
-    :param recap_documents: A list of RECAPDocument instances to check prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are True
-     if a prayer exists for the user and RD.
+    Args:
+        user: The user for whom to check prayer existence.
+        recap_documents: A list of RECAPDocument instances to check prayers.
+
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are True
+        if a prayer exists for the user and RD.
     """
     existing_prayers = Prayer.objects.filter(
         user=user, recap_document__in=recap_documents
@@ -184,13 +194,14 @@ async def get_existing_prayers_in_bulk(
 
 
 async def get_top_prayers() -> QuerySet[RECAPDocument]:
-    """Retrieve the most desired documents that have open prayers. It first
-    ranks by the number of requests and then by the number of views the particular
-    docket has received.
+    """Retrieve the most desired documents that have open prayers.
 
-    :return: A queryset of RECAPDocuments in descending order of preference.
+    It first ranks by the number of requests and then by the number of views
+    the particular docket has received.
+
+    Returns:
+        A queryset of RECAPDocuments in descending order of preference.
     """
-
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
@@ -308,8 +319,7 @@ async def get_user_prayers(
 
 
 async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
-    """
-    Computes the total cost of a given queryset of Prayer objects.
+    """Computes the total cost of a given queryset of Prayer objects.
 
     Args:
         queryset: A QuerySet of Prayer objects.
