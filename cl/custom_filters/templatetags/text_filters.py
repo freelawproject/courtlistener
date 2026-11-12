@@ -1,3 +1,5 @@
+"""Template filters for transforming text and values for display."""
+
 import html
 import re
 from typing import Literal, TypedDict, overload

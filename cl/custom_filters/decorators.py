@@ -1,3 +1,5 @@
+"""Decorators for checking a view's honeypot field."""
+
 from collections.abc import Callable
 from functools import wraps
 from typing import overload
