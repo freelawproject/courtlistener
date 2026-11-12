@@ -1,3 +1,5 @@
+from typing import NotRequired, TypedDict
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -451,3 +453,26 @@ def is_search_history_on_cached(user_pk: int) -> bool:
     return UserProfile.objects.values_list(
         "save_query_history", flat=True
     ).get(user_id=user_pk)
+
+
+class TabItem(TypedDict):
+    """One entry of the list passed to the c-tabs component.
+
+    The component picks its mode from the entries: when they have a `url`,
+    each tab is a link to its own page; when none do, each tab is a button
+    that shows the c-tabs.panel whose `name` matches its `key`. A list where
+    only some entries have a `url` is not supported.
+
+    :key: Identifies the tab. It's compared with the component's `active_tab`
+        and used to build its ids, so it must be unique within the list.
+    :label: Text shown on the tab and in the mobile dropdown.
+    :icon: Name of an SVG in cl/assets/static-global/svg/ for the {% svg %} tag.
+    :url: Page the tab links to. Only in link mode.
+    :count: Number shown in a chip next to the label. Only shown on desktop.
+    """
+
+    key: str
+    label: str
+    icon: str
+    url: NotRequired[str]
+    count: NotRequired[int]
