@@ -7,7 +7,7 @@ from cl.audio.models import Audio
 
 
 def get_audio_binary() -> str:
-    """Get the path to the installed binary for doing audio conversions
+    """Get the path to the installed binary for doing audio conversions.
 
     Ah, Linux. Land where ffmpeg can fork into avconv, where avconv can be the
     correct binary for years and years, and where much later, the fork can be
@@ -24,7 +24,8 @@ def get_audio_binary() -> str:
     when we originally wrote our code. One day, we'll want to switch to ffmpeg,
     once avconv is but dust in the bin of history.
 
-    :returns path to the winning binary
+    Returns:
+        path to the winning binary
     """
     path_to_binary = find_executable("avconv")
     if path_to_binary is None:
@@ -42,7 +43,7 @@ def make_af_filename(
     date_argued: datetime.date,
     extension: str,
 ) -> str:
-    """Make a filename for the audio file for uploading to IA"""
+    """Make a filename for the audio file for uploading to IA."""
     parts = [
         "gov",
         "uscourts",
@@ -55,8 +56,7 @@ def make_af_filename(
 
 
 def transcription_was_hallucinated(audio: Audio) -> bool:
-    """Detects when a phrase is repeated many times in the audio,
-    due to a transcription error by Whisper, known as "hallucination"
+    """Detects when a phrase is repeated many times in the audio, due to a transcription error by Whisper, known as "hallucination".
 
     We use the relationship between audio duration and number of
     unique words. The relationship is linear and very stable,

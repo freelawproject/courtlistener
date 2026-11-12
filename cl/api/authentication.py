@@ -25,8 +25,7 @@ def _activate_replica_routing(
     request: Request,
     user: AbstractBaseUser | AnonymousUser | None = None,
 ) -> None:
-    """
-    Enables replica routing for eligible requests.
+    """Enables replica routing for eligible requests.
 
     This helper evaluates whether the current request should be routed to
     a read replica. It is intended to be called *after* DRF authentication,
@@ -36,10 +35,11 @@ def _activate_replica_routing(
     If enabled, the resulting ContextVar token is stored on the underlying
     Django request object so that middleware can reset it after the response.
 
-    :param request: The DRF request instance.
-    :param user: The authenticated user resolved by DRF. Must be passed
-        explicitly because ``request.user`` is not yet assigned when
-        ``authenticate()`` returns.
+    Args:
+        request: The DRF request instance.
+        user: The authenticated user resolved by DRF. Must be passed
+            explicitly because ``request.user`` is not yet assigned when
+            ``authenticate()`` returns.
     """
     django_request: HttpRequest = request._request
 
@@ -96,9 +96,7 @@ class InsufficientScope(exceptions.PermissionDenied):
 
 
 class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
-    """OAuth2Authentication that requires the ``api`` scope and activates
-    replica routing after auth.
-    """
+    """OAuth2Authentication that requires the ``api`` scope and activates replica routing after auth."""
 
     def authenticate(self, request: Request):
         result = super().authenticate(request)

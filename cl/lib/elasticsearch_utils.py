@@ -121,13 +121,13 @@ def elasticsearch_enabled[**P, R](
 class CSVSerializableDocumentMixin:
     @classmethod
     def get_csv_headers(cls) -> list[str]:
-        """
-        Returns a list of strings representing the headers for a CSV file.
+        """Returns a list of strings representing the headers for a CSV file.
 
         This method defines the column headers for a CSV representation of the
         data associated with this class.
 
-        :return: A list of strings, where each string is a column header.
+        Returns:
+            A list of strings, where each string is a column header.
         """
         raise NotImplementedError(
             "Subclass must implement get_csv_headers method"
@@ -135,16 +135,16 @@ class CSVSerializableDocumentMixin:
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
-        """
-        Generates a dictionary of transformation functions for CSV export.
+        """Generates a dictionary of transformation functions for CSV export.
 
         This method defines how specific fields in a data structure should be
         transformed before being written to a CSV file. It covers
         transformations for various fields, including those from list of fields
         with highlights, file paths, URLs, and renamed fields.
 
-        :return: A dictionary where keys are field names and values are lambda
-        functions that define the transformations.
+        Returns:
+            A dictionary where keys are field names and values are lambda
+            functions that define the transformations.
         """
         raise NotImplementedError(
             "Subclass must implement get_csv_transformations method"
@@ -159,11 +159,14 @@ def build_numeric_range_query(
 ) -> list[Range]:
     """Returns documents that contain terms within a provided range.
 
-    :param field: Elasticsearch fieldname
-    :param lower_bound: _description_
-    :param upper_bound: _description_
-    :param relation: Indicates how the range query matches values for range fields. Defaults to None.
-    :return: Empty list or list with DSL Range query
+    Args:
+        field: Elasticsearch fieldname
+        lower_bound: _description_
+        upper_bound: _description_
+        relation: Indicates how the range query matches values for range fields. Defaults to None.
+
+    Returns:
+        Empty list or list with DSL Range query
     """
     if not any([lower_bound, upper_bound]):
         return []
@@ -185,20 +188,23 @@ def build_daterange_query(
     after: datetime.date | str,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
-    """Given field name and date range limits returns ElasticSearch absolute
-    range query or None
+    """Build an ElasticSearch absolute range query or None.
+
+    Built from a field name and date range limits. See:
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
 
     If a relative date string in the allowed syntax is provided, it is
     converted to an ES-compatible date math syntax to query a relative date.
 
-    :param field: The date field name
-    :param before: datetime upper limit
-    :param after: datetime lower limit
-    :param relation: Indicates how the range query matches values for range fields
-    :return: Empty list or list with DSL Range query
-    """
+    Args:
+        field: The date field name
+        before: datetime upper limit
+        after: datetime lower limit
+        relation: Indicates how the range query matches values for range fields
 
+    Returns:
+        Empty list or list with DSL Range query
+    """
     if not any([before, after]):
         return []
 
@@ -233,11 +239,13 @@ def build_daterange_query(
 async def build_more_like_this_query(related_ids: list[str]) -> Query:
     """Build an ES "more like this" query based on related Opinion IDs.
 
-    :param related_ids: A list of related Opinion IDs to build the query on.
-    :return: An ES query object with "more like this" query and
-    exclusions for specific opinion clusters.
-    """
+    Args:
+        related_ids: A list of related Opinion IDs to build the query on.
 
+    Returns:
+        An ES query object with "more like this" query and
+        exclusions for specific opinion clusters.
+    """
     opinion_cluster_pairs = [
         opinion_pair
         for opinion_id in related_ids
@@ -283,12 +291,14 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
 
 
 def make_es_boost_list(fields: dict[str, float]) -> list[str]:
-    """Constructs a list of Elasticsearch fields with their corresponding
-    boost values.
+    """Constructs a list of Elasticsearch fields with their corresponding boost values.
 
-    :param fields: A dictionary where keys are field names and values are
-    the corresponding boost values.
-    :return: A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
+    Args:
+        fields: A dictionary where keys are field names and values are
+            the corresponding boost values.
+
+    Returns:
+        A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
     """
     return [f"{k}^{v}" for k, v in fields.items()]
 
@@ -296,10 +306,12 @@ def make_es_boost_list(fields: dict[str, float]) -> list[str]:
 def is_case_name_query(query_value: str) -> bool:
     """Determines if the given query value is likely a case name query.
 
-    :param query_value: The search query to check.
-    :return: True if the query appears to be a case name, otherwise False.
-    """
+    Args:
+        query_value: The search query to check.
 
+    Returns:
+        True if the query appears to be a case name, otherwise False.
+    """
     vs_query = any(
         [
             " v " in query_value,
@@ -321,10 +333,13 @@ def add_fields_boosting(
 ) -> list[str]:
     """Applies boosting to specific fields according the search type.
 
-    :param cd: The user input CleanedData
-    :param fields: If provided, a custom fields list to apply boosting,
-    otherwise apply to all fields.
-    :return: A list of Elasticsearch fields with their respective boost values.
+    Args:
+        cd: The user input CleanedData
+        fields: If provided, a custom fields list to apply boosting,
+            otherwise apply to all fields.
+
+    Returns:
+        A list of Elasticsearch fields with their respective boost values.
     """
     # Apply standard qf parameters
     qf = BOOSTS["qf"][cd["type"]].copy()
@@ -356,8 +371,12 @@ def add_fields_boosting(
 
 def append_query_conjunctions(query: str) -> str:
     """Append default AND conjunctions to the query string.
-    :param query: The input query string
-    :return: The query string with AND conjunctions appended
+
+    Args:
+        query: The input query string
+
+    Returns:
+        The query string with AND conjunctions appended.
     """
     words = query.split()
     clean_q: list[str] = []
@@ -403,17 +422,20 @@ def append_query_conjunctions(query: str) -> str:
 
 
 def validate_query_syntax(value: str, query_type: QueryType) -> None:
-    """Validate the syntax of a query string. It checks for common syntax
-    errors in query strings, such as unbalanced parentheses, unbalanced quotes,
-    and unrecognized proximity tokens. If any of these errors are found, the
-    corresponding exception is raised.
+    """Validate the syntax of a query string.
 
-    :param value: The query string to validate.
-    :param query_type: The type of the query, used to specify the context in
-    which the validation is being performed.
-    :return: None, it raises the corresponding exception.
+    It checks for common syntax errors in query strings, such as unbalanced
+    parentheses, unbalanced quotes, and unrecognized proximity tokens. If any
+    of these errors are found, the corresponding exception is raised.
+
+    Args:
+        value: The query string to validate.
+        query_type: The type of the query, used to specify the context in
+            which the validation is being performed.
+
+    Returns:
+        None, it raises the corresponding exception.
     """
-
     if check_unbalanced_parenthesis(value):
         raise UnbalancedParenthesesQuery(query_type)
     if check_unbalanced_quotes(value):
@@ -425,14 +447,19 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 def build_fulltext_query(
     fields: list[str], value: str, only_queries: bool = False
 ) -> Query | list[Query]:
-    """Given the cleaned data from a form, return a Elastic Search string query or []
+    """Given cleaned form data, return an Elasticsearch string query or [].
+
+    See:
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
-    :param fields: A list of name fields to search in.
-    :param value: The string value to search for.
-    :param only_queries: If True return only the queries avoiding wrapping them
-    into a bool clause.
-    :return: A Elasticsearch Query or [] if the "value" param is empty.
+    Args:
+        fields: A list of name fields to search in.
+        value: The string value to search for.
+        only_queries: If True return only the queries avoiding wrapping them
+            into a bool clause.
+
+    Returns:
+        A Elasticsearch Query or [] if the "value" param is empty.
     """
     if value:
         validate_query_syntax(value, QueryType.QUERY_STRING)
@@ -496,21 +523,23 @@ def build_term_query(
     make_phrase: bool = False,
     slop: int = 0,
 ) -> list[Query]:
-    """Given field name and value or list of values, return Elasticsearch term
-    or terms query or [].
+    """Given field name and value or list of values, return Elasticsearch term or terms query or [].
+
     "term" Returns documents that contain an exact term in a provided field
     NOTE: Use it only when you want an exact match, avoid using this with text fields
     "terms" Returns documents that contain one or more exact terms in a provided field.
 
-    :param field: elasticsearch index fieldname
-    :param value: term or terms to find
-    :param make_phrase: Whether we should make a match_phrase query for
-    TextField filtering.
-    :param slop: Maximum distance between terms in a phrase for a match.
-    Only applicable on make_phrase queries.
-    :return: Empty list or list with DSL Match query
-    """
+    Args:
+        field: elasticsearch index fieldname
+        value: term or terms to find
+        make_phrase: Whether we should make a match_phrase query for
+            TextField filtering.
+        slop: Maximum distance between terms in a phrase for a match.
+            Only applicable on make_phrase queries.
 
+    Returns:
+        Empty list or list with DSL Match query
+    """
     if not value:
         return []
 
@@ -540,6 +569,7 @@ def build_term_query(
 
 def build_text_filter(field: str, value: str) -> list[Query]:
     """Given a field and value, return Elasticsearch match_phrase query or [].
+
     "match_phrase" Returns documents that contain the exact phrase in a
     provided field, by default match_phrase has a slop of 0 that requires all
     terms in the query to appear in the document exactly in the order specified
@@ -547,11 +577,13 @@ def build_text_filter(field: str, value: str) -> list[Query]:
     text fields where the order of the words matters.
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
 
-    :param field: elasticsearch index field name
-    :param value: the phrase to find
-    :return: Empty list or list with DSL Phrase query
-    """
+    Args:
+        field: elasticsearch index field name
+        value: the phrase to find
 
+    Returns:
+        Empty list or list with DSL Phrase query
+    """
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
@@ -573,17 +605,17 @@ def build_text_filter(field: str, value: str) -> list[Query]:
 def toggle_sort_order(
     order_by: str | None, toggle_sorting: bool
 ) -> str | None:
-    """Toggle the sorting order of the given "order_by" string from ascending
-    to descending, or vice versa. This is used for changing the sort direction
-    in queries, useful to perform backward pagination for the V4 Search API.
+    """Toggle the sorting order of the given "order_by" string from ascending to descending, or vice versa. This is used for changing the sort direction in queries, useful to perform backward pagination for the V4 Search API.
 
-    :param order_by: A string specifying the fields and sort directions,
-    separated by commas, e.g., "score asc, score desc".
-    :param toggle_sorting: A boolean flag that indicates whether the sorting
-    order should be toggled. If False, the original "order_by" is returned.
-    :return: A modified "order_by" string with toggled sort directions.
+    Args:
+        order_by: A string specifying the fields and sort directions,
+            separated by commas, e.g., "score asc, score desc".
+        toggle_sorting: A boolean flag that indicates whether the sorting
+            order should be toggled. If False, the original "order_by" is returned.
+
+    Returns:
+        A modified "order_by" string with toggled sort directions.
     """
-
     if not toggle_sorting or order_by is None:
         return order_by
 
@@ -605,16 +637,17 @@ def build_sort_results(
     toggle_sorting: bool = False,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> dict:
-    """Given cleaned data, find order_by value and return dict to use with
-    ElasticSearch sort
+    """Given cleaned data, find order_by value and return dict to use with ElasticSearch sort.
 
-    :param cd: The user input CleanedData
-    :param toggle_sorting: Whether to toggle the sorting order to perform backward
-    pagination for the V4 Search API.
-    :param api_version: Optional, the request API version.
-    :return: The short dict.
+    Args:
+        cd: The user input CleanedData
+        toggle_sorting: Whether to toggle the sorting order to perform backward
+            pagination for the V4 Search API.
+        api_version: Optional, the request API version.
+
+    Returns:
+        The short dict.
     """
-
     order_by = cd.get("order_by")
     order_by = toggle_sort_order(order_by, toggle_sorting)
     order_by_map = {
@@ -766,12 +799,14 @@ def build_sort_results(
 def get_function_score_sorting_key(
     cd: CleanData, api_version: Literal["v3", "v4"] | None = None
 ) -> tuple[str, str]:
-    """Given cleaned data, find the order_by value and return a key to use for
-    computing a custom score within build_custom_function_score_for_date.
+    """Given cleaned data, find the order_by value and return a key to use for computing a custom score within build_custom_function_score_for_date.
 
-    :param cd: The user input CleanedData
-    :param api_version: Optional, the request API version.
-    :return: A two tuple containing the short key and the order (asc or desc).
+    Args:
+        cd: The user input CleanedData
+        api_version: Optional, the request API version.
+
+    Returns:
+        A two tuple containing the short key and the order (asc or desc).
     """
     order_by_map_child = {
         "entry_date_filed asc": ("entry_date_filed", "asc"),
@@ -796,13 +831,15 @@ def get_function_score_sorting_key(
 def extend_selected_courts_with_child_courts(
     selected_courts: list[str],
 ) -> list[str]:
-    """Extend the list of selected courts with their corresponding child courts
+    """Extend the list of selected courts with their corresponding child courts.
 
-    :param selected_courts: A list of court IDs.
-    :return: A list of unique court IDs, including both the original and their
-    corresponding child courts.
+    Args:
+        selected_courts: A list of court IDs.
+
+    Returns:
+        A list of unique court IDs, including both the original and their
+        corresponding child courts.
     """
-
     unique_courts = set(selected_courts)
     unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
     return list(unique_courts)
@@ -811,10 +848,12 @@ def extend_selected_courts_with_child_courts(
 def build_es_plain_filters(cd: CleanData) -> list[Query]:
     """Builds elasticsearch filters based on the CleanData object.
 
-    :param cd: An object containing cleaned user data.
-    :return: The list of Elasticsearch queries built.
-    """
+    Args:
+        cd: An object containing cleaned user data.
 
+    Returns:
+        The list of Elasticsearch queries built.
+    """
     queries_list = []
     if (
         cd["type"] == SEARCH_TYPES.PARENTHETICAL
@@ -871,17 +910,18 @@ def build_highlights_dict(
     hl_tag: str,
     highlighting: bool = True,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    """Builds a dictionary for ES highlighting options and a list of fields to
-    exclude from the _source.
+    """Builds a dictionary for ES highlighting options and a list of fields to exclude from the _source.
 
-    :param highlighting_fields: A dictionary of fields to highlight in child docs.
-    :param hl_tag: The HTML tag to use for highlighting matched fragments.
-    :param highlighting: Whether highlighting should be enabled in docs.
-    :return: A tuple containing, a dictionary with the configuration for
-    highlighting each field and aa list of field names to exclude from the
-    _source results to avoid data redundancy.
+    Args:
+        highlighting_fields: A dictionary of fields to highlight in child docs.
+        hl_tag: The HTML tag to use for highlighting matched fragments.
+        highlighting: Whether highlighting should be enabled in docs.
+
+    Returns:
+        A tuple containing, a dictionary with the configuration for
+        highlighting each field and aa list of field names to exclude from the
+        _source results to avoid data redundancy.
     """
-
     if highlighting_fields is None:
         highlighting_fields = {}
     highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
@@ -921,9 +961,12 @@ def build_highlights_dict(
 def get_ms_current_time(default_current_date: datetime.date) -> int:
     """Convert a date to a timestamp in milliseconds at midnight.
 
-    :param default_current_date: The date object to convert.
-    :return: The corresponding timestamp in milliseconds for midnight of the
-    given date.
+    Args:
+        default_current_date: The date object to convert.
+
+    Returns:
+        The corresponding timestamp in milliseconds for midnight of the
+        given date.
     """
     midnight_current_date = datetime.datetime.combine(
         default_current_date, datetime.time()
@@ -953,16 +996,18 @@ def build_custom_function_score_for_date(
     This approach allows for handling dates in our system both before and
     after January 1, 1970 (epoch time), within a positive scoring range.
 
-    :param query: The Elasticsearch query string or Query object.
-    :param order_by: If provided the field to use to compute score for sorting
-    results based on a child document field.
-    :param default_score: The default score to return when the document lacks
-    the sort field.
-    :param default_current_date: The default current date to use for computing
-     a stable date score across pagination in the V4 Search API.
-    :return: The modified Query object with applied function score.
-    """
+    Args:
+        query: The Elasticsearch query string or Query object.
+        order_by: If provided the field to use to compute score for sorting
+            results based on a child document field.
+        default_score: The default score to return when the document lacks
+            the sort field.
+        default_current_date: The default current date to use for computing
+            a stable date score across pagination in the V4 Search API.
 
+    Returns:
+        The modified Query object with applied function score.
+    """
     default_current_time = (
         get_ms_current_time(default_current_date)
         if default_current_date
@@ -1030,30 +1075,31 @@ def build_custom_relevance_score(
     default_current_date: datetime.date | None = None,
     jurisdiction_relevancy: bool = False,
 ) -> Query:
-    """
-    Build a custom relevance score query for Elasticsearch that adjusts
-    document relevance based on two criteria:
+    """Build a custom relevance score query for Elasticsearch that adjusts document relevance based on the following two criteria.
+
      - Apply decay relevance using a date field.
      - Adjust jurisdiction relevance for Case Law search based on the Opinion
      Court jurisdiction hierarchy, according to multiplier factors defined in
      jurisdiction_relevance_multipliers.
 
-    :param query: The Elasticsearch query string or Query object.
-    :param date_field: The date field used to compute the relevance decay.
-    :param scale: The scale (in years) that determines the rate of decay.
-    :param decay: The decay factor.
-    :param default_missing_date: The default date to use when the date field
-    is null.
-    :param boost_mode: The mode to combine the decay score with the query's
-    original relevance score.
-    :param min_score: The minimum score where the decay function stabilizes.
-    :param default_current_date: The default current date to use for computing
-     a stable decay relevance score across pagination in the V4 Search API.
-    :param jurisdiction_relevancy: Whether to apply jurisdiction relevance,
-    which is currently supported only for Case Law Search.
-    :return: The modified Query object with applied function score.
-    """
+    Args:
+        query: The Elasticsearch query string or Query object.
+        date_field: The date field used to compute the relevance decay.
+        scale: The scale (in years) that determines the rate of decay.
+        decay: The decay factor.
+        default_missing_date: The default date to use when the date field
+            is null.
+        boost_mode: The mode to combine the decay score with the query's
+            original relevance score.
+        min_score: The minimum score where the decay function stabilizes.
+        default_current_date: The default current date to use for computing
+            a stable decay relevance score across pagination in the V4 Search API.
+        jurisdiction_relevancy: Whether to apply jurisdiction relevance,
+            which is currently supported only for Case Law Search.
 
+    Returns:
+        The modified Query object with applied function score.
+    """
     default_current_time = (
         get_ms_current_time(default_current_date)
         if default_current_date
@@ -1153,19 +1199,21 @@ def build_has_child_query(
 ) -> Query:
     """Build a 'has_child' query.
 
-    :param query: The Elasticsearch query string or Query object.
-    :param child_type: The type of the child document.
-    :param child_hits_limit: The maximum number of child hits to be returned.
-    :param highlighting_fields: List of fields to highlight in child docs.
-    :param order_by: If provided the field to use to compute score for sorting
-    results based on a child document field.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
-    :param default_current_date: The default current date to use for computing
-     a stable date score across pagination in the V4 Search API.
-    :param alerts: If highlighting is being applied to search Alerts hits.
-    :return: The 'has_child' query.
-    """
+    Args:
+        query: The Elasticsearch query string or Query object.
+        child_type: The type of the child document.
+        child_hits_limit: The maximum number of child hits to be returned.
+        highlighting_fields: List of fields to highlight in child docs.
+        order_by: If provided the field to use to compute score for sorting
+            results based on a child document field.
+        child_highlighting: Whether highlighting should be enabled in child docs.
+        default_current_date: The default current date to use for computing
+            a stable date score across pagination in the V4 Search API.
+        alerts: If highlighting is being applied to search Alerts hits.
 
+    Returns:
+        The 'has_child' query.
+    """
     if (
         order_by
         and all(order_by)
@@ -1219,16 +1267,17 @@ def combine_plain_filters_and_queries(
     string_query: Query | list[Query] | None,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
-    """Combine filters and query strings for plain documents, like Oral arguments
-    and Parentheticals.
+    """Combine filters and query strings for plain documents, like Oral arguments and Parentheticals.
 
-    :param cd: The query CleanedData
-    :param filters: A list of filter objects to be applied.
-    :param string_query: An Elasticsearch Query, a list of queries, or None.
-    :param api_version: Optional, the request API version.
-    :return: The modified Search object based on the given conditions.
+    Args:
+        cd: The query CleanedData
+        filters: A list of filter objects to be applied.
+        string_query: An Elasticsearch Query, a list of queries, or None.
+        api_version: Optional, the request API version.
+
+    Returns:
+        The modified Search object based on the given conditions.
     """
-
     # An empty list stands in for "no text query"; only a real Query can be
     # used as the top-level clause.
     final_query = (
@@ -1248,10 +1297,13 @@ def get_match_all_query(
 ) -> Query:
     """Build and return a match-all query for each type of document.
 
-    :param cd: The query CleanedData
-    :param api_version: Optional, the request API version.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
-    :return: The Match All Query object.
+    Args:
+        cd: The query CleanedData
+        api_version: Optional, the request API version.
+        child_highlighting: Whether highlighting should be enabled in child docs.
+
+    Returns:
+        The Match All Query object.
     """
     _, query_hits_limit = get_child_top_hits_limit(
         cd, cd["type"], api_version=api_version
@@ -1323,19 +1375,12 @@ def get_match_all_query(
 
 
 def includes_scotus(cd: CleanData) -> bool:
-    """Whether a RECAP search should include SCOTUS content. False unless
-    the caller sets cd["include_scotus"], which only the search frontend
-    does, behind the scotus_docket_page flag. Temporary: remove once
-    SCOTUS launches.
-    """
+    """Whether a RECAP search should include SCOTUS content. False unless the caller sets cd["include_scotus"], which only the search frontend does, behind the scotus_docket_page flag. Temporary: remove once SCOTUS launches."""
     return bool(cd.get("include_scotus"))
 
 
 def excludes_scotus(cd: CleanData) -> bool:
-    """True for a RECAP search (r, d, rd) that must leave SCOTUS content
-    out of its results, see includes_scotus. Other search types never
-    contain SCOTUS RECAP-style content.
-    """
+    """True for a RECAP search (r, d, rd) that must leave SCOTUS content out of its results, see includes_scotus. Other search types never contain SCOTUS RECAP-style content."""
     return not includes_scotus(cd) and cd["type"] in (
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
@@ -1344,8 +1389,7 @@ def excludes_scotus(cd: CleanData) -> bool:
 
 
 def exclude_scotus(query: Query | None) -> Query:
-    """Return query, or a match-everything query if it's None, without
-    SCOTUS dockets and documents.
+    """Return query, or a match-everything query if it's None, without SCOTUS dockets and documents.
 
     A bool query gets the exclusion added to its own must_not rather than
     being wrapped, so code that reads its clauses (e.g. clean_count_query)
@@ -1366,21 +1410,22 @@ def build_es_base_query(
     api_version: Literal["v3", "v4"] | None = None,
     alerts: bool = False,
 ) -> EsMainQueries:
-    """Builds filters and fulltext_query based on the given cleaned
-     data and returns an elasticsearch query.
+    """Builds filters and fulltext_query based on the given cleaned data and returns an elasticsearch query.
 
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The cleaned data object containing the query and filters.
-    :param child_highlighting: Whether highlighting should be enabled in child
-    docs.
-    :param api_version: Optional, the request API version.
-    :param alerts: If highlighting is being applied to search Alerts hits.
-    :return: An `EsMainQueries` object containing the Elasticsearch search
-    query object and an ES QueryString for child documents or None if there is
-    no need to query child documents and a QueryString for parent documents or
-    None.
+    Args:
+        search_query: The Elasticsearch search query object.
+        cd: The cleaned data object containing the query and filters.
+        child_highlighting: Whether highlighting should be enabled in child
+            docs.
+        api_version: Optional, the request API version.
+        alerts: If highlighting is being applied to search Alerts hits.
+
+    Returns:
+        An `EsMainQueries` object containing the Elasticsearch search
+        query object and an ES QueryString for child documents or None if there is
+        no need to query child documents and a QueryString for parent documents or
+        None.
     """
-
     main_query = None
     string_query = None
     child_query = None
@@ -1575,10 +1620,12 @@ def build_has_parent_parties_query(
     It is applicable in scenarios such as the child document count query and
     the RECAP Search feed.
 
-    :param parties_filters: A list of party and or attorney filters.
-    :return: An ES has parent query or None if there are no parties_filters.
-    """
+    Args:
+        parties_filters: A list of party and or attorney filters.
 
+    Returns:
+        An ES has parent query or None if there are no parties_filters.
+    """
     if parties_filters:
         return Q(
             "has_parent",
@@ -1596,19 +1643,17 @@ def build_child_docs_query(
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
 ) -> Query:
-    """Build a query for counting child documents in Elasticsearch, using the
-    has_child query filters and queries. And append a match filter to only
-    retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required
-    to retrieve child documents directly, such as in the Opinions Feed,
-    RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
+    """Build a query for counting child documents in Elasticsearch, using the has_child query filters and queries. And append a match filter to only retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required to retrieve child documents directly, such as in the Opinions Feed, RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
 
-    :param child_docs_query: Existing Elasticsearch Query object or None
-    :param cd: The user input CleanedData
-    :param exclude_docs_for_empty_field: Field that should not be empty for a
-    document to be included
-    :return: An Elasticsearch Query object
+    Args:
+        child_docs_query: Existing Elasticsearch Query object or None
+        cd: The user input CleanedData
+        exclude_docs_for_empty_field: Field that should not be empty for a
+            document to be included
+
+    Returns:
+        An Elasticsearch Query object
     """
-
     child_query_opinion = Q("match", cluster_child="opinion")
     child_query_recap = Q("match", docket_child="recap_document")
     parent_filters = build_join_es_filters(cd)
@@ -1679,16 +1724,17 @@ def build_child_docs_query(
 def build_es_main_query(
     search_query: Search, cd: CleanData
 ) -> tuple[Search, Search | None, int | None]:
-    """Builds and returns an elasticsearch query based on the given cleaned
-     data, also performs grouping if required, add highlighting and returns
-     additional query related metrics.
+    """Builds and returns an elasticsearch query based on the given cleaned data, also performs grouping if required, add highlighting and returns additional query related metrics.
 
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The cleaned data object containing the query and filters.
-    :return: A three tuple, the Elasticsearch search query object after applying
-    filters, string query and grouping if needed, the child documents count
-    query if required, the total number of top hits returned by a group if
-    applicable.
+    Args:
+        search_query: The Elasticsearch search query object.
+        cd: The cleaned data object containing the query and filters.
+
+    Returns:
+        A three tuple, the Elasticsearch search query object after applying
+        filters, string query and grouping if needed, the child documents count
+        query if required, the total number of top hits returned by a group if
+        applicable.
     """
     search_query_base = search_query
     es_queries = build_es_base_query(search_query, cd)
@@ -1738,13 +1784,15 @@ def add_es_highlighting[S: (Search, SearchDSL)](
 ) -> S:
     """Add elasticsearch highlighting to the main search query.
 
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The user input CleanedData
-    :param alerts: If highlighting is being applied to search Alerts hits.
-    :param highlighting: Whether highlighting should be enabled in docs.
-    :return: The modified Elasticsearch search query object with highlights set
-    """
+    Args:
+        search_query: The Elasticsearch search query object.
+        cd: The user input CleanedData
+        alerts: If highlighting is being applied to search Alerts hits.
+        highlighting: Whether highlighting should be enabled in docs.
 
+    Returns:
+        The modified Elasticsearch search query object with highlights set
+    """
     # Avoid highlighting for the related cluster query.
     related_match = RELATED_PATTERN.search(cd.get("q", ""))
     if related_match:
@@ -1796,15 +1844,18 @@ def merge_highlights_into_result(
     result: AttrDict | dict[str, Any],
 ) -> None:
     """Merges the highlighted terms into the search result.
+
     This function integrates highlighted terms from the meta highlights result
     into the corresponding search results.
 
-    :param highlights: The AttrDict object containing highlighted fields and
-    their highlighted terms.
-    :param result: The result AttrDict object
-    :return: None, the function updates the results in place.
-    """
+    Args:
+        highlights: The AttrDict object containing highlighted fields and
+            their highlighted terms.
+        result: The result AttrDict object
 
+    Returns:
+        None, the function updates the results in place.
+    """
     for (
         field,
         highlight_list,
@@ -1813,14 +1864,15 @@ def merge_highlights_into_result(
 
 
 def set_results_highlights(results: Page | Response, search_type: str) -> None:
-    """Sets the highlights for each search result in a Page object by updating
-    related fields in _source dict.
+    """Sets the highlights for each search result in a Page object by updating related fields in _source dict.
 
-    :param results: The Page or Response object containing search results.
-    :param search_type: The search type to perform.
-    :return: None, the function updates the results in place.
+    Args:
+        results: The Page or Response object containing search results.
+        search_type: The search type to perform.
+
+    Returns:
+        None, the function updates the results in place.
     """
-
     results_list = results
     if isinstance(results, Page):
         results_list = results.object_list
@@ -1863,15 +1915,16 @@ def group_search_results(
     cd: CleanData,
     order_by: dict[str, dict[str, str]],
 ) -> tuple[Search, int]:
-    """Group search results by a specified field and return top hits for each
-    group.
+    """Group search results by a specified field and return top hits for each group.
 
-    :param search: The elasticsearch Search object representing the query.
-    :param cd: The cleaned data object containing the query and filters.
-    :param order_by: The field name to use for sorting the top hits.
-    :return: The modified Elasticsearch search query with highlights and aggregations
+    Args:
+        search: The elasticsearch Search object representing the query.
+        cd: The cleaned data object containing the query and filters.
+        order_by: The field name to use for sorting the top hits.
+
+    Returns:
+        The modified Elasticsearch search query with highlights and aggregations
     """
-
     # If cluster_id query set the top_hits_limit to 100
     # Top hits limit in elasticsearch is 100
     cluster_query = re.search(r"cluster_id:\d+", cd["q"])
@@ -1926,12 +1979,14 @@ def group_search_results(
 def convert_str_date_fields_to_date_objects(
     results: Page, search_type: str
 ) -> None:
-    """Converts string date fields in Elasticsearch search results to date
-    objects.
+    """Converts string date fields in Elasticsearch search results to date objects.
 
-    :param results: A Page object containing the search results to be modified.
-    :param search_type: The search type to perform.
-    :return: None, the function modifies the search results object in place.
+    Args:
+        results: A Page object containing the search results to be modified.
+        search_type: The search type to perform.
+
+    Returns:
+        None, the function modifies the search results object in place.
     """
     if search_type == SEARCH_TYPES.PARENTHETICAL:
         date_field_name = "dateFiled"
@@ -1946,11 +2001,13 @@ def convert_str_date_fields_to_date_objects(
 def merge_courts_from_db(results: Page, search_type: str) -> None:
     """Merges court citation strings from the database into search results.
 
-    :param results: A Page object containing the search results to be modified.
-    :param search_type: The search type to perform.
-    :return: None, the function modifies the search results object in place.
-    """
+    Args:
+        results: A Page object containing the search results to be modified.
+        search_type: The search type to perform.
 
+    Returns:
+        None, the function modifies the search results object in place.
+    """
     if search_type == SEARCH_TYPES.PARENTHETICAL:
         court_ids = [
             d["grouped_by_opinion_cluster_id"]["hits"]["hits"][0]["_source"][
@@ -1976,12 +2033,14 @@ def fill_position_mapping(
     positions: QuerySet[Position, Position],
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
 ) -> BasePositionMapping | ApiPositionMapping:
-    """Extract all the data from the position queryset and
-    fill the attributes of the mapping.
+    """Extract all the data from the position queryset and fill the attributes of the mapping.
 
-    :param positions: List of position records.
-    :param request_type: The request type, frontend or api v3 or api v4.
-    :return: PositionMapping, the function fill the attributes of the mapping.
+    Args:
+        positions: List of position records.
+        request_type: The request type, frontend or api v3 or api v4.
+
+    Returns:
+        PositionMapping, the function fill the attributes of the mapping.
     """
     position_db_mapping = (
         BasePositionMapping()
@@ -2021,9 +2080,7 @@ def fill_position_mapping(
 def merge_semantic_relevant_chunks(
     results: Page | Response | list[Never],
 ) -> None:
-    """
-    Updates each child document in the given results with the most semantically
-    relevant chunk of text.
+    """Updates each child document in the given results with the most semantically relevant chunk of text.
 
     This function iterates over a list of result objects, each of which may
     contain child documents with semantic search results in the `inner_hits`
@@ -2031,9 +2088,12 @@ def merge_semantic_relevant_chunks(
     `embeddings` inner hit and assigns its text to the child document's
     `_source["text"]` field.
 
-    :param results: The Page or Response object containing search results,
-    or an empty list.
-    :return: None, the function updates the results in place.
+    Args:
+        results: The Page or Response object containing search results,
+            or an empty list.
+
+    Returns:
+        None, the function updates the results in place.
     """
     results_list = results
     if isinstance(results, Page):
@@ -2066,17 +2126,17 @@ def merge_unavailable_fields_on_parent_document(
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
     highlight: bool = True,
 ) -> None:
-    """Merges unavailable fields on parent document from the database into
-    search results, not all fields are required in frontend, so that fields are
-    completed according to the received request_type (frontend or api).
+    """Merges unavailable fields on parent document from the database into search results, not all fields are required in frontend, so that fields are completed according to the received request_type (frontend or api).
 
-    :param results: A Page object containing the search results to be modified.
-    :param search_type: The search type to perform.
-    :param request_type: The request type, frontend or api v3 or api v4.
-    :param highlight: Whether highlighting is enabled.
-    :return: None, the function modifies the search results object in place.
+    Args:
+        results: A Page object containing the search results to be modified.
+        search_type: The search type to perform.
+        request_type: The request type, frontend or api v3 or api v4.
+        highlight: Whether highlighting is enabled.
+
+    Returns:
+        None, the function modifies the search results object in place.
     """
-
     match search_type:
         case SEARCH_TYPES.PEOPLE if request_type != "v4":
             # Merge positions courts.
@@ -2274,10 +2334,12 @@ def clean_count_query(search_query: Search) -> SearchDSL:
     the 'should' clause of the boolean query.
     It then creates a new Search object with the modified query.
 
-    :param search_query: The ES Search object.
-    :return: A new ES Search object with the count query.
-    """
+    Args:
+        search_query: The ES Search object.
 
+    Returns:
+        A new ES Search object with the count query.
+    """
     parent_total_query_dict = search_query.to_dict(count=True)
     try:
         # Clean function_score in queries that contain it
@@ -2315,17 +2377,19 @@ def fetch_es_results(
 ) -> tuple[Response | list, int, bool, int | None, int | None]:
     """Fetch elasticsearch results with pagination.
 
-    :param clean_params: The user’s cleaned search parameters.
-    :param search_query: Elasticsearch DSL Search object
-    :param child_docs_count_query: The ES Search object to perform the count
-    for child documents if required, otherwise None.
-    :param page: Current page number.
-    :param rows_per_page: Number of records wanted per page.
-    :return: A five-tuple: The ES main response, the ES query time, whether
-    there was an error, the total number of hits for the main document, and
-    the total number of hits for the child document.
-    """
+    Args:
+        clean_params: The user’s cleaned search parameters.
+        search_query: Elasticsearch DSL Search object
+        child_docs_count_query: The ES Search object to perform the count
+            for child documents if required, otherwise None.
+        page: Current page number.
+        rows_per_page: Number of records wanted per page.
 
+    Returns:
+        A five-tuple: The ES main response, the ES query time, whether
+        there was an error, the total number of hits for the main document, and
+        the total number of hits for the child document.
+    """
     child_total = None
     child_total_query = None
     # Default to page 1 if the user request page 0.
@@ -2406,13 +2470,14 @@ def fetch_es_results(
 
 
 def build_has_child_filters(cd: CleanData) -> list[Query]:
-    """Builds Elasticsearch 'has_child' filters based on the given child type
-    and CleanData.
+    """Builds Elasticsearch 'has_child' filters based on the given child type and CleanData.
 
-    :param cd: The user input CleanedData.
-    :return: A list of QueryString objects containing the 'has_child' filters.
+    Args:
+        cd: The user input CleanedData.
+
+    Returns:
+        A list of QueryString objects containing the 'has_child' filters.
     """
-
     queries_list = []
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         selection_method = cd.get("selection_method", "")
@@ -2476,10 +2541,12 @@ def build_has_child_filters(cd: CleanData) -> list[Query]:
 def build_join_es_filters(cd: CleanData) -> list:
     """Builds parent join elasticsearch filters based on the CleanData object.
 
-    :param cd: An object containing cleaned user data.
-    :return: The list of Elasticsearch queries built.
-    """
+    Args:
+        cd: An object containing cleaned user data.
 
+    Returns:
+        The list of Elasticsearch queries built.
+    """
     queries_list = []
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         # Build parent document filters.
@@ -2583,18 +2650,21 @@ def build_join_es_filters(cd: CleanData) -> list:
 
 def add_highlighting_for_feed_query(s: Search, field: str) -> Search:
     """Add highlighting parameters for a feed query in ES.
+
     Although highlighting is not displayed in Feeds, this is required as an
-    optimization to avoid returning the entire plain_text in RECAPDocuments
-    or text in Opinions, which could be massive in some documents. This takes
+    optimization to avoid returning the entire plain_text in RECAPDocuments or
+    text in Opinions, which could be massive in some documents. This takes
     advantage of the no_match_size feature in highlighting to return only up to
     500 characters from the text field.
 
-    :param s: Elasticsearch DSL Search object
-    :param field: The field name for which highlighting is to be set.
-    :return: The modified Elasticsearch DSL Search object with highlighting
-    settings applied.
-    """
+    Args:
+        s: Elasticsearch DSL Search object
+        field: The field name for which highlighting is to be set.
 
+    Returns:
+        The modified Elasticsearch DSL Search object with highlighting
+        settings applied.
+    """
     s = s.highlight(
         field,
         type=settings.ES_HIGHLIGHTER,
@@ -2616,15 +2686,17 @@ def build_search_feed_query(
 ) -> Search:
     """Builds a search query for the feed based on cd and jurisdiction flag.
 
-    :param search_query:  Elasticsearch DSL Search object
-    :param cd: The query CleanedData
-    :param jurisdiction: Whether to perform a jurisdiction query with all the
-    child opinions.
-    :param exclude_docs_for_empty_field: Field that should not be empty for a
-    document to be included
-    :return: An Elasticsearch DSL Search object containing the feed query.
-    """
+    Args:
+        search_query: Elasticsearch DSL Search object
+        cd: The query CleanedData
+        jurisdiction: Whether to perform a jurisdiction query with all the
+            child opinions.
+        exclude_docs_for_empty_field: Field that should not be empty for a
+            document to be included
 
+    Returns:
+        An Elasticsearch DSL Search object containing the feed query.
+    """
     hl_field = "text"
     if cd["type"] == SEARCH_TYPES.RECAP:
         hl_field = "plain_text"
@@ -2652,10 +2724,13 @@ def process_feed_query_results(
 ) -> None:
     """Process feed query results by applying highlighting and limiting hits.
 
-    :param response: The Elasticsearch DSL response.
-    :param cd: The query CleanedData.
-    :param jurisdiction: Whether this is a jurisdiction query.
-    :return: None. The function modifies the response in place.
+    Args:
+        response: The Elasticsearch DSL response.
+        cd: The query CleanedData.
+        jurisdiction: Whether this is a jurisdiction query.
+
+    Returns:
+        None. The function modifies the response in place.
     """
     if cd["type"] == SEARCH_TYPES.OPINION:
         if not jurisdiction:
@@ -2664,10 +2739,7 @@ def process_feed_query_results(
 
 
 def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
-    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its
-    source. RECAP documents keep it in docket_entry_id; other sources keep
-    it in docket_entry_uid, prefixed with their uid_namespace (e.g.
-    "scotus_321").
+    """Return the DocketEntry pk of an ESRECAPDocument hit, whatever its source. RECAP documents keep it in docket_entry_id; other sources keep it in docket_entry_uid, prefixed with their uid_namespace (e.g. "scotus_321").
 
     :param doc: An ESRECAPDocument hit.
     :return: The docket entry pk, or None if the hit has neither field.
@@ -2680,8 +2752,7 @@ def get_docket_entry_pk(doc: AttrDict[Any]) -> int | None:
 
 
 def get_docket_entry_fragment(doc: AttrDict[Any]) -> str:
-    """Return the URL fragment of an ESRECAPDocument hit's entry on the
-    docket page, e.g. "#entry-7", or "" if the hit has no entry to point to.
+    """Return the URL fragment of an ESRECAPDocument hit's entry on the docket page, e.g. "#entry-7", or "" if the hit has no entry to point to.
 
     Use it to link documents without a page of their own, like minute
     entries and SCOTUS placeholders, to their entry. It matches the anchors
@@ -2707,16 +2778,18 @@ def do_es_feed_query(
 ) -> Response | list:
     """Execute an Elasticsearch query for feeds with optional micro-caching.
 
-    :param search_query: Elasticsearch DSL Search object
-    :param cd: The query CleanedData
-    :param rows: Number of rows (items) to be retrieved in the response
-    :param jurisdiction: Whether to perform a jurisdiction query with all the
-    child opinions.
-    :param exclude_docs_for_empty_field: Field that should not be empty for a
-    document to be included
-    :return: The Elasticsearch DSL response.
-    """
+    Args:
+        search_query: Elasticsearch DSL Search object
+        cd: The query CleanedData
+        rows: Number of rows (items) to be retrieved in the response
+        jurisdiction: Whether to perform a jurisdiction query with all the
+            child opinions.
+        exclude_docs_for_empty_field: Field that should not be empty for a
+            document to be included
 
+    Returns:
+        The Elasticsearch DSL response.
+    """
     cache_key: str | None = None
     # Check micro-cache if enabled
     if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
@@ -2767,14 +2840,17 @@ def do_es_feed_query(
 
 def nullify_query_score(query: Query) -> Query:
     """Nullify the scoring of a query.
-    This function modifies the scoring of the given query to always return zero,
-    which is useful for prioritizing a score set upstream or downstream.
 
-    :param query: The ES Query object to be modified.
-    :return: The modified Query object with a script score that always
-    returns zero.
+    This function modifies the scoring of the given query to always return
+    zero, which is useful for prioritizing a score set upstream or downstream.
+
+    Args:
+        query: The ES Query object to be modified.
+
+    Returns:
+        The modified Query object with a script score that always
+        returns zero.
     """
-
     query = Q(
         "function_score",
         query=query,
@@ -2797,12 +2873,15 @@ def apply_custom_score_to_main_query(
 ) -> Query:
     """Apply a custom function score to the main query.
 
-    :param cd: The query CleanedData
-    :param query: The ES Query object to be modified.
-    :param api_version: Optional, the request API version.
-    :param boost_mode: Optional, the boost mode to apply for the decay relevancy score
-    :return: The function_score query contains the base query, applied when
-    child_order is used.
+    Args:
+        cd: The query CleanedData
+        query: The ES Query object to be modified.
+        api_version: Optional, the request API version.
+        boost_mode: Optional, the boost mode to apply for the decay relevancy score
+
+    Returns:
+        The function_score query contains the base query, applied when
+        child_order is used.
     """
     child_order_by = get_function_score_sorting_key(cd, api_version)
     valid_child_order_by = bool(child_order_by and all(child_order_by))
@@ -2860,13 +2939,17 @@ def apply_custom_score_to_main_query(
 
 
 def get_query_embedding(text_query: str) -> list[float]:
-    """Generate an embedding vector for a search query via the inception
-    microservice.
+    """Generate an embedding vector for a search query via the inception microservice.
 
-    :param text_query: The raw user query string.
-    :return: The embedding vector as a list of floats.
-    :raises InputTooLongError: If the cleaned query exceeds
-        MAX_EMBEDDING_CHAR_LENGTH.
+    Args:
+        text_query: The raw user query string.
+
+    Returns:
+        The embedding vector as a list of floats.
+
+    Raises:
+        InputTooLongError: If the cleaned query exceeds
+            MAX_EMBEDDING_CHAR_LENGTH.
     """
     cleaned_text_query = text_query.replace('"', "")
     if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
@@ -2885,22 +2968,25 @@ def build_semantic_query(
     filters: list[Query],
     embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
-    """
-    Build a hybrid Elasticsearch query using both exact keyword matching and
-    semantic vector search.
+    """Build a hybrid Elasticsearch query using both exact keyword matching and semantic vector search.
 
-    :param text_query: The raw user query string, which may include quoted
-        phrases for exact matching.
-    :param filters: A list of filter clauses to apply as pre-filtering to the
-        semantic KNN search query.
-    :param embedding: Optional precomputed embedding vector. If not provided,
-        the function generates embeddings from the `text_query`.
-    :return: A two-tuple:
+    Args:
+        text_query: The raw user query string, which may include quoted
+            phrases for exact matching.
+        filters: A list of filter clauses to apply as pre-filtering to the
+            semantic KNN search query.
+        embedding: Optional precomputed embedding vector. If not provided,
+            the function generates embeddings from the `text_query`.
+
+    Returns:
+        A two-tuple:
         - keyword_query: A string representing the AND-joined quoted phrases, if any.
         - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
           and optionally a keyword-based full-text query.
-    :raises InputTooLongError: If the cleaned query string exceeds the maximum allowed length
-        for generating embeddings.
+
+    Raises:
+        InputTooLongError: If the cleaned query string exceeds the maximum allowed length
+            for generating embeddings.
     """
     validate_query_syntax(text_query, QueryType.QUERY_STRING)
 
@@ -2952,11 +3038,14 @@ def build_semantic_query(
 def has_semantic_params(get_params: QueryDict | CleanData) -> bool:
     """Check if parameters represent a valid semantic search query.
 
-    :param get_params: A QueryDict or CleanData object containing the
-    search parameters.
-    :return: True if the user enabled semantic search, the search type supports
-    it, and the query has content to generate an embedding or an embedding
-    is provided.
+    Args:
+        get_params: A QueryDict or CleanData object containing the
+            search parameters.
+
+    Returns:
+        True if the user enabled semantic search, the search type supports
+        it, and the query has content to generate an embedding or an embedding
+        is provided.
     """
     q = get_params.get("q", "")
     has_embeddable_text = bool(q.replace('"', "").strip())
@@ -2977,20 +3066,21 @@ def build_full_join_es_queries(
     api_version: Literal["v3", "v4"] | None = None,
     alerts: bool = False,
 ) -> EsJoinQueries:
-    """Build a complete Elasticsearch query with both parent and child document
-      conditions.
+    """Build a complete Elasticsearch query with both parent and child document conditions.
 
-    :param cd: The query CleanedData
-    :param child_query_fields: A dictionary mapping child fields document type.
-    :param parent_query_fields: A list of fields for the parent document.
-    :param mlt_query: the More Like This Query object.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
-    :param api_version: Optional, the request API version.
-    :param alerts: If highlighting is being applied to search Alerts hits.
-    :return: A three-tuple: the main join query, the child documents query, and
-    the parent documents query.
+    Args:
+        cd: The query CleanedData
+        child_query_fields: A dictionary mapping child fields document type.
+        parent_query_fields: A list of fields for the parent document.
+        mlt_query: the More Like This Query object.
+        child_highlighting: Whether highlighting should be enabled in child docs.
+        api_version: Optional, the request API version.
+        alerts: If highlighting is being applied to search Alerts hits.
+
+    Returns:
+        A three-tuple: the main join query, the child documents query, and
+        the parent documents query.
     """
-
     q_should = []
     has_text_query = False
     has_valid_semantic_query = has_semantic_params(cd)
@@ -3213,12 +3303,14 @@ def limit_inner_hits(
 ) -> None:
     """Limit inner hits of has_child query results.
 
-    :param get_params: The user search params.
-    :param results: The Page or Response object containing search results.
-    :param search_type: The search type to perform.
-    :return: None, the function updates the results in place.
-    """
+    Args:
+        get_params: The user search params.
+        results: The Page or Response object containing search results.
+        search_type: The search type to perform.
 
+    Returns:
+        None, the function updates the results in place.
+    """
     hits_limit, _ = get_child_top_hits_limit(get_params, search_type)
     match search_type:
         case SEARCH_TYPES.OPINION:
@@ -3263,14 +3355,16 @@ def get_child_top_hits_limit(
 ) -> tuple[int, int]:
     """Get the frontend and query hit limits for child documents.
 
-    :param search_params: Either a QueryDict or CleanData object containing the
-    search parameters.
-    :param search_type: Elasticsearch DSL Search object
-    :param api_version: Optional, the request API version.
-    :return: A two-tuple containing the limit for child hits to display and the
-    limit for child query hits
-    """
+    Args:
+        search_params: Either a QueryDict or CleanData object containing the
+            search parameters.
+        search_type: Elasticsearch DSL Search object
+        api_version: Optional, the request API version.
 
+    Returns:
+        A two-tuple containing the limit for child hits to display and the
+        limit for child query hits
+    """
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query and search_type in [
         SEARCH_TYPES.RECAP,
@@ -3306,8 +3400,12 @@ def do_count_query(
     search_query: Search,
 ) -> int:
     """Execute an Elasticsearch count query and catch errors.
-    :param search_query: Elasticsearch DSL Search object.
-    :return: The results count.
+
+    Args:
+        search_query: Elasticsearch DSL Search object.
+
+    Returns:
+        The results count.
     """
     try:
         total_results = search_query.count()
@@ -3322,10 +3420,13 @@ def do_count_query(
 
 
 def merge_opinion_and_cluster(results: Page | dict) -> None:
-    """Merges the fields from the opinion document with the best score into
-    the search results.
-    :param results: A Page object containing the search results to be modified.
-    :return: None, the function modifies the search results object in place.
+    """Merges the fields from the opinion document with the best score into the search results.
+
+    Args:
+        results: A Page object containing the search results to be modified.
+
+    Returns:
+        None, the function modifies the search results object in place.
     """
     for result in results:
         opinion = result["child_hits"][0]["_source"]
@@ -3352,17 +3453,19 @@ def do_es_api_query(
 ) -> tuple[Search, Query | None]:
     """Build an ES query for its use in the Search API and Webhooks.
 
-    :param search_query: Elasticsearch DSL Search object.
-    :param cd: The query CleanedData
-    :param highlighting_fields: A dictionary mapping field names to fragment
-    sizes for highlighting.
-    :param hl_tag: The HTML tag to use for highlighting matched fragments.
-    :param api_version: The request API version.
-    :return: A two-tuple, the Elasticsearch search query object and an ES
-    Query for child documents, or None if there is no need to query
-    child documents.
-    """
+    Args:
+        search_query: Elasticsearch DSL Search object.
+        cd: The query CleanedData
+        highlighting_fields: A dictionary mapping field names to fragment
+            sizes for highlighting.
+        hl_tag: The HTML tag to use for highlighting matched fragments.
+        api_version: The request API version.
 
+    Returns:
+        A two-tuple, the Elasticsearch search query object and an ES
+        Query for child documents, or None if there is no need to query
+        child documents.
+    """
     alerts = True if hl_tag == ALERTS_HL_TAG else False
     try:
         es_queries = build_es_base_query(
@@ -3468,6 +3571,7 @@ def build_cardinality_count(
     extra_unique_field: str | None = None,
 ) -> SearchDSL:
     """Build an Elasticsearch cardinality aggregation.
+
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
     ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
@@ -3475,17 +3579,18 @@ def build_cardinality_count(
     approximation count using this method ranges from 1% to 6%.
     https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate
 
-    :param count_query: The Elasticsearch DSL Search object containing the
-    count query.
-    :param unique_field: The field name on which the cardinality aggregation
-    will be based to estimate uniqueness.
-    :param extra_unique_field: Optional, a second field counted the same way,
-    for documents that have no unique_field. Read the total with
-    get_cardinality_count.
+    Args:
+        count_query: The Elasticsearch DSL Search object containing the
+            count query.
+        unique_field: The field name on which the cardinality aggregation
+            will be based to estimate uniqueness.
+        extra_unique_field: Optional, a second field counted the same way,
+            for documents that have no unique_field. Read the total with
+            get_cardinality_count.
 
-    :return: The ES cardinality aggregation query.
+    Returns:
+        The ES cardinality aggregation query.
     """
-
     count_query.aggs.bucket(
         "unique_documents",
         "cardinality",
@@ -3503,10 +3608,7 @@ def build_cardinality_count(
 
 
 def get_cardinality_count(aggregations: AttrDict[Any]) -> int:
-    """Return the unique documents count from the aggregations of a
-    build_cardinality_count response, including its extra_unique_field
-    count if it has one.
-    """
+    """Return the unique documents count from the aggregations of a build_cardinality_count response, including its extra_unique_field count if it has one."""
     count = aggregations.unique_documents.value
     if extra := getattr(aggregations, "extra_unique_documents", None):
         count += extra.value
@@ -3517,15 +3619,18 @@ def do_collapse_count_query(
     search_type: str, main_query: Search, query: Query
 ) -> int:
     """Execute an Elasticsearch count query for queries that uses collapse.
+
     Uses a query with aggregation to determine the number of unique opinions
     based on the 'cluster_id' or 'docket_id' according to the search_type.
 
-    :param search_type: The search type to perform.
-    :param main_query: The Elasticsearch DSL Search object.
-    :param query: The ES Query object to perform the count query.
-    :return: The results count.
-    """
+    Args:
+        search_type: The search type to perform.
+        main_query: The Elasticsearch DSL Search object.
+        query: The ES Query object to perform the count query.
 
+    Returns:
+        The results count.
+    """
     unique_field = (
         "cluster_id" if search_type == SEARCH_TYPES.OPINION else "docket_id"
     )
@@ -3547,16 +3652,17 @@ def do_collapse_count_query(
 def do_es_alert_estimation_query(
     search_query: Search, cd: CleanData, day_count: int
 ) -> tuple[int, int]:
-    """Builds an ES alert estimation query based on the provided search query,
-     clean data, and day count.
+    """Builds an ES alert estimation query based on the provided search query, clean data, and day count.
 
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The cleaned data object containing the query and filters.
-    :param day_count: The number of days to subtract from today's date to set
-    the date range filter.
-    :return: An integer representing the alert estimation.
+    Args:
+        search_query: The Elasticsearch search query object.
+        cd: The cleaned data object containing the query and filters.
+        day_count: The number of days to subtract from today's date to set
+            the date range filter.
+
+    Returns:
+        An integer representing the alert estimation.
     """
-
     total_recap_case_only_estimation = 0
     match cd["type"]:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
@@ -3645,15 +3751,17 @@ def do_es_sweep_alert_query(
 ) -> tuple[Response | None, Response | None, Response | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
 
-    :param search_query: Elasticsearch DSL Search object.
-    :param child_search_query: The Elasticsearch DSL search query to perform
-    the child-only query.
-    :param cd: The query CleanedData
-    :return: A two-tuple, the Elasticsearch search query object and an ES
-    Query for child documents, or None if there is no need to query
-    child documents.
-    """
+    Args:
+        search_query: Elasticsearch DSL Search object.
+        child_search_query: The Elasticsearch DSL search query to perform
+            the child-only query.
+        cd: The query CleanedData
 
+    Returns:
+        A two-tuple, the Elasticsearch search query object and an ES
+        Query for child documents, or None if there is no need to query
+        child documents.
+    """
     search_form = SearchForm(cd)
     if search_form.is_valid():
         cd = search_form.cleaned_data
@@ -3749,22 +3857,29 @@ def do_es_sweep_alert_query(
 
 
 def compute_lowest_possible_estimate(precision_threshold: int) -> int:
-    """Estimates can be below reality by as much as 6%. Round numbers below that threshold.
-    :return: The lowest possible estimate.
+    """Estimates can be below reality by as much as 6%.
+
+    Round numbers below that threshold.
+
+    Returns:
+        The lowest possible estimate.
     """
     return int(precision_threshold * 0.94)
 
 
 def simplify_estimated_count(search_count: int) -> int:
     """Simplify the estimated search count to the nearest rounded figure.
+
     It only applies this rounding if the search_count exceeds the
     ELASTICSEARCH_CARDINALITY_PRECISION threshold.
 
-    :param search_count: The original search count.
-    :return: The simplified search_count, rounded to the nearest significant
-    figure or the original search_count if below the threshold.
-    """
+    Args:
+        search_count: The original search count.
 
+    Returns:
+        The simplified search_count, rounded to the nearest significant
+        figure or the original search_count if below the threshold.
+    """
     if search_count >= compute_lowest_possible_estimate(
         settings.ELASTICSEARCH_CARDINALITY_PRECISION
     ):
@@ -3776,17 +3891,18 @@ def simplify_estimated_count(search_count: int) -> int:
 
 
 def get_max_score_for_knn_search(child_docs: list[Hit]) -> float:
-    """
-    Retrieves the maximum score from the k-NN search results of the first child
-    document.
+    """Retrieves the maximum score from the k-NN search results of the first child document.
 
     This function checks if the input list of child documents is non-empty and
     whether the first document contains k-NN `inner_hits` under the "embeddings"
     key. If so, it returns the `max_score` from the search hits. Otherwise, it
     returns 0.0.
 
-    :param child_docs: A list of child documents that may contain kNN metadata.
-    :return: The maximum score from the inner hits, or 0.0 if unavailable.
+    Args:
+        child_docs: A list of child documents that may contain kNN metadata.
+
+    Returns:
+        The maximum score from the inner hits, or 0.0 if unavailable.
     """
     if not len(child_docs) or not hasattr(child_docs[0], "inner_hits"):
         return 0.0
@@ -3805,15 +3921,17 @@ def set_child_docs_and_score(
 ) -> None:
     """Process and attach child documents to the main search results.
 
-    :param results: A list of search results, which can be ES Hit objects
-    or a list of dicts.
-    :param merge_highlights: A boolean indicating whether to merge
-    highlight data into the results.
-    :param merge_score: A boolean indicating whether to merge
-    the BM25 score into the results.
-    :return: None. Results are modified in place.
-    """
+    Args:
+        results: A list of search results, which can be ES Hit objects
+            or a list of dicts.
+        merge_highlights: A boolean indicating whether to merge
+            highlight data into the results.
+        merge_score: A boolean indicating whether to merge
+            the BM25 score into the results.
 
+    Returns:
+        None. Results are modified in place.
+    """
     for result in results:
         result_is_dict = isinstance(result, dict)
         if result_is_dict:
@@ -3848,13 +3966,15 @@ def get_court_opinions_counts(
 ) -> dict[str, int] | None:
     """Retrieve the opinion counts per each court.
 
-    :param search_query: The ES DSL Search object.
-    :param courts_count: The number of courts in the database, used as the size
-    for the terms aggregation.
-    :return: A dict mapping court IDs to their respective counts of
-    opinions, or None if an error occurs during query execution.
-    """
+    Args:
+        search_query: The ES DSL Search object.
+        courts_count: The number of courts in the database, used as the size
+            for the terms aggregation.
 
+    Returns:
+        A dict mapping court IDs to their respective counts of
+        opinions, or None if an error occurs during query execution.
+    """
     search_query = search_query.extra(size=0)
     search_query = search_query.query(
         Q("bool", must=Q("match", cluster_child="opinion"))

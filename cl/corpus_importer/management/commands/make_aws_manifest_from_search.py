@@ -24,8 +24,7 @@ s3_client = boto3.client("s3")
 
 
 def build_base_query(options: dict[str, Any]) -> Search:
-    """
-    Constructs a base Full text Elasticsearch query using the provided options.
+    """Constructs a base Full text Elasticsearch query using the provided options.
 
     Args:
         options (dict[str, Any]): A dictionary containing search options:

@@ -39,10 +39,13 @@ def readable_dir(prospective_dir: str) -> str:
 
 
 def _argparse_volumes(volumes_arg: str) -> list[int]:
-    """Custom argparse handling for volumes
+    """Custom argparse handling for volumes.
 
-    :param volumes_arg: The volume argparse for harvard imports
-    :return: Range of values
+    Args:
+        volumes_arg: The volume argparse for harvard imports
+
+    Returns:
+        Range of values
     """
     if ":" not in volumes_arg:
         return [int(volumes_arg)]

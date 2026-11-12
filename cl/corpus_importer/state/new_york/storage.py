@@ -7,12 +7,14 @@ PRIVATE_PREFIX: str = f"responses/dockets/{NY_STATE_CODE}/"
 
 
 def is_scraped(path: str) -> bool:
-    """Whether a stored path names a file the scraper left in the private
-    bucket, which is the only kind of path a scrape may report.
+    """Whether a stored path names a file the scraper left in the private bucket, which is the only kind of path a scrape may report.
 
-    :param path: The path a document's `filepath_local` holds, or a key a
-        scrape reported.
-    :return: Whether the file is sitting in the scrape bucket.
+    Args:
+        path: The path a document's `filepath_local` holds, or a key a
+            scrape reported.
+
+    Returns:
+        Whether the file is sitting in the scrape bucket.
     """
     return path.startswith(PRIVATE_PREFIX)
 
@@ -27,8 +29,11 @@ def is_published(path: str) -> bool:
     leave the loader no reason to move it to the name it now belongs under;
     see `AbstractStateDocument.get_pdf_path`.
 
-    :param path: The path a document's `filepath_local` holds.
-    :return: Whether the file is in the bucket CourtListener serves, wherever
+    Args:
+        path: The path a document's `filepath_local` holds.
+
+    Returns:
+        Whether the file is in the bucket CourtListener serves, wherever
         in it. `False` for a document with no file at all.
     """
     return bool(path) and not is_scraped(path)

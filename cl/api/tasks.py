@@ -36,11 +36,10 @@ def send_test_webhook_event(
 ) -> None:
     """POSTS the test webhook event.
 
-    :param webhook_pk: The webhook primary key.
-    :param content_str: The str content to POST.
-    :return: None
+    Args:
+        webhook_pk: The webhook primary key.
+        content_str: The str content to POST.
     """
-
     webhook = Webhook.objects.get(pk=webhook_pk)
     json_obj = json.loads(content_str)
     webhook_event = WebhookEvent.objects.create(
@@ -54,13 +53,12 @@ def send_docket_alert_webhook_events(
     des_pks: list[int],
     webhook_recipients_pks: list[int],
 ) -> None:
-    """POSTS the DocketAlert to the recipients webhook(s)
+    """POSTS the DocketAlert to the recipients webhook(s).
 
-    :param des_pks: The list of docket entries primary keys.
-    :param webhook_recipients_pks: A list of User pks to send the webhook to.
-    :return: None
+    Args:
+        des_pks: The list of docket entries primary keys.
+        webhook_recipients_pks: A list of User pks to send the webhook to.
     """
-
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
         user_id__in=webhook_recipients_pks,
@@ -95,11 +93,10 @@ def send_docket_alert_webhook_events(
 def send_pray_and_pay_webhooks(prayer_pk: int, webhook_pk: int) -> None:
     """Send webhook event when a pray-and-pay request is granted.
 
-    :param prayer_id: Primary key of the granted Prayer instance.
-    :param webhook_id: Primary key of the Webhook to send the event to.
-    :return: None
+    Args:
+        prayer_pk: Primary key of the granted Prayer instance.
+        webhook_pk: Primary key of the Webhook to send the event to.
     """
-
     prayer = Prayer.objects.get(pk=prayer_pk)
     webhook = Webhook.objects.get(pk=webhook_pk)
     # Only send webhook for granted prayers
@@ -129,14 +126,13 @@ def send_search_alert_webhook_es(
     webhook_pk: int,
     alert_pk: int,
 ) -> None:
-    """Send a search alert webhook event containing search results from a
-    search alert object.
+    """Send a search alert webhook event containing search results from a search alert object.
 
-    :param results: The search results returned for this alert.
-    :param webhook_pk: The webhook endpoint ID object to send the event to.
-    :param alert_pk: The search alert ID.
+    Args:
+        results: The search results returned for this alert.
+        webhook_pk: The webhook endpoint ID object to send the event to.
+        alert_pk: The search alert ID.
     """
-
     webhook = Webhook.objects.get(pk=webhook_pk)
     alert = Alert.objects.get(pk=alert_pk)
     serialized_alert = SearchAlertSerializerModel(alert).data

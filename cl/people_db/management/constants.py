@@ -1,9 +1,4 @@
-"""
-The FJC data being ingested for bankruptcy and magistrate judges is
-composed of postal code abbreviations for the state and a single letter
-for the district (if there is more than one district for a state).  The
-following helps convert these into abbreviations used by Courtlistener.
-"""
+"""The FJC data being ingested for bankruptcy and magistrate judges is composed of postal code abbreviations for the state and a single letter for the district (if there is more than one district for a state).  The following helps convert these into abbreviations used by Courtlistener."""
 
 FJC_DISTRICT_COURTS = {
     "AK": "akd",

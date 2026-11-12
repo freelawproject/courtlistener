@@ -60,7 +60,7 @@ class Note(models.Model):
 
 @pghistory.track()
 class DocketTag(models.Model):
-    """Through table linking dockets to tags"""
+    """Through table linking dockets to tags."""
 
     docket = models.ForeignKey(
         Docket, related_name="docket_tags", on_delete=models.CASCADE
@@ -83,7 +83,7 @@ class DocketTag(models.Model):
     exclude=["view_count"],
 )
 class UserTag(AbstractDateTimeModel):
-    """Tags that can be added by users to various objects"""
+    """Tags that can be added by users to various objects."""
 
     user = models.ForeignKey(
         User,

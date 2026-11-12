@@ -519,14 +519,15 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     )
 
     def execute_es_search(self, cleaned_data, request) -> Response:
-        """
-        Execute Elasticsearch search for the given cleaned data and request
-        object.
+        """Execute Elasticsearch search for the given cleaned data and request object.
 
-        :param cleaned_data: Validated and cleaned data from the request query
-            parameters.
-        :param request: The request object.
-        :return: Response object with paginated search results or validation
+        Args:
+            cleaned_data: Validated and cleaned data from the request query
+                parameters.
+            request: The request object.
+
+        Returns:
+            Response object with paginated search results or validation
             errors.
         """
         search_type = cleaned_data["type"]

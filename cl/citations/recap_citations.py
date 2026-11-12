@@ -19,14 +19,11 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def store_recap_citations(document: RECAPDocument) -> None:
+    """Identify citations from federal filings to opinions.
+
+    Args:
+        document: A search.RECAPDocument object.
     """
-    Identify citations from federal filings to opinions.
-
-    :param document: A search.RECAPDocument object.
-
-    :return: None
-    """
-
     chunks = make_get_citations_kwargs(document)
     citations = []
     for chunk in chunks:

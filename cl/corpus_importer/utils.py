@@ -63,10 +63,13 @@ def paginate_docs_queryset(
     Uses pk-based filtering to avoid server-side cursors that hold
     open DB connections (which time out during long celery waits).
 
-    :param queryset: A .values_list("pk", flat=True) queryset.
-    :param batch_size: Number of rows to fetch per query.
-    :param desc: If True, iterate in descending pk order.
-    :return: Yields individual pk values.
+    Args:
+        queryset: A .values_list("pk", flat=True) queryset.
+        batch_size: Number of rows to fetch per query.
+        desc: If True, iterate in descending pk order.
+
+    Returns:
+        Yields individual pk values.
     """
     if desc:
         # No upper-bound sentinel exists for PKs, so None means
@@ -96,15 +99,18 @@ def paginate_docs_queryset(
 def extract_file_name_from_url(url: str) -> str:
     """Extract the filename from a URL.
 
-    :param url: The URL to extract the filename from.
-    :return: The filename extracted from the URL path.
+    Args:
+        url: The URL to extract the filename from.
+
+    Returns:
+        The filename extracted from the URL path.
     """
     parsed_url = urlparse(url)
     return parsed_url.path.split("/")[-1]
 
 
 class OpinionMatchingException(Exception):
-    """An exception for wrong matching opinions"""
+    """An exception for wrong matching opinions."""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -118,21 +124,21 @@ class AuthorException(Exception):
 
 
 class JudgeException(Exception):
-    """An exception for wrong judges"""
+    """An exception for wrong judges."""
 
     def __init__(self, message: str) -> None:
         self.message = message
 
 
 class OpinionTypeException(Exception):
-    """An exception for incorrect opinion types"""
+    """An exception for incorrect opinion types."""
 
     def __init__(self, message: str) -> None:
         self.message = message
 
 
 class DocketSourceException(Exception):
-    """An exception for wrong docket source"""
+    """An exception for wrong docket source."""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -146,8 +152,7 @@ class DateException(Exception):
 
 
 class EmptyOpinionException(Exception):
-    """An exception for opinions that raise a ZeroDivisionError Exception due empty
-    opinion tag or empty opinion content in cl"""
+    """An exception for opinions that raise a ZeroDivisionError Exception due empty opinion tag or empty opinion content in cl."""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -161,9 +166,9 @@ async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     has been since it was last uploaded to Internet Archive, and whether it's
     time for us to do so.
 
-    :param d: The docket to mark
-    :param save_docket: Whether to save the docket or just modify it in place
-    :return: None
+    Args:
+        d: The docket to mark
+        save_docket: Whether to save the docket or just modify it in place
     """
     if not d.ia_needs_upload:
         d.ia_needs_upload = True
@@ -192,9 +197,11 @@ def is_bankruptcy_court(court_id: str) -> bool:
 async def is_appellate_court(court_id: str) -> bool:
     """Checks if the given court_id belongs to an appellate court.
 
-    :param court_id: The unique identifier of the court.
+    Args:
+        court_id: The unique identifier of the court.
 
-    :return: True if the court_id corresponds to an appellate court,
+    Returns:
+        True if the court_id corresponds to an appellate court,
         False otherwise.
     """
     appellate_court_ids = Court.federal_courts.appellate_courts()
@@ -202,24 +209,26 @@ async def is_appellate_court(court_id: str) -> bool:
 
 
 def should_check_acms_court(court_id: str) -> bool:
-    """
-    Checks whether the given court_id should be checked using ACMS-specific logic.
+    """Checks whether the given court_id should be checked using ACMS-specific logic.
 
     This helper is used to identify courts that require special handling,
     currently limited to a known set of appellate courts.
 
-    :param court_id: The unique identifier of the court.
+    Args:
+        court_id: The unique identifier of the court.
 
-    :return: True if the court_id is one that uses ACMS; False otherwise.
+    Returns:
+        True if the court_id is one that uses ACMS; False otherwise.
     """
     return court_id in ["ca2", "ca9"]
 
 
 def get_start_of_quarter(d: date | None = None) -> date:
-    """Get the start date of the  calendar quarter requested
+    """Get the start date of the  calendar quarter requested.
 
-    :param d: The date to get the start date for. If None, then use current
-    date/time.
+    Args:
+        d: The date to get the start date for. If None, then use current
+            date/time.
     """
     if d is None:
         d = now().date()
@@ -235,11 +244,14 @@ def get_start_of_quarter(d: date | None = None) -> date:
 
 
 def make_subset_range(cl_characters: str, max_string: str) -> list[int]:
-    """Find indices for matching max_string in CL opinion
+    """Find indices for matching max_string in CL opinion.
 
-    :param cl_characters: The stripped down CL characters
-    :param max_string: The current largest identified substring
-    :return: Range of indices of match to CL as list
+    Args:
+        cl_characters: The stripped down CL characters
+        max_string: The current largest identified substring
+
+    Returns:
+        Range of indices of match to CL as list
     """
     string_index_start = cl_characters.find(max_string)
     string_index_end = string_index_start + len(max_string)
@@ -247,14 +259,16 @@ def make_subset_range(cl_characters: str, max_string: str) -> list[int]:
 
 
 def filter_subsets(lists: list[list[int]]) -> Iterator[list[int]]:
-    """Filter subsets from matches
+    """Filter subsets from matches.
 
     Given list of lists, return new list of lists without subsets
 
-    :param lists: List of matched lists ranges
-    :return: Reduced list of matches
-    """
+    Args:
+        lists: List of matched lists ranges
 
+    Returns:
+        Reduced list of matches
+    """
     for match in lists:
         if not any(
             is_subset(match, other_matches)
@@ -265,15 +279,17 @@ def filter_subsets(lists: list[list[int]]) -> Iterator[list[int]]:
 
 
 def is_subset(match: list[int], other_match: list[int]) -> bool:
-    """Check if match is a subset of other matches
+    """Check if match is a subset of other matches.
 
     Check if needle is ordered subset of haystack in O(n)
 
-    :param match: Matching range of text as the indices
-    :param other_match: Other matching range of text as indices
-    :return: Is match a subset of other match
-    """
+    Args:
+        match: Matching range of text as the indices
+        other_match: Other matching range of text as indices
 
+    Returns:
+        Is match a subset of other match
+    """
     if len(other_match) < len(match):
         return False
     index = 0
@@ -287,16 +303,18 @@ def is_subset(match: list[int], other_match: list[int]) -> bool:
 
 
 def compare_documents(file_characters: str, cl_characters: str) -> int:
-    """Compare text from file/source to CL opinion text
+    """Compare text from file/source to CL opinion text.
 
     This code iterates over two opinions logging similar stretches and then
     returns a percentage of the total overlapping characters
 
-    :param file_characters: The stripped down opinion text from file/source
-    :param cl_characters: The stripped down opinion text on Courtlistener
-    :return: Percentage (as integer) overlapping content
-    """
+    Args:
+        file_characters: The stripped down opinion text from file/source
+        cl_characters: The stripped down opinion text on Courtlistener
 
+    Returns:
+        Percentage (as integer) overlapping content
+    """
     start, stop, count = 0, 0, 0
     matched_substring = ""
     found_overlaps = []
@@ -330,16 +348,18 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
 ) -> NDArray[np.float64]:
-    """Get similarity scores between two sets of lists
+    """Get similarity scores between two sets of lists.
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
     we use word frequency to generate a similarity score between the corpora
 
-    :param texts_to_compare_1: List of text to compare
-    :param texts_to_compare_2: List of text to compare
-    :return: Return similarity scores
-    """
+    Args:
+        texts_to_compare_1: List of text to compare
+        texts_to_compare_2: List of text to compare
 
+    Returns:
+        Return similarity scores
+    """
     # We import the library inside the function to avoid loading it if it is
     # not required
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -366,7 +386,7 @@ def similarity_scores(
 def match_opinion_lists(
     file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
-    """Match opinions on two lists from different sources
+    """Match opinions on two lists from different sources.
 
     Try to match the opinions on two lists and generate a dict with position of
     matching opinions
@@ -401,11 +421,13 @@ def match_opinion_lists(
     matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file opinion and
     2 is cl opinion
 
-    :param file_opinions_list: Opinions from file
-    :param cl_opinions_list: CL opinions
-    :return: Matches if found or empty dict
-    """
+    Args:
+        file_opinions_list: Opinions from file
+        cl_opinions_list: CL opinions
 
+    Returns:
+        Matches if found or empty dict
+    """
     scores = similarity_scores(file_opinions_list, cl_opinions_list)
 
     matches = {}
@@ -429,12 +451,14 @@ def match_opinion_lists(
 
 
 def clean_docket_number(docket_number: str) -> str:
-    """Strip non-numeric content from docket numbers
+    """Strip non-numeric content from docket numbers.
 
-    :param docket_number: Case docket number
-    :return: A stripped down docket number.
+    Args:
+        docket_number: Case docket number
+
+    Returns:
+        A stripped down docket number.
     """
-
     docket_number = re.sub("Department.*", "", docket_number)
     docket_number = re.sub("Nos?. ", "", docket_number)
     return docket_number
@@ -443,11 +467,11 @@ def clean_docket_number(docket_number: str) -> str:
 def merge_docket_numbers(
     cluster: OpinionCluster, docket_number: str
 ) -> str | None:
-    """Merge docket number
+    """Merge docket number.
 
-    :param cluster: The cluster of the merging item
-    :param docket_number: The docket number from file
-    :return: None
+    Args:
+        cluster: The cluster of the merging item
+        docket_number: The docket number from file
     """
     cl_docket = cluster.docket
     file_cleaned_docket = clean_docket_number(docket_number)
@@ -483,13 +507,16 @@ def merge_case_names(
     case_name_key: str,
     case_name_full_key: str,
 ) -> dict[str, Any]:
-    """Merge case names
+    """Merge case names.
 
-    :param cluster: The cluster of the merging item
-    :param file_data: json data from file(columbia, harvard, etc.)
-    :param case_name_key: dict key that contains case_name value from file
-    :param case_name_full_key: dict key that contains case_name_key value from file
-    :return: empty dict or dict with new value for field
+    Args:
+        cluster: The cluster of the merging item
+        file_data: json data from file(columbia, harvard, etc.)
+        case_name_key: dict key that contains case_name value from file
+        case_name_full_key: dict key that contains case_name_key value from file
+
+    Returns:
+        empty dict or dict with new value for field
     """
     file_case_name = titlecase(harmonize(file_data[case_name_key]))
     file_case_name_full = titlecase(file_data[case_name_full_key])
@@ -539,11 +566,14 @@ def merge_case_names(
 def merge_strings(
     field_name: str, overlapping_data: tuple[str, str]
 ) -> dict[str, Any]:
-    """Compare two strings and choose the largest
+    """Compare two strings and choose the largest.
 
-    :param field_name: field name to update in opinion cluster
-    :param overlapping_data: data to compare from file and courtlistener
-    :return: empty dict or dict with new value for field
+    Args:
+        field_name: field name to update in opinion cluster
+        overlapping_data: data to compare from file and courtlistener
+
+    Returns:
+        empty dict or dict with new value for field
     """
     if not overlapping_data:
         return {}
@@ -560,12 +590,15 @@ def merge_long_fields(
     overlapping_data: tuple[str, str] | None,
     cluster_id: int,
 ) -> dict[str, Any]:
-    """Merge two long text fields
+    """Merge two long text fields.
 
-    :param field_name: Field name to update in opinion cluster
-    :param overlapping_data: data to compare from columbia and courtlistener
-    :param cluster_id: cluster id
-    :return: empty dict or dict with new value for field
+    Args:
+        field_name: Field name to update in opinion cluster
+        overlapping_data: data to compare from columbia and courtlistener
+        cluster_id: cluster id
+
+    Returns:
+        empty dict or dict with new value for field
     """
     if not overlapping_data:
         return {}
@@ -592,15 +625,17 @@ def merge_judges(
     is_columbia: bool = False,
     skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
-    """Merge overlapping judge values
+    """Merge overlapping judge values.
 
-    :param overlapping_data: data to compare from file and courtlistener
-    :param cluster_id: opinion cluster id
-    :param is_columbia: True if merging judges from columbia
-    :param skip_judge_merger: skip judge merger instead of raise exception
-    :return: empty dict or dict with new value for field
+    Args:
+        overlapping_data: data to compare from file and courtlistener
+        cluster_id: opinion cluster id
+        is_columbia: True if merging judges from columbia
+        skip_judge_merger: skip judge merger instead of raise exception
+
+    Returns:
+        empty dict or dict with new value for field
     """
-
     if not overlapping_data:
         return {}
 
@@ -679,16 +714,18 @@ def merge_overlapping_data(
     skip_judge_merger: bool = False,
     is_columbia: bool = False,
 ) -> dict[str, Any]:
-    """Merge overlapping data
+    """Merge overlapping data.
 
-    :param cluster: the cluster object
-    :param long_fields: skip judge merger
-    :param changed_values_dictionary: the dictionary of data to merge
-    :param skip_judge_merger: skip judge merger
-    :param is_columbia: skip judge merger
-    :return: empty dict or dict with new values for fields
+    Args:
+        cluster: the cluster object
+        long_fields: skip judge merger
+        changed_values_dictionary: the dictionary of data to merge
+        skip_judge_merger: skip judge merger
+        is_columbia: skip judge merger
+
+    Returns:
+        empty dict or dict with new values for fields
     """
-
     if not changed_values_dictionary:
         # Empty dictionary means that we don't have overlapping data
         return {}
@@ -729,12 +766,12 @@ def merge_overlapping_data(
 def add_citations_to_cluster(
     cites: list[str], cluster_id: int, save_again_if_exists: bool = False
 ) -> None:
-    """Add string citations to OpinionCluster if it has not yet been added
+    """Add string citations to OpinionCluster if it has not yet been added.
 
-    :param cites: citation list
-    :param cluster_id: cluster id related to citations
-    :param save_again_if_exists: force save citation if it already exists
-    :return: None
+    Args:
+        cites: citation list
+        cluster_id: cluster id related to citations
+        save_again_if_exists: force save citation if it already exists
     """
     for cite in cites:
         clean_cite = re.sub(r"\s+", " ", cite)
@@ -803,17 +840,16 @@ def update_cluster_panel(
     panel_list: list[str],
     panel_date: date | None = None,
 ) -> None:
-    """Update cluster's panel
+    """Update cluster's panel.
 
     This is done independently since it is a m2m relationship, we collect the
     corrected names, find the Person ids and then add them to the relation
 
-    :param cluster: the cluster object
-    :param panel_list: list with people names
-    :param panel_date: date used to find people
-    :return: None
+    Args:
+        cluster: the cluster object
+        panel_list: list with people names
+        panel_date: date used to find people
     """
-
     panel_list = [titlecase(p) for p in panel_list]
     panel = async_to_sync(lookup_judges_by_last_name_list)(
         panel_list, cluster.docket.court.id, panel_date, True
@@ -823,10 +859,13 @@ def update_cluster_panel(
 
 
 def get_opinion_text(cluster: OpinionCluster) -> str:
-    """Get the opinions text for a cluster object
+    """Get the opinions text for a cluster object.
 
-    :param cluster: Cluster ID for a set of opinions
-    :return: Combined opinion text
+    Args:
+        cluster: Cluster ID for a set of opinions
+
+    Returns:
+        Combined opinion text
     """
     opinions = []
     for op in Opinion.objects.filter(cluster_id=cluster.id):
@@ -850,10 +889,13 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
 
 
 def winnow_case_name(case_name: str) -> set:
-    """Reduce each case title to a set of words worth comparing
+    """Reduce each case title to a set of words worth comparing.
 
-    :param case_name: The name of a case or combination of case names
-    :return: A set of words worth comparing
+    Args:
+        case_name: The name of a case or combination of case names
+
+    Returns:
+        A set of words worth comparing
     """
     false_positive_set = {
         "and",
@@ -920,11 +962,14 @@ def winnow_case_name(case_name: str) -> set:
 
 
 def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
-    """Strip all non-alphanumeric characters
+    """Strip all non-alphanumeric characters.
 
-    :param case_body: Opinion text
-    :param harvard_file: is this a harvard json file or not
-    :return:Opinion text with only alphanumeric characters
+    Args:
+        case_body: Opinion text
+        harvard_file: is this a harvard json file or not
+
+    Returns:
+        Opinion text with only alphanumeric characters
     """
     soup = BeautifulSoup(case_body, "lxml")
     if not harvard_file:
@@ -959,12 +1004,15 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
 def length_too_different(
     case: OpinionCluster, file_characters: str, cl_characters: str
 ) -> bool:
-    """Check if length is too different between texts
+    """Check if length is too different between texts.
 
-    :param case: The opinion cluster for the case
-    :param file_characters: The opinion content characters
-    :param cl_characters: The CL opinion content characters
-    :return: Whether the content is too different in length
+    Args:
+        case: The opinion cluster for the case
+        file_characters: The opinion content characters
+        cl_characters: The CL opinion content characters
+
+    Returns:
+        Whether the content is too different in length
     """
     if len(cl_characters) == 0:
         logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
@@ -983,7 +1031,7 @@ def content_too_different(
     cl_characters: str,
     docket: str,
 ) -> bool:
-    """Is the content too different
+    """Is the content too different.
 
     Check the percentage overlap of two blocks of text
 
@@ -997,13 +1045,15 @@ def content_too_different(
     Require a very close match - with name overlap and
     docket number for very small cases.
 
-    :param case: Opinion cluster for case
-    :param file_characters: The opinion content characters
-    :param cl_characters: The CL opinion content characters
-    :param docket: The docket number from file/source to compare
-    :return: Whether the opinion content is too dissimilar
-    """
+    Args:
+        case: Opinion cluster for case
+        file_characters: The opinion content characters
+        cl_characters: The CL opinion content characters
+        docket: The docket number from file/source to compare
 
+    Returns:
+        Whether the opinion content is too dissimilar
+    """
     if len(file_characters) > 10000:
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)
         if cosine_sim > 0.97:
@@ -1032,18 +1082,20 @@ def content_too_different(
 def case_names_dont_overlap(
     case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
-    """Case names not overlap
+    """Case names not overlap.
 
     Check if the case names have quality overlapping case name words.
     Excludes 'bad words' and other common words.
 
-    :param case: The case opinion cluster
-    :param case_name_full: The case name full from file/source to compare
-    :param case_name_abbreviation: The case name abbreviation from file/source
-    to compare
-    :return: Do the case names share quality overlapping words
-    """
+    Args:
+        case: The case opinion cluster
+        case_name_full: The case name full from file/source to compare
+        case_name_abbreviation: The case name abbreviation from file/source
+            to compare
 
+    Returns:
+        Do the case names share quality overlapping words
+    """
     file_case = f"{case_name_full} {case_name_abbreviation}"
     overlap = winnow_case_name(case.case_name) & winnow_case_name(file_case)
 
@@ -1055,17 +1107,19 @@ def case_names_dont_overlap(
 def cosine_similarity_too_different(
     case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
-    """Cosine similarity comparison between case names
+    """Cosine similarity comparison between case names.
 
     Checks the cosine similarity between a case in CL and file/source data
 
-    :param case: The case opinion cluster
-    :param case_name_full: The case name full from file/source to compare
-    :param case_name_abbreviation: The case name abbreviation from file/source
-    to compare
-    :return: Is the cosine similarity too different
-    """
+    Args:
+        case: The case opinion cluster
+        case_name_full: The case name full from file/source to compare
+        case_name_abbreviation: The case name abbreviation from file/source
+            to compare
 
+    Returns:
+        Is the cosine similarity too different
+    """
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
         # Lowercased: scrapers can store names in capitals
@@ -1083,18 +1137,20 @@ def cosine_similarity_too_different(
 def has_too_similar_citation(
     case: OpinionCluster, citation: FullCaseCitation
 ) -> bool:
-    """Has a citation associated with cluster in same volume
+    """Has a citation associated with cluster in same volume.
 
     If you make it this far - we should check if this small case has
     an identical volume reporter citation attached to it already.
     I think this may help us with the wilder v. state issue of having
     four identical opinions only differentiated by page number
 
-    :param case: The case opinion cluster
-    :param citation: The citation of a potential matching
-    :return: Whether the citation matches to the reporter and volume.
-    """
+    Args:
+        case: The case opinion cluster
+        citation: The citation of a potential matching
 
+    Returns:
+        Whether the citation matches to the reporter and volume.
+    """
     return (
         Citation.objects.filter(
             cluster_id=case.id,
@@ -1115,16 +1171,19 @@ def match_based_text(
     case_name_abbreviation: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
-    """Compare CL text to file content to establish duplicates
+    """Compare CL text to file content to establish duplicates.
 
-    :param file_characters: stripped characters to compare from file/source
-    :param possible_clusters: Candidate clusters to compare against; the
-        first one that passes every check is returned
-    :param docket_number: The docket number
-    :param case_name_full: The full case name
-    :param case_name_abbreviation: The case name abbreviation
-    :param citation: The citation obtained from file/source to compare
-    :return: OpinionCluster or None
+    Args:
+        file_characters: stripped characters to compare from file/source
+        possible_clusters: Candidate clusters to compare against; the
+            first one that passes every check is returned
+        docket_number: The docket number
+        case_name_full: The full case name
+        case_name_abbreviation: The case name abbreviation
+        citation: The citation obtained from file/source to compare
+
+    Returns:
+        OpinionCluster or None
     """
     # The docket is read by the content check and by callers of the match
     for case in possible_clusters.select_related("docket"):
@@ -1176,12 +1235,14 @@ def match_based_text(
 
 
 def get_court_id(raw_court: str) -> list[str]:
-    """Get court id using courts-db
+    """Get court id using courts-db.
 
-    :param raw_court: Court name
-    return: court id or None
+    Args:
+        raw_court: Court name
+
+    Returns:
+        court id or None
     """
-
     # Replace double spaces,
     court_text = re.sub(" +", " ", raw_court)
     # Replace \n and remove dot at end
@@ -1204,8 +1265,12 @@ def get_court_id(raw_court: str) -> list[str]:
 
 def make_iquery_probing_key(court_id: str) -> str:
     """Small wrapper to centralize iquery probing key semaphore generation.
-    :param court_id: A CL court ID
-    :return: The semaphore iquery probing key
+
+    Args:
+        court_id: A CL court ID
+
+    Returns:
+        The semaphore iquery probing key.
     """
     return f"iquery.probing.enqueued:{court_id}"
 
@@ -1215,14 +1280,16 @@ def compute_binary_probe_jitter(
 ) -> int:
     """Compute the jitter for binary probes.
 
-    :param testing: A boolean flag indicating whether the function is being
-    executed in a testing environment. If True, jitter is disabled and returns 0.
-    :param max_probe: Optional override for the geometric step cap. Defaults to
-    ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range (e.g.
-    the SCOTUS daemon) pass their own cap so the jitter scales accordingly.
-    :return: An integer representing the jitter value for binary probes.
-    """
+    Args:
+        testing: A boolean flag indicating whether the function is being
+            executed in a testing environment. If True, jitter is disabled and returns 0.
+        max_probe: Optional override for the geometric step cap. Defaults to
+            ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range (e.g.
+            the SCOTUS daemon) pass their own cap so the jitter scales accordingly.
 
+    Returns:
+        An integer representing the jitter value for binary probes.
+    """
     if max_probe is None:
         max_probe = cast(int, settings.IQUERY_MAX_PROBE)
     # The jitter will be a random value between 1 and half of max_probe.
@@ -1245,16 +1312,18 @@ def compute_next_binary_probe(
     ensure that probing values are not the same as in the previous iteration,
     increasing the chances of getting a hit.
 
-    :param highest_known_pacer_case_id: The final PACER case ID.
-    :param iteration: The current probe iteration number.
-    :param jitter: The jitter value to apply.
-    :param max_probe: Optional override for the geometric step cap. Defaults
-    to ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range
-    (e.g. the SCOTUS daemon) pass their own cap.
-    :return: The updated probe_iteration and the PACER case ID to lookup and
-    the probe offset + jitter computed.
-    """
+    Args:
+        highest_known_pacer_case_id: The final PACER case ID.
+        iteration: The current probe iteration number.
+        jitter: The jitter value to apply.
+        max_probe: Optional override for the geometric step cap. Defaults
+            to ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range
+            (e.g. the SCOTUS daemon) pass their own cap.
 
+    Returns:
+        The updated probe_iteration and the PACER case ID to lookup and
+        the probe offset + jitter computed.
+    """
     # Avoid applying jitter on the first iteration to speed up
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
@@ -1273,14 +1342,16 @@ def compute_blocked_court_wait(
     court_blocked_attempts: int,
     base_wait: int | None = None,
 ) -> tuple[int, int]:
-    """Compute the wait time for the current attempt and the total accumulated
-    seconds from previous attempts.
+    """Compute the wait time for the current attempt and the total accumulated seconds from previous attempts.
 
-    :param court_blocked_attempts: The current number of blocked attempts.
-    :param base_wait: Base wait in seconds for the exponential backoff.
-        Defaults to ``settings.IQUERY_COURT_BLOCKED_WAIT``.
-    :return: A tuple containing the wait time for the current attempt and the
-    total accumulated seconds.
+    Args:
+        court_blocked_attempts: The current number of blocked attempts.
+        base_wait: Base wait in seconds for the exponential backoff.
+            Defaults to ``settings.IQUERY_COURT_BLOCKED_WAIT``.
+
+    Returns:
+        A tuple containing the wait time for the current attempt and the
+        total accumulated seconds.
     """
     if base_wait is None:
         base_wait = settings.IQUERY_COURT_BLOCKED_WAIT  # type: ignore[assignment]
@@ -1328,10 +1399,13 @@ class CycleChecker:
         self.prev_iteration_courts: set = set()
 
     def check_if_cycled(self, court_id: str) -> bool:
-        """Check if the cycle repeated
+        """Check if the cycle repeated.
 
-        :param court_id: The ID of the court
-        :return True if the cycle started over, else False
+        Args:
+            court_id: The ID of the court
+
+        Returns:
+            True if the cycle started over, else False
         """
         self.court_counts[court_id] += 1
 
@@ -1355,11 +1429,13 @@ class CycleChecker:
 def is_long_appellate_document_number(
     document_number: str | int | None,
 ) -> bool:
-    """Check whether this docket_number is longer than 9 digits, indicating that it
-    comes from a court that doesn't use regular numbering.
+    """Check whether this docket_number is longer than 9 digits, indicating that it comes from a court that doesn't use regular numbering.
 
-    :param document_number: The document number
-    :return: A boolean indicating whether this is a long appellate document number.
+    Args:
+        document_number: The document number
+
+    Returns:
+        A boolean indicating whether this is a long appellate document number.
     """
     return isinstance(document_number, str) and len(document_number) >= 9
 
@@ -1367,7 +1443,8 @@ def is_long_appellate_document_number(
 def get_iquery_pacer_courts_to_scrape() -> list[str]:
     """Retrieve all district and bankruptcy PACER courts for the iquery scraper.
 
-    :return: A list of Court IDs.
+    Returns:
+        A list of Court IDs.
     """
     return list(
         Court.federal_courts.district_or_bankruptcy_pacer_courts()
@@ -1381,14 +1458,16 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
 def create_docket_entry_sequence_numbers(
     docket_entries: Sequence[Mapping[str, Any]], date_field: str = "date"
 ) -> list[str]:
-    """Calculates the sequence numbers for a list of docket entries to allow
-    consistent matching and merging.
+    """Calculates the sequence numbers for a list of docket entries to allow consistent matching and merging.
 
-    :param docket_entries: A list of dictionaries, which must all include a
-    "date" field with the `date` type.
-    :param date_field: The date field to use for calculating the sequence numbers.
-    :return: A list of sequence numbers corresponding to the list of docket
-    entries.
+    Args:
+        docket_entries: A list of dictionaries, which must all include a
+            "date" field with the `date` type.
+        date_field: The date field to use for calculating the sequence numbers.
+
+    Returns:
+        A list of sequence numbers corresponding to the list of docket
+        entries.
     """
     dates = [d[date_field].isoformat() for d in docket_entries]
     date_counts: dict[str, int] = {}
@@ -1404,8 +1483,12 @@ def create_docket_entry_sequence_numbers(
 def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
     """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
 
-    :param js_court_id: The court ID extracted from Juriscraper.
-    :return: The corresponding Court ID or None if invalid."""
+    Args:
+        js_court_id: The court ID extracted from Juriscraper.
+
+    Returns:
+        The corresponding Court ID or None if invalid.
+    """
     if js_court_id == CourtID.SUPREME_COURT.value:
         return "tex"
     if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
@@ -1421,11 +1504,14 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
 def texas_originating_court_to_court_id(
     court_data: TexasOriginatingCourt,
 ) -> str | None:
-    """Attempts to translate Juriscraper Texas originating court data to a
-    CourtListener Court ID.
+    """Attempts to translate Juriscraper Texas originating court data to a CourtListener Court ID.
 
-    :param court_data: The originating court data from Juriscraper.
-    :return: The matching Court ID or None if no court could be found."""
+    Args:
+        court_data: The originating court data from Juriscraper.
+
+    Returns:
+        The matching Court ID or None if no court could be found.
+    """
     court_type = court_data["court_type"]
     match court_type:
         case CourtType.APPELLATE.value:
