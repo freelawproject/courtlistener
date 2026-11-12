@@ -50,6 +50,8 @@ docstring-code-format = true
 "**/test_*.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/tests.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/tests_*.py" = ["D100", "D101", "D102", "D103", "D107"]
+"**/bench/**" = ["D100", "D101", "D102", "D103", "D107"]
+"**/bench_*.py" = ["D100", "D101", "D102", "D103", "D107"]
 "**/migrations/**" = ["D"]
 # Legacy undocumented code exempt from docstring rules; remove a file once it is documented.
 ".github/scripts/frontend_checks.py" = ["D101", "D103", "D205", "D301"]

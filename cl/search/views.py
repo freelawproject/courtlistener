@@ -30,10 +30,12 @@ from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
     merge_form_with_courts,
+    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
+from cl.search.es_docket_sources import recap_search_courts
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
@@ -162,7 +164,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_es_search(request.GET.copy()))
+            render_dict.update(
+                do_es_search(
+                    request.GET.copy(),
+                    include_scotus=scotus_frontend_search_enabled(request),
+                )
+            )
             render_dict.update(
                 {
                     "alert_form": alert_form,
@@ -287,13 +294,17 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
 
     if search_type == SEARCH_TYPES.RECAP:
+        include_scotus = scotus_frontend_search_enabled(request)
         search_results = do_es_search(
-            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
+            request.GET.copy(),
+            courts=recap_search_courts(include_scotus=include_scotus),
+            include_scotus=include_scotus,
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
+            include_scotus=scotus_frontend_search_enabled(request),
         )
 
     render_dict.update(search_results)
@@ -341,7 +352,9 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
         return TemplateResponse(request, "advanced.html", render_dict)
 
     if search_type == SEARCH_TYPES.RECAP:
-        courts_in_use = Court.federal_courts.all_pacer_courts()
+        courts_in_use = recap_search_courts(
+            include_scotus=scotus_frontend_search_enabled(request)
+        )
 
     search_form = SearchForm({"type": search_type}, courts=courts)
     courts, court_count_human, court_count = merge_form_with_courts(

@@ -79,6 +79,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
+    TaggableType,
 )
 from cl.search.tasks import index_docket_parties_in_es
 
@@ -1970,7 +1971,7 @@ def add_claim_history_entry(new_history, claim):
 
 
 @transaction.atomic
-def add_claims_to_docket(d, new_claims, tag_names=None):
+def add_claims_to_docket(d, new_claims, tag_names: list[str] | None = None):
     """Add claims data to the docket.
 
     Args:
@@ -2061,7 +2062,7 @@ def get_data_from_appellate_att_report(
 
 
 async def add_tags_to_objs(
-    tag_names: list[str] | None, objs: Any
+    tag_names: list[str] | None, objs: Iterable[TaggableType]
 ) -> list[Tag]:
     """Add tags by name to objects.
 
@@ -2088,7 +2089,12 @@ async def add_tags_to_objs(
 
 @transaction.atomic
 def merge_pacer_docket_into_cl_docket(
-    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None
+    d,
+    pacer_case_id,
+    docket_data,
+    report,
+    appellate=False,
+    tag_names: list[str] | None = None,
 ):
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was

@@ -21,6 +21,9 @@ module.exports = {
       /*  SVG files that could contain Tailwind CSS classes. */
       '../static-global/svg/*.svg',
       '../static-global/svg/**/*.svg',
+
+      /*  Form files. */
+      '../../**/forms_v2.py',
     ],
   },
   theme: {
@@ -117,6 +120,9 @@ module.exports = {
       },
       maxWidth: {
         content: '948px',
+      },
+      borderRadius: {
+        'lg-10': '10px',
       },
     },
   },

@@ -50,7 +50,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     o_type_index_map,
 )
-from cl.search.es_docket_sources import SOURCE_BY_MODEL, SourceDocument
+from cl.search.es_docket_sources import SourceDocument, es_uid
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -1262,7 +1262,7 @@ class ESRECAPBaseDocument(DSLDocument):
         search_analyzer="search_analyzer",
     )
     attachment_number = fields.IntegerField(attr="attachment_number")
-    is_available = fields.BooleanField(attr="is_available")
+    is_available = fields.BooleanField()
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
     absolute_url = fields.KeywordField(index=False)
@@ -1356,6 +1356,13 @@ class ESRECAPDocument(
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
             return instance.filepath_local.name
+
+    def prepare_is_available(self, instance: SourceDocument) -> bool | None:
+        """Index whether the document's file is available."""
+        # SCOTUS maps filepath_local changes to is_available. Without a
+        # prepare method, partial updates would copy the filepath_local
+        # value into is_available.
+        return instance.is_available
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
@@ -1475,17 +1482,11 @@ class ESRECAPDocument(
 
     def prepare_uid(self, instance: SourceDocument) -> str | None:
         """Return the pk prefixed with the source's uid_namespace, e.g. "scotus_123"; empty for sources without one, like RECAP."""
-        source = SOURCE_BY_MODEL.get(type(instance))
-        if not source or not source.uid_namespace:
-            return None
-        return f"{source.uid_namespace}_{instance.pk}"
+        return es_uid(type(instance), instance.pk)
 
     def prepare_docket_entry_uid(self, instance: SourceDocument) -> str | None:
         """Return the docket entry pk prefixed with the source's uid_namespace, e.g. "scotus_321"; empty for sources without one, like RECAP."""
-        source = SOURCE_BY_MODEL.get(type(instance))
-        if not source or not source.uid_namespace:
-            return None
-        return f"{source.uid_namespace}_{instance.docket_entry_id}"
+        return es_uid(type(instance), instance.docket_entry_id)
 
 
 class DocketBaseDocument(DSLDocument):

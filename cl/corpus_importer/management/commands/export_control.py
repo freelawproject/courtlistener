@@ -52,7 +52,7 @@ def do_bulk_export(options):
         )
 
 
-def get_data(options, row_transform, tags):
+def get_data(options, row_transform, tags: list[str]):
     """Download dockets from a csv, then download claims register data from those dockets.
 
     Args:

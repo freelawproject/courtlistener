@@ -1050,7 +1050,7 @@ def check_alert_limits(
 
 
 def get_alert_estimation_count(
-    query_data: QueryDict, day_count: int
+    query_data: QueryDict, day_count: int, include_scotus: bool = False
 ) -> tuple[int, int] | None:
     """Estimate the number of alert hits a query would have produced over the last ``day_count`` days.
 
@@ -1061,6 +1061,9 @@ def get_alert_estimation_count(
     Args:
         query_data: A QueryDict holding the alert's search query parameters.
         day_count: The number of days to average the estimation across.
+        include_scotus: Whether RECAP estimates may count SCOTUS content.
+            Off by default; only the create-alert modal on the search
+            frontend turns it on, with scotus_frontend_search_enabled.
 
     Returns:
         A two-tuple ``(total_hits, case_only_hits)`` where
@@ -1079,6 +1082,7 @@ def get_alert_estimation_count(
         return None
 
     cd = search_form.cleaned_data
+    cd["include_scotus"] = include_scotus
     total_case_only_query_results = 0
     try:
         match cd["type"]:

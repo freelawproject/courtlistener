@@ -18,7 +18,7 @@ from cl.recap.tasks import process_recap_attachment
 
 
 def get_docket_and_claims(
-    docket_number, court, case_name, cookies_data, tags, q
+    docket_number, court, case_name, cookies_data, tags: list[str], q
 ):
     """Get the docket report, claims history report, and save it all to the DB."""
     chain(

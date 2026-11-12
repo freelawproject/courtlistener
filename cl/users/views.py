@@ -62,7 +62,8 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.es_docket_sources import es_uid
+from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -205,29 +206,41 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         # Carried alongside the form so the template can build a link/
         # icon for the noted object.
         note_forms[bucket].append((NoteForm(instance=note), target))
+    search_url = reverse("show_results")
     docket_search_url = (
-        "/?type=r&q=xxx AND docket_id:("
+        f"{search_url}?type=r&q=xxx AND docket_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=xxx AND id:("
+        f"{search_url}?type=oa&q=xxx AND id:("
         + " OR ".join(
             str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
         + ")"
     )
-    recap_search_url = (
-        "/?type=r&q=xxx AND id:("
-        + " OR ".join(
-            str(target.pk)
-            for _, target in note_forms["Documents"]
-            if isinstance(target, RECAPDocument)
-        )
-        + ")"
-    )
+    # The ES id field holds RECAP pks only; other sources' documents are
+    # matched by their uid (e.g. "scotus_123").
+    ids: list[str] = []
+    uids: list[str] = []
+    for _, d in note_forms["Documents"]:
+        if uid := es_uid(type(d), d.pk):
+            uids.append(uid)
+        else:
+            ids.append(str(d.pk))
+    id_query = f"id:({' OR '.join(ids)})"
+    uid_query = f"uid:({' OR '.join(uids)})"
+    # ES rejects an empty "id:()" or "uid:()", so each is only added when
+    # it has values.
+    if ids and uids:
+        document_query = f"({id_query} OR {uid_query})"
+    elif uids:
+        document_query = uid_query
+    else:
+        document_query = id_query
+    recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
     opinion_search_url = (
-        "/?q=xxx AND cluster_id:("
+        f"{search_url}?q=xxx AND cluster_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )

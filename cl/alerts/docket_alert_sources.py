@@ -4,7 +4,6 @@ from datetime import datetime
 
 from django.db.models import Prefetch, QuerySet
 
-from cl.lib.models import AbstractPDF
 from cl.search.models import (
     Docket,
     DocketEntry,
@@ -36,7 +35,7 @@ class DocketAlertSource:
 
 
 def _with_email_relations(
-    qs: QuerySet, documents_attr: str, document_model: type[AbstractPDF]
+    qs: QuerySet, documents_attr: str, documents: QuerySet
 ) -> QuerySet:
     """Preload what a docket alert email renders -- each entry's docket (with its court, which DocketEntry.datetime_filed reads for the timezone) and documents, minus their potentially huge plain_text -- in a fixed number of queries, however many entries there are. Re-rendering the evaluated entries, as make_alert_messages does per recipient, adds no queries.
 
@@ -44,13 +43,11 @@ def _with_email_relations(
         qs: The entries queryset.
         documents_attr: The entry model's reverse accessor to its
             documents, e.g. "recap_documents".
-        document_model: The document model behind `documents_attr`.
+        documents: The documents to load under each entry, e.g. all of
+            them, or all but the ones the email shouldn't list.
     """
     return qs.select_related("docket__court").prefetch_related(
-        Prefetch(
-            documents_attr,
-            queryset=document_model.objects.defer("plain_text"),
-        )
+        Prefetch(documents_attr, queryset=documents.defer("plain_text"))
     )
 
 
@@ -64,7 +61,7 @@ def _recap_entries_by_pk(des_pks: list[int]) -> QuerySet:
             "recap_sequence_number", "entry_number"
         ),
         "recap_documents",
-        RECAPDocument,
+        RECAPDocument.objects.all(),
     )
 
 
@@ -75,7 +72,7 @@ def _recap_entries_since(docket: Docket, since: datetime) -> QuerySet:
             date_created__gte=since, docket=docket
         ).order_by("recap_sequence_number", "entry_number"),
         "recap_documents",
-        RECAPDocument,
+        RECAPDocument.objects.all(),
     )
 
 
@@ -90,6 +87,11 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
 # SCOTUS
 
 
+def _scotus_email_documents() -> QuerySet[SCOTUSDocument]:
+    """Return the SCOTUS documents an alert email lists under their entry: all but placeholders, so entries without attachments render as procedural entries with no documents."""
+    return SCOTUSDocument.objects.exclude(url="")
+
+
 def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
     """Return the SCOTUSDocketEntry rows matching the given pks."""
     return _with_email_relations(
@@ -97,7 +99,7 @@ def _scotus_entries_by_pk(des_pks: list[int]) -> QuerySet:
             "sequence_number"
         ),
         "scotus_documents",
-        SCOTUSDocument,
+        _scotus_email_documents(),
     )
 
 
@@ -108,7 +110,7 @@ def _scotus_entries_since(docket: Docket, since: datetime) -> QuerySet:
             date_created__gte=since, docket=docket
         ).order_by("sequence_number"),
         "scotus_documents",
-        SCOTUSDocument,
+        _scotus_email_documents(),
     )
 
 

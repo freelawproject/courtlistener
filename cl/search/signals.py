@@ -51,6 +51,9 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
 )
 from cl.search.state.shared import AbstractStateDocument
 from cl.settings import DEVELOPMENT, TESTING
@@ -355,9 +358,15 @@ docket_field_mapping: DocumentModelMapping = {
                 "trustee_str": ["trustee_str"],
             }
         },
+        ScotusDocketMetadata: {
+            "scotus_metadata": {
+                "capital_case": ["capital_case"],
+            }
+        },
     },
     "reverse-delete": {
         BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
+        ScotusDocketMetadata: {"docket": {"all": ["capital_case"]}},
     },
 }
 
@@ -419,6 +428,65 @@ recap_document_field_mapping: DocumentModelMapping = {
         },
     },
     "delete": {RECAPDocument: {}},
+    "m2m": {},
+    "reverse": {},
+    "reverse-delete": {},
+}
+
+scotus_document_field_mapping: DocumentModelMapping = {
+    "save": {
+        SCOTUSDocument: {
+            "self": {
+                "description": ["short_description"],
+                "document_number": ["document_number", "absolute_url"],
+                "attachment_number": ["attachment_number", "absolute_url"],
+                "plain_text": ["plain_text"],
+                "page_count": ["page_count"],
+                "filepath_local": ["filepath_local", "is_available"],
+                "docket_entry_id": ["prepare"],
+            },
+        },
+        SCOTUSDocketEntry: {
+            "docket_entry": {
+                "description": ["description"],
+                "entry_number": ["entry_number"],
+                "date_filed": ["entry_date_filed"],
+            }
+        },
+        Docket: {
+            "docket_entry__docket": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+            }
+        },
+        Person: {
+            "assigned_to": {
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
+            },
+        },
+    },
+    "delete": {SCOTUSDocument: {}},
     "m2m": {},
     "reverse": {},
     "reverse-delete": {},
@@ -572,6 +640,9 @@ _position_signal_processor = ESSignalProcessor(
 if not settings.ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED:
     _recap_document_signal_processor = ESSignalProcessor(
         RECAPDocument, ESRECAPDocument, recap_document_field_mapping
+    )
+    _scotus_document_signal_processor = ESSignalProcessor(
+        SCOTUSDocument, ESRECAPDocument, scotus_document_field_mapping
     )
 if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(

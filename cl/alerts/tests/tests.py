@@ -1109,6 +1109,35 @@ class DocketAlertSourceTest(TestCase):
             with self.subTest(lookup=lookup_name):
                 self.assertEqual([de.sequence_number for de in qs], expected)
 
+    def test_scotus_source_lookups_leave_out_placeholders(self) -> None:
+        """Do both SCOTUS lookups leave placeholder documents out, so the alert email renders entries without attachments as procedural entries instead of as a document row?"""
+        before = now()
+        placeholder_entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        SCOTUSDocumentFactory(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+        attachment = SCOTUSDocumentFactory(docket_entry=attachment_entry)
+        expected = {
+            placeholder_entry.pk: [],
+            attachment_entry.pk: [attachment],
+        }
+        lookups = {
+            "entries_by_pk": SCOTUS_ALERT_SOURCE.entries_by_pk(list(expected)),
+            "entries_since": SCOTUS_ALERT_SOURCE.entries_since(
+                self.scotus_docket, before
+            ),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual(
+                    {de.pk: list(de.scotus_documents.all()) for de in qs},
+                    expected,
+                )
+
     def test_docket_get_alert_source_dispatches_by_court_id(self) -> None:
         """Does Docket.get_alert_source() route to the right registry entry?"""
         self.assertIs(self.recap_docket.get_alert_source(), RECAP_ALERT_SOURCE)

@@ -143,6 +143,20 @@ def random_int(a: int, b: int) -> int:
 
 
 @register.filter
+def docket_entry_fragment(doc: AttrDict) -> str:
+    """Return the URL fragment of a RECAP search document's entry on the docket page, e.g. "#entry-7", or "". Use it to link documents without a page of their own to their entry.
+
+    :param doc: The document's ES content, as get_es_doc_content returns it.
+    :return: The fragment, including its "#", or "".
+    """
+    # Imported here because elasticsearch_utils imports models that import
+    # this module, which would make a top-level import circular.
+    from cl.lib.elasticsearch_utils import get_docket_entry_fragment
+
+    return get_docket_entry_fragment(doc)
+
+
+@register.filter
 def get_es_doc_content(
     mapping: AttrDict | dict, scheduled_alert: bool = False
 ) -> AttrDict | dict | str:
@@ -503,8 +517,17 @@ def get_request_value(request_get, field_name):
 
 @register.simple_tag
 def render_field_with_id(field, field_id):
-    """Render a form field with a custom ID attribute."""
-    return field.as_widget(attrs={"id": field_id})
+    """Render a form field with a custom ID attribute.
+
+    Django marks a field with errors ``aria-invalid`` on its own, but its
+    default ``aria-describedby`` points at ``<auto_id>_error``, so it is
+    overridden here to match the ``<field_id>-error`` element that
+    c-form.input renders.
+    """
+    attrs = {"id": field_id}
+    if field.errors:
+        attrs["aria-describedby"] = f"{field_id}-error"
+    return field.as_widget(attrs=attrs)
 
 
 @register.simple_tag

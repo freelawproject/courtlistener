@@ -47,6 +47,7 @@ from reporters_db import (
     VARIATIONS_ONLY,
 )
 from seal_rookery.search import ImageSizes, seal
+from waffle import flag_is_active
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -77,7 +78,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -102,6 +103,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    separate_syllabus,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -368,7 +370,10 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    if await sync_to_async(flag_is_active)(request, "use_new_design"):
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
@@ -410,7 +415,11 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
-            entry.documents = list(source.documents_for_entry(entry))
+            entry.documents = [
+                document
+                for document in source.documents_for_entry(entry)
+                if source.document_is_listed(document)
+            ]
             for document in entry.documents:
                 attach_display_fields(source, document)
             page_documents.extend(entry.documents)
@@ -627,7 +636,11 @@ def download_docket_entries_csv(
 ) -> HttpResponse:
     """Download csv file containing list of DocketEntry for specific Docket."""
     docket, _ = async_to_sync(core_docket_data)(request, docket_id)
-    de_list = async_to_sync(fetch_docket_entries)(docket)
+    # Order explicitly from the source config: SCOTUSDocketEntry's
+    # Meta.ordering is descending, while DocketEntry's is ascending.
+    de_list = async_to_sync(fetch_docket_entries)(docket).order_by(
+        *docket.get_entry_source().order_by_asc
+    )
     court_id = docket.court_id
     case_name = docket.slug
 
@@ -635,21 +648,7 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    try:
-        csv_content = (
-            generate_docket_entries_csv_data(de_list) if de_list else b""
-        )
-    except (NotImplementedError, AttributeError):
-        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
-        # Only return a handled 501 for those. A RECAP docket hitting
-        # this branch means a real bug in the CSV path, and that should
-        # still raise a error 500.
-        if docket.get_entry_source() is docket_entry_sources.RECAP:
-            raise
-        # A handled 501 shows an error message instead of crashing: the
-        # generic one in legacy's export-csv.js, the status-keyed one in the
-        # v2 download composable.
-        return HttpResponse(status=501)
+    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -1025,6 +1024,7 @@ async def setup_opinion_context(
         "private": cluster.blocked,
         "sponsored": sponsored,
         "citations": sorted(cluster.citations.all(), key=sort_cites),
+        "separate_syllabus": separate_syllabus(cluster),
     }
 
     download_context = await get_downloads_context(cluster)

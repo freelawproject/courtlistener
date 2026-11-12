@@ -67,6 +67,34 @@ class ProcessingError:
     )
 
 
+class CourtRefused(Exception):
+    """A court answered a document download with 403.
+
+    Courts block our requests in bursts, so a refusal is transient: the same
+    URL usually downloads once the block lifts. Download tasks retry on this
+    exception with a long backoff instead of giving up on the document.
+
+    Attributes:
+        model_name: The document model that was being downloaded.
+        pk: The primary key of the document.
+        url: The URL that was refused. This is the endpoint that turned us
+            away, which for gated courts may be the challenge endpoint rather
+            than the document itself.
+    """
+
+    def __init__(self, model_name: str, pk: int, url: str) -> None:
+        """Record which document was refused, and at which URL."""
+        # All constructor arguments go to the base class so the exception
+        # pickles, which Celery needs to report a failed task.
+        super().__init__(model_name, pk, url)
+        self.model_name = model_name
+        self.pk = pk
+        self.url = url
+
+    def __str__(self) -> str:
+        return f"Court refused {self.model_name} {self.pk} at {self.url} (403)"
+
+
 @document_model
 class AbstractStateDocument(AbstractPDF):
     """Abstract state document.
@@ -278,6 +306,11 @@ class AbstractStateDocument(AbstractPDF):
             pk: The primary key of the document to download.
             extract: Whether to extract the document after downloading.
             queue: The queue to use for the extraction task.
+
+        Raises:
+            CourtRefused: When the court answers with 403, since that is a
+                transient block the calling task should retry later rather
+                than a failure of this document.
         """
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
@@ -306,9 +339,12 @@ class AbstractStateDocument(AbstractPDF):
             return None
 
         # A URL that can't be built is a per-document problem, so it must
-        # not take down the task that's working through a batch.
+        # not take down the task that's working through a batch. A refusal
+        # while building it is the court's doing, though, and is retried.
         try:
             url = document.build_url()
+        except CourtRefused:
+            raise
         except Exception:
             logger.exception("Failed to build URL for %s %s", cls.__name__, pk)
             return None
@@ -330,22 +366,17 @@ class AbstractStateDocument(AbstractPDF):
                     document, url, result, extract, queue
                 )
         except requests.HTTPError as exc:
-            # A refusal gets its own message, without a traceback: a 5xx is
-            # the court having a bad day, a 403 is the court turning us away.
+            # A 5xx is the court having a bad day and is logged here; a 403
+            # is the court turning us away, and is raised for the task to
+            # retry once the block lifts.
             if exc.response.status_code == HTTPStatus.FORBIDDEN:
-                logger.error(
-                    "Court refused %s %s at %s (403)",
-                    cls.__name__,
-                    pk,
-                    exc.request.url,
-                )
-            else:
-                logger.exception(
-                    "Failed to fetch %s %s from %s",
-                    cls.__name__,
-                    pk,
-                    exc.request.url,
-                )
+                raise CourtRefused(cls.__name__, pk, str(exc.request.url))
+            logger.exception(
+                "Failed to fetch %s %s from %s",
+                cls.__name__,
+                pk,
+                exc.request.url,
+            )
             return None
 
     @classmethod

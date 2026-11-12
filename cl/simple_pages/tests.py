@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -419,6 +420,11 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     # (reverse_param, expected WIP template)
     WIP_PAGES: list[tuple[dict[str, Any], str]] = []
 
+    # WIP pages that redirect anonymous visitors to sign in
+    AUTHENTICATED_WIP_PAGES: list[tuple[dict[str, Any], str]] = [
+        ({"viewname": "view_api"}, "wip_profile/api.html"),
+    ]
+
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
         """Returns the legacy template a v2 one replaces, None otherwise."""
@@ -444,6 +450,18 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             except TemplateDoesNotExist:
                 continue
         return None
+
+    def _iter_wip_pages(self) -> Iterator[tuple[dict[str, Any], str]]:
+        """Yields every registered WIP page, anonymous ones first.
+
+        Logs self.client in before yielding AUTHENTICATED_WIP_PAGES, so
+        callers must request each page with self.client as they iterate.
+        """
+        yield from self.WIP_PAGES
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        yield from self.AUTHENTICATED_WIP_PAGES
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -474,7 +492,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     @override_flag(WIP_PROPS["flag"], active=True)
     def test_wip_pages(self) -> None:
         """Do all registered WIP pages load with both redesign flags?"""
-        for reverse_param, wip_template in self.WIP_PAGES:
+        for reverse_param, wip_template in self._iter_wip_pages():
             with self.subTest(
                 "Checking WIP page", reverse_params=reverse_param
             ):
@@ -489,7 +507,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         Each one falls back to its v2_ template, then its legacy one, or is
         a 404 when the page has neither.
         """
-        for reverse_param, wip_template in self.WIP_PAGES:
+        for reverse_param, wip_template in self._iter_wip_pages():
             with self.subTest(
                 "Checking WIP page", reverse_params=reverse_param
             ):

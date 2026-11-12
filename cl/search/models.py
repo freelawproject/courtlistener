@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
@@ -280,6 +281,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
 )
 class Docket(AbstractDateTimeModel, DocketSources):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries, and link them together."""
+
+    # Not a model field - merge_scotus_docket sets this transiently, right
+    # before a Docket's first save, so the ES signal processor can tell a
+    # real SCOTUS docket from one created only to hold a scraped Opinion.
+    # Declared here only so the type checker knows the attribute exists.
+    _index_in_es: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
@@ -939,9 +946,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         """Return the DocketEntrySource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
         from cl.opinion_page import docket_entry_sources
 
-        return docket_entry_sources.BY_COURT_ID.get(
-            self.court_id, docket_entry_sources.RECAP
-        )
+        return docket_entry_sources.source_for_court_id(self.court_id)
 
     def get_alert_source(self) -> "DocketAlertSource":
         """Return the DocketAlertSource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
@@ -4032,6 +4037,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(fields=["capital_case"])
 
     def __str__(self) -> str:
         return f"SCOTUS metadata for docket {self.docket_id}"
@@ -4271,15 +4277,34 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "entry_number",
+            "description",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         ordering = ["-sequence_number"]
 
+    csv_columns = [
+        "id",
+        "entry_number",
+        "date_filed",
+        "sequence_number",
+        "description",
+    ]
+
 
 @pghistory.track()
 @document_model
-class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
     """Represents an attachment to a SCOTUS docket entry.
+
+    An entry without attachments gets one empty placeholder document (no
+    url), so its metadata can be indexed in ES, which indexes entries
+    through their documents. See is_placeholder.
 
     Attributes:
         docket_entry: The Docket this document is associated with.
@@ -4304,6 +4329,17 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         null=True,
     )
     url = models.URLField(max_length=1000)
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "description",
+            "document_number",
+            "attachment_number",
+            "plain_text",
+            "page_count",
+            "filepath_local",
+        ]
+    )
 
     class Meta:
         indexes = [
@@ -4316,6 +4352,41 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+    csv_columns = [
+        "id",
+        "description",
+        "document_number",
+        "attachment_number",
+        "url",
+        "is_available",
+        "sha1",
+        "page_count",
+        "file_size",
+        "filepath_local",
+        "filepath_ia",
+        "ocr_status",
+    ]
+
+    def _get_readable_ocr_status(self, field: str) -> str:
+        """Return the OCR status label for the CSV export."""
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, field: str) -> str:
+        """Return the file's full storage URL for the CSV export, or an empty string when there's no file."""
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs to be pre-processed before being add to csv.
+
+        returns: dict -- > {attr1: function}
+        """
+        return {
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
@@ -4367,6 +4438,11 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     @property
     def is_available(self) -> bool:
         return bool(self.filepath_local)
+
+    @property
+    def is_placeholder(self) -> bool:
+        """Whether this is the empty document of an entry without attachments. Placeholders have no file to download and no page of their own; to find them in a query, filter on url=""."""
+        return not self.url
 
     @property
     def has_valid_pdf(self) -> bool:

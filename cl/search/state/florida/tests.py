@@ -14,6 +14,7 @@ from cl.search.state.florida.models import (
     AltchaChallengeSolution,
     FloridaDocument,
 )
+from cl.search.state.shared import CourtRefused
 from cl.tests.cases import SimpleTestCase, TestCase
 
 # A real challenge issued by Florida ACIS and the solution the browser
@@ -175,8 +176,8 @@ class DocumentDownloadTest(TestCase):
                     self.document.pk, self.logger.exception.call_args.args
                 )
 
-    def test_download_logs_refusals_distinctly(self) -> None:
-        """Does a 403 from either the challenge endpoint or the document fetch go to the dedicated refusal logger, and nowhere else?"""
+    def test_download_raises_on_refusal(self) -> None:
+        """Does a 403 from either the challenge endpoint or the document fetch raise `CourtRefused`, naming the endpoint that refused us, so the task can retry once the block lifts?"""
         ok_challenge = challenge_response(200, json=CHALLENGE_JSON)
         refused_document = mock.Mock(status_code=403)
         refused_document.request.url = REFUSED_URL
@@ -195,19 +196,20 @@ class DocumentDownloadTest(TestCase):
                 self.pdf_response.raise_for_status.side_effect = fetch_error
                 self.logger.reset_mock()
 
-                result = FloridaDocument.download(self.document.pk)
+                with self.assertRaises(CourtRefused) as ctx:
+                    FloridaDocument.download(self.document.pk)
 
-                self.assertIsNone(result)
-                self.logger.error.assert_called_once()
-                *_, logged_pk, logged_url = self.logger.error.call_args.args
-                self.assertEqual(logged_pk, self.document.pk)
+                self.assertEqual(ctx.exception.pk, self.document.pk)
                 # The endpoint that refused us, not the document's stored URL:
                 # a block on the shared challenge endpoint must be
                 # distinguishable from a block on one document.
                 self.assertTrue(
-                    str(logged_url).startswith(refused_url),
-                    f"{logged_url!r} does not start with {refused_url!r}",
+                    str(ctx.exception.url).startswith(refused_url),
+                    f"{ctx.exception.url!r} does not start with {refused_url!r}",
                 )
+                # A refusal is retried by the task, so it is not an error
+                # until the retries run out.
+                self.logger.error.assert_not_called()
                 self.logger.exception.assert_not_called()
                 self.document.refresh_from_db()
                 self.assertFalse(self.document.filepath_local)

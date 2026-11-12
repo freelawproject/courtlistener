@@ -93,6 +93,13 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
+from cl.search.es_docket_sources import (
+    ALL_ES_SOURCES,
+    ES_SOURCE_BY_NAME,
+    RECAP_ES_SOURCE,
+    SOURCE_BY_MODEL,
+    skips_percolation,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
@@ -228,6 +235,9 @@ def es_save_document(
         # Abort task the instance is not found in DB.
         self.request.chain = None
         return None
+    skip_percolator_request = skip_percolator_request or skips_percolation(
+        instance
+    )
     match app_label:
         case "people_db.Position":
             parent_id = getattr(instance.person, "pk", None)
@@ -251,7 +261,7 @@ def es_save_document(
                 self.request.chain = None
                 return None
             doc_id = instance.pk
-        case "search.RECAPDocument":
+        case _ if model in SOURCE_BY_MODEL:
             parent_id = getattr(instance.docket_entry.docket, "pk", None)
             if not parent_id:
                 self.request.chain = None
@@ -264,7 +274,10 @@ def es_save_document(
                 DocketDocument(meta={"id": parent_id}, **doc).save(
                     skip_empty=False, return_doc_meta=True
                 )
-            doc_id = ES_CHILD_ID(instance.pk).RECAP
+            doc_id = getattr(
+                ES_CHILD_ID(instance.pk),
+                SOURCE_BY_MODEL[type(instance)].child_id_property,
+            )
             es_args["_routing"] = parent_id
         case "search.Opinion":
             parent_id = getattr(instance.cluster, "pk", None)
@@ -545,6 +558,9 @@ def update_es_document(
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
         return
+    skip_percolator_request = skip_percolator_request or skips_percolation(
+        main_model_instance
+    )
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:
@@ -639,8 +655,11 @@ def get_es_doc_id_and_parent_id(
     if es_document is PositionDocument:
         doc_id = ES_CHILD_ID(instance.pk).POSITION
         parent_id = getattr(instance, "person_id", None)
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
+    elif es_document is ESRECAPDocument and type(instance) in SOURCE_BY_MODEL:
+        doc_id = getattr(
+            ES_CHILD_ID(instance.pk),
+            SOURCE_BY_MODEL[type(instance)].child_id_property,
+        )
         parent_id = getattr(instance.docket_entry, "docket_id", None)
     elif es_document is OpinionDocument:
         doc_id = ES_CHILD_ID(instance.pk).OPINION
@@ -979,7 +998,14 @@ def bulk_indexing_generator(
         Yields ES child documents for bulk indexing.
     """
     parent_id_mappings = {
-        "RECAP": lambda document: document.docket_entry.docket_id,
+        # Every docket source's documents reach their Docket through
+        # docket_entry, the same assumption es_save_document makes.
+        **{
+            source.child_id_property: lambda document: (
+                document.docket_entry.docket_id
+            )
+            for source in ALL_ES_SOURCES
+        },
         "OPINION": lambda document: document.cluster_id,
     }
     for doc in docs_query_set.iterator():
@@ -1091,6 +1117,7 @@ def index_parent_and_child_docs(
     instance_ids: list[int],
     search_type: str,
     use_streaming_bulk: bool = False,
+    source_name: str = RECAP_ES_SOURCE.name,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
@@ -1103,7 +1130,11 @@ def index_parent_and_child_docs(
             Or force the use of streaming_bulk to reduce memory usage.
             https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
             Default is False.
+        source_name: The name of a registered ESDocketSource. For the
+            RECAP search type, its documents are indexed as children; other
+            search types don't use it.
     """
+    source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.PEOPLE:
             parent_es_document = PersonDocument
@@ -1112,7 +1143,7 @@ def index_parent_and_child_docs(
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
-            child_id_property = "RECAP"
+            child_id_property = source.child_id_property
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
             child_es_document = OpinionDocument
@@ -1129,7 +1160,7 @@ def index_parent_and_child_docs(
             child_docs = instance.positions.all()
         elif search_type == SEARCH_TYPES.RECAP:
             instance = Docket.objects.get(pk=instance_id)
-            child_docs = RECAPDocument.objects.filter(
+            child_docs = source.document_model.objects.filter(
                 docket_entry__docket=instance
             )
         elif search_type == SEARCH_TYPES.OPINION:
@@ -1200,6 +1231,7 @@ def index_parent_or_child_docs_in_es(
     search_type: str,
     document_type: str | None,
     use_streaming_bulk: bool = False,
+    source_name: str = RECAP_ES_SOURCE.name,
 ) -> None:
     """Index parent or child documents in Elasticsearch.
 
@@ -1213,18 +1245,22 @@ def index_parent_or_child_docs_in_es(
             Or force the use of streaming_bulk to reduce memory usage.
             https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
             Default is False.
+        source_name: The name of a registered ESDocketSource. For the
+            RECAP search type, child instance_ids are its documents; other
+            search types don't use it.
     """
     parent_instances = QuerySet()
     child_instances = QuerySet()
+    source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
-            child_id_property = "RECAP"
+            child_id_property = source.child_id_property
             if document_type == "parent":
                 parent_instances = Docket.objects.filter(pk__in=instance_ids)
             elif document_type == "child":
-                child_instances = RECAPDocument.objects.filter(
+                child_instances = source.document_model.objects.filter(
                     pk__in=instance_ids
                 )
         case SEARCH_TYPES.OPINION:
@@ -1259,7 +1295,9 @@ def index_parent_or_child_docs_in_es(
         )
 
         if failed_docs:
-            model_label = child_es_document.Django.model.__name__.capitalize()
+            # The ES document class is shared by every docket source, so
+            # name the failing model from the queryset instead.
+            model_label = child_instances.model.__name__.capitalize()
             logger.error(
                 "Error indexing documents from %s, Failed Doc IDs are: %s",
                 model_label,

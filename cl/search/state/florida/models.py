@@ -20,6 +20,7 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
+    CourtRefused,
     DocketEntryType,
 )
 from cl.settings import COURT_REQUEST_USER_AGENT
@@ -298,7 +299,13 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     link_uuid = models.UUIDField()
 
     def build_url(self) -> str | None:
-        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL with the token appended."""
+        """Requests parameters for and computes the altcha proof-of-work token for Florida documents, returning the URL with the token appended.
+
+        Raises:
+            CourtRefused: When ACIS answers the challenge request with 403. A
+                block on the shared challenge endpoint is the same transient
+                refusal as one on the document, and is retried the same way.
+        """
         scheme, netloc, path, params, query, fragment = urlparse(self.url)
 
         try:
@@ -306,12 +313,9 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != HTTPStatus.FORBIDDEN:
                 raise
-            logger.error(
-                "Florida refused proof-of-work parameter fetch for %s at %s (403)",
-                self.pk,
-                exc.request.url,
-            )
-            return None
+            raise CourtRefused(
+                type(self).__name__, self.pk, str(exc.request.url)
+            ) from exc
         if challenge is None:
             return self.url
         solution = challenge.solve()

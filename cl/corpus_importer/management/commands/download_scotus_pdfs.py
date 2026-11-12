@@ -33,7 +33,8 @@ def download_scotus_pdfs(
     """Download PDFs for SCOTUSDocuments missing a local file.
 
     Queries SCOTUSDocument instances that have no filepath_local,
-    then schedules a download task for each.
+    then schedules a download task for each. Placeholders are skipped, since
+    they have no URL to download from.
 
     Args:
         download_queue: The celery queue for download tasks.
@@ -42,8 +43,10 @@ def download_scotus_pdfs(
         auto_resume: Resume from last pk stored in Redis.
     """
     desc = download_order == "desc"
-    docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
-        "pk", flat=True
+    docs = (
+        SCOTUSDocument.objects.filter(filepath_local="")
+        .exclude(url="")
+        .values_list("pk", flat=True)
     )
 
     if auto_resume:

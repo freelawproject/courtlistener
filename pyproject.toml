@@ -140,4 +140,5 @@ dev = [
   "pyrefly>=1.4.0",
   "pandas-stubs~=3.1.0",
   "unittest-xml-reporting>=4.0.0",
+  "pytest-benchmark>=5.3.1",
 ]
