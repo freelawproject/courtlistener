@@ -1,3 +1,5 @@
+"""URL routes for accounts, profiles, and SES notifications."""
+
 from django.contrib.auth import views as auth_views
 from django.urls import include, path, re_path
 from django.views.generic import RedirectView
