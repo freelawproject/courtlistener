@@ -243,12 +243,15 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
 
 
 class Command(StatePollCommand):
+    """Continuously poll Texas TAMES for new and changed cases."""
+
     help = (
         "Continuously polls TAMES for new cases and backfills "
         "when changes are detected."
     )
 
     def add_arguments(self, parser) -> None:
+        """Add the poll window, rate limit, and backoff options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--poll-window-days",
@@ -281,6 +284,11 @@ class Command(StatePollCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Run poll cycles, sleeping between them, until shutdown is requested.
+
+        Raises:
+            CommandError: If ``TAMES_USER`` isn't set.
+        """
         global shutdown_requested
 
         if not settings.TAMES_USER:

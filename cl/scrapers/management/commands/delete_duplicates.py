@@ -1,3 +1,5 @@
+"""Find duplicate scraped opinions and merge or delete them."""
+
 import importlib
 import re
 from collections import defaultdict
@@ -330,9 +332,12 @@ def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
 
 
 class Command(VerboseCommand):
+    """Find and remove duplicate opinions with one of several matching methods."""
+
     help = "Find and merge Opinion objects that are versions of each other"
 
     def add_arguments(self, parser):
+        """Add the method, cluster source, court ID, and Juriscraper module options."""
         super().add_arguments(parser)
         parser.add_argument(
             "method",
@@ -373,6 +378,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Remove duplicates with the chosen method and log the resulting stats.
+
+        Raises:
+            ValueError: If the method is unsupported, or ``cleanup_content``
+                is used without a court ID and a Juriscraper module that
+                implements ``cleanup_content``.
+        """
         super().handle(*args, **options)
         stats = defaultdict(lambda: 0)
         method = options["method"]

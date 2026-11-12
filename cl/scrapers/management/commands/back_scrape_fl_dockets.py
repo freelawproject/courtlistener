@@ -163,6 +163,8 @@ async def _backfill(
 
 
 class Command(StateBackScrapeCommand, FLScrapeCommand):
+    """Back-scrape Florida appellate dockets over a date range or from a CSV of case UUIDs."""
+
     help: str = "Back-scrape Florida dockets"
 
     checkpoint_trackers: dict[FloridaCourtID, ScraperCheckpointTracker] = {
@@ -177,6 +179,7 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
     date_range_required: ClassVar[bool] = False
 
     def add_arguments(self, parser: CommandParser):
+        """Add the full-scrape, skip-parsed, and targeted UUID CSV options."""
         super().add_arguments(parser)
 
         parser.add_argument(
@@ -218,6 +221,12 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
         scrape_uuids: str,
         **options,
     ):
+        """Back-scrape the cases in ``scrape_uuids``, or each court's dockets in the date range.
+
+        With ``auto_resume``, each court starts from its saved checkpoint
+        when it has one. Without ``scrape_uuids``, logs an error and does
+        nothing unless both the start and end dates are given.
+        """
         logger.info("Setting up Florida back-scrape...")
         court_ids = self.parse_court_ids(courts)
 

@@ -1,3 +1,5 @@
+"""Detect when a scraper is revisiting content it has already seen."""
+
 from juriscraper.AbstractSite import logger
 
 from cl.scrapers.exceptions import (
@@ -9,6 +11,8 @@ from cl.search.models import Court
 
 
 class DupChecker(dict):
+    """Track duplicates found while scraping a court to decide when to stop."""
+
     def __init__(
         self,
         court: Court,
@@ -17,6 +21,15 @@ class DupChecker(dict):
         *args,
         **kwargs,
     ):
+        """Build a checker for ``court`` with no duplicates counted yet.
+
+        Args:
+            court: The court being scraped.
+            full_crawl: If True, unchanged site hashes don't abort the crawl.
+            dup_threshold: How many duplicates in a row are tolerated.
+            *args: Passed to ``dict``.
+            **kwargs: Passed to ``dict``.
+        """
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
@@ -36,6 +49,7 @@ class DupChecker(dict):
         self.last_found_date = None
 
     def update_site_hash(self, hash):
+        """Save ``hash`` as the current URL hash's SHA1."""
         self.url_hash.sha1 = hash
         self.url_hash.save()
 
