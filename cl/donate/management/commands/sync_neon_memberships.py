@@ -417,6 +417,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the expiry window and deletion age options."""
         parser.add_argument(
             "--min-hours-expired",
             type=int,
@@ -445,6 +446,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Sync the expired memberships in the window and report the counts.
+
+        Raises:
+            CommandError: If ``--delete-after-days`` is positive but within
+                the membership grace period.
+        """
         super().handle(*args, **options)
         delete_after_days = options["delete_after_days"]
         grace_days = settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS

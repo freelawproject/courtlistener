@@ -1,3 +1,5 @@
+"""Helpers for parsing Neon CRM webhook values."""
+
 from datetime import datetime
 
 from django.db import models
