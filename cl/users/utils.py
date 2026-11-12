@@ -476,3 +476,21 @@ class TabItem(TypedDict):
     icon: str
     url: NotRequired[str]
     count: NotRequired[int]
+
+
+def resolve_active_tab(tabs: list[TabItem], active_tab: str | None) -> str:
+    """Pick the key of the tab a panel-mode c-tabs component opens on.
+
+    Use it in views that read the requested tab from the query string, so a
+    missing or unknown value opens the first tab instead of an empty section.
+    Link-mode views don't need it: each page already knows its own tab.
+
+    :param tabs: The entries passed to the component. Must not be empty.
+    :param active_tab: The key asked for, usually request.GET.get("tab").
+    :return: `active_tab` when it matches a tab's key, else the first tab's key.
+    """
+    for tab in tabs:
+        if tab["key"] == active_tab:
+            return tab["key"]
+
+    return tabs[0]["key"]
