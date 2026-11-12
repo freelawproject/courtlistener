@@ -1,3 +1,5 @@
+"""Views for account registration, confirmation, and the user's profile pages."""
+
 import logging
 from collections import OrderedDict
 from datetime import timedelta
@@ -96,6 +98,7 @@ logger = logging.getLogger(__name__)
 @login_required
 @never_cache
 def view_alerts(request: HttpRequest) -> HttpResponse:
+    """Redirect to the docket alerts page if the user only has docket alerts, otherwise to search alerts."""
     if (
         not request.user.alerts.exists()
         and request.user.docket_alerts.filter(
@@ -109,6 +112,7 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_search_alerts(request: HttpRequest) -> HttpResponse:
+    """Render the user's search alerts, each with its search type."""
     search_alerts = request.user.alerts.all()
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
@@ -129,6 +133,10 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's docket subscriptions, sorted by the ``order_by`` parameter.
+
+    Defaults to the most recently triggered alerts first.
+    """
     order_by_param = request.GET.get("order_by", "")
     if order_by_param.startswith("-"):
         direction = "-"
@@ -262,6 +270,7 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's support page."""
     return TemplateResponse(
         request,
         "profile/donations.html",
@@ -272,6 +281,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API documentation tab of the user's API page."""
     return TemplateResponse(
         request,
         "profile/api.html",
@@ -286,6 +296,7 @@ def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API token tab of the user's API page."""
     return TemplateResponse(
         request,
         "profile/api.html",
@@ -299,6 +310,11 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Replace the user's API token after they confirm their password.
+
+    Shows the confirmation form with the user's API request count from the
+    last five minutes, and redirects to the token page after a reset.
+    """
     if request.method == "POST":
         reset_form = PasswordConfirmForm(request, request.POST)
         if reset_form.is_valid():
@@ -331,6 +347,10 @@ def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API usage tab with the user's effective API rate limits.
+
+    Blocking rates (``0/...``) are left out.
+    """
     overrides = get_all_throttle_overrides(ThrottleType.API)
     user_rates = overrides.get(request.user.username) or []
     if not user_rates:
@@ -373,6 +393,12 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show and save the user's account and profile settings.
+
+    Changing the email address unconfirms the account, emails both the new
+    and old addresses, and logs the user out. Outside development, saving
+    also queues a Neon account update or creation.
+    """
     old_email = request.user.email  # this line has to be at the top to work.
     user = request.user
     up = user.profile
@@ -438,6 +464,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's CourtListener ID."""
     user = request.user
     return TemplateResponse(
         request,
@@ -451,6 +478,11 @@ def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Delete the user's account after they confirm their password.
+
+    Emails a deletion notice, deletes the user's assets, converts the
+    account to a stub, and logs the user out.
+    """
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
     ).count()
@@ -486,11 +518,17 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 async def delete_profile_done(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming the account was deleted."""
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
 @login_required
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Request an export of the user's data.
+
+    On POST, queues a Zoho Desk ticket for the export and redirects to the
+    done page.
+    """
     if request.method == "POST":
         user = request.user
         confirmed = "Yes" if user.profile.email_confirmed else "No"
@@ -521,6 +559,7 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 async def take_out_done(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming the data export was requested."""
     return TemplateResponse(
         request,
         "profile/take_out_done.html",
@@ -819,6 +858,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def email_confirm_success(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming an email confirmation link was requested."""
     return TemplateResponse(
         request,
         "register/request_email_confirmation_success.html",
@@ -832,6 +872,7 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Change the user's password, keeping them logged in."""
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
@@ -947,6 +988,7 @@ def toggle_recap_email_auto_subscription(
 @login_required
 @never_cache
 def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's RECAP email page with their auto-subscribe setting."""
     auto_subscribe = request.user.profile.auto_subscribe
     return TemplateResponse(
         request,

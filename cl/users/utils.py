@@ -1,3 +1,5 @@
+"""Helpers for stub accounts, deleting users' data, and account emails."""
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User

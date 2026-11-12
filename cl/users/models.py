@@ -1,3 +1,5 @@
+"""Models for user profiles, bar memberships, email flags, and stored emails."""
+
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -27,6 +29,8 @@ donation_exclusion_codes = [
 
 
 class BarMembership(models.Model):
+    """A state bar membership, identified by its state."""
+
     barMembership = USStateField(
         "the two letter state abbreviation of a bar membership"
     )
@@ -41,6 +45,8 @@ class BarMembership(models.Model):
 
 @pghistory.track()
 class UserProfile(models.Model):
+    """A user's settings and details beyond Django's user model."""
+
     user = models.OneToOneField(
         User,
         related_name="profile",
@@ -533,6 +539,14 @@ class FailedEmail(AbstractDateTimeModel):
 def generate_recap_email(
     user_profile: UserProfile, append: int | None = None
 ) -> str:
+    """Make a unique ``@recap.email`` address from the user's username.
+
+    Non-alphanumeric runs become dots, and a number is appended if the
+    address is taken.
+
+    Raises:
+        FieldError: If no free address is found after 100 attempts.
+    """
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""
