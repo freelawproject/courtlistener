@@ -1,3 +1,5 @@
+"""Helpers for PACER court IDs, docket data, and connectivity."""
+
 import logging
 import pickle
 import re
@@ -53,10 +55,12 @@ cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
 def map_pacer_to_cl_id(pacer_id: str) -> str:
+    """Map a PACER court ID to its CourtListener ID, if they differ."""
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
 def map_cl_to_pacer_id(cl_id: str) -> str:
+    """Map a CourtListener court ID to its PACER ID, if they differ."""
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
@@ -575,6 +579,8 @@ def normalize_attorney_contact(
 
 
 class ConnectionType(TypedDict):
+    """The result of checking a PACER court's connectivity."""
+
     connection_ok: bool
     status_code: int | None
     date_time: datetime

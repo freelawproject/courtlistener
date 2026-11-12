@@ -1,3 +1,5 @@
+"""Helpers for calling LLM chat models and OpenAI transcription models."""
+
 from typing import IO, overload
 
 import instructor

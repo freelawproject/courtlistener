@@ -1,3 +1,5 @@
+"""Paginators for Elasticsearch results."""
+
 from typing import Any
 
 from django.core.paginator import Page, Paginator
@@ -10,6 +12,11 @@ class ESPaginator(Paginator):
     def __init__(
         self, total_query_results: int | None, *args: Any, **kwargs: Any
     ) -> None:
+        """Build the paginator.
+
+        The count is ``total_query_results`` if it is truthy, otherwise the
+        length of the object list.
+        """
         super().__init__(*args, **kwargs)
         if total_query_results:
             self._count = total_query_results
@@ -32,5 +39,6 @@ class ESPaginator(Paginator):
         return self._aggregations
 
     def page(self, number: float | int | str) -> Page:
+        """Get a page that holds the whole object list, without slicing it."""
         number = self.validate_number(number)
         return Page(self.object_list, number, self)

@@ -1,3 +1,5 @@
+"""Authentication backend and sign-in form that accept a username or email."""
+
 import re
 from typing import Any
 
@@ -217,6 +219,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form."""
         super().__init__(*args, **kwargs)
 
     def clean(self) -> dict[str, Any]:

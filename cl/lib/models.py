@@ -1,3 +1,5 @@
+"""Abstract base models and shared models used across apps."""
+
 from abc import abstractmethod
 
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -19,6 +21,8 @@ s3_warning_note = (
 
 
 class THUMBNAIL_STATUSES:
+    """Choices for the status of a document's thumbnail."""
+
     NEEDED = 0
     COMPLETE = 1
     FAILED = 2
@@ -134,6 +138,8 @@ class AbstractPDF(models.Model):
 
 
 class AbstractFile(models.Model):
+    """Abstract model for a file attached to any object."""
+
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -145,14 +151,18 @@ class AbstractFile(models.Model):
 
     @property
     def file_contents(self) -> str:
+        """The contents of the file, read from its local path."""
         with open(self.filepath.path) as f:
             return f.read()
 
     def print_file_contents(self) -> None:
+        """Print the contents of the file."""
         print(self.file_contents)
 
 
 class AbstractJSON(AbstractFile):
+    """Abstract model for a LASC JSON file kept in media storage."""
+
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_lasc_json_path,

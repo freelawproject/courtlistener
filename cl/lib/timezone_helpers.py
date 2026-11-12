@@ -1,3 +1,5 @@
+"""Helpers for converting dates and times to a court's timezone."""
+
 from datetime import date, datetime, time
 
 import pytz

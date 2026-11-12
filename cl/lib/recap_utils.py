@@ -1,3 +1,5 @@
+"""Helpers for RECAP file names, storage paths, and Internet Archive URLs."""
+
 import logging
 import re
 from collections.abc import Sequence
@@ -16,6 +18,7 @@ UNDATED_PATH_SEGMENT = "undated"
 
 
 def get_bucket_name(court: str, pacer_case_id: str | int | None) -> str:
+    """Make a case's Internet Archive bucket name, prefixed with ``dev`` in debug mode."""
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
@@ -103,6 +106,7 @@ def scotus_document_number_segments(
 
 
 def get_docketxml_url(court: str, pacer_case_id: str) -> str:
+    """Make the download URL of a case's docket XML."""
     return "{}/{}/{}".format(
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
@@ -143,12 +147,14 @@ def get_local_document_url_from_path(
 
 
 def get_pdf_url(court: str, pacer_case_id: str, filename: str) -> str:
+    """Make the download URL of a file in a case's bucket."""
     return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
 def get_docket_filename(
     court: str, pacer_case_id: str | None, ext: str
 ) -> str:
+    """Make a case's docket file name with the given extension."""
     return ".".join(
         [
             "gov",
@@ -166,6 +172,7 @@ def get_document_filename(
     document_number: str,
     attachment_number: int | None,
 ) -> str:
+    """Make a document's PDF file name, using 0 when there is no attachment number."""
     return ".".join(
         [
             "gov",

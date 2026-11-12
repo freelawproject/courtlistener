@@ -1,3 +1,5 @@
+"""Make PNG thumbnails of PDF documents."""
+
 from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
 

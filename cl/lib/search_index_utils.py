@@ -1,3 +1,5 @@
+"""Helpers for preparing values for the search index."""
+
 import re
 from collections.abc import Iterable
 from datetime import date
@@ -44,6 +46,7 @@ class InvalidDocumentError(Exception):
     """The document could not be formed."""
 
     def __init__(self, message: str) -> None:
+        """Build the error with a message."""
         Exception.__init__(self, message)
 
 

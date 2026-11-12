@@ -1,3 +1,5 @@
+"""Signal handlers that keep Elasticsearch documents in sync with their models."""
+
 from collections.abc import Callable, Iterable
 from functools import partial
 
@@ -751,6 +753,7 @@ class ESSignalProcessor:
         es_document: type[ESDocumentType],
         documents_model_mapping: DocumentModelMapping,
     ):
+        """Build the processor and connect its signal handlers."""
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -758,6 +761,7 @@ class ESSignalProcessor:
         self.setup()
 
     def setup(self):
+        """Connect the save, delete, many-to-many, and reverse relation handlers for the mapped models."""
         models_save = list(self.documents_model_mapping["save"].keys())
         models_delete = list(self.documents_model_mapping["delete"].keys())
         models_m2m = list(self.documents_model_mapping["m2m"].keys())

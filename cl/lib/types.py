@@ -1,3 +1,5 @@
+"""Shared types for requests, search queries, views, and position data."""
+
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
@@ -18,12 +20,16 @@ TaskData = dict[str, Any]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
+    """An HTTP request whose user is a ``User``."""
+
     # Narrowing `user` is the purpose of this class; views that take it are
     # only reachable once authentication has run.
     user: "User"  # pyrefly:ignore[bad-override-mutable-attribute]
 
 
 class EmailType(TypedDict, total=False):
+    """An email's subject, body, sender, and recipients."""
+
     subject: str
     body: str
     from_email: str
@@ -31,6 +37,8 @@ class EmailType(TypedDict, total=False):
 
 
 class ESRangeQueryParams(TypedDict):
+    """The bounds and relation of an Elasticsearch range query."""
+
     gte: str | int | float
     lte: str | int | float
     relation: NotRequired[str]
@@ -156,6 +164,8 @@ can be represented as:
 
 @dataclass
 class BasePositionMapping:
+    """Position fields grouped by position ID, for indexing a person's positions."""
+
     court_dict: defaultdict[int, list[str]] = field(
         default_factory=lambda: defaultdict(list)
     )
@@ -195,11 +205,14 @@ class BasePositionMapping:
     }
 
     def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
+        """Map each position field to the lookups it provides and the dict each fills."""
         return self.__db_to_dataclass_map
 
 
 @dataclass
 class EsMainQueries:
+    """A search with its boost mode and its parent and child queries."""
+
     search_query: Search
     boost_mode: str
     parent_query: Query | None = None
@@ -208,6 +221,8 @@ class EsMainQueries:
 
 @dataclass
 class EsJoinQueries:
+    """The main, parent, and child queries of a parent-child search."""
+
     main_query: Query | list
     parent_query: Query | None
     child_query: Query | None
@@ -216,6 +231,8 @@ class EsJoinQueries:
 
 @dataclass
 class ApiPositionMapping(BasePositionMapping):
+    """Position fields grouped by position ID, with the extra fields used by the API."""
+
     position_type_dict: defaultdict[int, list[str]] = field(
         default_factory=lambda: defaultdict(list)
     )
@@ -304,6 +321,7 @@ class ApiPositionMapping(BasePositionMapping):
     }
 
     def get_db_to_dataclass_map(self) -> dict[str, dict[str, str]]:
+        """Map each position field to its lookups and dicts, including the API-only fields."""
         parent_map = super().get_db_to_dataclass_map()
         return parent_map | self.__db_to_dataclass_map
 

@@ -1,3 +1,5 @@
+"""Decorators for caching, retrying, timing, and documenting models."""
+
 import asyncio
 import logging
 import re
@@ -388,6 +390,8 @@ def document_model[M: models.Model](model: type[M]) -> type[M]:
 def time_call[**P, R](
     fn_logger: logging.Logger,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Make a decorator that logs how long each call that returns takes, at debug level."""
+
     def decorator(
         f: Callable[P, R],
     ) -> Callable[P, R]:

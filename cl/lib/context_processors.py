@@ -1,3 +1,5 @@
+"""Template context processors for settings, tips, and email ban status."""
+
 import random
 from typing import Never, TypedDict, cast
 
@@ -111,6 +113,7 @@ info_tips = (
 
 
 def inject_random_tip(request: HttpRequest) -> dict[str, str]:
+    """Add a random tip to the context as ``TIP``."""
     return {"TIP": random.choice(info_tips)}
 
 

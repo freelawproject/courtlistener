@@ -1,3 +1,5 @@
+"""Invalidate paths in the CloudFront cache."""
+
 import time
 
 import boto3

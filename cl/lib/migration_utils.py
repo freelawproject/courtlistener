@@ -1,3 +1,5 @@
+"""Helpers for data migrations."""
+
 from collections.abc import Iterable
 
 from django.apps.registry import Apps
@@ -69,6 +71,7 @@ def make_new_user(
     email: str,
     permission_codenames: Iterable[str],
 ) -> None:
+    """Create a user with an unusable password, a confirmed profile, and the given permissions."""
     User = apps.get_model(
         "auth",
         "User",

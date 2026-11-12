@@ -1,3 +1,5 @@
+"""Helpers for finding Juriscraper scraper modules."""
+
 import importlib
 import pkgutil
 import re
@@ -9,6 +11,7 @@ from juriscraper.AbstractSite import AbstractSite
 
 
 def walk_juriscraper() -> Iterator[ModuleInfo]:
+    """Iterate over every module and package in Juriscraper, recursively."""
     return pkgutil.walk_packages(
         juriscraper.__path__, f"{juriscraper.__name__}."
     )

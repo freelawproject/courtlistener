@@ -1,3 +1,5 @@
+"""Helpers for looking up users by email and restricting views to groups."""
+
 from collections.abc import Callable, Coroutine
 from typing import Any, cast
 
