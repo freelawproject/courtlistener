@@ -1,3 +1,5 @@
+"""Cached sitemap views."""
+
 import hashlib
 from calendar import timegm
 from datetime import datetime

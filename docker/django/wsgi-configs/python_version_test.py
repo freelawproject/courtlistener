@@ -1,3 +1,5 @@
+"""WSGI app that reports the Python and locale setup of the server."""
+
 # Use this test to ensure that your python binary and virtualenvs are set up
 # properly.
 import locale
@@ -5,6 +7,7 @@ import sys
 
 
 def application(environ, start_response):
+    """Respond with the Python version, paths, locale, encodings, and mod_wsgi process group as plain text."""
     status = "200 OK"
 
     output = ""
