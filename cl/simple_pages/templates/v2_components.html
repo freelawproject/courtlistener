@@ -665,7 +665,7 @@ Sample code here.
     </p>
 
     <h4 class="mt-3">Demo</h4>
-    <c-tabs class="my-4" title="My tabs">
+    <c-tabs class="my-4" label="My tabs">
       <c-tabs.panel name="First tab">
         First tab panel content
       </c-tabs.panel>
@@ -679,9 +679,9 @@ Sample code here.
 
     <c-library.list title="Props" only>
       <c-library.item only>
-        <c-slot name="label"><code>c-tabs</code>: <code>title</code></c-slot>
+        <c-slot name="label"><code>c-tabs</code>: <code>label</code></c-slot>
         <c-slot name="description">
-          Component title used for accessibility.
+          Accessible name for the tabs.
         </c-slot>
       </c-library.item>
       <c-library.item only>
@@ -707,7 +707,7 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-tabs title="My tabs"&gt;
+&lt;c-tabs label="My tabs"&gt;
   &lt;c-tabs.panel name="First tab"&gt;
     First tab panel content
   &lt;/c-tabs.panel&gt;
