@@ -6,6 +6,7 @@ from unittest import mock
 from uuid import uuid4
 
 import httpx
+import requests
 from juriscraper.state.docket import (
     DocketEntryType as ScrapeDocketEntryType,
 )
@@ -61,7 +62,11 @@ from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
-from cl.search.state.shared import DocketEntryType, ProcessingError
+from cl.search.state.shared import (
+    CourtRefused,
+    DocketEntryType,
+    ProcessingError,
+)
 from cl.tests.cases import TestCase
 
 
@@ -327,8 +332,7 @@ class FloridaMergerTest(TestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_docket_appellate_disaggregates_existing(self):
-        """Does merge_docket move a matching docket from the aggregate court
-        into its specific district court?"""
+        """Does merge_docket move a matching docket from the aggregate court into its specific district court?"""
         agg_dn = "1D2025-1234"
         agg_docket = DocketFactory.create(
             court=self.flagg,
@@ -355,8 +359,7 @@ class FloridaMergerTest(TestCase):
 
     @merger_test(expected_query_count=14)
     def test_merge_docket_appellate_creates_new(self):
-        """Does merge_docket create a new docket in the specific appellate
-        court when no existing docket matches?"""
+        """Does merge_docket create a new docket in the specific appellate court when no existing docket matches?"""
         original_pks = set(Docket.objects.values_list("pk", flat=True))
         docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SECOND_COA.value,
@@ -404,8 +407,7 @@ class FloridaMergerTest(TestCase):
 
     @merger_test(expected_query_count=15)
     def test_merge_docket_no_entries_falls_back_to_date_filed(self):
-        """When there are no entries, does date_last_filing fall back to
-        date_filed?"""
+        """When there are no entries, does date_last_filing fall back to date_filed?"""
         filed = datetime(2024, 6, 15, 12, 0, 0)
         docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
@@ -452,8 +454,7 @@ class FloridaMergerTest(TestCase):
 
 
 class FloridaPartyMergerTest(TestCase):
-    """Tests for merging parties, attorneys, and attorney roles from Florida
-    cases."""
+    """Tests for merging parties, attorneys, and attorney roles from Florida cases."""
 
     @classmethod
     def setUpTestData(cls):
@@ -472,8 +473,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=11)
     def test_merge_creates_party_with_type(self):
-        """Does merging create the scrape's party and link it to the docket
-        with the correct party type?"""
+        """Does merging create the scrape's party and link it to the docket with the correct party type?"""
         scrape_party = FloridaCasePartyFactory.create(
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
@@ -496,8 +496,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=14)
     def test_merge_creates_all_parties(self):
-        """Are multiple parties in a scrape merged as separate objects, each
-        with its own party type?"""
+        """Are multiple parties in a scrape merged as separate objects, each with its own party type?"""
         appellant = FloridaCasePartyFactory.create(
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
@@ -533,8 +532,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_primary_representative_is_lead_attorney(self):
-        """Is a primary representative merged as a lead attorney for the
-        party on the merged docket?"""
+        """Is a primary representative merged as a lead attorney for the party on the merged docket?"""
         rep = FloridaRepresentativeFactory.create(
             name="Jane Lawyer", primary_flag=True
         )
@@ -604,8 +602,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_party_with_multiple_representatives(self):
-        """Are all of a party's representatives merged as separate attorneys
-        with their own roles?"""
+        """Are all of a party's representatives merged as separate attorneys with their own roles?"""
         lead = FloridaRepresentativeFactory.create(
             name="Jane Lawyer", primary_flag=True
         )
@@ -633,8 +630,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=27)
     def test_remerge_is_idempotent(self):
-        """Does merging the same case twice avoid duplicating parties,
-        attorneys, and their links?"""
+        """Does merging the same case twice avoid duplicating parties, attorneys, and their links?"""
         rep = FloridaRepresentativeFactory.create(
             name="Jane Lawyer", primary_flag=True
         )
@@ -668,8 +664,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=11)
     def test_merge_does_not_modify_unrelated_parties(self):
-        """Does merging create a new party rather than renaming an existing
-        party from another docket?"""
+        """Does merging create a new party rather than renaming an existing party from another docket?"""
         other_docket = DocketFactory.create(court=self.flsc)
         other_party = PartyFactory.create(
             name="Unrelated Party",
@@ -701,8 +696,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_preserves_unrelated_party_types_and_roles(self):
-        """Does merging one docket leave party and attorney links on other
-        dockets in place?"""
+        """Does merging one docket leave party and attorney links on other dockets in place?"""
         other_docket = DocketFactory.create(court=self.flsc)
         other_attorney = AttorneyFactory.create(docket=other_docket)
         other_party = PartyFactory.create(
@@ -737,8 +731,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=19)
     def test_party_type_change_renames_in_place(self):
-        """When a party's type changes between scrapes, is the single
-        PartyType row renamed rather than duplicated?"""
+        """When a party's type changes between scrapes, is the single PartyType row renamed rather than duplicated?"""
         scrape_party = FloridaCasePartyFactory.create(
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
@@ -762,9 +755,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=22)
     def test_remerge_keeps_same_name_parties_distinct(self):
-        """When two parties on a docket share a name (e.g. a cross-appellant),
-        does a re-merge match each by its UUID rather than collapsing both onto
-        one party?"""
+        """When two parties on a docket share a name (e.g. a cross-appellant), does a re-merge match each by its UUID rather than collapsing both onto one party?"""
         appellant = FloridaCasePartyFactory.create(
             name="State of Florida",
             party_type=ScrapePartyType.APPELLANT,
@@ -803,8 +794,7 @@ class FloridaPartyMergerTest(TestCase):
 
     @merger_test(expected_query_count=20)
     def test_merge_empty_parties_preserves_existing(self):
-        """Does a scrape with no parties leave existing parties, types, and
-        roles untouched?"""
+        """Does a scrape with no parties leave existing parties, types, and roles untouched?"""
         rep = FloridaRepresentativeFactory.create(
             name="Jane Lawyer", primary_flag=True
         )
@@ -851,8 +841,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_creates_docket_entries(self):
-        """Does merging a case create its docket entries with the scrape's
-        field values?"""
+        """Does merging a case create its docket entries with the scrape's field values?"""
         entry = FloridaDocketEntryFactory.create(
             entry_type=ScrapeDocketEntryType.MOTION,
             entry_type_raw="motions other",
@@ -944,8 +933,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_unrecognized_entry_status_is_unknown(self):
-        """Is an entry status Florida hasn't shown us before stored as
-        unknown rather than failing the merge?"""
+        """Is an entry status Florida hasn't shown us before stored as unknown rather than failing the merge?"""
         entry = FloridaDocketEntryFactory.create(
             entry_status="Surprising", attachments=[]
         )
@@ -961,8 +949,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=12)
     def test_merge_submitted_by_links_docket_party(self):
-        """Is a submitter that matches a party on the docket linked to that
-        party?"""
+        """Is a submitter that matches a party on the docket linked to that party?"""
         party = FloridaCasePartyFactory.create(
             name="Acme Corp", representatives=[]
         )
@@ -991,8 +978,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=17)
     def test_merge_submitted_by_unknown_party_keeps_name_only(self):
-        """Is a submitter who isn't a party on the docket -- court staff, for
-        instance -- recorded by name with no party link?"""
+        """Is a submitter who isn't a party on the docket -- court staff, for instance -- recorded by name with no party link?"""
         entry = FloridaDocketEntryFactory.create(
             submitted_by=[
                 FloridaCaseActorFactory.create(display_name="Broward Clerk")
@@ -1012,8 +998,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=20)
     def test_remerge_keeps_resolved_submitted_by_party(self):
-        """Does a later scrape that can't match the submitter keep the party
-        we resolved earlier?"""
+        """Does a later scrape that can't match the submitter keep the party we resolved earlier?"""
         party = FloridaCasePartyFactory.create(
             name="Acme Corp", representatives=[]
         )
@@ -1062,8 +1047,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
     @merger_test(expected_query_count=2)
     def test_entry_merger_standalone(self):
-        """Can an entry be merged directly into an existing docket, outside
-        of a full docket merge?"""
+        """Can an entry be merged directly into an existing docket, outside of a full docket merge?"""
         docket = DocketFactory.create(court=self.flsc)
         entry = FloridaDocketEntryFactory.create(attachments=[])
 
@@ -1097,8 +1081,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=20)
     def test_merge_creates_documents(self):
-        """Does merging a case create its entries' documents with the
-        scrape's field values?"""
+        """Does merging a case create its entries' documents with the scrape's field values?"""
         document = FloridaDocumentFactory.create(
             document_name="Initial Brief",
             document_type="Brief",
@@ -1127,8 +1110,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=20)
     def test_merge_document_without_type_is_blank(self):
-        """Is a scrape document with no document type merged with a blank
-        string instead of None?"""
+        """Is a scrape document with no document type merged with a blank string instead of None?"""
         document = FloridaDocumentFactory.create(document_type=None)
         docket_data = self._make_case(document)
 
@@ -1142,8 +1124,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=20)
     def test_merge_document_without_content_type_is_blank(self):
-        """Is a scrape document with no content type merged with a blank
-        string instead of None?"""
+        """Is a scrape document with no content type merged with a blank string instead of None?"""
         document = FloridaDocumentFactory.create(content_type=None)
         docket_data = self._make_case(document)
 
@@ -1175,8 +1156,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=36)
     def test_merge_removes_documents_missing_from_scrape(self):
-        """Are DB documents deleted when a later scrape doesn't include
-        them?"""
+        """Are DB documents deleted when a later scrape doesn't include them?"""
         document = FloridaDocumentFactory.create()
         docket_data = self._make_case(document)
         FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
@@ -1199,7 +1179,8 @@ class FloridaDocumentMergerTest(TestCase):
         """Merge a case, then flag its document as downloaded with a bad URL.
 
         Returns the scrape document and the merged FloridaDocument, set up so
-        a re-merge exercises the pre_update download-state reset."""
+        a re-merge exercises the pre_update download-state reset.
+        """
         document = FloridaDocumentFactory.create(
             url="https://acis.flcourts.gov/docs/old",
         )
@@ -1215,8 +1196,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=34)
     def test_remerge_changed_url_resets_download_state(self):
-        """Does updating a document clear its bad-URL flag, stored file, and
-        OCR status so it gets downloaded again?"""
+        """Does updating a document clear its bad-URL flag, stored file, and OCR status so it gets downloaded again?"""
         document, docket_data, merged = (
             self._merge_downloaded_bad_url_document()
         )
@@ -1236,9 +1216,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=33)
     def test_remerge_missing_file_is_update(self):
-        """Is an unchanged document with no stored file and no processing
-        error reported as updated, so a re-ingest retries its failed
-        download?"""
+        """Is an unchanged document with no stored file and no processing error reported as updated, so a re-ingest retries its failed download?"""
         document = FloridaDocumentFactory.create()
         docket_data = self._make_case(document)
         FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
@@ -1253,8 +1231,7 @@ class FloridaDocumentMergerTest(TestCase):
 
     @merger_test(expected_query_count=33)
     def test_remerge_unchanged_document_keeps_download_state(self):
-        """Is download state (bad-URL flag, stored file, OCR status) left
-        alone when the rescraped document is unchanged?"""
+        """Is download state (bad-URL flag, stored file, OCR status) left alone when the rescraped document is unchanged?"""
         _document, docket_data, merged = (
             self._merge_downloaded_bad_url_document()
         )
@@ -1271,8 +1248,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(merged.ocr_status, FloridaDocument.OCR_UNNECESSARY)
 
     def test_remerge_changed_link_uuid_updates_document_in_place(self):
-        """Is a document whose link UUID changed between scrapes matched on
-        its title and updated, rather than duplicated?"""
+        """Is a document whose link UUID changed between scrapes matched on its title and updated, rather than duplicated?"""
         document = FloridaDocumentFactory.create()
         docket_data = self._make_case(document)
         FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
@@ -1291,8 +1267,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(FloridaDocument.objects.count(), 1)
 
     def test_merge_same_title_distinct_link_uuids_stay_separate(self):
-        """Are documents sharing a title kept apart when the scrape lists
-        each of their link UUIDs?"""
+        """Are documents sharing a title kept apart when the scrape lists each of their link UUIDs?"""
         first = FloridaDocumentFactory.create(document_name="Brief")
         second = FloridaDocumentFactory.create(document_name="Brief")
         docket_data = self._make_case(first, second)
@@ -1310,8 +1285,7 @@ class FloridaDocumentMergerTest(TestCase):
         )
 
     def test_merge_new_link_uuid_with_new_title_creates_document(self):
-        """Is a document with an unseen title and link UUID created even
-        though the entry already has another document?"""
+        """Is a document with an unseen title and link UUID created even though the entry already has another document?"""
         first = FloridaDocumentFactory.create(document_name="Brief")
         docket_data = self._make_case(first)
         FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
@@ -1327,8 +1301,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(len(result.creates["FloridaDocument"]), 1)
 
     def test_remerge_changed_link_uuid_with_sibling_entries(self):
-        """Is a document whose link UUID changed matched on its title when
-        the case has other entries?"""
+        """Is a document whose link UUID changed matched on its title when the case has other entries?"""
         document = FloridaDocumentFactory.create(document_name="Brief")
         docket_data = self._make_case(document)
         docket_data.entries.append(
@@ -1352,9 +1325,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(merged.link_uuid, document.document_link_uuid)
 
     def test_remerge_replaced_document_with_new_duplicate_title(self):
-        """When a document's file is replaced and a new document with the same
-        title is added, are both created rather than one taking over the
-        stored row, regardless of attachment order?"""
+        """When a document's file is replaced and a new document with the same title is added, are both created rather than one taking over the stored row, regardless of attachment order?"""
         for replacement_first in (False, True):
             with self.subTest(replacement_first=replacement_first):
                 original = FloridaDocumentFactory.create(
@@ -1397,9 +1368,7 @@ class FloridaDocumentMergerTest(TestCase):
                 )
 
     def test_remerge_single_title_match_with_multiple_stored_candidates(self):
-        """When an entry has two stored documents sharing a title and the next
-        scrape has only one document with that title and an unseen link UUID,
-        is the new document created and are the stale ones removed?"""
+        """When an entry has two stored documents sharing a title and the next scrape has only one document with that title and an unseen link UUID, is the new document created and are the stale ones removed?"""
         first = FloridaDocumentFactory.create(document_name="Motion")
         second = FloridaDocumentFactory.create(document_name="Motion")
         docket_data = self._make_case(first, second)
@@ -1453,8 +1422,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
 
     def test_merge_creates_appeal_transfer_from_circuit_court(self):
-        """Does merging create an appeal transfer from the originating
-        circuit court into the scraped docket's court?"""
+        """Does merging create an appeal transfer from the originating circuit court into the scraped docket's court?"""
         docket_data = self._make_case(self._circuit_transfer())
 
         result = FloridaDocketMerger(
@@ -1476,8 +1444,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
     @merger_test(expected_query_count=8)
     def test_merge_creates_transfer_from_appellate_court(self):
-        """Does a transfer from a district court of appeal map to its
-        specific CourtListener court?"""
+        """Does a transfer from a district court of appeal map to its specific CourtListener court?"""
         docket_data = self._make_case(
             self._circuit_transfer(
                 court_id=FloridaCourtID.FIRST_COA.value,
@@ -1518,8 +1485,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
     @merger_test(expected_query_count=8)
     def test_merge_maps_transfer_reason(self):
-        """Does the transfer's reason map to the matching CaseTransfer
-        type?"""
+        """Does the transfer's reason map to the matching CaseTransfer type?"""
         docket_data = self._make_case(
             self._circuit_transfer(reason=ScrapeTransferReason.WORKLOAD)
         )
@@ -1574,8 +1540,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
     @merger_test(expected_query_count=8)
     def test_merge_fills_existing_partial_transfer(self):
-        """Does merging fill in the destination docket FK on an existing
-        transfer that only knows its origin docket?"""
+        """Does merging fill in the destination docket FK on an existing transfer that only knows its origin docket?"""
         scrape_transfer = self._circuit_transfer()
         docket_data = self._make_case(scrape_transfer)
         origin_docket = DocketFactory.create(
@@ -1638,8 +1603,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
     @merger_test(expected_query_count=4)
     def test_merge_skips_unmappable_court(self):
-        """Are transfers from courts with no CourtListener mapping skipped
-        without failing the merge?"""
+        """Are transfers from courts with no CourtListener mapping skipped without failing the merge?"""
         docket_data = self._make_case(
             self._circuit_transfer(
                 court_id=FloridaCourtID.COMPENSATION_CLAIMS.value
@@ -1655,8 +1619,7 @@ class FloridaCaseTransferMergerTest(TestCase):
 
     @merger_test(expected_query_count=5)
     def test_merge_skips_court_missing_from_db(self):
-        """Is a mappable court that isn't in the DB skipped without failing
-        the merge?"""
+        """Is a mappable court that isn't in the DB skipped without failing the merge?"""
         docket_data = self._make_case(
             self._circuit_transfer(court_id=FloridaCourtID.COUNTY.value)
         )
@@ -1703,8 +1666,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_ingest_merges_docket_and_dispatches_downloads(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does ingesting a case merge the docket and dispatch a download for
-        each created document?"""
+        """Does ingesting a case merge the docket and dispatch a download for each created document?"""
         case = self._make_case()
 
         with mock.patch(
@@ -1724,8 +1686,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_ingest_skips_downloads_when_disabled(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does download_attachments=False merge documents without
-        downloading them?"""
+        """Does download_attachments=False merge documents without downloading them?"""
         case = self._make_case()
 
         with mock.patch(
@@ -1744,8 +1705,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_reingest_with_stored_file_skips_download(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does re-ingesting an unchanged case skip downloading a document
-        whose file is already stored?"""
+        """Does re-ingesting an unchanged case skip downloading a document whose file is already stored?"""
         case = self._make_case()
         fl_ingest_docket_task((case, "bucket", "key"))
         document = FloridaDocument.objects.get()
@@ -1764,8 +1724,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_reingest_metadata_update_with_stored_file_skips_download(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does a rescrape that only updates a document's metadata skip
-        downloading a file that's already stored for the same link UUID?"""
+        """Does a rescrape that only updates a document's metadata skip downloading a file that's already stored for the same link UUID?"""
         case = self._make_case()
         fl_ingest_docket_task((case, "bucket", "key"))
         document = FloridaDocument.objects.get()
@@ -1784,8 +1743,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_reingest_changed_link_uuid_with_stored_file_skips_download(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does a rescrape that changes a document's link UUID update the
-        existing document and skip downloading its already stored file?"""
+        """Does a rescrape that changes a document's link UUID update the existing document and skip downloading its already stored file?"""
         case = self._make_case()
         fl_ingest_docket_task((case, "bucket", "key"))
         document = FloridaDocument.objects.get()
@@ -1808,8 +1766,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_reingest_missing_file_downloads_again(
         self, download_mock: mock.Mock
     ) -> None:
-        """Does re-ingesting an unchanged case re-dispatch the download for a
-        document whose earlier download never stored a file?"""
+        """Does re-ingesting an unchanged case re-dispatch the download for a document whose earlier download never stored a file?"""
         case = self._make_case()
         fl_ingest_docket_task((case, "bucket", "key"))
         document = FloridaDocument.objects.get()
@@ -1823,8 +1780,7 @@ class FloridaIngestTaskTest(TestCase):
 
     @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
     def test_ingest_invalid_case_fails(self, download_mock: mock.Mock) -> None:
-        """Does an undeserializable payload fail the merge without raising or
-        downloading anything?"""
+        """Does an undeserializable payload fail the merge without raising or downloading anything?"""
         result = fl_ingest_docket_task((b"not json", "bucket", "key"))
 
         self.assertFalse(result.success)
@@ -1836,8 +1792,7 @@ class FloridaDocumentDownloadTest(TestCase):
     """Tests for the download_fl_document Celery task."""
 
     def setUp(self) -> None:
-        """Mock the task throttle, the ACIS proof-of-work gate, the download
-        stream, and the extraction task dispatch."""
+        """Mock the task throttle, the ACIS proof-of-work gate, the download stream, and the extraction task dispatch."""
         self.throttle_patch = mock.patch(
             "cl.lib.celery_utils.get_task_wait", return_value=0
         )
@@ -1945,6 +1900,79 @@ class FloridaDocumentDownloadTest(TestCase):
         self.assertFalse(fl_document.filepath_local)
         self.extract_document_mock.assert_not_called()
 
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
+    def test_download_refusal_is_retried(
+        self,
+        ext_mock: mock.Mock,
+        pcs_mock: mock.Mock,
+    ) -> None:
+        """Is a 403 from the court retried, and the file stored once the court relents? A refusal is a transient block on our requests, not a sealed document, so one must not cost us the file."""
+        fl_document = FloridaDocumentModelFactory.create()
+        pcs_mock.return_value = httpx.Response(200, text="1")
+        refused = requests.HTTPError(response=mock.Mock(status_code=403))
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake pdf data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.side_effect = [
+                refused,
+                (tmp, "pdfsha1"),
+            ]
+
+            download_fl_document.apply(args=(fl_document.pk,))
+
+        self.assertEqual(self.download_document_mock.call_count, 2)
+        fl_document.refresh_from_db()
+        self.assertTrue(fl_document.filepath_local)
+        self.assertEqual(fl_document.sha1, "pdfsha1")
+        self.extract_document_mock.assert_called_once()
+
+    def test_download_refusal_fails_after_retries(self) -> None:
+        """Does a court that keeps refusing eventually fail the task with the refusal, rather than retrying forever or passing silently?"""
+        fl_document = FloridaDocumentModelFactory.create()
+        self.download_document_mock.return_value.__enter__.side_effect = (
+            requests.HTTPError(response=mock.Mock(status_code=403))
+        )
+
+        result = download_fl_document.apply(args=(fl_document.pk,))
+
+        self.assertTrue(result.failed())
+        self.assertIsInstance(result.result, CourtRefused)
+        self.assertEqual(
+            self.download_document_mock.call_count,
+            download_fl_document.max_retries + 1,
+        )
+        fl_document.refresh_from_db()
+        self.assertFalse(fl_document.filepath_local)
+        self.extract_document_mock.assert_not_called()
+
+    def test_download_refusal_retries_wait_full_backoff(self) -> None:
+        """Does every retry of a refused download wait its whole backoff interval? A retry sent while the court is still blocking us is wasted, so the waits must not be shortened at random."""
+        fl_document = FloridaDocumentModelFactory.create()
+        self.download_document_mock.return_value.__enter__.side_effect = (
+            requests.HTTPError(response=mock.Mock(status_code=403))
+        )
+
+        with mock.patch.object(
+            download_fl_document, "retry", wraps=download_fl_document.retry
+        ) as retry_mock:
+            download_fl_document.apply(args=(fl_document.pk,))
+
+        minute = 60
+        # The final call to retry raises the refusal instead of waiting.
+        waits = [
+            call.kwargs["countdown"]
+            for call in retry_mock.call_args_list[
+                : download_fl_document.max_retries
+            ]
+        ]
+        self.assertEqual(
+            waits,
+            [5 * minute, 10 * minute, 20 * minute, 40 * minute, 60 * minute],
+        )
+
     @mock.patch("cl.search.state.shared.logger")
     @mock.patch("cl.scrapers.utils.get_extension", return_value=".tiff")
     def test_download_tiff_extracts_without_warning(
@@ -1952,8 +1980,7 @@ class FloridaDocumentDownloadTest(TestCase):
         ext_mock: mock.Mock,
         logger_mock: mock.Mock,
     ) -> None:
-        """Is a TIFF (expected and extractable) stored and extracted with no
-        unexpected-extension warning?"""
+        """Is a TIFF (expected and extractable) stored and extracted with no unexpected-extension warning?"""
         fl_document = FloridaDocumentModelFactory.create()
 
         with NamedTemporaryFile(suffix=".tmp") as tmp:
@@ -1980,8 +2007,7 @@ class FloridaDocumentDownloadTest(TestCase):
         ext_mock: mock.Mock,
         logger_mock: mock.Mock,
     ) -> None:
-        """Is an HTML file (unexpected but extractable) stored with a warning
-        and still sent to extraction?"""
+        """Is an HTML file (unexpected but extractable) stored with a warning and still sent to extraction?"""
         fl_document = FloridaDocumentModelFactory.create()
 
         with NamedTemporaryFile(suffix=".tmp") as tmp:
@@ -2012,8 +2038,7 @@ class FloridaDocumentDownloadTest(TestCase):
         ext_mock: mock.Mock,
         logger_mock: mock.Mock,
     ) -> None:
-        """Is an unknown file type stored with a warning, marked
-        OCR_UNNECESSARY, and kept out of extraction?"""
+        """Is an unknown file type stored with a warning, marked OCR_UNNECESSARY, and kept out of extraction?"""
         fl_document = FloridaDocumentModelFactory.create()
 
         with NamedTemporaryFile(suffix=".tmp") as tmp:
@@ -2046,9 +2071,11 @@ class StateDocumentExtractionTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        """Create documents covering every page_count scenario. They share
-        one docket entry since each new entry would create a duplicate
-        AttorneyOrganization through the party factories."""
+        """Create documents covering every page_count scenario.
+
+        They share one docket entry since each new entry would create a
+        duplicate AttorneyOrganization through the party factories.
+        """
         entry = FloridaDocketEntryModelFactory.create()
         cls.small_pdf = FloridaDocumentModelFactory.create(
             docket_entry=entry, filepath_local="small.pdf", page_count=5
@@ -2094,8 +2121,7 @@ class StateDocumentExtractionTest(TestCase):
         }
 
     def test_page_limit_filters_pdfs_only(self) -> None:
-        """Does --page-limit keep only PDFs with a real page count within
-        the limit, while still scheduling non-PDF documents?"""
+        """Does --page-limit keep only PDFs with a real page count within the limit, while still scheduling non-PDF documents?"""
         extract_state_documents(
             FloridaDocument,
             throttle_min_items=100,
@@ -2111,8 +2137,7 @@ class StateDocumentExtractionTest(TestCase):
         )
 
     def test_no_page_limit_schedules_everything(self) -> None:
-        """Without --page-limit, are all documents scheduled regardless of
-        their page_count, including null, zero and negative values?"""
+        """Without --page-limit, are all documents scheduled regardless of their page_count, including null, zero and negative values?"""
         extract_state_documents(
             FloridaDocument,
             throttle_min_items=100,

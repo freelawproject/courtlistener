@@ -23,9 +23,7 @@ def get_total_estimate_count(table_name: str) -> int:
 async def get_clusters_from_citation_str(
     reporter: str, volume: str, page: str
 ) -> tuple[QuerySet[OpinionCluster] | None, int]:
-    """
-    This function attempts to retrieve opinion clusters related to a citation
-    string.
+    """This function attempts to retrieve opinion clusters related to a citation string.
 
     This helper first tries to find an exact match of the citation string within
     our OpinionCluster records. If no exact match is found, the helper searches

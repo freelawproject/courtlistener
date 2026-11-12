@@ -1,4 +1,4 @@
-"""Merge a jkent scrape run into CourtListener.
+r"""Merge a jkent scrape run into CourtListener.
 
     manage.py load_state_scrape nycoa nycourts_gov/2026-08-08.db \\
         --ingest-throttle 100 --extraction-throttle 100
@@ -54,9 +54,12 @@ DEFAULT_THROTTLE = 5
 def compose_redis_key(loader: str, database: str) -> str:
     """Compose the Redis key a load's checkpoint and ledger hang off.
 
-    :param loader: The `LOADERS` name the load ran under.
-    :param database: The run database's path within the storage bucket.
-    :return: The Redis key.
+    Args:
+        loader: The `LOADERS` name the load ran under.
+        database: The run database's path within the storage bucket.
+
+    Returns:
+        The Redis key.
     """
     return f"state_scrape_load:{loader}:{database}"
 
@@ -251,28 +254,33 @@ class Command(BaseCommand):
         load settles a run that is already in the queue; skipping verification
         returns as soon as everything is dispatched.
 
-        :param loader: The `LOADERS` name of the court's loader.
-        :param database: The run database's path within the storage bucket.
-        :param limit: Stop after this many dockets.
-        :param ingest_queue: The celery queue to merge dockets on.
-        :param ingest_throttle: Tasks to hold the merge queue to.
-        :param skip_extraction: Dispatch no text extraction.
-        :param extraction_queue: The celery queue to extract documents on.
-        :param extraction_throttle: Tasks to hold the extraction queue to.
-        :param db_delay: Seconds to wait after each docket.
-        :param start_row: Dockets to skip before dispatching anything.
-        :param auto_resume: Start from the last checkpointed row.
-        :param retry: Put back what the last load left unfinished, rather than
-            dispatching anything new.
-        :param skip_verification: Do not wait to see what the merges did.
-        :param skip_load: Dispatch nothing, and check up on a load that
-            already ran instead.
-        :param in_flight_time: Seconds a queue's count must hold steady before
-            what is left counts as lost.
-        :param verify_timeout: Seconds to wait on a queue still coming down.
-        :raises CommandError: If a pair of contradictory flags is given, if
-            both phases are skipped, or if the run database cannot be fetched
-            or does not pass the loader's preflight checks.
+        Args:
+            *args: Unused.
+            loader: The `LOADERS` name of the court's loader.
+            database: The run database's path within the storage bucket.
+            limit: Stop after this many dockets.
+            ingest_queue: The celery queue to merge dockets on.
+            ingest_throttle: Tasks to hold the merge queue to.
+            skip_extraction: Dispatch no text extraction.
+            extraction_queue: The celery queue to extract documents on.
+            extraction_throttle: Tasks to hold the extraction queue to.
+            db_delay: Seconds to wait after each docket.
+            start_row: Dockets to skip before dispatching anything.
+            auto_resume: Start from the last checkpointed row.
+            retry: Put back what the last load left unfinished, rather than
+                dispatching anything new.
+            skip_verification: Do not wait to see what the merges did.
+            skip_load: Dispatch nothing, and check up on a load that
+                already ran instead.
+            in_flight_time: Seconds a queue's count must hold steady before
+                what is left counts as lost.
+            verify_timeout: Seconds to wait on a queue still coming down.
+            **options: Unused.
+
+        Raises:
+            CommandError: If a pair of contradictory flags is given, if
+                both phases are skipped, or if the run database cannot be fetched
+                or does not pass the loader's preflight checks.
         """
         loader_class = LOADERS[loader]
         run_key = compose_redis_key(loader, database)
@@ -353,12 +361,17 @@ class Command(BaseCommand):
 
         We only load the scrape db for merge error retries.
 
-        :param loader_class: The court's loader.
-        :param database: The run database's path within the storage bucket.
-        :param loader_kwargs: What to build the loader with.
-        :return: What the retry dispatched and what came of it.
-        :raises CommandError: If the run database is wanted and cannot be
-            fetched.
+        Args:
+            loader_class: The court's loader.
+            database: The run database's path within the storage bucket.
+            loader_kwargs: What to build the loader with.
+
+        Returns:
+            What the retry dispatched and what came of it.
+
+        Raises:
+            CommandError: If the run database is wanted and cannot be
+                fetched.
         """
         from_ledger = loader_class(database, **loader_kwargs)
         rows, documents = from_ledger.ledger.retry_counts()
@@ -380,11 +393,11 @@ class Command(BaseCommand):
     def print_report(self, report: LoadReport, *, verified: bool) -> None:
         """Write out what the load did, for whoever ran it.
 
-
-        :param report: The load's report.
-        :param verified: Whether the load waited on its merges. An unverified
-            load knows only what it dispatched, so saying nothing merged would
-            be wrong rather than merely incomplete.
+        Args:
+            report: The load's report.
+            verified: Whether the load waited on its merges. An unverified
+                load knows only what it dispatched, so saying nothing merged would
+                be wrong rather than merely incomplete.
         """
         self.stdout.write(str(report))
         for check in report.preflight:
@@ -456,7 +469,8 @@ class Command(BaseCommand):
     def print_counts(self, report: LoadReport) -> None:
         """Write what the run's merges wrote, one line per model, table style.
 
-        :param report: The load's report.
+        Args:
+            report: The load's report.
         """
         models = sorted(set(report.creates) | set(report.updates))
         if not models:
@@ -482,8 +496,11 @@ class Command(BaseCommand):
     def humanize_outcome(wait: WaitOutcome | None) -> str:
         """Human readable WaitOutcome for reporting.
 
-        :param wait: How the phase's wait ended.
-        :return: A clause to append, empty where there is nothing to say.
+        Args:
+            wait: How the phase's wait ended.
+
+        Returns:
+            A clause to append, empty where there is nothing to say.
         """
         match wait:
             case WaitOutcome.STALLED:

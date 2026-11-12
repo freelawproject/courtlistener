@@ -50,13 +50,13 @@ class Command(VerboseCommand):
         court_mapping: str,
         start_timestamp: datetime,
     ) -> None:
-        """
-        Processes a batch of court data for LLM cleaning by using one Celery task per court_mapping.
+        """Processes a batch of court data for LLM cleaning by using one Celery task per court_mapping.
 
-        :param celery_queue: The name of the Celery queue to use for task dispatch.
-        :param court_batch: A batch of court records with docket IDs and numbers.
-        :param court_mapping: Identifier for the court mapping.
-        :param start_timestamp: Timestamp marking the start of the daemon job.
+        Args:
+            celery_queue: The name of the Celery queue to use for task dispatch.
+            court_batch: A batch of court records with docket IDs and numbers.
+            court_mapping: Identifier for the court mapping.
+            start_timestamp: Timestamp marking the start of the daemon job.
         """
         self.throttle.maybe_wait()
         clean_docket_number_by_court.apply_async(

@@ -5,10 +5,13 @@ from cl.visualizations.models import JSONVersion
 
 
 async def build_visualization(viz):
-    """Use the start and end points to generate a visualization
+    """Use the start and end points to generate a visualization.
 
-    :param viz: A Visualization object to work on
-    :return: A tuple of (status<str>, viz)
+    Args:
+        viz: A Visualization object to work on
+
+    Returns:
+        A tuple of (status<str>, viz)
     """
     build_kwargs = {
         "parent_authority": viz.cluster_end,

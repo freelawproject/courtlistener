@@ -14,9 +14,7 @@ from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
 def get_recap_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[RECAPDocument]:
-    """
-    Creates a queryset that retrieves a random sample of RECAPDocuments from
-    the database.
+    """Creates a queryset that retrieves a random sample of RECAPDocuments from the database.
 
     This function utilizes the TABLESAMPLE SYSTEM clause within a raw SQL query
     to efficiently retrieve a random subset of RECAPDocuments from the database.
@@ -41,9 +39,7 @@ def get_recap_random_dataset(
 def get_opinions_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[Opinion]:
-    """
-    Creates a queryset that retrieves a random sample of Opinions from the
-    database.
+    """Creates a queryset that retrieves a random sample of Opinions from the database.
 
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
@@ -60,8 +56,7 @@ def get_opinions_random_dataset(
 
 
 def get_clean_opinion_text(opinion: Opinion) -> str:
-    """
-    Extracts and cleans the opinion text from a provided Opinion object.
+    """Extracts and cleans the opinion text from a provided Opinion object.
 
     This function attempts to retrieve the opinion text from various source
     fields within the Opinion object, prioritizing HTML formats with citations
@@ -109,8 +104,7 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
 
 
 def compute_avg_from_list(array: list[float]) -> float:
-    """
-    Computes the average of a list of numbers.
+    """Computes the average of a list of numbers.
 
     Args:
         array (list[float]): A list containing numeric values.
@@ -155,9 +149,7 @@ class Command(VerboseCommand):
     def _compute_case_law_token_count(
         self, percentage: float, db_connection: str
     ):
-        """
-        Computes and reports token counts for Caselaw dataset.
-        """
+        """Computes and reports token counts for Caselaw dataset."""
         opinion_queryset = get_opinions_random_dataset(
             percentage, db_connection
         )
@@ -200,9 +192,7 @@ class Command(VerboseCommand):
     def _compute_recap_token_count(
         self, percentage: float, db_connection: str
     ):
-        """
-        Computes and reports token counts for RECAP Documents.
-        """
+        """Computes and reports token counts for RECAP Documents."""
         rd_queryset = get_recap_random_dataset(percentage, db_connection)
 
         token_count = []

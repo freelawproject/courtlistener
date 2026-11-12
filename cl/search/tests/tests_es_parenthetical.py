@@ -40,7 +40,7 @@ from cl.tests.cases import (
 
 
 class ParentheticalESTest(ESIndexTestCase, TestCase):
-    """Parenthetical ES search related tests"""
+    """Parenthetical ES search related tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -176,7 +176,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         super().setUpClass()
 
     def test_filter_search(self) -> None:
-        """Test filtering and search at the same time"""
+        """Test filtering and search at the same time."""
         filters = []
         filters.append(Q("match", representative_text="different"))
         s1 = ParentheticalGroupDocument.search().filter(
@@ -191,7 +191,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s2.count(), 1)
 
     def test_filter_daterange(self) -> None:
-        """Test filter by date range"""
+        """Test filter by date range."""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -213,7 +213,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s1.count(), 2)
 
     def test_filter_search_2(self) -> None:
-        """Test filtering date range and search at the same time"""
+        """Test filtering date range and search at the same time."""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -235,7 +235,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 1)
 
     def test_ordering(self) -> None:
-        """Test filter and then ordering by descending dateFiled"""
+        """Test filter and then ordering by descending dateFiled."""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -269,11 +269,11 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     @staticmethod
     def get_article_count(r):
-        """Get the article count in a query response"""
+        """Get the article count in a query response."""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_build_daterange_query(self) -> None:
-        """Test build es daterange query"""
+        """Test build es daterange query."""
         filters = []
         date_gte = datetime.datetime(1976, 8, 30, 0, 0).date()
         date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
@@ -287,13 +287,13 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 2)
 
     def test_build_fulltext_query(self) -> None:
-        """Test build es fulltext query"""
+        """Test build es fulltext query."""
         q1 = build_fulltext_query(["representative_text"], "responsibility")
         s = ParentheticalGroupDocument.search().filter(q1)
         self.assertEqual(s.count(), 1)
 
     def test_build_term_query(self) -> None:
-        """Test build es terms query"""
+        """Test build es terms query."""
         filters = []
         q = build_term_query(
             "court_id",
@@ -306,8 +306,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 2)
 
     def test_cd_query(self) -> None:
-        """Test build es query with cleaned data"""
-
+        """Test build es query with cleaned data."""
         cd = {
             "filed_after": datetime.datetime(1976, 8, 30, 0, 0).date(),
             "filed_before": datetime.datetime(1978, 3, 10, 0, 0).date(),
@@ -319,7 +318,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
-        """Test build es query with cleaned data"""
+        """Test build es query with cleaned data."""
         cd = {
             "filed_after": "",
             "filed_before": "",
@@ -335,7 +334,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             self.assertEqual(s.count(), 4)
 
     def test_docket_number_filter(self) -> None:
-        """Test filter by docker_number"""
+        """Test filter by docker_number."""
         filters = []
 
         filters.append(Q("term", docketNumber="1:98-cr-35856"))
@@ -346,7 +345,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 1)
 
     def test_build_sort(self) -> None:
-        """Test we can build sort dict and sort ES query"""
+        """Test we can build sort dict and sort ES query."""
         cd = {"order_by": "dateFiled desc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
@@ -385,8 +384,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
 
     def test_group_results(self) -> None:
-        """Test retrieve results grouped by group_id"""
-
+        """Test retrieve results grouped by group_id."""
         cd = {"type": SEARCH_TYPES.PARENTHETICAL, "q": ""}
         q1 = build_fulltext_query(["representative_text"], "Necessary")
         s = ParentheticalGroupDocument.search().query(q1)
@@ -410,7 +408,6 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     def test_index_advanced_search_fields(self) -> None:
         """Test confirm advanced search fields are indexed."""
-
         filters = []
         filters.append(Q("term", docketNumber="1:98-cr-35856"))
         s = ParentheticalGroupDocument.search().filter(
@@ -514,7 +511,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 class ParentheticalESSignalProcessorTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
-    """Parenthetical ES indexing related tests"""
+    """Parenthetical ES indexing related tests."""
 
     def setUp(self):
         super().setUp()
@@ -570,7 +567,6 @@ class ParentheticalESSignalProcessorTest(
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""
-
         # Retrieve the document from ES and confirm it was indexed.
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual(self.cluster_1.docket.docket_number, doc.docketNumber)
@@ -729,10 +725,7 @@ class ParentheticalESSignalProcessorTest(
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
 
     def test_parenthetical_indexing_and_tasks_count(self) -> None:
-        """Confirm a ParentheticalGroup is properly indexed in ES with the
-        right number of indexing tasks.
-        """
-
+        """Confirm a ParentheticalGroup is properly indexed in ES with the right number of indexing tasks."""
         # Index ParentheticalGroup on creation.
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",

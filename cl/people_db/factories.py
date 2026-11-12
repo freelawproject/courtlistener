@@ -163,7 +163,7 @@ class PartyFactory(DjangoModelFactory):
 
     @post_generation
     def docket(self, create, extracted, **kwargs):
-        """Override default docket"""
+        """Override default docket."""
         if not create:
             return
         self.docket = extracted
@@ -195,8 +195,7 @@ class PartyTypeFactory(DjangoModelFactory):
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
-        """Override default docket"""
-
+        """Override default docket."""
         docket = kwargs.pop("docket", None)
         if not docket:
             return None

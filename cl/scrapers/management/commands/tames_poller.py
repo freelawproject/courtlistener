@@ -63,8 +63,11 @@ def verify_subscription_success(html: str) -> tuple[bool, str]:
     your list" response are treated as successful. Note that it is
     possible to subscribe successfully to cases that do not exist.
 
-    :param html: Raw HTML from the CaseMail CaseAdd endpoint.
-    :returns: ``(is_success, message_text)`` where *message_text* is the
+    Args:
+        html: Raw HTML from the CaseMail CaseAdd endpoint.
+
+    Returns:
+        ``(is_success, message_text)`` where *message_text* is the
         extracted message or a fallback description when no message is
         found.
     """
@@ -96,10 +99,13 @@ def _login_tames(
     Fetches the login page, extracts ASP.NET hidden fields, and POSTs
     credentials.
 
-    :param session: A requests session to authenticate.
-    :param tames_user: Dict with "username" and "password" keys.
-    :raises SubscriptionFailure: If login fails.
-    :raises requests.RequestException: If the login request fails.
+    Args:
+        session: A requests session to authenticate.
+        tames_user: Dict with "username" and "password" keys.
+
+    Raises:
+        SubscriptionFailure: If login fails.
+        requests.RequestException: If the login request fails.
     """
     resp = session.get(CASEMAIL_LOGIN_URL, timeout=30)
     resp.raise_for_status()
@@ -141,8 +147,9 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
     SET, attempts to subscribe, and removes successful cases. Failed cases
     remain in the SET for the next poll cycle.
 
-    :param redis: Redis interface (CACHE).
-    :param tames_user: Dict with "username", "password", "email" keys.
+    Args:
+        redis: Redis interface (CACHE).
+        tames_user: Dict with "username", "password", "email" keys.
     """
     pending_members = redis.smembers(TAMES_PENDING_SUBSCRIPTIONS_KEY)
     if not pending_members:

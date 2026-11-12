@@ -28,9 +28,12 @@ FLORIDA_COURT_IDS: set[str] = set(FLORIDA_COURT_ID_MAP.values()) | {
 def is_florida_court(court_id: str) -> bool:
     """Check if the given `court_id` belongs to a Florida state court.
 
-    :param court_id: The court ID to check.
-    :return: Whether the ID belongs to a Florida state court."""
+    Args:
+        court_id: The court ID to check.
 
+    Returns:
+        Whether the ID belongs to a Florida state court.
+    """
     return court_id in FLORIDA_COURT_IDS
 
 
@@ -61,9 +64,13 @@ def make_docket_number_core(
 
     The `court_id` parameter helps determine what format to force.
 
-    :param docket_number: The docket number to normalize.
-    :param court_id: The court ID of the docket. Defaults to the Supreme Court.
-    :return: The normalized Florida docket number."""
+    Args:
+        docket_number: The docket number to normalize.
+        court_id: The court ID of the docket. Defaults to the Supreme Court.
+
+    Returns:
+        The normalized Florida docket number.
+    """
     if not is_florida_court(court_id):
         logger.error(
             "Cannot make Florida DN core from non-Florida court %s", court_id

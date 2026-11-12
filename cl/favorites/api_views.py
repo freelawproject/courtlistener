@@ -95,10 +95,7 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
     http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
-        """
-        Return a list of all the open prayers
-        for the currently authenticated user.
-        """
+        """Return a list of all the open prayers for the currently authenticated user."""
         user = self.request.user
         return Prayer.objects.filter(
             user=user, status=Prayer.WAITING
@@ -112,8 +109,7 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
     throttle_classes = [EventCounterThrottle]
 
     def create(self, request, *args, **kwargs):
-        """
-        Handle a POST request to increment event counters based on their label.
+        """Handle a POST request to increment event counters based on their label.
 
         This method validates incoming request data, retrieves or creates a
         GenericCount record for the specified label, and atomically increments

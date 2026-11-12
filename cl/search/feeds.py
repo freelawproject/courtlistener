@@ -1,21 +1,29 @@
 import logging
 from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 from django.contrib.syndication.views import Feed
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.html import strip_tags
+from django.utils.text import slugify
 from django.utils.timezone import is_naive
 from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, TransportError
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import do_es_feed_query
+from cl.lib.elasticsearch_utils import (
+    do_es_feed_query,
+    get_docket_entry_fragment,
+)
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.search_index_utils import null_map
 from cl.lib.search_utils import scotus_frontend_search_enabled
+from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
 from cl.search.exception import (
@@ -42,16 +50,17 @@ def get_item(item):
 def cleanup_control_chars(
     items: Response, document_text_key: str, jurisdiction: bool = False
 ) -> None:
-    """Clean up control characters from document texts for a proper XML
-    rendering.
+    """Clean up control characters from document texts for a proper XML rendering.
 
-    :param items: The ES Response containing the search results.
-    :param document_text_key: Key in the item dict to clean.
-    :param jurisdiction: A bool to indicate if the item is from a jurisdiction
-    feed.
-    :return: None. The function modify items in place.
+    Args:
+        items: The ES Response containing the search results.
+        document_text_key: Key in the item dict to clean.
+        jurisdiction: A bool to indicate if the item is from a jurisdiction
+            feed.
+
+    Returns:
+        None. The function modify items in place.
     """
-
     for item in items:
         if document_text_key == "text":
             # Opinions case.
@@ -76,8 +85,10 @@ def cleanup_control_chars(
 
 
 class SearchFeed(Feed):
-    """This feed returns the results of a search feed. It lacks a second
-    argument in the method b/c it gets its search query from a GET request.
+    """This feed returns the results of a search feed.
+
+    It lacks a second argument in the method b/c it gets its search query from
+    a GET request.
     """
 
     feed_type = Atom1Feed
@@ -92,8 +103,9 @@ class SearchFeed(Feed):
         return request
 
     def items(self, obj):
-        """Do a search query here. Return the first 20 results.
-        For Opinions SearchFeed returns clusters.
+        """Do a search query here.
+
+        Return the first 20 results. For Opinions SearchFeed returns clusters.
         For RECAP SearchFeed returns RECAPDocuments.
         """
         search_form = SearchForm(obj.GET)
@@ -133,8 +145,25 @@ class SearchFeed(Feed):
         cleanup_control_chars(items, document_text_key)
         return items
 
-    def item_link(self, item):
-        return get_item(item)["absolute_url"]
+    def item_link(self, item: AttrDict[Any]) -> str:
+        """Return the item's own page, or, for a RECAP search document without one, its entry on the docket page."""
+        doc = get_item(item)
+        if doc["absolute_url"]:
+            return doc["absolute_url"]
+        # RECAP and SCOTUS documents without a number have no page of their
+        # own, so link to their entry on the docket page. The slug is rebuilt
+        # the way Docket.save() does, since child documents don't store it.
+        docket_url = reverse(
+            "view_docket",
+            args=[doc["docket_id"], slugify(trunc(doc["caseName"], 75))],
+        )
+        return f"{docket_url}{get_docket_entry_fragment(doc)}"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        """Add the item's link to the description template's context, so its "Original document" link gets the same fallback as item_link."""
+        context = super().get_context_data(**kwargs)
+        context["item_link"] = self.item_link(kwargs["item"])
+        return context
 
     def item_author_name(self, item):
         return get_item(item)["court"]
@@ -159,9 +188,7 @@ class SearchFeed(Feed):
 
 
 class JurisdictionFeed(Feed):
-    """When working on this feed, note that it is overridden in a number of
-    places, so changes here may have unintended consequences.
-    """
+    """When working on this feed, note that it is overridden in a number of places, so changes here may have unintended consequences."""
 
     feed_type = Atom1Feed
     link = "https://www.courtlistener.com/"
@@ -177,8 +204,10 @@ class JurisdictionFeed(Feed):
         return get_object_or_404(Court, pk=court)
 
     def items(self, obj):
-        """Do a search query here. Return the first 20 results
-        JurisdictionFeed return Opinions instead of Clusters.
+        """Do a search query here.
+
+        Return the first 20 results JurisdictionFeed return Opinions instead of
+        Clusters.
         """
         es_search_query = OpinionClusterDocument.search()
         cd = {
@@ -232,7 +261,7 @@ class AllJurisdictionsFeed(JurisdictionFeed):
         return None
 
     def items(self, obj):
-        """Do a match all search query. Return the first 20 results"""
+        """Do a match all search query. Return the first 20 results."""
         es_search_query = OpinionClusterDocument.search()
         cd = {
             "order_by": "dateFiled desc",
@@ -248,8 +277,11 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 def search_feed_error_handler(view_func: Callable) -> Callable:
     """Wraps a Feed view function to handle search feed errors gracefully.
 
-    :param view_func: The Feed view to be wrapped.
-    :return: The wrapped view function that handles search feed errors.
+    Args:
+        view_func: The Feed view to be wrapped.
+
+    Returns:
+        The wrapped view function that handles search feed errors.
     """
 
     @wraps(view_func)

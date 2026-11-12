@@ -11,9 +11,10 @@ from cl.users.factories import UserWithChildProfileFactory
 
 
 class NoteFactory(DjangoModelFactory):
-    """Builds a Note on an OpinionCluster by default. Pass content_object=
-    to attach it to any other saved noteable object instead (see
-    NOTEABLE_MODELS in cl/favorites/utils.py).
+    """Builds a Note on an OpinionCluster by default.
+
+    Pass content_object= to attach it to any other saved noteable object
+    instead (see NOTEABLE_MODELS in cl/favorites/utils.py).
     """
 
     class Meta:

@@ -187,9 +187,11 @@ class SCOTUSAlertsPercolatorTest(ESIndexTestCase, TransactionTestCase):
                 },
                 download_file=True,
             )
-        mock_chain.return_value.apply_async.assert_called_once_with(
-            link_error=percolate_scotus_document.si(doc_pk)
+        pdf_chain = mock_chain.return_value
+        pdf_chain.link_error.assert_called_once_with(
+            percolate_scotus_document.si(doc_pk)
         )
+        pdf_chain.apply_async.assert_called_once_with()
 
     def test_document_without_a_pdf_download_is_percolated_on_creation(
         self, mock_prefix: mock.MagicMock

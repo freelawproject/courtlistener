@@ -108,12 +108,16 @@ class ZohoModule(ZohoBase):
 
     @staticmethod
     def handle_api_response(response: APIResponse | None) -> list[Any] | None:
-        """
-        Handle a Zoho API response, raising exceptions on errors.
+        """Handle a Zoho API response, raising exceptions on errors.
 
-        :param response: The response object from a Zoho API call.
-        :return: The data from the response if successful.
-        :raises Exception: if the response is None, empty, or contains an APIException.
+        Args:
+            response: The response object from a Zoho API call.
+
+        Returns:
+            The data from the response if successful.
+
+        Raises:
+            Exception: if the response is None, empty, or contains an APIException.
         """
         if response is None:
             raise Exception("Received no response from the API.")
@@ -159,8 +163,8 @@ class ZohoModule(ZohoBase):
     def _build_record(
         fields: dict[str | Field, Any], record_id: int | None = None
     ) -> Record:
-        """
-        Build a Zoho Record instance from a dictionary of fields.
+        """Build a Zoho Record instance from a dictionary of fields.
+
         Optionally set a record ID for updates.
         """
         record = Record()
@@ -180,9 +184,7 @@ class ZohoModule(ZohoBase):
         process: list[str] | None = None,
         triggers: list[str] | None = None,
     ) -> BodyWrapper:
-        """
-        Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
-        """
+        """Wrap one or more Record instances in a BodyWrapper with optional process and trigger."""
         wrapper = BodyWrapper()
         wrapper.set_data(records)
         wrapper.set_trigger(triggers or ["approval", "workflow", "blueprint"])
@@ -235,13 +237,16 @@ class ZohoDeskClient(ZohoBase):
     ) -> dict:
         """Create a new Zoho Desk ticket.
 
-        :param subject: Ticket subject line.
-        :param email: Submitter's email (used to link/create a Desk contact).
-        :param contact_name: Submitter's full name.
-        :param description: Full ticket body (plain text).
-        :param request_type: Request type label (e.g. "General Support").
-        :param assignee_id: Zoho Desk agent ID. Empty = unassigned.
-        :return: Parsed JSON response from the Desk API.
+        Args:
+            subject: Ticket subject line.
+            email: Submitter's email (used to link/create a Desk contact).
+            contact_name: Submitter's full name.
+            description: Full ticket body (plain text).
+            request_type: Request type label (e.g. "General Support").
+            assignee_id: Zoho Desk agent ID. Empty = unassigned.
+
+        Returns:
+            Parsed JSON response from the Desk API.
         """
         payload: dict = {
             "subject": subject,
@@ -281,11 +286,16 @@ class SearchRecordMixin:
         to the Zoho API. If matching records are found, they are returned
         as a list of data objects.
 
-        :param cl_ids: Optional list of CourtListener record IDs to search for.
-        :param emails: Optional list of email addresses to search for.
-        :param fields: Optional list of field names to retrieve from each record.
-        :return: A list of Zoho record data objects returned by the API.
-        :raises ValueError: If both `cl_ids` and `emails` are empty or None.
+        Args:
+            cl_ids: Optional list of CourtListener record IDs to search for.
+            emails: Optional list of email addresses to search for.
+            fields: Optional list of field names to retrieve from each record.
+
+        Returns:
+            A list of Zoho record data objects returned by the API.
+
+        Raises:
+            ValueError: If both `cl_ids` and `emails` are empty or None.
         """
         cl_ids = cl_ids or []
         emails = emails or []
@@ -325,13 +335,15 @@ class AddTagsMixin:
     def add_tags(
         self: HasModuleName, record_id: int, tag_names: list[str]
     ) -> list[Any] | None:
-        """
-        Add one or more tags to a Zoho CRM record.
+        """Add one or more tags to a Zoho CRM record.
 
-        :param record_id: The Zoho CRM record ID to tag.
-        :param tag_names: List of tag names to add. Tag matching is exact;
-            tags that don't already exist in Zoho will be auto-created.
-        :return: The Zoho API response data, parsed and validated by
+        Args:
+            record_id: The Zoho CRM record ID to tag.
+            tag_names: List of tag names to add. Tag matching is exact;
+                tags that don't already exist in Zoho will be auto-created.
+
+        Returns:
+            The Zoho API response data, parsed and validated by
             `ZohoModule.handle_api_response`.
         """
         tags = []
@@ -353,17 +365,19 @@ class CreateRecordMixin:
     def create_record(
         self: HasModuleName, fields: dict[str | Field, Any]
     ) -> list[Any] | None:
-        """
-        Create a single Zoho CRM record with the given field values.
+        """Create a single Zoho CRM record with the given field values.
 
         This method and sends a record creation request to the Zoho CRM API.
         It supports both standard Zoho fields (represented by `Field`
         instances) and custom fields (represented by string keys).
 
-        :param fields: A mapping of Zoho fields to their new values. Keys may
-            be `Field` instances for standard CRM fields or strings for custom
-            fields.
-        :return: The Zoho API response data, parsed and validated by
+        Args:
+            fields: A mapping of Zoho fields to their new values. Keys may
+                be `Field` instances for standard CRM fields or strings for custom
+                fields.
+
+        Returns:
+            The Zoho API response data, parsed and validated by
             `ZohoModule.handle_api_response`.
         """
         record_operations = RecordOperations(self.module_name)
@@ -380,13 +394,15 @@ class UpdateRecordMixin:
     def update_record(
         self: HasModuleName, record_id: int, fields: dict[str | Field, Any]
     ) -> list[Any] | None:
-        """
-        Update a Zoho CRM record with the given field values.
+        """Update a Zoho CRM record with the given field values.
 
-        :param record_id: The Zoho CRM record ID to update.
-        :param fields: A mapping of Zoho fields to their new values. Keys may be
-            `Field` instances for standard CRM fields or strings for custom fields.
-        :return: The Zoho API response data, parsed and validated by
+        Args:
+            record_id: The Zoho CRM record ID to update.
+            fields: A mapping of Zoho fields to their new values. Keys may be
+                `Field` instances for standard CRM fields or strings for custom fields.
+
+        Returns:
+            The Zoho API response data, parsed and validated by
             `ZohoModule.handle_api_response`.
         """
         record_operations = RecordOperations(self.module_name)

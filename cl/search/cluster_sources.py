@@ -121,8 +121,11 @@ class ClusterSources:
     def _canonical_combine(cls, chars: frozenset[str]) -> str:
         """Sort characters by CANONICAL_ORDER for a deterministic result.
 
-        :param chars: frozenset of single-character source codes
-        :return: combined source string in canonical order
+        Args:
+            chars: frozenset of single-character source codes
+
+        Returns:
+            combined source string in canonical order
         """
         return "".join(
             sorted(chars, key=lambda c: cls.CANONICAL_ORDER.index(c))
@@ -130,13 +133,16 @@ class ClusterSources:
 
     @classmethod
     def merge_sources(cls, source1: str, source2: str) -> str:
-        """Merge source values
+        """Merge source values.
 
         Use this to merge sources when merging clusters
 
-        :param source1: a source
-        :param source2: other source
-        :return: a source which merges the input sources
+        Args:
+            source1: a source
+            source2: other source
+
+        Returns:
+            a source which merges the input sources
         """
         unique_parts = frozenset(source1 + source2)
 
@@ -154,8 +160,11 @@ class ClusterSources:
         For known combinations, returns the name from NAMES.
         For dynamically-generated combinations, builds a descriptive name.
 
-        :param source: source string (e.g. "CM", "ZLCRU")
-        :return: human-readable description
+        Args:
+            source: source string (e.g. "CM", "ZLCRU")
+
+        Returns:
+            human-readable description
         """
         names_dict = dict(cls.NAMES)
         if source in names_dict:
@@ -169,12 +178,14 @@ class ClusterSources:
 
     @classmethod
     def validate_source(cls, value: str) -> None:
-        """Validate that a source string contains only known base source
-        characters in canonical order.
+        """Validate that a source string contains only known base source characters in canonical order.
 
-        :param value: source string to validate
-        :raises ValidationError: if value contains invalid characters or
-            is not in canonical order
+        Args:
+            value: source string to validate
+
+        Raises:
+            ValidationError: if value contains invalid characters or
+                is not in canonical order
         """
         valid_chars = set(cls.CANONICAL_ORDER)
         if invalid := set(value) - valid_chars:

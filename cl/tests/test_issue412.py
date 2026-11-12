@@ -1,8 +1,5 @@
 # pylint: disable=C0103
-"""
-Test Issue 412: Add admin-visible notice to various pages showing if they are
-blocked from search engines
-"""
+"""Test Issue 412: Add admin-visible notice to various pages showing if they are blocked from search engines."""
 
 from django.contrib.auth.hashers import make_password
 from django.urls import reverse
@@ -34,10 +31,7 @@ class Base412Test(BaseSeleniumTest):
 
 
 class OpinionBlockedFromSearchEnginesTest(Base412Test):
-    """
-    Tests for validating UX elements of showing or not showing visual
-    indications of whether Opinions are blocked from Search Engines
-    """
+    """Tests for validating UX elements of showing or not showing visual indications of whether Opinions are blocked from Search Engines."""
 
     fixtures = [
         "test_court.json",
@@ -82,7 +76,7 @@ class OpinionBlockedFromSearchEnginesTest(Base412Test):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_opinion(self) -> None:
-        """For a non-blocked Opinion, there should be no indication"""
+        """For a non-blocked Opinion, there should be no indication."""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -100,10 +94,7 @@ class OpinionBlockedFromSearchEnginesTest(Base412Test):
 
 
 class DocketBlockedFromSearchEnginesTest(Base412Test):
-    """
-    Tests for validating UX elements of showing or not showing visual
-    indications of whether Dockets are blocked from Search Engines
-    """
+    """Tests for validating UX elements of showing or not showing visual indications of whether Dockets are blocked from Search Engines."""
 
     fixtures = [
         "test_court.json",
@@ -168,10 +159,7 @@ class DocketBlockedFromSearchEnginesTest(Base412Test):
 
 
 class AudioBlockedFromSearchEnginesTest(Base412Test):
-    """
-    Tests for validating UX elements of showing or not showing visual
-    indications of whether Audio pages are blocked from Search Engines
-    """
+    """Tests for validating UX elements of showing or not showing visual indications of whether Audio pages are blocked from Search Engines."""
 
     fixtures = [
         "test_court.json",
@@ -239,7 +227,7 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_audio_page(self) -> None:
-        """For a non-blocked Audio pages, there should be no indication"""
+        """For a non-blocked Audio pages, there should be no indication."""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")

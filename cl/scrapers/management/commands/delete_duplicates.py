@@ -27,15 +27,14 @@ def delete_duplicate_opinion(
     strict_merging: bool,
     stats: defaultdict,
 ) -> None:
-    """Deletes a duplicate opinion and cluster, saving it's metadata
+    """Deletes a duplicate opinion and cluster, saving it's metadata.
 
-    :param opinion_to_keep: the opinion to keep
-    :param opinion_to_delete: the opinion that will be deleted
-    :param strict_merging: raise an error if there is any difference in
-        related metadata
-    :param stats: a dict to count events
-
-    :return None
+    Args:
+        opinion_to_keep: the opinion to keep
+        opinion_to_delete: the opinion that will be deleted
+        strict_merging: raise an error if there is any difference in
+            related metadata
+        stats: a dict to count events
     """
     # merge all metadata
     opinion_needs_update = merge_metadata(
@@ -117,12 +116,11 @@ def delete_duplicate_opinion(
 def delete_same_hash_duplicates(
     stats: defaultdict, sources: list[str]
 ) -> None:
-    """Delete opinions with the same hash, and their related objects
+    """Delete opinions with the same hash, and their related objects.
 
-    :param stats: a dictionary to count events
-    :param sources: a list of OpinionCluster.source values
-
-    :return None
+    Args:
+        stats: a dictionary to count events
+        sources: a list of OpinionCluster.source values
     """
     # Group opinions by hash
     # Keep the groups with a single hash, and more than 1 row
@@ -191,11 +189,14 @@ def delete_same_hash_duplicates(
 
 
 def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
-    """Computes the hash over the cleaned up opinion content
+    """Computes the hash over the cleaned up opinion content.
 
-    :param opinion: the opinion
-    :param site: the juriscraper site
-    :return: the sha1 hash
+    Args:
+        opinion: the opinion
+        site: the juriscraper site
+
+    Returns:
+        the sha1 hash
     """
     content = opinion.local_path.read()
     return sha1(force_bytes(site.cleanup_content(content)))
@@ -204,8 +205,7 @@ def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
 def delete_cleaned_up_content_duplicates(
     stats: defaultdict, court_id: str, site: OpinionSite
 ) -> None:
-    """Get duplicate candidate groups and check if their hashes are the same
-    after applying `Site.cleanup_content` from the proper juriscraper module
+    """Get duplicate candidate groups and check if their hashes are the same after applying `Site.cleanup_content` from the proper juriscraper module.
 
     This is mostly reusing logic from `merge_opinion_versions_by_download_url`.
     Since this are different hash duplicates, they sort of look like versions,
@@ -216,9 +216,10 @@ def delete_cleaned_up_content_duplicates(
     `local_path` string manipulation to drop the index _1, _2, _3 which may
     become costy
 
-    :param stats: stats dictionary for reporting
-    :param court_id: a court id to group opinions by
-    :param site: a juriscraper Site with a `cleanup_content` method
+    Args:
+        stats: stats dictionary for reporting
+        court_id: a court id to group opinions by
+        site: a juriscraper Site with a `cleanup_content` method
     """
     query = Q(
         cluster__docket__court_id=court_id,
@@ -271,11 +272,11 @@ def delete_cleaned_up_content_duplicates(
 
 
 def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
-    """Get duplicate candidate groups and check if their content is the same
-    after hardcoded cleanups by court
+    """Get duplicate candidate groups and check if their content is the same after hardcoded cleanups by court.
 
-    :param stats: stats dictionary for reporting
-    :param court_id: a court id to group opinions by
+    Args:
+        stats: stats dictionary for reporting
+        court_id: a court id to group opinions by
     """
     if court_id not in ["neb", "nebctapp", "coloctapp"]:
         raise ValueError(
