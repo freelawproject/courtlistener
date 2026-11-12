@@ -279,6 +279,13 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PARENTHETICAL: "id",
 }
 
+# SCOTUS documents have no id (it's RECAP-only), so the search page's
+# document counts also count their uid. The search APIs don't show SCOTUS
+# yet, so they count id only.
+cardinality_query_extra_unique_ids = {
+    SEARCH_TYPES.RECAP_DOCUMENT: "uid",
+}
+
 
 date_decay_relevance_types = {
     SEARCH_TYPES.OPINION: {
