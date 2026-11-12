@@ -1,9 +1,11 @@
 # Code for importing Centralia structured opinion extractions into the DB
 import logging
 from enum import StrEnum
+from html import unescape
 from typing import Any
 
 from django.db import transaction
+from django.utils.html import strip_tags
 from eyecite import get_citations
 from juriscraper.lib.string_utils import titlecase
 
@@ -122,15 +124,33 @@ def _syllabus_html(payload: dict) -> str:
     )
 
 
+def _text_length(text: str | None) -> int:
+    """Count the characters of a text, leaving out whitespace.
+
+    pdftotext pads `plain_text` with layout spaces and blank lines that a
+    structured read drops, so whitespace would skew any comparison of the
+    two.
+
+    :param text: The text to measure.
+    :return: The number of non-whitespace characters.
+    """
+    return sum(not char.isspace() for char in text or "")
+
+
 def _payload_text_length(payload: dict) -> int:
-    """Total plain text the structured read recovered.
+    """Total text the structured read recovered, leaving out whitespace.
+
+    Covers everything the read takes from the PDF, so it can be compared
+    with the opinion's `plain_text`, which holds the whole PDF.
 
     :param payload: Doctor's structured payload.
-    :return: Combined length of the headmatter and every writing's text.
+    :return: Combined length of the headmatter, the syllabus and every
+    writing's text, counted with _text_length.
     """
-    total = len((payload.get("headmatter") or {}).get("text") or "")
+    total = _text_length((payload.get("headmatter") or {}).get("text"))
+    total += _text_length(unescape(strip_tags(_syllabus_html(payload))))
     for writing in payload.get("opinions") or []:
-        total += len(writing.get("text") or "")
+        total += _text_length(writing.get("text"))
     return total
 
 
@@ -175,7 +195,7 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
 
     # Guard against a silently partial read by comparing against whatever
     # the existing extraction already managed.
-    existing = len(opinion.plain_text or "")
+    existing = _text_length(opinion.plain_text)
     recovered = _payload_text_length(payload)
     if existing and recovered < existing * MIN_TEXT_COVERAGE:
         return False, (
@@ -260,21 +280,33 @@ def compare_structured_extraction(
     the opinion's current content. Citation counting runs eyecite on both
     versions, so this is too slow to run on every ingest.
 
+    Both sides cover the whole PDF: the current content was extracted from
+    all of it, so the extraction's headmatter and syllabus are counted along
+    with its writings.
+
     :param opinion: The opinion as currently stored.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
-    :return: The character counts of the current `plain_text` and of the
-    extracted text, and the number of citations eyecite finds in the
-    opinion's current content and in the extracted HTML.
+    :return: The character counts, without whitespace, of the current
+    `plain_text` and of the extracted text, and the number of citations
+    eyecite finds in the opinion's current content and in the extracted
+    HTML.
     """
     extracted = Opinion(
         html="".join(
-            _wrap(writing.get("html") or "")
-            for writing in data.get("opinions") or []
+            _wrap(fragment)
+            for fragment in (
+                (data.get("headmatter") or {}).get("html") or "",
+                _syllabus_html(data),
+                *(
+                    writing.get("html") or ""
+                    for writing in data.get("opinions") or []
+                ),
+            )
         )
     )
     return {
-        "old_chars": len(opinion.plain_text or ""),
+        "old_chars": _text_length(opinion.plain_text),
         "new_chars": _payload_text_length(data),
         "old_citations": count_citations(opinion),
         "new_citations": count_citations(extracted),
