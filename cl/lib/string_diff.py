@@ -1,3 +1,5 @@
+"""Helpers for comparing strings, mainly case names."""
+
 import difflib
 import math
 import re
@@ -8,6 +10,7 @@ from typing import TypedDict
 
 
 def remove_words(phrase: str) -> str:
+    """Strip punctuation and stop words from a phrase, joining the remaining words without spaces."""
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = (
         r"a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"

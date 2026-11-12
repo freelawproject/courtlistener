@@ -1,3 +1,5 @@
+"""Email backend that filters, stores, and rate-limits outgoing messages."""
+
 import time
 from collections.abc import Sequence
 
@@ -162,6 +164,14 @@ class EmailBackend(BaseEmailBackend):
         self,
         email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
     ) -> int:
+        """Store and send messages through the base backend.
+
+        Banned recipients are dropped, and recipients under a backoff period
+        get the message queued instead of sent.
+
+        Returns:
+            The number of messages sent.
+        """
         if not email_messages:
             return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).
