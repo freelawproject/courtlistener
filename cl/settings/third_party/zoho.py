@@ -1,3 +1,5 @@
+"""Settings for the Zoho CRM SDK and Zoho Desk."""
+
 import os
 import tempfile
 

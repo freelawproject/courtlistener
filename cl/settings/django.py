@@ -1,3 +1,5 @@
+"""Core Django settings: databases, caches, static files, templates, middleware, and apps."""
+
 from pathlib import Path
 
 import environ

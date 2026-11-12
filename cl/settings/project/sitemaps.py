@@ -1,3 +1,5 @@
+"""Settings for sitemap generation."""
+
 import environ
 
 env = environ.FileAwareEnv()

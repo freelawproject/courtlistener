@@ -1,3 +1,5 @@
+"""Settings for Redis connections, retries, and databases."""
+
 import environ
 from redis import Redis
 from redis.backoff import ExponentialBackoff

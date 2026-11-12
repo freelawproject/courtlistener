@@ -1,3 +1,5 @@
+"""Miscellaneous settings: credentials for outside services, wiki URLs, and assorted limits."""
+
 import os
 from datetime import date
 

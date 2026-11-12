@@ -1,3 +1,5 @@
+"""Security-related settings, such as allowed hosts, HSTS, CORS, CSP, and authentication."""
+
 import socket
 
 import environ
