@@ -12,6 +12,15 @@ from cl.opinion_page.utils import make_docket_title
 from cl.search.models import Docket
 
 
+def _entry_number_of(item: SourceDocketEntry) -> int | None:
+    """Return the entry's number, or None when it has none.
+
+    Some sources, like Texas, have no entry numbers at all, so the feed
+    treats their entries like RECAP's unnumbered minute entries.
+    """
+    return getattr(item, "entry_number", None)
+
+
 class DocketFeed(Feed):
     """This feed returns the results of a search feed.
 
@@ -61,7 +70,7 @@ class DocketFeed(Feed):
 
     def item_title(self, item: SourceDocketEntry) -> SafeText:
         docket_title = make_docket_title(item.docket)
-        entry_number = item.entry_number
+        entry_number = _entry_number_of(item)
         if entry_number:
             preface = f"Entry #{entry_number}"
         else:
@@ -80,8 +89,8 @@ class DocketFeed(Feed):
         return item.description or main_doc.description
 
     def item_link(self, item: SourceDocketEntry) -> str:
-        if item.entry_number:
-            anchor = f"entry-{item.entry_number}"
+        if entry_number := _entry_number_of(item):
+            anchor = f"entry-{entry_number}"
         else:
             anchor = f"minute-entry-{item.pk}"
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
@@ -90,7 +99,7 @@ class DocketFeed(Feed):
         return midnight_pt(item.date_filed)
 
     def item_enclosure_url(self, item: SourceDocketEntry) -> str | None:
-        if not item.entry_number:
+        if not _entry_number_of(item):
             return None
 
         # If we don't have a representative document, abort.

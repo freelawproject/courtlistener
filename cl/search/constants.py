@@ -9,6 +9,17 @@ from cl.search.models import SEARCH_TYPES, Court, Opinion
 # listing them in both modules makes it easy to miss one.
 SCOTUS_COURT_IDS: frozenset[str] = frozenset({"scotus"})
 
+# Texas courts whose dockets come from TAMES (search.txcourts.gov), mapped to
+# the court code TAMES uses in its case URLs: the Supreme Court, the Court of
+# Criminal Appeals and the fifteen Courts of Appeals. The ids match the ones
+# texas_js_court_id_to_court_id gives the merged dockets.
+TAMES_COURT_CODES: dict[str, str] = {
+    "tex": "cossup",
+    "texcrimapp": "coscca",
+    **{f"txctapp{n}": f"coa{n:02}" for n in range(1, 16)},
+}
+TAMES_COURT_IDS: frozenset[str] = frozenset(TAMES_COURT_CODES)
+
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,

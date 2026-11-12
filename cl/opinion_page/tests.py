@@ -121,6 +121,7 @@ from cl.recap.factories import (
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.constants import TAMES_COURT_IDS
 from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -151,6 +152,11 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
     SCOTUSDocument,
+    TexasDocketEntry,
+)
+from cl.search.state.texas.factories import (
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
@@ -2085,6 +2091,156 @@ class IsSourceHiddenTest(TestCase):
                     ),
                     not active,
                 )
+
+
+class TexasDocketUrlTest(SimpleTestCase):
+    """Does Docket.texas_docket_url build the case page on TAMES for every TAMES court, and nothing for anything else?"""
+
+    def test_texas_docket_url(self) -> None:
+        """Is each court mapped to its TAMES court code, and is the URL left empty when it can't be built?"""
+        base = "https://search.txcourts.gov/Case.aspx"
+        cases = [
+            ("tex", "26-0999", f"{base}?cn=26-0999&coa=cossup"),
+            ("texcrimapp", "PD-0123-26", f"{base}?cn=PD-0123-26&coa=coscca"),
+            (
+                "txctapp3",
+                "03-24-00123-CV",
+                f"{base}?cn=03-24-00123-CV&coa=coa03",
+            ),
+            (
+                "txctapp15",
+                "15-25-00001-CV",
+                f"{base}?cn=15-25-00001-CV&coa=coa15",
+            ),
+            ("tex", "", ""),
+            ("scotus", "26-101", ""),
+        ]
+        for court_id, docket_number, expected in cases:
+            with self.subTest(court_id=court_id, docket_number=docket_number):
+                docket = Docket(court_id=court_id, docket_number=docket_number)
+                self.assertEqual(docket.texas_docket_url, expected)
+
+
+class TexasDocketEntrySourceTest(TestCase):
+    """Is every TAMES court served by the Texas source, and does that source load a page of entries in a fixed number of queries?"""
+
+    def test_every_tames_court_uses_the_texas_source(self) -> None:
+        """Do the Supreme Court, the Court of Criminal Appeals and the fifteen Courts of Appeals all map to TEXAS?"""
+        self.assertEqual(len(TAMES_COURT_IDS), 17)
+        for court_id in TAMES_COURT_IDS:
+            with self.subTest(court_id=court_id):
+                self.assertIs(
+                    docket_entry_sources.source_for_court_id(court_id),
+                    docket_entry_sources.TEXAS,
+                )
+
+    def test_entries_and_documents_load_in_two_queries(self) -> None:
+        """Do the docket page's entries and their documents take two queries, however many entries there are?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        for n in (1, 2, 3):
+            TexasDocumentFactory(
+                docket_entry=TexasDocketEntryFactory(
+                    docket=docket, sequence_number=f"2026-10-0{n}.001"
+                )
+            )
+        source = docket_entry_sources.TEXAS
+        with self.assertNumQueries(2):
+            documents = [
+                document
+                for entry in source.entries_queryset(docket)
+                for document in source.documents_for_entry(entry)
+            ]
+        self.assertEqual(len(documents), 3)
+
+    def test_initial_document_buttons_link_to_tames(self) -> None:
+        """Does the initial-document button point at the first document of the earliest entry, on TAMES, in one query?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        later = TexasDocketEntryFactory(
+            docket=docket, sequence_number="2026-10-02.001"
+        )
+        earliest = TexasDocketEntryFactory(
+            docket=docket, sequence_number="2026-10-01.001"
+        )
+        TexasDocumentFactory(docket_entry=later, url="https://example.com/b")
+        TexasDocumentFactory(
+            docket_entry=earliest, url="https://example.com/a"
+        )
+        with self.assertNumQueries(1):
+            buttons = docket_entry_sources.TEXAS.initial_document_buttons(
+                [docket.pk]
+            )
+        self.assertEqual(
+            buttons,
+            {
+                docket.pk: docket_entry_sources.InitialDocumentButton(
+                    None, "https://example.com/a", "Initial Document"
+                )
+            },
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_docket_page_waffle")
+class TexasDocketPageTest(TestCase):
+    """Does a Texas docket stay hidden behind texas_docket_page, and once the flag is on, render its entries and TAMES links in both stacks?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            docket_number="26-0999",
+        )
+        cls.document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=cls.docket,
+                sequence_number="2026-10-01.001",
+                description="Petition for review",
+            ),
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+        )
+        cls.url = reverse("view_docket", args=[cls.docket.pk, cls.docket.slug])
+
+    def test_docket_returns_404_while_flag_is_off(self) -> None:
+        """Is the page a 404, like SCOTUS before its launch, while texas_docket_page is off?"""
+        with override_flag("texas_docket_page", active=False):
+            r = self.client.get(self.url)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_docket_renders_entries_and_tames_links(self) -> None:
+        """With the flag on, does each stack list the entry, link the docket and the document to TAMES, and leave out the PACER-only controls?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                r = self.client.get(self.url)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                content = r.content.decode()
+                self.assertIn("Petition for review", content)
+                self.assertIn("View on TAMES", content)
+                self.assertIn(
+                    "https://search.txcourts.gov/Case.aspx?cn=26-0999&amp;coa=cossup",
+                    content,
+                )
+                self.assertIn(
+                    "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+                    content,
+                )
+                self.assertNotIn('name="entry_gte"', content)
+                self.assertNotIn("Buy on PACER", content)
+
+    def test_docket_feed_lists_entries_without_numbers(self) -> None:
+        """Does the docket feed list Texas entries, which have no entry number, linking each to its row on the docket page?"""
+        TexasDocketEntry.objects.filter(
+            pk=self.document.docket_entry_id
+        ).update(date_filed=date(2026, 10, 1))
+        r = self.client.get(reverse("docket_feed", args=[self.docket.pk]))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn("Minute entry from 2026-10-01", content)
+        self.assertIn(
+            f"#minute-entry-{self.document.docket_entry_id}", content
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
