@@ -19,6 +19,7 @@
         hx-target="#{{ tabs_id }}"
         hx-select="#{{ tabs_id }}"
         hx-swap="outerHTML show:none"
+        hx-sync="this:replace"
       >
         <ul role="list" class="flex gap-1">
           {% for tab in tabs %}
