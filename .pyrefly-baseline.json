@@ -1080,13 +1080,6 @@
       "severity": "error"
     },
     {
-      "column": 53,
-      "path": "cl/donate/api_views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `account_id` with type `int` in function `cl.lib.neon_utils.NeonClient.get_account_by_id`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/donate/api_views.py",
       "name": "unbound-name",
