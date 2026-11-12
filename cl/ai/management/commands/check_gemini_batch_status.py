@@ -263,9 +263,16 @@ def handle_request(
 
 
 class Command(VerboseCommand):
+    """Check in-progress Gemini batch jobs and process completed ones."""
+
     help = "Check the status of in-progress Google Gemini batch jobs and download results when complete."
 
     def handle(self, *args, **options):
+        """Check every in-progress Gemini batch request.
+
+        Raises:
+            CommandError: If ``GEMINI_BATCH_API_KEY`` is not set.
+        """
         super().handle(*args, **options)
         env = environ.FileAwareEnv()
         batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)

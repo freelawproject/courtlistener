@@ -1,3 +1,5 @@
+"""Google Gemini batch API wrapper and its request and result types."""
+
 import json
 import logging
 import mimetypes
