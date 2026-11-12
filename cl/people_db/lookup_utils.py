@@ -1,3 +1,5 @@
+"""Extract judge names from text and look up the matching people."""
+
 import html
 import re
 from datetime import date, timedelta

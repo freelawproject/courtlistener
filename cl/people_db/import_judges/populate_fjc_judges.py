@@ -1,3 +1,5 @@
+"""Create judges and their positions from Federal Judicial Center data."""
+
 import re
 from datetime import date
 
@@ -36,6 +38,12 @@ from cl.people_db.models import (
 
 
 def transform_employ(string):
+    """Split an FJC employment text cell into jobs.
+
+    Returns:
+        Parallel lists of positions, locations, start years, and end years,
+        or four ``[None]`` lists if the cell is null.
+    """
     if pd.isnull(string):
         return [None], [None], [None], [None]
     string_list = re.split("<BR>|;|<br>", string)
@@ -100,6 +108,13 @@ def transform_employ(string):
 
 
 def transform_bankruptcy(string):
+    """Split an FJC bankruptcy and magistrate service text cell into jobs.
+
+    Returns:
+        Parallel lists of positions, locations, start dates, and end dates,
+        or four ``[None]`` lists if the cell is empty or describes an
+        allotment as circuit justice.
+    """
     month_list = [
         "June",
         "March",
@@ -209,6 +224,18 @@ def transform_bankruptcy(string):
 
 
 def add_positions_from_row(item, person, testing, fix_nums=None):
+    """Create a person's judicial positions from an FJC row.
+
+    Handles up to six positions, skipping duplicates of existing positions.
+    Each position's appointer, political affiliation, and ABA rating are
+    recorded too, along with an FJC source per position. Nothing is saved
+    when ``testing``, and positions, affiliations, and ratings are only
+    saved for position numbers in ``fix_nums`` when it is given.
+
+    Raises:
+        Exception: If ``match_court_string`` finds no court for a
+            position's court name.
+    """
     # add position items (up to 6 of them)
     prev_politics = None
     for posnum in range(1, 7):

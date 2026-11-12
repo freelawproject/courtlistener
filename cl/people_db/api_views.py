@@ -1,3 +1,5 @@
+"""REST API viewsets for judges, parties, and attorneys."""
+
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions
 
@@ -46,6 +48,8 @@ from cl.people_db.models import (
 
 
 class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for people."""
+
     queryset = Person.objects.prefetch_related(
         "positions",
         "educations__school",
@@ -81,6 +85,8 @@ class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class PositionViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for positions."""
+
     queryset = (
         Position.objects.select_related(
             "person",
@@ -126,6 +132,8 @@ class PositionViewSet(
 class RetentionEventViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for retention events."""
+
     queryset = RetentionEvent.objects.order_by("-id")
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
@@ -147,6 +155,8 @@ class RetentionEventViewSet(
 class EducationViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for education records."""
+
     queryset = Education.objects.select_related("school").order_by("-id")
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
@@ -166,6 +176,8 @@ class EducationViewSet(
 
 
 class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for schools."""
+
     queryset = School.objects.order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
@@ -187,6 +199,8 @@ class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class PoliticalAffiliationViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for political affiliations."""
+
     queryset = PoliticalAffiliation.objects.order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
@@ -212,6 +226,8 @@ class PoliticalAffiliationViewSet(
 
 
 class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for people's sources."""
+
     queryset = Source.objects.order_by("-id")
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
@@ -233,6 +249,8 @@ class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class ABARatingViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for ABA ratings."""
+
     queryset = ABARating.objects.order_by("-id")
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter
@@ -259,6 +277,8 @@ class ABARatingViewSet(
 class PartyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for parties."""
+
     permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
@@ -286,6 +306,8 @@ class PartyViewSet(
 class AttorneyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for attorneys."""
+
     permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter

@@ -1,3 +1,5 @@
+"""Import federal, magistrate, and bankruptcy judges from CSV files."""
+
 import argparse
 
 import numpy as np
@@ -13,9 +15,19 @@ from cl.search.models import Court
 
 
 class Command(VerboseCommand):
+    """Run a judge import action on an input file."""
+
     help = "Import judge data from various files."
 
     def valid_actions(self, s):
+        """Look up the action method named by ``s``.
+
+        ``s`` is validated in lowercase but looked up as given.
+
+        Raises:
+            argparse.ArgumentTypeError: If ``s``, lowercased, isn't a valid
+                action.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -26,12 +38,18 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def ensure_input_file(self):
+        """Check that an input file was given.
+
+        Raises:
+            argparse.ArgumentTypeError: If no input file was given.
+        """
         if not self.options["input_file"]:
             raise argparse.ArgumentTypeError(
                 "--input_file is a required argument for this action."
             )
 
     def add_arguments(self, parser):
+        """Add the offset, limit, debug, action, input file, and jurisdiction options."""
         parser.add_argument(
             "--offset",
             type=int,
@@ -75,6 +93,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action."""
         super().handle(*args, **options)
         self.debug = options["debug"]
         self.options = options
@@ -83,6 +102,10 @@ class Command(VerboseCommand):
         self.options["action"](self)
 
     def import_fjc_judges(self, infile=None):
+        """Create federal judges from the rows of an FJC CSV, within the offset and limit.
+
+        Uses ``--input_file`` if ``infile`` isn't given.
+        """
         if infile is None:
             self.ensure_input_file()
             infile = self.options["input_file"]
@@ -114,6 +137,10 @@ class Command(VerboseCommand):
             make_federal_judge(dict(row), testing=self.debug)
 
     def process_mag_bk_entries(self, df):
+        """Create magistrate and bankruptcy judges from a dataframe's rows, within the offset and limit.
+
+        Rows that fail validation are collected and printed at the end.
+        """
         bad_record = []
 
         textfields = [
@@ -146,6 +173,10 @@ class Command(VerboseCommand):
             print(b)
 
     def import_mag_bk_judges(self, infile=None):
+        """Create magistrate and bankruptcy judges from the CSV rows that have a start date granularity.
+
+        Uses ``--input_file`` if ``infile`` isn't given.
+        """
         if infile is None:
             self.ensure_input_file()
             infile = self.options["input_file"]
