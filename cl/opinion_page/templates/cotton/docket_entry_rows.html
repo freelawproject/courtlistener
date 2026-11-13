@@ -11,7 +11,8 @@
 {% if docket_entries %}
   {# Column headers — desktop only #}
   <div class="hidden md:flex border-b border-greyscale-200 bg-greyscale-100 rounded-lg px-4 py-2 text-sm font-medium text-greyscale-700">
-    <div class="w-28 shrink-0">Document Number</div>
+    {# Sources whose entries are never numbered keep the empty column so the layout matches the other sources. #}
+    <div class="w-28 shrink-0">{% if docket_source.has_entry_numbers %}Document Number{% endif %}</div>
     <div class="w-32 shrink-0">Date Filed</div>
     <div class="flex-1">Description</div>
   </div>
@@ -24,10 +25,12 @@
         <div class="flex gap-2">
           <dl class="flex-1 flex flex-wrap items-start md:flex-nowrap text-sm m-0">
             <div class="md:w-28 md:shrink-0">
-              <dt class="sr-only">Document Number</dt>
-              <dd class="font-medium md:font-normal text-greyscale-900">
-                {{ entry.entry_number|default_if_none:"" }}
-              </dd>
+              {% if docket_source.has_entry_numbers %}
+                <dt class="sr-only">Document Number</dt>
+                <dd class="font-medium md:font-normal text-greyscale-900">
+                  {{ entry.entry_number|default_if_none:"" }}
+                </dd>
+              {% endif %}
             </div>
             <div class="ml-auto md:ml-0 md:w-32 md:shrink-0 text-greyscale-700">
               <dt class="sr-only">Date Filed</dt>

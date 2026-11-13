@@ -4971,6 +4971,39 @@ class DocketWithoutEntryNumbersTest(TestCase):
                     self.assertNotIn('name="entry_gte"', content)
                     self.assertNotIn('name="entry_lte"', content)
 
+    def test_entry_number_column_unlabeled(self) -> None:
+        """Does each stack drop the "Document Number" label, which would head an always-empty column, only for a source without entry numbers?"""
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        for has_entry_numbers in (True, False):
+            source = replace(
+                docket_entry_sources.RECAP,
+                has_entry_numbers=has_entry_numbers,
+            )
+            for new_design in (False, True):
+                with (
+                    self.subTest(
+                        has_entry_numbers=has_entry_numbers,
+                        new_design=new_design,
+                    ),
+                    mock.patch.dict(
+                        docket_entry_sources.BY_COURT_ID,
+                        {self.court.pk: source},
+                    ),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    content = self.client.get(url).content.decode()
+                    # The v2 header's site search also has a "Document
+                    # Number" field, so look for the entry list's markup.
+                    labels = [
+                        '<p class="hidden-xs">Document Number</p>',
+                        'shrink-0">Document Number</div>',
+                        '<dt class="sr-only">Document Number</dt>',
+                    ]
+                    self.assertEqual(
+                        any(label in content for label in labels),
+                        has_entry_numbers,
+                    )
+
 
 class BuildDocketTabsTest(SimpleTestCase):
     """Test the build_docket_tabs helper function."""

@@ -5,7 +5,8 @@
 <div class="fake-table col-xs-12" id="docket-entry-table">
   <div class="row bold">
     <div class="col-xs-1 text-center">
-      <p class="hidden-xs">Document Number</p>
+      {# Sources whose entries are never numbered keep the empty column so the layout matches the other sources. #}
+      {% if docket_source.has_entry_numbers %}<p class="hidden-xs">Document Number</p>{% endif %}
     </div>
     <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
     <div class="col-xs-8 col-sm-2">
