@@ -361,6 +361,21 @@ async def components(request: HttpRequest) -> HttpResponse:
         {"key": "second", "label": "Second tab"},
         {"key": "third", "label": "Third tab"},
     ]
+    components_url = reverse("components")
+    demo_link_tabs: list[TabItem] = [
+        {
+            "key": "search",
+            "label": "Search Alerts",
+            "icon": "magnifier",
+            "url": f"{components_url}?link_tab=search#tabbed-cards",
+        },
+        {
+            "key": "docket",
+            "label": "Docket Alerts",
+            "icon": "file_text",
+            "url": f"{components_url}?link_tab=docket#tabbed-cards",
+        },
+    ]
 
     return TemplateResponse(
         request,
@@ -378,6 +393,10 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_panel_tabs": demo_panel_tabs,
             "demo_panel_active_tab": resolve_active_tab(
                 demo_panel_tabs, request.GET.get("tab")
+            ),
+            "demo_link_tabs": demo_link_tabs,
+            "demo_link_active_tab": resolve_active_tab(
+                demo_link_tabs, request.GET.get("link_tab")
             ),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},

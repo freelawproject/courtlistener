@@ -20,7 +20,7 @@
         {'href': '#expansion', 'text': 'Expansion panel'},
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
-        {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+        {'href': '#tabbed-cards', 'text': 'Tabs'},
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#flex-table', 'text': 'Flex table'},
         {'href': '#dialog', 'text': 'Dialog'},
@@ -657,14 +657,17 @@ Sample code here.
     </c-expansion-panel>
   </c-layout-with-navigation.section>
 
-  {# TABBED CARDS #}
+  {# TABS #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
-    <h2 class="mt-6 mb-3">Tabbed cards</h2>
-    <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.panel</code> element.
-    Include a <code>c-tabs.panel</code> element for each tab in the <code>c-tabs</code> slot.
-    </p>
+    <h2 class="mt-6 mb-3">Tabs</h2>
+    <p>Switches between related views. The mode comes from the <code>tabs</code> list: when its entries have a <code>url</code>, each tab is a link to its own page and loads without a full reload; when none do, each tab shows a <code>c-tabs.panel</code> on the same page. Below <code>md</code>, the tabs become a dropdown.</p>
 
-    <h4 class="mt-3">Demo</h4>
+    <h4 class="mt-3">Demo — Link tabs</h4>
+    <c-tabs class="my-4" label="Alert types" :tabs="demo_link_tabs" :active_tab="demo_link_active_tab">
+      <div class="p-4">{% if demo_link_active_tab == "docket" %}Docket alerts page content.{% else %}Search alerts page content.{% endif %}</div>
+    </c-tabs>
+
+    <h4 class="mt-3">Demo — Panel tabs</h4>
     <c-tabs class="my-4" label="My tabs" :tabs="demo_panel_tabs" :active_tab="demo_panel_active_tab">
       <c-tabs.panel key="first" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
         <div class="p-4">First tab panel content.</div>
@@ -677,45 +680,68 @@ Sample code here.
       </c-tabs.panel>
     </c-tabs>
 
+    <h4 class="mt-3">Notes</h4>
+    <ul class="list-disc pl-4">
+      <li>Build the <code>tabs</code> list in the view, as a list of <code>TabItem</code> from <code>cl/users/utils.py</code>. Mixing entries with and without a <code>url</code> isn't supported.</li>
+      <li>Panel tabs: give each <code>c-tabs.panel</code> the <code>key</code> of its tab and the component's <code>label</code> as <code>tabs_label</code>. Pass <code>active_tab</code> from <code>resolve_active_tab</code>, so the right panel renders from the start and <code>?tab=</code> survives a reload.</li>
+    </ul>
+
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>c-tabs</code>: <code>label</code></c-slot>
-        <c-slot name="description">
-          Accessible name for the tabs.
-        </c-slot>
+        <c-slot name="description">Accessible name for the tabs and the dropdown. Also builds the component's ids, it must be unique.</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>c-tabs.panel</code>: <code>name</code></c-slot>
-        <c-slot name="description">
-          Tab label displayed in selector.
-        </c-slot>
+        <c-slot name="label"><code>c-tabs</code>: <code>tabs</code></c-slot>
+        <c-slot name="description">List of <code>TabItem</code>: <code>key</code> (unique id), <code>label</code>, and optionally <code>url</code> (link tabs), <code>icon</code> (link tabs) and <code>count</code> (chip on panel tabs, in brackets in the dropdown).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code>: <code>active_tab</code></c-slot>
+        <c-slot name="description">Key of the current tab. Link tabs: the page's own tab. Panel tabs: falls back to the first tab, but pass it to avoid an empty panel until Alpine starts.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code>: <code>class</code></c-slot>
+        <c-slot name="description">Extra classes for the component's root, such as margins.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>key</code></c-slot>
+        <c-slot name="description">Key of the tab that shows this panel.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>tabs_label</code></c-slot>
+        <c-slot name="description">The component's <code>label</code>, so the panel builds the same ids as its tab.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>active_tab</code></c-slot>
+        <c-slot name="description">Same value as the component's, so inactive panels are hidden on the server.</c-slot>
       </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
       <c-library.item only>
         <c-slot name="label"><code>c-tabs</code> default</c-slot>
-        <c-slot name="description">
-          Add as many <code>c-tabs.panel</code> elements as needed.
-        </c-slot>
+        <c-slot name="description">Link tabs: the current page's content. Panel tabs: one <code>c-tabs.panel</code> per tab.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-tabs.panel</code> default</c-slot>
-        <c-slot name="description">Content displayed when this tab is active.</c-slot>
+        <c-slot name="description">Content shown while its tab is selected.</c-slot>
       </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-tabs label="My tabs"&gt;
-  &lt;c-tabs.panel name="First tab"&gt;
-    First tab panel content
+{% templatetag opencomment %} Link tabs {% templatetag closecomment %}
+&lt;c-tabs label="Alert types" :tabs="tabs" :active_tab="active_tab"&gt;
+  ...this page's content...
+&lt;/c-tabs&gt;
+
+{% templatetag opencomment %} Panel tabs {% templatetag closecomment %}
+&lt;c-tabs label="Notes" :tabs="tabs" :active_tab="active_tab"&gt;
+  &lt;c-tabs.panel key="dockets" tabs_label="Notes" :active_tab="active_tab"&gt;
+    ...
   &lt;/c-tabs.panel&gt;
-  &lt;c-tabs.panel name="Second tab"&gt;
-    Second tab panel content
-  &lt;/c-tabs.panel&gt;
-  &lt;c-tabs.panel name="Third tab"&gt;
-    Third tab panel content
+  &lt;c-tabs.panel key="opinions" tabs_label="Notes" :active_tab="active_tab"&gt;
+    ...
   &lt;/c-tabs.panel&gt;
 &lt;/c-tabs&gt;
       </c-code>
