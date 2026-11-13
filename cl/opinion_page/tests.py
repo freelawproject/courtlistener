@@ -2470,6 +2470,33 @@ class TexasDocketPageTest(TestCase):
                 )
                 self.assertNotIn("<script>alert(1)</script>", content)
 
+    def test_document_urls_return_404(self) -> None:
+        """Texas documents have no detail page: does a document or attachment URL on a Texas docket answer 404 rather than fail?"""
+        urls = [
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": "1",
+                    "slug": self.docket.slug,
+                },
+            ),
+            reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": "1",
+                    "att_num": 1,
+                    "slug": self.docket.slug,
+                },
+            ),
+        ]
+        with override_flag("texas_docket_page", active=True):
+            for url in urls:
+                with self.subTest(url=url):
+                    r = self.client.get(url)
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
     def test_document_description_is_escaped(self) -> None:
         """Does each stack escape a scraped document description, even where the legacy stack renders descriptions unescaped?"""
         TexasDocumentFactory(

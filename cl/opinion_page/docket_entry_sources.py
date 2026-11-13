@@ -11,7 +11,15 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
-from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
+from django.db.models import (
+    Exists,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+)
 from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.html import conditional_escape, format_html, format_html_join
@@ -278,7 +286,8 @@ class DocketEntrySource:
     main_docs_prefetch: Callable[[], Prefetch]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
-    # Single-document lookup, for the document detail page.
+    # Single-document lookup, for the document detail page, which reads
+    # pk, attachment_number and description from the queryset's rows.
     documents_for_docket_and_number: Callable[
         [int, str], QuerySet[SourceDocument]
     ]
@@ -839,8 +848,15 @@ def _texas_main_docs_prefetch() -> Prefetch:
 def _texas_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet[TexasDocument]:
-    """Return no documents: Texas documents have no document number, so they have no detail page to look up."""
-    return TexasDocument.objects.none()
+    """Return no documents: Texas documents have no document number, so they have no detail page to look up.
+
+    The detail page reads attachment_number from the rows, which
+    TexasDocument doesn't have, so the empty queryset still provides it and
+    the page answers 404 instead of failing.
+    """
+    return TexasDocument.objects.none().annotate(
+        attachment_number=Value(None, output_field=IntegerField())
+    )
 
 
 async def _get_texas_document_for_render(pk: int) -> TexasDocument:
