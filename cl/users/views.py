@@ -697,6 +697,10 @@ def confirm_email(request, activation_key):
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
 
+    Confirmation only happens on POST. A GET renders a page with a button, so
+    that mail scanners and link prefetchers that follow links in emails can't
+    consume the single-use key before the human clicks it.
+
     Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
     protection against brute-forcing activation_key.
     """
@@ -731,6 +735,15 @@ def confirm_email(request, activation_key):
             request,
             "register/confirm.html",
             {"expired": True, "private": True},
+        )
+
+    if request.method != "POST":
+        # Valid key, but don't change anything on a GET. Ask the human to
+        # confirm.
+        return TemplateResponse(
+            request,
+            "register/confirm.html",
+            {"needs_confirmation": True, "private": True},
         )
 
     # Tests pass; Save the profile

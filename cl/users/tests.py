@@ -397,7 +397,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -417,6 +417,53 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_unknown_or_used_key_explains_what_happened(self) -> None:
+        """Does an unknown or already-used key get a helpful message?
+
+        Once a key is spent it is blanked, so a used key looks the same as one
+        that never existed. The page should say so rather than just "invalid".
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        url = reverse("email_confirm", args=[up.activation_key])
+        await self.async_client.post(url)  # Spends the key.
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = await getattr(self.async_client, method)(url)
+                self.assertEqual(r.status_code, 200)
+                content = r.content.decode()
+                self.assertIn("Confirmation Link Not Found", content)
+                self.assertIn("may have already been used", content)
+
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -428,7 +475,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -4186,7 +4233,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4223,7 +4270,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4249,7 +4296,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
