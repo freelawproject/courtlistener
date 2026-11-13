@@ -418,8 +418,10 @@ class UserDataTest(LiveServerTestCase):
         self.assertEqual(up.activation_key, "")
 
     async def test_get_does_not_confirm_email(self) -> None:
-        """Does a GET (e.g. a mail scanner prefetch) leave the account and
-        key untouched while showing a confirmation button?
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
         """
         up = await sync_to_async(UserProfileWithParentsFactory.create)(
             email_confirmed=False
