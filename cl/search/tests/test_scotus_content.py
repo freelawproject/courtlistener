@@ -912,7 +912,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_document_triggers_download_correctly(
         self, mock_chain
     ) -> None:
-        """Confirm PDF download is triggered only when document is new or filename changes."""
+        """Confirm PDF download is triggered only when document is new, filename changes or it has no stored file."""
         docket = DocketFactory(
             court=self.court,
             docket_number="23-1435",
@@ -949,6 +949,10 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(scotus_doc.file_name, "document1.pdf")
         self.assertEqual(
             SCOTUSDocument.objects.count(), 1, "Should have 1 document"
+        )
+        # The download chain is mocked, so store the file it would have.
+        SCOTUSDocument.objects.filter(pk=doc_pk).update(
+            filepath_local="recap/document1.pdf"
         )
 
         # Case 2: Update same document with same filename, should NOT trigger download
@@ -1014,6 +1018,19 @@ class ScotusDocketMergeTest(TestCase):
         scotus_doc.refresh_from_db()
         self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+        # Case 5: Same filename but no stored file (e.g. its download
+        # failed), should trigger download
+        SCOTUSDocument.objects.filter(pk=doc_pk).update(filepath_local="")
+        created, doc_pk_5 = merge_scotus_document(docket_entry, doc_data_4)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_5, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered when the document has no file",
+        )
 
     @mock.patch("cl.corpus_importer.tasks.chain")
     def test_merge_scotus_document_skips_download_when_flag_is_false(

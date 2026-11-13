@@ -3736,9 +3736,10 @@ def merge_scotus_document(
     """Merge a single SCOTUSDocument attachment into CL.
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
-    not. Then, if the document is new, was a placeholder, or the filename has
-    changed, fetch the attachment PDF, store it, and compute metadata. The
-    download is queued when the current transaction commits.
+    not. Then, if the document is new, was a placeholder, has no stored file
+    (e.g. its earlier download failed), or the filename has changed, fetch the
+    attachment PDF, store it, and compute metadata. The download is queued
+    when the current transaction commits.
 
     Args:
         docket_entry: The docket entry this attachment belongs to.
@@ -3776,14 +3777,16 @@ def merge_scotus_document(
         scotus_document.save()
         created = True
 
-    # Check if the filename has changed for existing documents. A filled-in
-    # placeholder never had a file, so it needs one whatever its URL.
-    file_name_changed = False
+    # Existing documents need a download if their filename has changed or
+    # they have no stored file, whatever their URL: a filled-in placeholder
+    # never had one, and a failed download didn't store one.
+    needs_download = False
     if not created:
         old_file_name = extract_file_name_from_url(scotus_document.url)
         new_file_name = extract_file_name_from_url(url)
-        file_name_changed = (
-            scotus_document.is_placeholder or old_file_name != new_file_name
+        needs_download = (
+            not scotus_document.filepath_local
+            or old_file_name != new_file_name
         )
 
         # Update the fields
@@ -3793,13 +3796,13 @@ def merge_scotus_document(
         # its text is ready (see percolate_scotus_document), so don't
         # percolate this save too.
         scotus_document.skip_percolator_request = (
-            download_file and file_name_changed
+            download_file and needs_download
         )
         scotus_document.save(
             update_fields=["description", "url", "date_modified"]
         )
 
-    if download_file and (created or file_name_changed):
+    if download_file and (created or needs_download):
         percolate = percolate_scotus_document.si(scotus_document.pk)
         pdf_chain = chain(
             download_scotus_document_pdf.si(scotus_document.pk),
