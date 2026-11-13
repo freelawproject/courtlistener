@@ -297,49 +297,42 @@ class Machine[Scrape, Params, M: Model](ABC):
         self, state: Lookup[Scrape, Params, M]
     ) -> LookupOutput[Scrape, Params, M]:
         """Attempt to find existing objects for update."""
-        raise NotImplementedError
 
     @abstractmethod
     def resolve(
         self, state: Resolve[Scrape, Params, M]
     ) -> ResolveOutput[Scrape, Params, M]:
         """Resolve the output of a lookup into a single object."""
-        raise NotImplementedError
 
     @abstractmethod
     def create(
         self, state: Create[Scrape, Params, M]
     ) -> CreateOutput[Scrape, Params, M]:
         """Create a new object with the merged attributes and 1-1 relations."""
-        raise NotImplementedError
 
     @abstractmethod
     def update(
         self, state: Update[Scrape, Params, M]
     ) -> UpdateOutput[Scrape, Params, M]:
         """Merge attributes and 1-1 relations in-place."""
-        raise NotImplementedError
 
     @abstractmethod
     def children(
         self, state: Children[Scrape, Params, M]
     ) -> ChildrenOutput[Scrape, Params, M]:
         """Merge child objects into a given parent."""
-        raise NotImplementedError
 
     @abstractmethod
     def complete(
         self, state: Complete[Scrape, Params, M]
     ) -> CompleteOutput[Scrape, Params, M]:
         """Cleanup and logging after a successful merge."""
-        raise NotImplementedError
 
     @abstractmethod
     def failed(
         self, state: Failed[Scrape, Params, M]
     ) -> FailedOutput[Scrape, Params, M]:
         """Cleanup and logging after a failed merge."""
-        raise NotImplementedError
 
     def run(self) -> Complete[Scrape, Params, M] | Failed[Scrape, Params, M]:
         """Run this merge until it reaches a terminal state.
@@ -349,5 +342,7 @@ class Machine[Scrape, Params, M: Model](ABC):
         """
         while not is_terminal(self.state):
             self.step()
+
+        self.step()
 
         return self.state
