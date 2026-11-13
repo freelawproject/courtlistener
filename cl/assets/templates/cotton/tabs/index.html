@@ -25,7 +25,7 @@
         hx-swap="outerHTML show:none"
         hx-sync="this:replace"
       >
-        <ul role="list" class="hidden md:flex items-center border-greyscale-200">
+        <ul role="list" class="hidden md:flex items-center list-none pl-0 border-greyscale-200">
           {% for tab in tabs %}
             <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
           {% endfor %}
