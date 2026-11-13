@@ -29,7 +29,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
    Date Updated: {{ doc.timestamp|parse_utc_date|localtime|date:"F jS, Y h:i a T" }}
    {% if doc.description %}Description: {{ doc.description|render_string_or_list|safe|striptags }}{% endif %}
    {% if doc.plain_text %}{% contains_highlights doc.plain_text.0 True as highlighted %}{% if highlighted %}...{% endif %}{{ doc.plain_text|render_string_or_list|safe|striptags|underscore_to_space }}...{% endif %}
-   View this document on our site: https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}
+   View this document on our site: https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}{% if doc.docket_entry_id %}#minute-entry-{{ doc.docket_entry_id }}{% endif %}{% endif %}
 {% endwith %}{% endfor %}
 {% if result.child_docs and result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
 {% endif %}~~~~~

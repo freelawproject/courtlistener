@@ -247,20 +247,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
       "column": 36,
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
@@ -1273,13 +1259,6 @@
       "path": "cl/lasc/tasks.py",
       "name": "unbound-name",
       "concise_description": "`di` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
