@@ -9,7 +9,28 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('tabsComponent', () => ({
     isBusy: false,
     errorMessage: "",
+    activeTab: "",
 
+    init() {
+      this.activeTab = this.$el.dataset.activeTab ?? "";
+    },
+    get isSelected() {
+      return this.$el.dataset.tabKey === this.activeTab;
+    },
+    get tabIndex() {
+      return this.isSelected ? 0 : -1;
+    },
+    get isInactive() {
+      return !this.isSelected;
+    },
+    selectTab() {
+      const key = this.$el.dataset.tabKey;
+      if (key === this.activeTab) return;
+      this.activeTab = key;
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', key);
+      history.replaceState(history.state, '', url);
+    },
     startRequest() {
       this.isBusy = true;
       this.errorMessage = "";
