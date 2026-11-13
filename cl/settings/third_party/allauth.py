@@ -1,7 +1,14 @@
+import environ
+
+env = environ.FileAwareEnv()
+
 # django-allauth provides single sign-on (OIDC and SAML) and nothing else.
 # CourtListener keeps its own sign-in, registration, email confirmation and
 # password reset views, so these settings switch off every allauth behavior
 # that would compete with them.
+
+ACCOUNT_ADAPTER = "cl.sso.adapters.AccountAdapter"
+SOCIALACCOUNT_ADAPTER = "cl.sso.adapters.SocialAccountAdapter"
 
 # auth_user.email is not unique in CourtListener. allauth's migrations read
 # this setting, so it must be False before they run, or they add a unique
@@ -23,7 +30,7 @@ ACCOUNT_LOGIN_METHODS = {"username"}
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
 # Never link an SSO identity to an existing account just because the email
-# addresses match.
+# addresses match. Linking rules belong in SocialAccountAdapter.
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
 SOCIALACCOUNT_AUTO_SIGNUP = False
@@ -43,3 +50,14 @@ SOCIALACCOUNT_PROVIDERS = {
         "OAUTH_PKCE_ENABLED": True,
     },
 }
+
+# CourtListener's own SSO policy (see cl.sso.policy).
+
+# Require staff and superusers to sign in through the staff organization's
+# IdP (Organization.is_staff_organization). Turn on only after every staff
+# account is linked.
+SSO_REQUIRED_FOR_STAFF = env.bool("SSO_REQUIRED_FOR_STAFF", default=False)
+
+# How often an existing session is re-checked against the SSO policy, so
+# turning on enforcement ends password sessions within this many seconds.
+SSO_POLICY_RECHECK_SECONDS = env.int("SSO_POLICY_RECHECK_SECONDS", default=300)

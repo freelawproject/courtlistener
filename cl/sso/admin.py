@@ -1,8 +1,12 @@
 import csv
 
 from django.contrib import admin
+from django.db import transaction
 from django.db.models import Count, Q, QuerySet
+from django.forms import BaseInlineFormSet, ModelForm
 from django.http import HttpRequest, HttpResponse
+from django.utils.html import format_html_join
+from django.utils.safestring import mark_safe
 
 from cl.sso.models import (
     AuthEvent,
@@ -12,6 +16,7 @@ from cl.sso.models import (
     SSOConnection,
     SSOEmailException,
 )
+from cl.sso.throttles import sync_organization_throttles
 
 
 def spreadsheet_safe(value: str) -> str:
@@ -37,12 +42,24 @@ class OrganizationDomainInline(admin.TabularInline):
 
 
 class SSOConnectionInline(admin.TabularInline):
-    """An organization's IdP connections."""
+    """An organization's IdP connections, with the URLs its IdP needs."""
 
     model = SSOConnection
     extra = 0
     raw_id_fields = ("social_app",)
-    fields = ("social_app", "is_enabled")
+    fields = ("social_app", "is_enabled", "idp_settings")
+    readonly_fields = ("idp_settings",)
+
+    @admin.display(description="URLs for the IdP")
+    def idp_settings(self, obj: SSOConnection) -> str:
+        """Show the URLs to send the organization's IdP admin."""
+        if not obj.pk:
+            return "Save first."
+        return format_html_join(
+            mark_safe("<br>"),
+            "{}: <code>{}</code>",
+            obj.get_idp_settings().items(),
+        )
 
 
 class OrganizationMembershipInline(admin.TabularInline):
@@ -89,8 +106,12 @@ class OrganizationAdmin(admin.ModelAdmin):
             super()
             .get_queryset(request)
             .annotate(
+                # distinct, since searching by domain joins the domains and
+                # would count each seat once per matching domain.
                 seat_count=Count(
-                    "memberships", filter=Q(memberships__has_seat=True)
+                    "memberships",
+                    filter=Q(memberships__has_seat=True),
+                    distinct=True,
                 )
             )
         )
@@ -100,6 +121,25 @@ class OrganizationAdmin(admin.ModelAdmin):
         """Show seats used against the limit, e.g. "12 / 25"."""
         limit = "∞" if obj.seat_limit is None else obj.seat_limit
         return f"{getattr(obj, 'seat_count', 0)} / {limit}"
+
+    def save_related(
+        self,
+        request: HttpRequest,
+        form: ModelForm,
+        formsets: list[BaseInlineFormSet],
+        change: bool,
+    ) -> None:
+        """Re-sync members' API throttles after the organization changes.
+
+        The organization's level decides its members' API rates, so a
+        level change in the admin has to reach them. It waits for the
+        commit, so a request in between can't cache the old rates again.
+        """
+        super().save_related(request, form, formsets, change)
+        organization = form.instance
+        transaction.on_commit(
+            lambda: sync_organization_throttles(organization)
+        )
 
     @admin.action(description="Export members as CSV")
     def export_members(
