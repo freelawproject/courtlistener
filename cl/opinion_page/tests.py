@@ -2074,6 +2074,7 @@ class IsSourceHiddenTest(TestCase):
     """Does is_source_hidden hide a source only while its own flag is off?"""
 
     def setUp(self) -> None:
+        """Build an anonymous request to check each source's flag against."""
         self.request = RequestFactory().get("/")
         self.request.user = AnonymousUser()
 
@@ -2237,6 +2238,7 @@ class CaseTransferMetadataTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create the docket whose transfers are listed, and a court of appeals docket on the other end."""
         cls.docket = DocketFactory(docket_number="26-0999")
         cls.coa = CourtFactory(short_name="Tex. App. - Houston [1st Dist.]")
         cls.coa_docket = DocketFactory(
@@ -2408,6 +2410,7 @@ class TexasDocketPageTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create a Texas Supreme Court docket with one entry and document, trial court data and an appeal from a court of appeals."""
         cls.docket = DocketFactory(
             court=CourtFactory(id="tex", jurisdiction="S"),
             docket_number="26-0999",
@@ -4997,6 +5000,7 @@ class DocketWithoutEntryNumbersTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create a docket with three numbered entries, so a filter on entry numbers would visibly drop some."""
         cls.court = CourtFactory(id="nonumbers", jurisdiction="S")
         cls.docket = DocketFactory(court=cls.court)
         DocketEntry.objects.bulk_create(
