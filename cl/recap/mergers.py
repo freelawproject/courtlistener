@@ -1135,7 +1135,9 @@ async def get_or_make_docket_entry(
     return de, de_created
 
 
-async def keep_latest_rd_document(queryset: QuerySet[RECAPDocument]) -> RECAPDocument:
+async def keep_latest_rd_document(
+    queryset: QuerySet[RECAPDocument],
+) -> RECAPDocument:
     """Retains the most recent item with a PDF, if available otherwise, retains the most recent item overall.
 
     Args:

@@ -99,13 +99,13 @@ def find_citations_and_parantheticals_for_recap_documents(
         self: The bound Celery task.
         doc_ids: An iterable of search.RECAPDocument PKs
     """
-    documents: QuerySet[RECAPDocument] = (
-        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-            ocr_status__in=[
-                RECAPDocument.OCR_UNNECESSARY,
-                RECAPDocument.OCR_COMPLETE,
-            ]
-        )
+    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
+        pk__in=doc_ids
+    ).filter(
+        ocr_status__in=[
+            RECAPDocument.OCR_UNNECESSARY,
+            RECAPDocument.OCR_COMPLETE,
+        ]
     )
 
     for d in documents:

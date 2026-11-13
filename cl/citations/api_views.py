@@ -191,9 +191,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[str], volume: str, page: str
-    ) -> tuple[
-        QuerySet[OpinionCluster] | None, int, list[str]
-    ]:
+    ) -> tuple[QuerySet[OpinionCluster] | None, int, list[str]]:
         """Retrieves opinion clusters associated with a list of reporter slugs.
 
         This method takes a list of reporter variations (as slugs) and attempts
