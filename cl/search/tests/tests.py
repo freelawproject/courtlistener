@@ -17,7 +17,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import QueryDict
-from django.test import Client, RequestFactory, override_settings
+from django.test import AsyncClient, Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.dsl import Q
@@ -113,6 +113,7 @@ from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     ESIndexTestCase,
     SimpleTestCase,
     TestCase,
@@ -217,8 +218,7 @@ class ModelTest(TestCase):
         self.assertEqual(cluster_count, expected_count)
 
     def test_opinions_order(self) -> None:
-        """Test opinions order"""
-
+        """Test opinions order."""
         # Create court
         court = CourtFactory(id="nyappdiv")
 
@@ -303,7 +303,7 @@ class ModelTest(TestCase):
         self.assertEqual(op_5.ordering_key, None)
 
     def test_opinion_content_model(self):
-        """Verify the correct creation of OpinionContent object"""
+        """Verify the correct creation of OpinionContent object."""
         self.docket = Docket.objects.create(
             case_name="People v. Curry",
             court_id="cal",
@@ -488,7 +488,7 @@ class RECAPDocumentValidationTest(TestCase):
     "cl.lib.courts.get_cache_key_for_court_list",
     return_value="common_search:minimal-court-list",
 )
-class ESCommonSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -594,7 +594,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
     @staticmethod
     def get_article_count(r):
-        """Get the article count in a query response"""
+        """Get the article count in a query response."""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_get_child_court_ids_for_parents(
@@ -670,9 +670,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             )
 
     def test_modify_court_id_queries(self, court_cache_key_mock) -> None:
-        """Test parse_court_id_query method, it should properly parse a
-        court_id query
-        """
+        """Test parse_court_id_query method, it should properly parse a court_id query."""
         tests = [
             {"input": "court_id:cabc", "output": 'court_id:("cabc")'},
             {"input": "court_id:(cabc)", "output": 'court_id:("cabc")'},
@@ -712,10 +710,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     async def test_filter_parent_child_courts(
         self, court_cache_key_mock
     ) -> None:
-        """Does filtering in a given parent court return opinions from the
-        parent and its child courts?
-        """
-
+        """Does filtering in a given parent court return opinions from the parent and its child courts?"""
         r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "court": "canb"}
         )
@@ -749,9 +744,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     async def test_advanced_search_parent_child_courts(
         self, court_cache_key_mock
     ) -> None:
-        """Does querying in a given parent court return opinions from the
-        parent and its child courts?
-        """
+        """Does querying in a given parent court return opinions from the parent and its child courts?"""
         r = await self.async_client.get(
             reverse("show_results"), {"q": "court_id:canb"}
         )
@@ -801,10 +794,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     async def test_es_bad_syntax_proximity_tokens(
         self, court_cache_key_mock
     ) -> None:
-        """Can we make a suggestion for queries that use unrecognized proximity
-        search?
-        """
-
+        """Can we make a suggestion for queries that use unrecognized proximity search?"""
         # On string queries
         r = await self.async_client.get(
             reverse("show_results"),
@@ -845,10 +835,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
 
     async def test_es_unbalanced_quotes(self, court_cache_key_mock) -> None:
-        """Can we make a suggestion for queries that use include unbalanced
-        quotes?
-        """
-
+        """Can we make a suggestion for queries that use include unbalanced quotes?"""
         # On string queries
         r = await self.async_client.get(
             reverse("show_results"), {"q": 'Test query with "quotes'}
@@ -877,10 +864,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertNotIn("Did you mean:", r.content.decode())
 
     def test_handle_unbalanced_parentheses(self, court_cache_key_mock) -> None:
-        """Can we make a suggestion for queries that use include unbalanced
-        parentheses?
-        """
-
+        """Can we make a suggestion for queries that use include unbalanced parentheses?"""
         # On string queries
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -928,8 +912,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertNotIn("Did you mean", r.content.decode())
 
     def test_round_estimated_search_counts(self, court_cache_key_mock) -> None:
-        """Confirm search counts above the threshold are properly rounded"""
-
+        """Confirm search counts above the threshold are properly rounded."""
         tests = [
             (13, 13),  # Below ELASTICSEARCH_CARDINALITY_PRECISION threshold
             (109, 109),
@@ -954,9 +937,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     def test_avoid_wrapping_boosted_numbers_in_quotes(
         self, court_cache_key_mock
     ) -> None:
-        """Confirm that numbers in boost queries are not wrapped in quotes
-        that makes the query to fail.
-        """
+        """Confirm that numbers in boost queries are not wrapped in quotes that makes the query to fail."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "q": "Jose^3",
@@ -985,10 +966,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     async def test_avoid_splitting_terms_on_special_chars(
         self, court_cache_key_mock
     ) -> None:
-        """Can we avoid splitting words in queries such as §247 and phrases
-        like "§247"?
-        """
-
+        """Can we avoid splitting words in queries such as §247 and phrases like "§247"?"""
         special_chars_exceptions = ["§", "$", "%", "¶"]
         # A search for phrase "§247" shouldn't match "247"
         for special_char in special_chars_exceptions:
@@ -1167,7 +1145,6 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
     def test_built_in_search_connectors(self, court_cache_key_mock) -> None:
         """Verify that built in ES search connectors return the expected results."""
-
         tests = [
             {
                 "label": "NOT query",
@@ -1232,10 +1209,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     )
 
     def test_support_search_connectors(self, court_cache_key_mock) -> None:
-        """Verify that new supported custom search connectors yield the
-        expected results.
-        """
-
+        """Verify that new supported custom search connectors yield the expected results."""
         tests = [
             {
                 "label": "But not %",
@@ -1321,10 +1295,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
     def test_support_search_connectors_filters(
         self, court_cache_key_mock
     ) -> None:
-        """Verify that new supported custom search connectors yield the
-        expected results.
-        """
-
+        """Verify that new supported custom search connectors yield the expected results."""
         tests = [
             {
                 "label": "But not %",
@@ -1409,7 +1380,6 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
     def test_disallowed_wildcard_pattern(self, court_cache_key_mock) -> None:
         """Verify that expensive wildcard queries thrown an error."""
-
         tests = [
             {
                 "label": "Disallowed ! in short queries.",
@@ -1492,9 +1462,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 )
 
     def test_absolute_dates_filter(self, court_cache_key_mock):
-        """Confirm that passing absolute dates returns the expected absolute
-        filter in ISO format.
-        """
+        """Confirm that passing absolute dates returns the expected absolute filter in ISO format."""
         filed_before = datetime.date(2025, 5, 1)
         filed_after = datetime.date(2025, 5, 18)
         qs = build_daterange_query(
@@ -1507,10 +1475,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertNotIn("time_zone", body)
 
     def test_all_relative_syntaxes(self, court_cache_key_mock):
-        """Confirms that build_daterange_query is able to parse and convert
-        the different allowed relative date syntaxes into an ES-compatible date
-         math expression.
-        """
+        """Confirms that build_daterange_query is able to parse and convert the different allowed relative date syntaxes into an ES-compatible date math expression."""
         cases = {
             # days
             "1d ago": "now-1d/d",
@@ -1561,9 +1526,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     self.assertNotIn("lte", query_dict)
 
     def test_before_and_after_relative(self, court_cache_key_mock):
-        """Confirm that both values, before and after are compatible with the
-        relative date syntaxes.
-        """
+        """Confirm that both values, before and after are compatible with the relative date syntaxes."""
         qs = build_daterange_query(
             "dateFiled",
             before="7 days ago",
@@ -1575,10 +1538,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(query_dict["lte"], "now-7d/d")
 
     def test_mixed_absolute_and_relative(self, court_cache_key_mock):
-        """Confirm that the range filter is compatible with mixed requests,
-        where one value may be absolute and the other relative,
-        as might occur in API calls.
-        """
+        """Confirm that the range filter is compatible with mixed requests, where one value may be absolute and the other relative, as might occur in API calls."""
         qs = build_daterange_query(
             "dateFiled", before=datetime.date(2025, 5, 10), after="2 days ago"
         )
@@ -1589,12 +1549,22 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual(body["lte"], "2025-05-10T23:59:59Z")
 
 
-class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+class SearchAPIV4CommonTest(
+    AuthenticatedClientMixin, ESIndexTestCase, TestCase
+):
     """Common tests for the Search API V4 endpoints."""
+
+    async def test_anonymous_users_are_rejected(self) -> None:
+        """Do anonymous requests to the v4 Search API get a 401?"""
+        anonymous_client = AsyncClient()
+        r = await anonymous_client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            {"type": SEARCH_TYPES.OPINION, "q": "lorem"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_es_general_bad_request_error_(self) -> None:
         """Can we properly raise the ElasticBadRequestError exception?"""
-
         # Bad syntax due to the / char in the query.
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -1611,7 +1581,6 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
 
     async def test_es_bad_syntax_proximity_tokens(self) -> None:
         """Can we properly raise the BadProximityQuery exception?"""
-
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "This query contains /s proximity token",
@@ -1627,7 +1596,6 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
 
     async def test_es_unbalanced_quotes(self) -> None:
         """Can we properly raise the UnbalancedQuotesQuery exception?"""
-
         params = {"type": SEARCH_TYPES.RECAP, "q": 'Test query with "quotes'}
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v4"}), params
@@ -1638,10 +1606,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
     async def test_handle_unbalanced_parentheses(self) -> None:
-        """Can we properly raise the UnbalancedParenthesesQuery
-        exception?
-        """
-
+        """Can we properly raise the UnbalancedParenthesesQuery exception?"""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "(Loretta OR (SEC) AND Jose",
@@ -1674,8 +1639,8 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
 @override_flag("ui_flag_for_o_es", active=True)
 @override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
-    """
-    Test some of the primary search functionality of CL: searching opinions.
+    """Test some of the primary search functionality of CL: searching opinions.
+
     These tests should exercise all aspects of using the search box and SERP.
     """
 
@@ -1702,9 +1667,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def _get_opinion_tab(self, label: str) -> WebElement:
         """Find a tab in the opinion detail page's tab bar by its label.
 
-        :param label: The tab's label, e.g. "Cited By". Non-breaking spaces in
-            the rendered label are matched by a regular space.
-        :return: The tab's link element.
+        Args:
+            label: The tab's label, e.g. "Cited By". Non-breaking spaces in
+                the rendered label are matched by a regular space.
+
+        Returns:
+            The tab's link element.
         """
         return self.browser.find_element(
             By.XPATH,
@@ -1715,9 +1683,14 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def _get_opinion_tab_count(self, label: str) -> int:
         """Return the count shown on an opinion tab, e.g. 13 for "Cited By (13)".
 
-        :param label: The tab's label, e.g. "Cited By".
-        :return: The count displayed on the tab.
-        :raises AssertionError: If no count appears before the Selenium timeout.
+        Args:
+            label: The tab's label, e.g. "Cited By".
+
+        Returns:
+            The count displayed on the tab.
+
+        Raises:
+            AssertionError: If no count appears before the Selenium timeout.
         """
         try:
             match = WebDriverWait(
@@ -2137,14 +2110,17 @@ class SaveSearchQueryTest(TestCase):
         self.source_error_message = (
             f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
         )
+        # The v4 Search API requires authentication. Only log in for the API
+        # tests so the website tests keep exercising anonymous searches.
+        self.api_user = UserProfileWithParentsFactory().user
 
     @staticmethod
     def normalize_query(query, replace_space=False):
         """Normalize a query dictionary by sorting lists of values.
+
         Sometimes the search process alters the order of the query parameters,
         or duplicates them.
         """
-
         if replace_space:
             query = query.replace("%20", "+")
         parsed_query = parse_qs(query)
@@ -2152,7 +2128,7 @@ class SaveSearchQueryTest(TestCase):
 
     @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
     def test_search_query_saving(self) -> None:
-        """Do we save queries on all public endpoints"""
+        """Do we save queries on all public endpoints."""
         for query in self.searches:
             url = f"{reverse('show_results')}?{query}"
             self.client.get(url)
@@ -2198,7 +2174,8 @@ class SaveSearchQueryTest(TestCase):
         )
 
     def test_search_api_v4_query_saving(self) -> None:
-        """Do we save queries on all V4 Search endpoints"""
+        """Do we save queries on all V4 Search endpoints."""
+        self.client.force_login(self.api_user)
         for query in self.base_searches:
             url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
             self.client.get(url)
@@ -2224,6 +2201,7 @@ class SaveSearchQueryTest(TestCase):
 
     def test_failed_es_search_v4_api_queries(self) -> None:
         """Do we flag failed v4 API queries properly?"""
+        self.client.force_login(self.api_user)
         query = "type=r&q=contains/sproximity token"
         url = f"{reverse('search-list', kwargs={'version': 'v4'})}?{query}"
         r = self.client.get(url)
@@ -2240,7 +2218,7 @@ class SaveSearchQueryTest(TestCase):
         )
 
     def test_search_es_api_v3_query_saving(self) -> None:
-        """Do we save queries on all V3 Search endpoints"""
+        """Do we save queries on all V3 Search endpoints."""
         for query in self.base_searches:
             url = f"{reverse('search-list', kwargs={'version': 'v3'})}?{query}"
             self.client.get(url)
@@ -2454,9 +2432,7 @@ class CaptionTest(TestCase):
 
 
 class DocketEntriesTimezone(TestCase):
-    """Test docket entries with time, store date and time in the local court
-    timezone and make datetime_filed aware to the local court timezone.
-    """
+    """Test docket entries with time, store date and time in the local court timezone and make datetime_filed aware to the local court timezone."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2549,10 +2525,7 @@ class DocketEntriesTimezone(TestCase):
         )
 
     def test_add_docket_entries_with_no_time(self):
-        """Do time_filed field and datetime_filed property are None when
-        ingesting docket entries with no time info?
-        """
-
+        """Do time_filed field and datetime_filed property are None when ingesting docket entries with no time info?"""
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_date_data["docket_entries"]
         )
@@ -2564,11 +2537,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_date.datetime_filed, None)
 
     def test_add_docket_entries_with_time(self):
-        """Can we store docket entries date_filed in the local court timezone
-        divided into date_filed and time_filed if we ingest
-        docket entries with datetime?
-        """
-
+        """Can we store docket entries date_filed in the local court timezone divided into date_filed and time_filed if we ingest docket entries with datetime?"""
         # Add docket entries with UTC datetime for CAND
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data["docket_entries"]
@@ -2616,10 +2585,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_pdt.time_filed, datetime.time(5, 46, 51))
 
     def test_update_docket_entries_without_date_or_time_data(self):
-        """Can we avoid updating docket entries date_filed and time_filed if
-        we ingest docket entries with no date_filed?
-        """
-
+        """Can we avoid updating docket entries date_filed and time_filed if we ingest docket entries with no date_filed?"""
         # Add docket entries with UTC datetime for CAND
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data["docket_entries"]
@@ -2642,10 +2608,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
     def test_update_docket_entries_with_no_time_data(self):
-        """Does time_filed is set to None only when the new date_filed doesn't
-        contain time data and the date differs from the previous one?
-        """
-
+        """Does time_filed is set to None only when the new date_filed doesn't contain time data and the date differs from the previous one?"""
         # Add docket entries with UTC datetime for CAND
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data["docket_entries"]
@@ -2678,10 +2641,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, None)
 
     def test_update_docket_entries_with_time_data(self):
-        """Does data_filed and time_filed are properly updated when ingesting
-        docket entries with date and time data?
-        """
-
+        """Does data_filed and time_filed are properly updated when ingesting docket entries with date and time data?"""
         # Add docket entries with UTC datetime for CAND
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data["docket_entries"]
@@ -2714,10 +2674,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(18, 46, 51))
 
     def test_show_docket_entry_date_filed_according_court_timezone_dst(self):
-        """Does the datetime_filed is shown to properly to users using the
-        timezone template filter, considering DST time?
-        """
-
+        """Does the datetime_filed is shown to properly to users using the timezone template filter, considering DST time?"""
         # Add docket entries for CAND US/Pacific filed in DST, in UTC and a
         # different time offset.
         async_to_sync(add_docket_entries)(
@@ -2784,10 +2741,7 @@ class DocketEntriesTimezone(TestCase):
     def test_show_docket_entry_date_filed_according_court_timezone_not_dst(
         self,
     ):
-        """Does the datetime_filed is shown to properly to users using the
-        timezone template filter, considering a not DST time?
-        """
-
+        """Does the datetime_filed is shown to properly to users using the timezone template filter, considering a not DST time?"""
         # Add docket entries for CAND filed in not DST time. US/Pacific
         async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data_not_dst["docket_entries"]
@@ -2856,10 +2810,7 @@ class ESIndexingTasksUtils(TestCase):
 
     @staticmethod
     def mock_pgh_created_at(mock_date) -> int:
-        """Since it is not possible to use time_machine to mock the
-        pgh_created_at field on instances created by triggers, this method
-        assigns the mock_date to the most recently created event.
-        """
+        """Since it is not possible to use time_machine to mock the pgh_created_at field on instances created by triggers, this method assigns the mock_date to the most recently created event."""
         docket_events = DocketEvent.objects.all().order_by("pgh_created_at")
         latest_d_event = docket_events.last()
         latest_d_event.pgh_created_at = mock_date
@@ -2868,10 +2819,7 @@ class ESIndexingTasksUtils(TestCase):
         return latest_d_event.pk
 
     def test_get_es_doc_id_and_parent_id(self) -> None:
-        """Confirm that get_es_doc_id_and_parent_id returns the correct doc_id
-        and parent_id for their use in ES indexing.
-        """
-
+        """Confirm that get_es_doc_id_and_parent_id returns the correct doc_id and parent_id for their use in ES indexing."""
         tests = [
             {
                 "es_doc": PositionDocument,
@@ -2907,10 +2855,7 @@ class ESIndexingTasksUtils(TestCase):
             self.assertEqual(parent_id, test["expected_parent_id"])
 
     def test_get_unique_oldest_date_range_rows(self) -> None:
-        """Can we retrieve the unique oldest rows from history tables within a
-        specified date range?
-        """
-
+        """Can we retrieve the unique oldest rows from history tables within a specified date range?"""
         docket_2 = DocketFactory(
             court=self.court,
             docket_number="21-55555",
@@ -2991,7 +2936,7 @@ class ESIndexingTasksUtils(TestCase):
     return_value="es_sweep_indexer:log_test",
 )
 class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
-    """sweep_indexer command tests for Elasticsearch"""
+    """sweep_indexer command tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3118,10 +3063,7 @@ class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
         )
 
     def test_sweep_indexer_all(self, mock_logging_prefix):
-        """Confirm the sweep_indexer command works properly indexing 'all' the
-        documents serially.
-        """
-
+        """Confirm the sweep_indexer command works properly indexing 'all' the documents serially."""
         s = DocketDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
 
@@ -3234,10 +3176,7 @@ class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
 
     @override_settings(ELASTICSEARCH_SWEEP_INDEXER_ACTION="missing")
     def test_sweep_indexer_missing(self, mock_logging_prefix):
-        """Confirm the sweep_indexer command works properly indexing 'missing'
-        the documents serially.
-        """
-
+        """Confirm the sweep_indexer command works properly indexing 'missing' the documents serially."""
         # Call sweep_indexer command to indexing everything.
         call_command(
             "sweep_indexer",
@@ -3322,10 +3261,7 @@ class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
         )
 
     def test_restart_from_last_document_logged(self, mock_logging_prefix):
-        """Confirm the sweep_indexer command can resume from where it left
-        off after a failure or interruption.
-        """
-
+        """Confirm the sweep_indexer command can resume from where it left off after a failure or interruption."""
         # Log last status to simulate a resume from "search.Docket"
         log_indexer_last_status(
             "search.Docket",
@@ -3382,7 +3318,7 @@ class SweepIndexerCommandTest(PeopleTestCase, ESIndexTestCase, TestCase):
     return_value="es_sweep_indexer:log_remove",
 )
 class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
-    """cl_remove_content_from_es command tests for Elasticsearch"""
+    """cl_remove_content_from_es command tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3420,10 +3356,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.create_index(["search.Docket", "search.OpinionCluster"])
 
     def test_remove_non_recap_dockets(self, mock_logging_prefix):
-        """Confirm the cl_remove_content_from_es command works
-        properly removing non-recap dockets from ES.
-        """
-
+        """Confirm the cl_remove_content_from_es command works properly removing non-recap dockets from ES."""
         # Index all the dockets regardless of their source.
         index_dockets_in_bulk.delay(
             [
@@ -3458,10 +3391,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertTrue(DocketDocument.exists(self.recap_docket.pk))
 
     def test_restart_from_last_document_logged(self, mock_logging_prefix):
-        """Confirm the cl_remove_content_from_es is able to resume
-        from the last logged docket.
-        """
-
+        """Confirm the cl_remove_content_from_es is able to resume from the last logged docket."""
         # Index all the dockets regardless of their source.
         index_dockets_in_bulk.delay(
             [
@@ -3500,17 +3430,14 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertFalse(DocketDocument.exists(self.non_recap_docket_2.pk))
 
     def test_remove_opinions_by_timestamp(self, mock_logging_prefix):
-        """Confirm the cl_remove_content_from_es command works
-        properly removing opinions by a timestamp range query.
-        """
-
+        """Confirm the cl_remove_content_from_es command works properly removing opinions by a timestamp range query."""
         # Opinion Factories
         opinion_cluster_1 = OpinionClusterFactory.create(
             source="C",
             precedential_status="Errata",
             docket=self.recap_docket,
         )
-        opinion_1 = OpinionFactory.create(
+        OpinionFactory.create(
             extracted_by_ocr=False,
             cluster=opinion_cluster_1,
             type="020lead",
@@ -3701,10 +3628,7 @@ class OpinionQuerySetWithBestTextTest(TestCase):
         )
 
     def test_with_best_text_annotation(self):
-        """Test that with_best_text annotates the Opinion queryset with the
-        correct  best_text and best_text_source values based on the
-        prioritization of OPINION_TEXT_SOURCE_FIELDS.
-        """
+        """Test that with_best_text annotates the Opinion queryset with the correct  best_text and best_text_source values based on the prioritization of OPINION_TEXT_SOURCE_FIELDS."""
         qs = Opinion.objects.all().with_best_text()
 
         o_html_citations = qs.get(pk=self.opinion_html_with_citations.pk)
@@ -3948,7 +3872,7 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             self.model_response,  # Second mini model response
         ]
 
-        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with mock.patch("cl.lib.decorators.time.sleep"):
             call_command(
                 "llm_clean_docket_number_daemon",
                 testing_iterations=1,
@@ -4074,7 +3998,6 @@ class SearchFormCourtCleanTest(TestCase):
 
     def test_picker_syntax_is_normalized_into_court_field(self) -> None:
         """Picker syntax populates canonical 'court' filter."""
-
         # Single court selected via picker
         form = SearchForm(
             QueryDict("q=test&type=o&court_scotus=on"),
@@ -4143,7 +4066,7 @@ class SearchFormCourtCleanTest(TestCase):
         )
 
     def test_no_court_selection_results_in_empty_court_filter(self) -> None:
-        """With no court selection, all picker booleans default to True"""
+        """With no court selection, all picker booleans default to True."""
         form = SearchForm(
             QueryDict("q=test&type=o"),
             courts=[self.court_scotus, self.court_ca1],
@@ -4195,7 +4118,7 @@ class DocketSignalTest(TestCase):
 
     @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
     def test_signal_does_not_trigger_when_value_is_the_same(self):
-        """Verify cleaning does not run if the field did not change"""
+        """Verify cleaning does not run if the field did not change."""
         dn = "2023-cv-00001"
         docket = Docket.objects.create(
             court=self.court, docket_number_raw=dn, source=Docket.SCRAPER
@@ -4235,8 +4158,7 @@ class DocketSignalTest(TestCase):
 
     @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
     def test_signal_triggers_with_explicit_update_fields(self):
-        """Verify cleaning runs when save(update_fields) includes
-        docket_number_raw."""
+        """Verify cleaning runs when save(update_fields) includes docket_number_raw."""
         docket = Docket.objects.create(
             court=self.court,
             docket_number_raw="2023-cv-00001",
@@ -4252,8 +4174,7 @@ class DocketSignalTest(TestCase):
 
     @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
     def test_signal_skipped_with_explicit_unrelated_update_fields(self):
-        """Verify cleaning does not run when save(update_fields) excludes
-        docket_number_raw, even if the field was changed in memory."""
+        """Verify cleaning does not run when save(update_fields) excludes docket_number_raw, even if the field was changed in memory."""
         docket = Docket.objects.create(
             court=self.court,
             docket_number_raw="123-ABC",
@@ -4269,9 +4190,7 @@ class DocketSignalTest(TestCase):
 
     @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
     def test_signal_no_recursion_from_cleaner(self):
-        """Verify the cleaner's internal save does not cause infinite
-        recursion. The cleaner calls save(update_fields=["docket_number", ...])
-        which re-triggers the signal, but the guard returns early."""
+        """Verify the cleaner's internal save does not cause infinite recursion. The cleaner calls save(update_fields=["docket_number", ...]) which re-triggers the signal, but the guard returns early."""
         from cl.search.docket_number_cleaner import (
             clean_docket_number_raw_and_update_redis_cache,
         )

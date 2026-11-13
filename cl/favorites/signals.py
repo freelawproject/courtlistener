@@ -16,11 +16,7 @@ from .utils import NOTEABLE_MODELS, get_notes_for, prayer_unavailable
     dispatch_uid="check_prayer_availability",
 )
 def check_prayer_availability(sender, instance: Prayer, **kwargs):
-    """
-    Signal to check if a given RecapDocument is available for purchase after a user has requested it
-    as part of the pray-and-pay project.
-    """
-
+    """Signal to check if a given RecapDocument is available for purchase after a user has requested it as part of the pray-and-pay project."""
     rd = instance.recap_document
     user = instance.user
 
@@ -63,10 +59,7 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
 def mark_document_accessible_after_prayer_availability_deletion(
     sender, instance: PrayerAvailability, **kwargs
 ):
-    """
-    Signal to to mark the associated RecapDocument as accessible when a
-    PrayerAvailability instance is deleted.
-    """
+    """Signal to to mark the associated RecapDocument as accessible when a PrayerAvailability instance is deleted."""
     recap_document = instance.recap_document
 
     # No need to update if already marked as accessible
@@ -78,11 +71,11 @@ def mark_document_accessible_after_prayer_availability_deletion(
 
 
 def delete_orphaned_notes(sender, instance: Model, **kwargs):
-    """Delete a Note when the object it points to is deleted (#7725).
+    """Delete a Note when the object it points to is deleted.
 
-    Only needed for the GenericForeignKey shape -- a legacy-shaped Note is
-    already cleaned up by that FK's own on_delete=CASCADE, since object_id
-    is a plain integer column with no DB-level FK constraint of its own.
+    This is the only cleanup Notes get: object_id is a plain integer column
+    with no DB-level FK, so deletes that skip Django's post_delete leave
+    orphaned Notes behind.
     """
     get_notes_for(instance).delete()
 

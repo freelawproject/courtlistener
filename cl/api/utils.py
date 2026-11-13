@@ -112,9 +112,7 @@ logger = logging.getLogger(__name__)
 
 
 class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
-    """Extend the HyperlinkedModelSerializer to add IDs as well for the best of
-    both worlds.
-    """
+    """Extend the HyperlinkedModelSerializer to add IDs as well for the best of both worlds."""
 
     id = serializers.ReadOnlyField()
 
@@ -155,10 +153,13 @@ def is_valid_filter_param(
     recursively traversing the RelatedFilter chain. Also handles negation
     filters with '!' suffix (e.g., 'person!' means "not equal to").
 
-    :param param: The parameter name to validate.
-    :param filterset_class: The FilterSet class for validation.
-    :param depth: Current recursion depth (used internally to prevent DOS).
-    :return: True if the parameter is valid, False otherwise.
+    Args:
+        param: The parameter name to validate.
+        filterset_class: The FilterSet class for validation.
+        depth: Current recursion depth (used internally to prevent DOS).
+
+    Returns:
+        True if the parameter is valid, False otherwise.
     """
     if filterset_class is None:
         return False
@@ -200,9 +201,12 @@ def detect_unknown_filter_params(
 ) -> set[str]:
     """Detect unknown filter parameters in the request.
 
-    :param query_params: The query parameters from the request.
-    :param filterset_class: The FilterSet class for validation.
-    :return: Set of unknown parameter names.
+    Args:
+        query_params: The query parameters from the request.
+        filterset_class: The FilterSet class for validation.
+
+    Returns:
+        Set of unknown parameter names.
     """
     unknown_params: set[str] = set()
     for param in query_params:
@@ -241,11 +245,16 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
         DisabledHTMLFilterBackend. Calling super().filter_queryset() would
         apply filters twice, causing duplicate results from JOINs.
 
-        :param request: The DRF request object.
-        :param queryset: The queryset to filter.
-        :param view: The view instance.
-        :return: The queryset unchanged.
-        :raises ValidationError: If unknown parameters are found.
+        Args:
+            request: The DRF request object.
+            queryset: The queryset to filter.
+            view: The view instance.
+
+        Returns:
+            The queryset unchanged.
+
+        Raises:
+            ValidationError: If unknown parameters are found.
         """
         filterset_class = self.get_filterset_class(view, queryset)
 
@@ -272,8 +281,7 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
 
 
 class FilterManyToManyMixin:
-    """
-    Mixin for filtering nested many-to-many relationships.
+    """Mixin for filtering nested many-to-many relationships.
 
     Provides helper methods to efficiently filter nested querysets when using
     `RelatedFilter` classes in filtersets. This is particularly useful for
@@ -290,8 +298,7 @@ class FilterManyToManyMixin:
     join_table_cleanup_mapping: dict[str, str] = {}
 
     def _get_filter_label(self: FilterSet, field_name: str) -> str:
-        """
-        Maps a filter field name to its corresponding label.
+        """Maps a filter field name to its corresponding label.
 
         When defining filters(Declarative or using the `fields` attribute) in a
         filterset, the field name used internally might not directly match the
@@ -308,7 +315,6 @@ class FilterManyToManyMixin:
         Returns:
             str: The corresponding label for the given field name.
         """
-
         FIELD_NAME_LABEL_MAPPING = {
             filter_class.field_name: label
             for label, filter_class in self.filters.items()
@@ -316,8 +322,7 @@ class FilterManyToManyMixin:
         return FIELD_NAME_LABEL_MAPPING[field_name]
 
     def _clean_join_table_key(self, key: str) -> str:
-        """
-        Cleans and adjusts a given key for compatibility with prefetch queries.
+        """Cleans and adjusts a given key for compatibility with prefetch queries.
 
         This method modifies specific lookups within the `key` to ensure
         correct filtering when used in prefetch queries. It iterates over a
@@ -336,8 +341,7 @@ class FilterManyToManyMixin:
         return join_table_key
 
     def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
-        """
-        Processes request filters for use in a join table query.
+        """Processes request filters for use in a join table query.
 
         Iterates through the request filters, cleaning and transforming them to
         be suitable for applying filtering conditions to a join table. Returns
@@ -472,8 +476,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return metadata
 
     def determine_actions(self, request, view):
-        """Simple override to always show the field information even for people
-        that don't have POST access.
+        """Simple override to always show the field information even for people that don't have POST access.
 
         Fixes issue #732.
         """
@@ -490,14 +493,15 @@ class SimpleMetadataWithFilters(SimpleMetadata):
 
 
 def get_logging_prefix(api_version: str) -> str:
-    """Simple tool for getting the prefix for logging API requests. Useful for
-    mocking the logger.
+    """Simple tool for getting the prefix for logging API requests.
+
+    Useful for mocking the logger.
     """
     return f"api:{api_version}"
 
 
 class LoggingMixin:
-    """Log requests to Redis
+    """Log requests to Redis.
 
     This draws inspiration from the code that can be found at:
       https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
@@ -538,8 +542,8 @@ class LoggingMixin:
         return response
 
     def _get_response_ms(self) -> int:
-        """
-        Get the duration of the request response cycle in milliseconds.
+        """Get the duration of the request response cycle in milliseconds.
+
         In case of negative duration 0 is returned.
         """
         response_timedelta = now() - self.requested_at
@@ -629,7 +633,7 @@ class LoggingMixin:
 
 
 class CacheListMixin:
-    """Cache listed results"""
+    """Cache listed results."""
 
     @method_decorator(cache_page(60))
     # Ensure that permissions are maintained and not cached!
@@ -641,8 +645,7 @@ class CacheListMixin:
 def make_cache_key_for_no_filter_mixin(
     prefix: str, ordering_key: str, is_count_request: bool
 ) -> str:
-    """
-    Generates a cache key for the `NoFilterCacheListMixin`.
+    """Generates a cache key for the `NoFilterCacheListMixin`.
 
     The key varies based on whether a count or ordered is requested. Useful
     for mocking the logger.
@@ -653,9 +656,7 @@ def make_cache_key_for_no_filter_mixin(
 
 
 class NoFilterCacheListMixin:
-    """
-    A mixin that caches list of results when there's no pagination and either a
-    count is requested or no filters are applied to the queryset.
+    """A mixin that caches list of results when there's no pagination and either a count is requested or no filters are applied to the queryset.
 
     It leverages Django's caching mechanism to store responses when no filters
     or pagination are applied to the queryset, improving performance by
@@ -717,8 +718,7 @@ class NoFilterCacheListMixin:
         def _save_page_in_cache(
             cache_connection: BaseCache, key: str, data: dict[str, Any]
         ):
-            """
-            Helper function to save the response in the cache.
+            """Helper function to save the response in the cache.
 
             Args:
                 cache_connection: The cache instance (e.g., Django's `caches["db_cache"]`).
@@ -763,8 +763,11 @@ def get_all_throttle_overrides(
       MANUAL overrides exist. If any MANUAL overrides are present, they fully
       replace the MEMBERSHIP set.
 
-    :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
-    :return: Dictionary mapping username to a list of rate strings. A list
+    Args:
+        throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
+
+    Returns:
+        Dictionary mapping username to a list of rate strings. A list
         containing a '0/...' rate blocks the user, because the enforcement
         loop rejects on `count >= 0`.
     """
@@ -861,8 +864,7 @@ def promo_doubling_applies(user: User) -> bool:
 def apply_membership_throttles(
     user: User, level: int, clear_cache: bool = False
 ) -> bool:
-    """
-    Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
+    """Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
 
     This function replaces all existing MEMBERSHIP-source `APIThrottle` records for the user
     with the rate limits defined for the provided `level`.
@@ -917,17 +919,23 @@ def apply_membership_throttles(
     return True
 
 
-def clear_membership_throttles(user: User) -> None:
+def clear_membership_throttles(user: User, clear_cache: bool = True) -> None:
     """Delete the user's MEMBERSHIP-source API throttle rows.
 
     MANUAL rows are never touched.
+
+    Args:
+        user: The user whose membership throttles are removed.
+        clear_cache: When True, call ``clear_tiered_cache()`` if any rows
+            were deleted. Batch callers can pass False and clear the cache once
+            after their loop instead of scanning Redis on every iteration.
     """
     deleted, _ = APIThrottle.objects.filter(
         user=user,
         throttle_type=ThrottleType.API,
         source=APIThrottle.Source.MEMBERSHIP,
     ).delete()
-    if deleted:
+    if deleted and clear_cache:
         clear_tiered_cache()
 
 
@@ -994,11 +1002,14 @@ def _next_available_at(
     accommodated in the throttle window, considering the current usage and
     the limit.
 
-    :param in_window: ``(weight, timestamp)`` entries inside the rate window.
-    :param used: Total weight currently in the window.
-    :param limit: Requests (or citations) the rate allows per window.
-    :param duration: Window length in seconds.
-    :return: Unix timestamp, or None if no expiry would admit a request.
+    Args:
+        in_window: ``(weight, timestamp)`` entries inside the rate window.
+        used: Total weight currently in the window.
+        limit: Requests (or citations) the rate allows per window.
+        duration: Window length in seconds.
+
+    Returns:
+        Unix timestamp, or None if no expiry would admit a request.
     """
     if not in_window or limit == 0:
         # A '0/...' rate blocks outright; no amount of expiry admits anything.
@@ -1174,7 +1185,7 @@ class TagRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
 
 
 class EventCounterThrottle(CloudFrontIdentMixin, UserRateThrottle):
-    """Throttles increment-event"""
+    """Throttles increment-event."""
 
     scope = "events"
 
@@ -1186,9 +1197,12 @@ def has_throttle_override(user: User, throttle_type: int) -> bool:
     (``get_all_throttle_overrides``), so MANUAL/MEMBERSHIP precedence and
     membership expiry are honored.
 
-    :param user: The user to check.
-    :param throttle_type: The ThrottleType integer value.
-    :return: True if the user has an active override of that type.
+    Args:
+        user: The user to check.
+        throttle_type: The ThrottleType integer value.
+
+    Returns:
+        True if the user has an active override of that type.
     """
     return user.username in get_all_throttle_overrides(throttle_type)
 
@@ -1266,8 +1280,11 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
         TTL is the longest window so entries relevant to longer-window checks
         are preserved.
 
-        :param rates: List of rate strings, e.g. ['5/min', '50/hour'].
-        :return: True if allowed, False if throttled.
+        Args:
+            rates: List of rate strings, e.g. ['5/min', '50/hour'].
+
+        Returns:
+            True if allowed, False if throttled.
         """
         parsed: list[tuple[int, int, str]] = []
         for r in rates:
@@ -1403,14 +1420,10 @@ class FetchRateThrottle(ExceptionalUserRateThrottle):
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
-    """
-    Limits the rate of API calls that may be made by users based on the
-    number of citations they try to look up.
-    """
+    """Limits the rate of API calls that may be made by users based on the number of citations they try to look up."""
 
     def get_citation_count_from_request(self, request, view) -> int:
-        """
-        Gets the number of citations from a request.
+        """Gets the number of citations from a request.
 
         This helper method retrieves the number of citations from a request
         object. It first validates the data using the `validate_request_data`
@@ -1442,15 +1455,17 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         }
 
     def get_citations_rate(self, request) -> list[str]:
-        """
-        Check for a custom citations API rate limit from the database.
+        """Check for a custom citations API rate limit from the database.
 
         If the authenticated user has a custom rate limit set in the database,
         it returns that value. A rate of '0/min' (or any '0/...') blocks the
         user. Otherwise, it returns the default rate limit.
 
-        :param request: The request object with the user's data.
-        :return: Rate string (e.g., '100/hour'), or None if user is blocked.
+        Args:
+            request: The request object with the user's data.
+
+        Returns:
+            Rate string (e.g., '100/hour'), or None if user is blocked.
         """
         default = self.THROTTLE_RATES["citations"]
         if default is None:
@@ -1590,7 +1605,7 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
 
 
 class RECAPUploaders(DjangoModelPermissions):
-    """Provides some users upload permissions in RECAP
+    """Provides some users upload permissions in RECAP.
 
     Such users must have the has_recap_upload_access flag set on their account
     """
@@ -1616,11 +1631,14 @@ def make_date_str_list(
     start: str | datetime,
     end: str | datetime,
 ) -> list[str]:
-    """Make a list of date strings for a date span
+    """Make a list of date strings for a date span.
 
-    :param start: The beginning date, as a string or datetime object
-    :param end: The end date, as a string or datetime object
-    :returns: A list of dates in the ISO-8601 format
+    Args:
+        start: The beginning date, as a string or datetime object
+        end: The end date, as a string or datetime object
+
+    Returns:
+        A list of dates in the ISO-8601 format
     """
     if isinstance(start, str):
         start = parser.parse(start, fuzzy=False)
@@ -1641,12 +1659,14 @@ def invert_user_logs(
     - Anonymous users are aggregated under the key 'AnonymousUser'.
     - Both v3 and v4 API counts are combined in the results.
 
-    :param start: Beginning date (inclusive) for the query range
-    :param end: End date (inclusive) for the query range
-    :param add_usernames: If True, replaces user IDs with usernames as keys.
-        When False, uses only user IDs as keys.
+    Args:
+        start: Beginning date (inclusive) for the query range
+        end: End date (inclusive) for the query range
+        add_usernames: If True, replaces user IDs with usernames as keys.
+            When False, uses only user IDs as keys.
 
-    :return: Dictionary mapping user identifiers (usernames if `add_usernames=True`,
+    Returns:
+        Dictionary mapping user identifiers (usernames if `add_usernames=True`,
         otherwise user IDs) to their daily API usage counts and totals.
         Inner dictionaries are ordered by date. Only dates with usage are included.
     """
@@ -1728,10 +1748,13 @@ def get_user_api_usage(
     by reading every day's set in full, which suits the admin-facing reports
     but is wasteful for a single user.
 
-    :param user_id: The pk of the user whose usage to look up
-    :param start: Beginning date (inclusive) for the query range
-    :param end: End date (inclusive) for the query range
-    :return: Dictionary mapping ISO dates with usage to their counts, in
+    Args:
+        user_id: The pk of the user whose usage to look up
+        start: Beginning date (inclusive) for the query range
+        end: End date (inclusive) for the query range
+
+    Returns:
+        Dictionary mapping ISO dates with usage to their counts, in
         chronological order, followed by a 'total' key. Dates without usage
         are omitted; 'total' is always present.
     """
@@ -1764,14 +1787,17 @@ def get_user_ids_for_date_range(
     start: str | datetime,
     end: str | datetime,
 ) -> set[int]:
-    """Get a list of user IDs that used the API during a span of time
+    """Get a list of user IDs that used the API during a span of time.
 
-    :param start: The beginning of when you want to find users. A str to be
-    interpreted by dateparser.
-    :param end: The end of when you want to find users.  A str to be
-    interpreted by dateparser.
-    :return Set of user IDs during a time period. Will not contain anonymous
-    users.
+    Args:
+        start: The beginning of when you want to find users. A str to be
+            interpreted by dateparser.
+        end: The end of when you want to find users.  A str to be
+            interpreted by dateparser.
+
+    Returns:
+        Set of user IDs during a time period. Will not contain anonymous
+        users.
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
@@ -1786,13 +1812,16 @@ def get_user_ids_for_date_range(
 
 
 def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
-    """Get the count of hits for an endpoint by name, during a date range
+    """Get the count of hits for an endpoint by name, during a date range.
 
-    :param endpoint: The endpoint to get the count for. Typically something
-    like 'docket-list' or 'docket-detail'
-    :param start: The beginning date (inclusive) you want the results for.
-    :param end: The end date (inclusive) you want the results for.
-    :return int: The count for that endpoint
+    Args:
+        endpoint: The endpoint to get the count for. Typically something
+            like 'docket-list' or 'docket-detail'
+        start: The beginning date (inclusive) you want the results for.
+        end: The end date (inclusive) you want the results for.
+
+    Returns:
+        int: The count for that endpoint
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
@@ -1805,13 +1834,16 @@ def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
 
 
 def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
-    """
+    """Get the average response time of an endpoint on a given day.
 
-    :param endpoint: The endpoint to get the average timing for. Typically
-    something like 'docket-list' or 'docket-detail'
-    :param d: The date to get the timing for (a date object)
-    :return: The average number of ms that endpoint used to serve requests on
-    that day.
+    Args:
+        endpoint: The endpoint to get the average timing for. Typically
+            something like 'docket-list' or 'docket-detail'
+        d: The date to get the timing for (a date object)
+
+    Returns:
+        The average number of ms that endpoint used to serve requests on
+        that day.
     """
     d_str = d.isoformat()
     r = get_redis_interface("STATS")
@@ -1824,8 +1856,7 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
 
 
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
-    """Returns the next retry datetime to schedule a webhook retry based on its
-    current retry counter.
+    """Returns the next retry datetime to schedule a webhook retry based on its current retry counter.
 
     The next retry date is computed based to meet an exponential backoff with a
     starting multiplier of three.
@@ -1846,11 +1877,13 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     minute. On average the total elapsed time in the 7th retry would be 54
     hours and 39 minutes.
 
-    :param retry_counter: The current retry_counter used to compute the next
-    retry date.
-    :return datatime: The next retry datetime.
-    """
+    Args:
+        retry_counter: The current retry_counter used to compute the next
+            retry date.
 
+    Returns:
+        datatime: The next retry datetime.
+    """
     INITIAL_TIME = 3  # minutes
     # Update new_next_retry_date exponentially
     new_next_retry_date = now() + timedelta(
@@ -1865,15 +1898,11 @@ WEBHOOK_MAX_RETRY_COUNTER = 7
 async def check_webhook_failure_count_and_notify(
     webhook_event: WebhookEvent,
 ) -> None:
-    """Check if a Webhook needs to be disabled and/or send a notification about
-     a failing webhook event. Only email failing webhook notifications based on
-     the oldest active ENQUEUED_RETRY WebhookEvent, avoiding sending
-     notifications for every failing webhook event.
+    """Check if a Webhook needs to be disabled and/or send a notification about a failing webhook event. Only email failing webhook notifications based on the oldest active ENQUEUED_RETRY WebhookEvent, avoiding sending notifications for every failing webhook event.
 
-    :param webhook_event: The related WebhookEvent to check.
-    :return: None
+    Args:
+        webhook_event: The related WebhookEvent to check.
     """
-
     # Send failing webhook events notifications for only some of the retries
     notify_on = {
         0: False,
@@ -1931,19 +1960,20 @@ def update_webhook_event_after_request(
     response: Response | None = None,
     error: str | None = "",
 ) -> None:
-    """Update the webhook event after sending the POST request. If the webhook
-    event fails, increase the retry counter, next retry date and increase its
-    parent webhook failure count. If the webhook event reaches the max retry
-    counter marks it as Failed. If there is no error marks it as Successful.
+    """Update the webhook event after sending the POST request.
 
-    :param webhook_event: The WebhookEvent to update.
-    :param response: Optional in case we receive a requests Response object, to
-    update the WebhookEvent accordingly.
-    :param error: Optional, if we don't receive a request Response we'll
-    receive an error to log it.
-    :return: None
+    If the webhook event fails, increase the retry counter, next retry date and
+    increase its parent webhook failure count. If the webhook event reaches the
+    max retry counter marks it as Failed. If there is no error marks it as
+    Successful.
+
+    Args:
+        webhook_event: The WebhookEvent to update.
+        response: Optional in case we receive a requests Response object, to
+            update the WebhookEvent accordingly.
+        error: Optional, if we don't receive a request Response we'll
+            receive an error to log it.
     """
-
     failed_request = False
     data = ""
     status_code = None
@@ -2008,14 +2038,15 @@ class WebhookKeyType(TypedDict):
 
 
 def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
-    """Convert a webhook deprecation date string to ISO-8601 format with
-     UTC timezone.
+    """Convert a webhook deprecation date string to ISO-8601 format with UTC timezone.
 
-    :param webhook_deprecation_date: The deprecation date as a string in
-    "YYYY-MM-DD" format.
-    :return: The ISO-8601 formatted date string with UTC timezone.
+    Args:
+        webhook_deprecation_date: The deprecation date as a string in
+            "YYYY-MM-DD" format.
+
+    Returns:
+        The ISO-8601 formatted date string with UTC timezone.
     """
-
     deprecation_date = (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
         .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
@@ -2027,11 +2058,13 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     """Generate a dictionary representing the content for the webhook key.
 
-    :param webhook: The Webhook instance.
-    :return: A dictionary containing webhook details, event type, version,
-    creation date in ISO format, and deprecation date according webhook version.
-    """
+    Args:
+        webhook: The Webhook instance.
 
+    Returns:
+        A dictionary containing webhook details, event type, version,
+        creation date in ISO format, and deprecation date according webhook version.
+    """
     deprecation_date: str | None = None
     match webhook.version:
         case WebhookVersions.v1:
@@ -2051,6 +2084,7 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
 
 def get_webhook_logging_prefix() -> str:
     """Simple tool for getting the prefix for logging webhook requests.
+
     Useful for mocking the logger.
     """
     return "webhook:v1"
@@ -2059,11 +2093,13 @@ def get_webhook_logging_prefix() -> str:
 def log_webhook_event(webhook_user_id: int) -> list[int | float]:
     """Log a successful webhook event to redis.
 
-    :param webhook_user_id: The webhook user id
-    :return: A list of successful webhook events' global count and the user's
-    webhook count.
-    """
+    Args:
+        webhook_user_id: The webhook user id
 
+    Returns:
+        A list of successful webhook events' global count and the user's
+        webhook count.
+    """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
     webhook_prefix = get_webhook_logging_prefix()
@@ -2080,13 +2116,12 @@ def log_webhook_event(webhook_user_id: int) -> list[int | float]:
 
 
 def handle_webhook_events(results: list[int | float], user: User) -> None:
-    """Create global and user tracking events if a webhook milestone is
-    reached.
+    """Create global and user tracking events if a webhook milestone is reached.
 
-    :param results: A list of successful webhook events' global count and the
-    user's webhook count.
-    :param user: The webhook user
-    :return: None
+    Args:
+        results: A list of successful webhook events' global count and the
+            user's webhook count.
+        user: The webhook user
     """
     total_count = results[0]
     user_count = results[1]
@@ -2105,10 +2140,7 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
 
 
 class DynamicFieldsMixin:
-    """
-    A serializer mixin that takes an additional `fields` argument that controls
-    which fields should be displayed.
-    """
+    """A serializer mixin that takes an additional `fields` argument that controls which fields should be displayed."""
 
     @property
     def prevent_nested_processing(self) -> bool:
@@ -2123,15 +2155,14 @@ class DynamicFieldsMixin:
 
     @cached_property
     def fields(self):
-        """
-        Filters the fields according to the `fields` query parameter.
+        """Filters the fields according to the `fields` query parameter.
 
         A blank `fields` parameter (?fields) will remove all fields. Not
         passing `fields` will pass all fields individual fields are comma
         separated (?fields=id,name,url,email).
 
         """
-        fields = super(DynamicFieldsMixin, self).fields
+        fields = super().fields
 
         if not hasattr(self, "_context"):
             # We are being called before a request cycle
@@ -2198,8 +2229,7 @@ class DynamicFieldsMixin:
 
 
 class NestedDynamicFieldsMixin(DynamicFieldsMixin):
-    """A serializer mixin that extends DynamicFieldsMixin to allow nested serializers
-    to filter their fields based on the original `fields` query parameter.
+    """A serializer mixin that extends DynamicFieldsMixin to allow nested serializers to filter their fields based on the original `fields` query parameter.
 
     Unlike the base mixin—which only applies filtering at the root serializer,
     this subclass:
@@ -2223,11 +2253,7 @@ class NestedDynamicFieldsMixin(DynamicFieldsMixin):
     def get_filter_fields(
         self, params, level, source, default=None, include_parent=True
     ):
-        """
-        Parse the raw `fields` parameter and return the subset of fields
-        that apply at this serializer’s nesting level under the given
-        source prefix.
-        """
+        """Parse the raw `fields` parameter and return the subset of fields that apply at this serializer’s nesting level under the given source prefix."""
         fields = super().get_filter_fields(
             params, level, source, default, include_parent
         )
@@ -2255,9 +2281,7 @@ def get_source_path(serializer) -> str:
 def get_fields_for_level_and_prefix(
     fields_list, level, source, include_parent, default
 ):
-    """Extract the field names relevant to a specific nesting depth
-    from a list of double‑underscore lookup strings.
-    """
+    """Extract the field names relevant to a specific nesting depth from a list of double‑underscore lookup strings."""
     if not fields_list:
         return default
 
@@ -2287,9 +2311,7 @@ def get_fields_for_level_and_prefix(
 
 
 def compute_level(serializer) -> int:
-    """Recursively count how many ancestors of `serializer` are not
-    ListSerializer instances. Stops when parent is None.
-    """
+    """Recursively count how many ancestors of `serializer` are not ListSerializer instances. Stops when parent is None."""
     parent = getattr(serializer, "parent", None)
     if parent is None:
         # base case, reached the top
@@ -2314,14 +2336,15 @@ class RetrieveFilteredFieldsMixin:
     def _filter_top_level_fields_to_defer(
         self, field_list: set[str] | None, keep_if: Callable
     ) -> list[str]:
-        """Method to retrieve the top-level fields to defer, given a list of
-        field names (allow or omit) and a condition that determines which
-        fields to defer.
+        """Method to retrieve the top-level fields to defer, given a list of field names (allow or omit) and a condition that determines which fields to defer.
 
-        :param field_list: A list of field names to filter by.
-        :param keep_if: A function that takes a field name and returns a
-         boolean indicating whether to defer the field.
-        :return: A list of top field names to defer
+        Args:
+            field_list: A list of field names to filter by.
+            keep_if: A function that takes a field name and returns a
+                boolean indicating whether to defer the field.
+
+        Returns:
+            A list of top field names to defer
         """
         meta = getattr(self, "Meta", None)
         model = getattr(meta, "model", None)
@@ -2332,11 +2355,10 @@ class RetrieveFilteredFieldsMixin:
         return [name for name in all_fields if keep_if(name, field_list)]
 
     def _get_disallowed_top_level_fields_to_defer(self) -> list[str]:
-        """Determine which top-level model fields should be deferred when an
-        explicit fields filter is in use.
-        Other model fields not explicitly included in 'fields' are deferred.
+        """Determine which top-level model fields should be deferred when an explicit fields filter is in use. Other model fields not explicitly included in 'fields' are deferred.
 
-        :return: A list of disallowed top field names to defer
+        Returns:
+            A list of disallowed top field names to defer
         """
         allow = getattr(self, "_flat_allow", None)
         return self._filter_top_level_fields_to_defer(
@@ -2344,11 +2366,10 @@ class RetrieveFilteredFieldsMixin:
         )
 
     def _get_omit_top_level_fields_to_defer(self) -> list[str]:
-        """
-        Determine which top-level model fields should be deferred when an
-        explicit omit filter is in use. Valid database fields in the omit list
-        will be deferred.
-        :return: A list of omit top field names to defer
+        """Determine which top-level model fields should be deferred when an explicit omit filter is in use. Valid database fields in the omit list will be deferred.
+
+        Returns:
+            A list of omit top field names to defer.
         """
         omit = getattr(self, "_flat_omit", None)
         return self._filter_top_level_fields_to_defer(
@@ -2360,15 +2381,16 @@ class RetrieveFilteredFieldsMixin:
         nested_mapping: defaultdict[str, list[str]] | dict,
         should_defer: Callable,
     ) -> dict[str, tuple[type[Model], list[str]]]:
-        """Method to retrieve nested fields to defer based on a mapping and a
-        defer condition.
+        """Method to retrieve nested fields to defer based on a mapping and a defer condition.
 
-        :param nested_mapping: A nested mapping from fields to defer
-        :param should_defer: A function that takes a field name and returns a
-         boolean indicating whether to defer the field.
-        :return: A dict containing the mapping of nested fields to defer.
+        Args:
+            nested_mapping: A nested mapping from fields to defer
+            should_defer: A function that takes a field name and returns a
+                boolean indicating whether to defer the field.
+
+        Returns:
+            A dict containing the mapping of nested fields to defer.
         """
-
         nested_defer_map: dict[str, tuple[type[Model], list[str]]] = {}
         for parent, items in nested_mapping.items():
             field = getattr(self, "fields", {}).get(parent)
@@ -2400,11 +2422,10 @@ class RetrieveFilteredFieldsMixin:
     def _get_disallowed_nested_level_fields_to_defer(
         self,
     ) -> dict[str, tuple[type[Model], list[str]]]:
-        """Determine which top-level model fields should be deferred when an
-         explicit fields filter is in use.
-        Other model fields not explicitly included in 'fields' are deferred.
+        """Determine which top-level model fields should be deferred when an explicit fields filter is in use. Other model fields not explicitly included in 'fields' are deferred.
 
-        :return: A dict containing the mapping of nested fields to defer.
+        Returns:
+            A dict containing the mapping of nested fields to defer.
         """
         allow_map = getattr(self, "_nested_allow", {})
         return self._get_nested_level_fields_to_defer(
@@ -2415,11 +2436,10 @@ class RetrieveFilteredFieldsMixin:
     def _get_omit_nested_level_fields_to_defer(
         self,
     ) -> dict[str, tuple[type[Model], list[str]]]:
-        """
-        Determine which nested-model fields should be deferred for each nested
-        serializer when an explicit omit filter is in use.
+        """Determine which nested-model fields should be deferred for each nested serializer when an explicit omit filter is in use.
 
-        :return: A dict containing the mapping of nested fields to defer.
+        Returns:
+            A dict containing the mapping of nested fields to defer.
         """
         omit_map = getattr(self, "_nested_omit", {})
         return self._get_nested_level_fields_to_defer(
@@ -2429,14 +2449,14 @@ class RetrieveFilteredFieldsMixin:
     def get_deferred_model_fields(
         self,
     ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
-        """
-        Returns a flat list of omitted model-fields; top-level and nested.
+        """Returns a flat list of omitted model-fields; top-level and nested.
+
         Ensures that parsing of "fields"/"omit" has run by accessing ".fields".
 
-        :return: A two tuple of top fields names to defer and a dict containing
-         the mapping of nested fields to defer.
+        Returns:
+            A two tuple of top fields names to defer and a dict containing
+            the mapping of nested fields to defer.
         """
-
         self._flat_allow = set()
         self._flat_omit = set()
         self._nested_allow = defaultdict(list)
@@ -2506,7 +2526,8 @@ class RetrieveFilteredFieldsMixin:
 
 
 class DeferredFieldsMixin:
-    """ViewSet Mixin that:
+    """ViewSet Mixin that does the following.
+
     - defers top‐level model columns based on omit/fields
     - omit deferring select related fields
     - builds a Prefetch for each nested relation to defer its columns,

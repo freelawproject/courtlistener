@@ -2,9 +2,9 @@ import json
 import logging
 import random
 from datetime import timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, assert_never
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -30,7 +30,7 @@ from cl.users.tasks import notify_new_or_updated_webhook
 logger = logging.getLogger(__name__)
 
 
-class SESEventType(str, Enum):
+class SESEventType(StrEnum):
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -38,10 +38,12 @@ class SESEventType(str, Enum):
 def get_message_id(mail_obj: dict) -> str:
     """Returns the unique message_id from the SES notification header.
 
-    :param mail_obj: The notification mail object to extract the message_id
-    :return message_id: The unique message_id
-    """
+    Args:
+        mail_obj: The notification mail object to extract the message_id
 
+    Returns:
+        message_id: The unique message_id
+    """
     headers = mail_obj["headers"]
     for header in headers:
         if header["name"] == "X-CL-ID":
@@ -53,14 +55,13 @@ def get_message_id(mail_obj: dict) -> str:
 def store_bounce_or_complaint_obj(
     bounce_obj: dict[str, Any], email_recipient: str, obj_type: SESEventType
 ) -> None:
-    """
-    Store the SES bounce/complaint payload to S3 as JSON.
+    """Store the SES bounce/complaint payload to S3 as JSON.
 
-    :param bounce_obj: The bounce payload to store.
-    :param email_recipient: The email address the event belongs to.
-    :param obj_type: The type of the bounce/complaint.
+    Args:
+        bounce_obj: The bounce payload to store.
+        email_recipient: The email address the event belongs to.
+        obj_type: The type of the bounce/complaint.
     """
-
     match obj_type:
         case SESEventType.COMPLAINT:
             dir_name = "complaints"
@@ -69,6 +70,7 @@ def store_bounce_or_complaint_obj(
             dir_name = "bounces"
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
+            assert_never(obj_type)
             return None
 
     if random.random() >= storing_rate or not email_recipient:
@@ -96,10 +98,7 @@ def store_bounce_or_complaint_obj(
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
-    """Receiver function to handle bounce notifications sent by Amazon SES via
-    handle_event_webhook
-    """
-
+    """Receiver function to handle bounce notifications sent by Amazon SES via handle_event_webhook."""
     message_id = get_message_id(mail_obj)
     normalized_recipients = []
     if bounce_obj:
@@ -144,10 +143,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
 def complaint_handler(
     sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
 ):
-    """Receiver function to handle complaint notifications sent by
-    Amazon SES via handle_event_webhook
-    """
-
+    """Receiver function to handle complaint notifications sent by Amazon SES via handle_event_webhook."""
     if complaint_obj:
         complained_recipients = complaint_obj["complainedRecipients"]
         recipient_emails = [
@@ -201,17 +197,14 @@ def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
 def webhook_created_or_updated(
     sender, instance=None, created=False, update_fields=None, **kwargs
 ) -> None:
-    """Notify admins when a new webhook is created or updated. Avoid sending
-    the notification when the webhook failure_count is updated.
+    """Notify admins when a new webhook is created or updated.
+
+    Avoid sending the notification when the webhook failure_count is updated.
     """
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)
     else:
-        if update_fields:
-            if (
-                "failure_count"
-                or "enabled"
-                or "date_modified" in update_fields
-            ):
-                return
+        bypass_fields = ("failure_count", "enabled", "date_modified")
+        if update_fields and set(bypass_fields) & set(update_fields):
+            return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)

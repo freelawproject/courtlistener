@@ -67,9 +67,9 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Handle the command execution.
 
-        :param args: Additional arguments.
-        :param options: Command options.
-        :return: None
+        Args:
+            args: Additional arguments.
+            options: Command options.
         """
         logger.info("Starting import_harvard_pdfs command")
         if options["verbose"]:
@@ -98,10 +98,7 @@ class Command(BaseCommand):
         self.process_crosswalks(self.reporter, self.resume)
 
     def setup_s3_clients(self) -> None:
-        """Initialize S3 client for accessing Harvard CAP R2.
-
-        :return: None
-        """
+        """Initialize S3 client for accessing Harvard CAP R2."""
         # Initialize S3 client for accessing Harvard CAP R2
         self.cap_client = boto3.client(
             "s3",
@@ -116,9 +113,9 @@ class Command(BaseCommand):
     ) -> None:
         """Process crosswalk files for importing PDFs.
 
-        :param specific_reporter: Specific reporter to process, if any.
-        :param resume: Whether to resume from the last completed reporter.
-        :return: None
+        Args:
+            specific_reporter: Specific reporter to process, if any.
+            resume: Whether to resume from the last completed reporter.
         """
         logger.info(
             "Processing crosswalks. Specific reporter: %s, Resume: %s, Workers: %s",
@@ -209,17 +206,20 @@ class Command(BaseCommand):
                     f.write(reporter)
 
     def process_entry(self, entry: dict[str, Any]) -> int:
-        """Processes a single entry by attempting to download and store its associated
-        PDF file
-        :param entry: A dictionary containing details about the case entry.
-        :return: An integer indicating the result of the process:
+        """Processes a single entry by attempting to download and store its associated PDF file.
+
+        Args:
+            entry: A dictionary containing details about the case entry.
+
+        Returns:
+            An integer indicating the result of the process:
                  - 1 if the PDF was successfully downloaded and stored.
                  - 0 if the PDF was not downloaded (e.g., already processed, dry run
                  mode, or an error occurred).
         """
         logger.debug("Processing entry: %s", entry)
         try:
-            cap_case_id = entry["cap_case_id"]
+            entry["cap_case_id"]
             cl_cluster_id = entry["cl_cluster_id"]
             json_path = entry["cap_path"]
 
@@ -278,8 +278,8 @@ class Command(BaseCommand):
     def process_crosswalk_file(self, crosswalk_file: str) -> None:
         """Process a single crosswalk file.
 
-        :param crosswalk_file: Path to the crosswalk file.
-        :return: None
+        Args:
+            crosswalk_file: Path to the crosswalk file.
         """
         logger.info("Processing crosswalk file: %s", crosswalk_file)
 
@@ -319,8 +319,11 @@ class Command(BaseCommand):
     def parse_cap_path(self, cap_path: str) -> tuple[str, str, str]:
         """Extract data from CAP path.
 
-        :param cap_path: CAP path string.
-        :return: Tuple containing reporter_slug, volume_folder, and case_name.
+        Args:
+            cap_path: CAP path string.
+
+        Returns:
+            Tuple containing reporter_slug, volume_folder, and case_name.
         """
         # Extract data from CAP path
         parts = cap_path.strip("/").split("/")
@@ -332,8 +335,11 @@ class Command(BaseCommand):
     def fetch_pdf_from_cap(self, pdf_path: str) -> bytes | None:
         """Fetch PDF content from CAP.
 
-        :param pdf_path: Path to the PDF in CAP storage.
-        :return: PDF content as bytes, or None if fetching fails.
+        Args:
+            pdf_path: Path to the PDF in CAP storage.
+
+        Returns:
+            PDF content as bytes, or None if fetching fails.
         """
         logger.info("Fetching PDF from CAP: %s", pdf_path)
         logger.debug("Bucket name: %s", self.cap_bucket_name)
@@ -373,9 +379,9 @@ class Command(BaseCommand):
     ) -> None:
         """Store the fetched PDF in CourtListener's storage.
 
-        :param cluster: OpinionCluster object to associate the PDF with.
-        :param pdf_content: PDF content as bytes.
-        :return: None
+        Args:
+            cluster: OpinionCluster object to associate the PDF with.
+            pdf_content: PDF content as bytes.
         """
         logger.info("Storing PDF for cluster: %s", cluster.id)
         storage = HarvardPDFStorage()

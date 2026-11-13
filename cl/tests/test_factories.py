@@ -8,9 +8,7 @@ from cl.tests.cases import TestCase
 
 
 class TestFactoryCreation(TestCase):
-    """
-    Tests to make sure that we can use our factories to generate data.
-    """
+    """Tests to make sure that we can use our factories to generate data."""
 
     @factory.django.mute_signals(signals.pre_save, signals.post_save)
     def test_making_docket(self) -> None:

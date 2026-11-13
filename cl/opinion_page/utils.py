@@ -2,8 +2,9 @@ import csv
 import logging
 import traceback
 from dataclasses import dataclass, field
+from datetime import date
 from io import StringIO
-from typing import Any, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -15,8 +16,9 @@ from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.utils.html import format_html
 from django.utils.http import urlencode
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
@@ -33,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.model_helpers import choices_to_csv
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
@@ -45,6 +48,7 @@ from cl.opinion_page.docket_entry_sources import (
 )
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -66,10 +70,7 @@ def _person_item(
     person_str: str,
     search_param: str = "assigned_to",
 ) -> MetadataItem | None:
-    """Build a metadata item for a person field with both a FK and a string
-    fallback. Returns a linked item when the person FK is set, a nofollow
-    search-link item when only the string is set, or None when both are empty.
-    """
+    """Build a metadata item for a person field with both a FK and a string fallback. Returns a linked item when the person FK is set, a nofollow search-link item when only the string is set, or None when both are empty."""
     if person:
         return {
             "label": label,
@@ -434,6 +435,264 @@ def build_originating_court_metadata(
     return items
 
 
+class IdbRow(TypedDict):
+    """One Field / Value / Hints row of the FJC Integrated Database tab.
+
+    hint is HTML-safe: static copy with links plus the field's choice labels.
+    Rows without a hint omit it.
+    """
+
+    label: str
+    value: str
+    hint: NotRequired[SafeString]
+
+
+def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
+    """Build the Field / Value / Hints rows of the FJC IDB tab.
+
+    Values are display-ready: dates in the site's date format, choice fields
+    as their label, Origin and Jurisdiction as the code followed by the
+    label, and unset fields as "Not Provided".
+    """
+    not_provided = "Not Provided"
+    codebook = "https://www.fjc.gov/research/idb/"
+
+    def show(value: object) -> str:
+        """Formats a value for display, with the fallback for unset ones."""
+        if value is None or value == "":
+            return not_provided
+        if isinstance(value, date):
+            return date_format(value)
+        return str(value)
+
+    def coded(code: object, label: str) -> str:
+        """Formats a choice as its code followed by its label."""
+        return f"({code}) {label}" if code is not None else not_provided
+
+    def possible_values(field_name: str, intro: str = "") -> SafeString:
+        """Lists the field's choices, after an optional intro paragraph."""
+        csv = choices_to_csv(idb_data, field_name)
+        if not intro:
+            return format_html("Possible values: {}.", csv)
+        return format_html("<p>{}</p><p>Possible values: {}.</p>", intro, csv)
+
+    def codebook_link(text: str) -> SafeString:
+        """Links text to the FJC codebook."""
+        return format_html(
+            '<a class="links-external" href="{}">{}</a>', codebook, text
+        )
+
+    return [
+        {
+            "label": "Office Number",
+            "value": show(idb_data.office),
+            "hint": mark_safe(
+                "Office codes are listed in the "
+                '<a class="links-external" href="https://free.law/xlsx/fjc/integrated-database/office-codes.xlsx">'
+                "Guide to Judiciary Policies and Procedures, Appendix A</a>."
+            ),
+        },
+        {
+            "label": "Origin",
+            "value": coded(idb_data.origin, idb_data.get_origin_display()),
+            "hint": possible_values("origin"),
+        },
+        {"label": "Date Filed", "value": show(idb_data.date_filed)},
+        {"label": "Date Terminated", "value": show(idb_data.date_terminated)},
+        {
+            "label": "Jurisdiction",
+            "value": coded(
+                idb_data.jurisdiction, idb_data.get_jurisdiction_display()
+            ),
+            "hint": possible_values(
+                "jurisdiction",
+                "The basis for U.S. district court jurisdiction in the case.",
+            ),
+        },
+        {
+            "label": "Nature of Suit",
+            "value": show(idb_data.get_nature_of_suit_display()),
+        },
+        {
+            "label": "Title",
+            "value": show(idb_data.title),
+            "hint": mark_safe(
+                "The title in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Section",
+            "value": show(idb_data.section),
+            "hint": mark_safe(
+                "The section in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Subsection",
+            "value": show(idb_data.subsection),
+            "hint": mark_safe(
+                "The subsection in the U.S.C. for the cause of this case."
+            ),
+        },
+        {
+            "label": "Diversity of Residence",
+            "value": show(idb_data.diversity_of_residence),
+        },
+        {
+            "label": "Class Action Status",
+            "value": show(idb_data.class_action),
+            "hint": mark_safe(
+                "If true, designates that the case involves an allegation by "
+                "the plaintiff that the complaint meets the prerequisites of "
+                '"Class Action" as provided in Rule 23.'
+            ),
+        },
+        {
+            "label": "Termination Class Action Status",
+            "value": show(
+                idb_data.get_termination_class_action_status_display()
+            ),
+            "hint": possible_values("termination_class_action_status"),
+        },
+        {
+            "label": "Monetary Demand",
+            "value": show(idb_data.monetary_demand),
+            "hint": format_html(
+                "The monetary amount sought by the plaintiff (in thousands). "
+                "Amounts less than $500 appear as 1 and amounts over $10k "
+                "appear as 9999. See notes {} for details.",
+                codebook_link("in codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "County of Residence",
+            "value": show(idb_data.county_of_residence),
+            "hint": format_html(
+                "The code for the county of residence for the first listed "
+                "plaintiff (see notes in {}).",
+                codebook_link("codebook on FJC website"),
+            ),
+        },
+        {
+            "label": "Arbitration at Filing",
+            "value": show(idb_data.get_arbitration_at_filing_display()),
+            "hint": possible_values(
+                "arbitration_at_filing",
+                "Only used by courts participating in the Formal Arbitration "
+                "Program.",
+            ),
+        },
+        {
+            "label": "Arbitration at Termination",
+            "value": show(idb_data.get_arbitration_at_termination_display()),
+            "hint": possible_values("arbitration_at_termination"),
+        },
+        {
+            "label": "Multidistrict Litigation Number",
+            "value": show(idb_data.multidistrict_litigation_docket_number),
+            "hint": mark_safe("A four digit multidistrict litigation number."),
+        },
+        {
+            "label": "Plaintiff",
+            "value": show(idb_data.plaintiff),
+            "hint": mark_safe(
+                "The first listed plaintiff in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Defendant",
+            "value": show(idb_data.defendant),
+            "hint": mark_safe(
+                "The first listed defendant in the case. Field truncated to "
+                "30 characters upon extraction by the AOUSC source system."
+            ),
+        },
+        {
+            "label": "Date of Transfer",
+            "value": show(idb_data.date_transfer),
+            "hint": mark_safe(
+                "The date when the papers for the case were received by the "
+                "receiving district for a transferred case."
+            ),
+        },
+        {
+            "label": "Transfer Docket Number",
+            "value": show(idb_data.transfer_docket_number),
+            "hint": mark_safe(
+                "The docket number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Transfer Origin",
+            "value": show(idb_data.transfer_origin),
+            "hint": mark_safe(
+                "The origin number of the case in the source district."
+            ),
+        },
+        {
+            "label": "Procedural Progress",
+            "value": show(idb_data.get_procedural_progress_display()),
+            "hint": possible_values(
+                "procedural_progress",
+                format_html(
+                    "The point to which the case had progressed when it was "
+                    "disposed of (see notes in {}).",
+                    codebook_link("codebook on FJC website"),
+                ),
+            ),
+        },
+        {
+            "label": "Disposition",
+            "value": show(idb_data.get_disposition_display()),
+            "hint": possible_values(
+                "disposition", "The manner in which the case was disposed of."
+            ),
+        },
+        {
+            "label": "Nature of Judgment",
+            "value": show(idb_data.get_nature_of_judgement_display()),
+            "hint": possible_values(
+                "nature_of_judgement",
+                "Cases disposed of by an entry of a final judgment.",
+            ),
+        },
+        {
+            "label": "Amount Received",
+            "value": show(idb_data.amount_received),
+            "hint": format_html(
+                "Dollar amount received (in thousands) when appropriate. "
+                "Field not uniformally used; {}.",
+                codebook_link("see codebook"),
+            ),
+        },
+        {
+            "label": "Judgment",
+            # The FJC codebook uses 0 and -8 for missing judgment data.
+            "value": (
+                not_provided
+                if idb_data.judgment in (0, -8)
+                else show(idb_data.get_judgment_display())
+            ),
+            "hint": possible_values(
+                "judgment", "Which party the case was disposed in favor of."
+            ),
+        },
+        {
+            "label": "Pro Se",
+            "value": show(idb_data.get_pro_se_display()),
+            "hint": possible_values(
+                "pro_se",
+                format_html(
+                    "The parties that filed pro se in the case. See {} for "
+                    "more details.",
+                    codebook_link("codebook on IDB website"),
+                ),
+            ),
+        },
+    ]
+
+
 def build_docket_tabs(
     docket: Docket,
     parties: bool,
@@ -506,6 +765,25 @@ def build_docket_tabs(
     return tabs
 
 
+def separate_syllabus(cluster: OpinionCluster) -> bool:
+    """Whether the opinion page should show the syllabus after the headmatter.
+
+    The page shows a cluster's headmatter instead of its other front matter,
+    since Harvard's headmatter already holds the syllabus. Other sources,
+    such as Centralia's structured extraction, store the cover in headmatter
+    and the syllabus on its own, so it has to be shown as well.
+
+    :param cluster: The cluster shown on the page.
+    :return: True when the cluster has headmatter and a syllabus, and does
+    not come from Harvard.
+    """
+    return bool(
+        cluster.headmatter
+        and cluster.syllabus
+        and not cluster.filepath_json_harvard
+    )
+
+
 async def get_case_title(cluster: OpinionCluster) -> str:
     return f"{trunc(best_case_name(cluster), 100)}, {await cluster.acitation_string()}"
 
@@ -527,10 +805,7 @@ def make_docket_title(docket: Docket) -> str:
 async def _common_metadata_sections(
     docket: Docket, og_info: OriginatingCourtInformation | None
 ) -> list[MetadataSection]:
-    """Build the metadata sections that apply across every docket source,
-    not just one. build_originating_court_metadata() already returns []
-    when there's nothing to show.
-    """
+    """Build the metadata sections that apply across every docket source, not just one. build_originating_court_metadata() already returns [] when there's nothing to show."""
     return [
         {
             "items": await sync_to_async(build_originating_court_metadata)(
@@ -551,13 +826,20 @@ class CoreDocketDataDict(TypedDict):
     docket_source: DocketEntrySource
     docket_source_url: str | None
     metadata_sections: list[MetadataSection]
+    parties: bool
+    has_authorities: bool
+    tabs: list[dict[str, str]]
 
 
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
 ) -> tuple[Docket, CoreDocketDataDict]:
-    """Gather the core data for a docket, party, or IDB page."""
+    """Gather the core data shared by every tab view of a docket.
+
+    The tab navigation is built here so every tab lists the same set,
+    whichever one is active.
+    """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
     is_scotus = source is docket_entry_sources.SCOTUS
@@ -611,6 +893,8 @@ async def core_docket_data(
         *await _common_metadata_sections(docket, og_info),
     ]
 
+    parties = await docket.parties.aexists()
+    has_authorities = await docket.ahas_authorities()
     return (
         docket,
         {
@@ -627,6 +911,15 @@ async def core_docket_data(
                 docket
             ),
             "metadata_sections": metadata_sections,
+            "parties": parties,
+            "has_authorities": has_authorities,
+            "tabs": build_docket_tabs(
+                docket,
+                parties,
+                # Reads the FK id to avoid fetching the row in async code.
+                bool(docket.idb_data_id),  # pyrefly:ignore[missing-attribute]
+                has_authorities,
+            ),
         },
     )
 
@@ -645,25 +938,31 @@ def generate_docket_entries_csv_data(
 ) -> str:
     """Get str representing in memory file from docket_entries.
 
-    :param docket_entries: List of DocketEntry that implements CSVExportMixin.
-    :returns str with csv in memory content
+    Args:
+        docket_entries: List of DocketEntry that implements CSVExportMixin.
+
+    Returns:
+        str with csv in memory content
     """
     output: StringIO = StringIO()
     csvwriter = csv.writer(output, quotechar='"', quoting=csv.QUOTE_ALL)
     columns = []
 
+    # Each docket source keeps its documents under its own related name.
+    source = docket_entries[0].docket.get_entry_source()
     columns = docket_entries[0].get_csv_columns(get_column_name=True)
-    columns += (
-        docket_entries[0]
-        .recap_documents.first()
-        .get_csv_columns(get_column_name=True)
-    )
+    # The first entry may have no documents, so take the document columns
+    # from the first document found.
+    for docket_entry in docket_entries:
+        if documents := list(source.documents_for_entry(docket_entry)):
+            columns += documents[0].get_csv_columns(get_column_name=True)
+            break
     csvwriter.writerow(columns)
 
     for docket_entry in docket_entries:
-        for recap_doc in docket_entry.recap_documents.all():
+        for document in source.documents_for_entry(docket_entry):
             csvwriter.writerow(
-                docket_entry.to_csv_row() + recap_doc.to_csv_row()
+                docket_entry.to_csv_row() + document.to_csv_row()
             )
 
     csv_content: str = output.getvalue()
@@ -674,14 +973,16 @@ def generate_docket_entries_csv_data(
 async def build_cites_clusters_query(
     cluster_search: Search, sub_opinion_pks: list[str]
 ) -> Search:
-    """Build the ES cites clusters query to find clusters citing specific
-    sub-opinions.
+    """Build the ES cites clusters query to find clusters citing specific sub-opinions.
 
-    :param cluster_search: The Elasticsearch DSL Search object
-    :param sub_opinion_pks: A list of ids of sub-opinions to search for in
-    the 'cites' field.
-    :return: The ES DSL Search object representing the query to find clusters
-    citing the specified sub-opinions.
+    Args:
+        cluster_search: The Elasticsearch DSL Search object
+        sub_opinion_pks: A list of ids of sub-opinions to search for in
+            the 'cites' field.
+
+    Returns:
+        The ES DSL Search object representing the query to find clusters
+        citing the specified sub-opinions.
     """
     cites_query = Q(
         "bool",
@@ -717,10 +1018,13 @@ async def build_related_clusters_query(
 ) -> Search:
     """Build the ES related clusters query based on sub-opinion IDs.
 
-    :param cluster_search: The Elasticsearch DSL Search object
-    :param sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
-    :return: The ES DSL Search object representing the query to find the
-    related clusters.
+    Args:
+        cluster_search: The Elasticsearch DSL Search object
+        sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
+
+    Returns:
+        The ES DSL Search object representing the query to find the
+        related clusters.
     """
     mlt_query = await build_more_like_this_query(sub_opinion_pks)
     parent_filters = await sync_to_async(build_join_es_filters)(
@@ -782,11 +1086,14 @@ async def es_get_related_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> RelatedClusterResults:
-    """Elastic Related Clusters Search or Cache
+    """Elastic Related Clusters Search or Cache.
 
-    :param cluster:The cluster to use
-    :param request:The user request
-    :return:Related Cluster Data
+    Args:
+        cluster: The cluster to use
+        request: The user request
+
+    Returns:
+        Related Cluster Data
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     mlt_cache_key = await sync_to_async(make_s3_cache_key)(
@@ -893,11 +1200,14 @@ async def es_get_cited_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> RelatedCitingResults:
-    """Elastic cited by cluster search or cache
+    """Elastic cited by cluster search or cache.
 
-    :param cluster:The cluster to check
-    :param request:The user request
-    :return:The cited by data
+    Args:
+        cluster: The cluster to check
+        request: The user request
+
+    Returns:
+        The cited by data
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     cache_citing_key = await sync_to_async(make_s3_cache_key)(
@@ -980,11 +1290,14 @@ async def es_get_cited_clusters_with_cache(
 async def es_cited_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
-    """Elastic quick cited by count query
+    """Elastic quick cited by count query.
 
-    :param cluster_id: The cluster id to search with
-    :param sub_opinion_pks: The subopinion ids of the cluster
-    :return: Opinion Cited Count
+    Args:
+        cluster_id: The cluster id to search with
+        sub_opinion_pks: The subopinion ids of the cluster
+
+    Returns:
+        Opinion Cited Count
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     cache_cited_by_key = await sync_to_async(make_s3_cache_key)(
@@ -1023,13 +1336,15 @@ async def es_cited_case_count(
 async def es_related_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
-    """Elastic quick related cases count
+    """Elastic quick related cases count.
 
-    :param cluster_id: The cluster id of the object
-    :param sub_opinion_pks: The sub opinion ids of the cluster
-    :return: The count of related cases in elastic
+    Args:
+        cluster_id: The cluster id of the object
+        sub_opinion_pks: The sub opinion ids of the cluster
+
+    Returns:
+        The count of related cases in elastic
     """
-
     if not sub_opinion_pks:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0

@@ -24,15 +24,16 @@ PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 async def query_and_parse_claims_activity(
     courts: list[str], date_start: date, date_end: date
 ) -> None:
-    """Queries and parses claims activity for a list of courts and a specified
-     date range.
+    """Queries and parses claims activity for a list of courts and a specified date range.
 
-    :param courts: List of courts to query the reports.
-    :param date_start: Start date for the date range to query.
-    :param date_end: End date for the date range to query.
-    :return: None, output files are stored in disk.
+    Args:
+        courts: List of courts to query the reports.
+        date_start: Start date for the date range to query.
+        date_end: End date for the date range to query.
+
+    Returns:
+        None, output files are stored in disk.
     """
-
     if not courts:
         bankr_courts = (
             Court.federal_courts.bankruptcy_pacer_courts().all().only("pk")
@@ -132,10 +133,12 @@ async def query_and_parse_claims_activity(
 def serialize_json(obj: date) -> str:
     """Serialize a date object to ISO format string.
 
-    :param obj: A JSON object.
-    :return: A string date in ISO format.
-    """
+    Args:
+        obj: A JSON object.
 
+    Returns:
+        A string date in ISO format.
+    """
     if isinstance(obj, date):
         return obj.isoformat()
     return ""
@@ -144,9 +147,9 @@ def serialize_json(obj: date) -> str:
 def make_csv_file() -> None:
     """Generate a CSV based on the data of all the JSON files.
 
-    :return: None, The function saves a CSV file in disk.
+    Returns:
+        None, The function saves a CSV file in disk.
     """
-
     # Check if the csv directory already exists
     csv_path = os.path.join(settings.MEDIA_ROOT, "claims_activity", "csv")
     if not os.path.exists(csv_path):

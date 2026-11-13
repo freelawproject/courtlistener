@@ -28,9 +28,7 @@ MINIMUM_WORDS_DESCRIPTIVE = 10
 def parenthetical_score(
     description: str, citing_opinion_cluster: OpinionCluster
 ) -> float:
-    """
-    Takes a cleaned, non-spam description; returns a usefulness score between 0 and 1.
-    """
+    """Takes a cleaned, non-spam description; returns a usefulness score between 0 and 1."""
     num_words = len(description.split(" "))
     # Baseline 500 so we don't end up with negative score when we penalize
     score = 500.0

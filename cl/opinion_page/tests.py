@@ -1,10 +1,15 @@
 import asyncio
+import csv
 import datetime
+import io
+import json
 import os
 import re
 import shutil
 import threading
+from collections import Counter
 from datetime import date
+from hashlib import md5
 from http import HTTPStatus
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
@@ -18,6 +23,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.staticfiles.finders import find
+from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -36,6 +42,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
+from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
@@ -63,7 +70,7 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
     _recap_document_detail_url,
     _scotus_document_detail_url,
@@ -81,6 +88,7 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
+    build_idb_rows,
     build_originating_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -107,8 +115,11 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    FjcIntegratedDatabaseFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
+from cl.recap.models import FjcIntegratedDatabase
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -117,7 +128,9 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionsCitedWithParentsFactory,
+    OpinionWithParentsFactory,
     RECAPAttachmentFactory,
     RECAPDocumentFactory,
     SCOTUSDocketEntryFactory,
@@ -135,6 +148,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
@@ -556,9 +570,7 @@ class OpinionPageLoadTest(ESIndexTestCase, SearchTestCase, TestCase):
 
 
 class ViewRecapDocumentTest(TestCase):
-    """
-    Tests for view_recap_document
-    """
+    """Tests for view_recap_document."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -738,10 +750,7 @@ class ViewRecapDocumentTest(TestCase):
         self.assertIsNotNone(c["og_file_path"])
 
     async def test_appellate_redirect_to_attachment_page(self) -> None:
-        """
-        Test to make sure the document page of appellate entries redirect users
-        to the attachment page if the main document got converted into an attachment
-        """
+        """Test to make sure the document page of appellate entries redirect users to the attachment page if the main document got converted into an attachment."""
         court = await sync_to_async(CourtFactory)(id="ca1", jurisdiction="F")
         docket = await sync_to_async(DocketFactory)(
             court=court, source=Docket.RECAP, pacer_case_id="104490"
@@ -791,7 +800,7 @@ class ViewRecapDocumentTest(TestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_page_waffle")
 @override_flag("scotus_docket_page", active=True)
 class ViewSCOTUSDocumentTest(TestCase):
-    "Tests for view_recap_document rendering SCOTUSDocument records"
+    """Tests for view_recap_document rendering SCOTUSDocument records."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -817,10 +826,7 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_non_numeric_doc_num_returns_404(self) -> None:
-        """SCOTUSDocument.document_number is an IntegerField,
-        so a non-numeric doc_num used to raise an uncaught
-        ValueError instead of the usual 404.
-        """
+        """SCOTUSDocument.document_number is an IntegerField, so a non-numeric doc_num used to raise an uncaught ValueError instead of the usual 404."""
         r = await self.get(docket_id=self.docket.id, doc_num="abc")
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
@@ -849,9 +855,7 @@ class ViewSCOTUSDocumentTest(TestCase):
     async def test_get_absolute_url_builds_main_document_url_without_attachment_number(
         self,
     ) -> None:
-        """A SCOTUSDocument with a document_number but no attachment_number
-        is still served at the main view_recap_document URL by
-        recap_document_context()."""
+        """A SCOTUSDocument with a document_number but no attachment_number is still served at the main view_recap_document URL by recap_document_context()."""
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket
         )
@@ -937,10 +941,7 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertContains(r, document.get_absolute_url())
 
     def test_scotus_document_detail_urls_are_internal(self) -> None:
-        """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal
-        for SCOTUS: _scotus_document_detail_url returns the document's own
-        CourtListener page when we have the file, and None otherwise --
-        never an externally-sourced URL."""
+        """Mirrors DocketEntryRowsV2Test.test_document_detail_urls_are_internal for SCOTUS: _scotus_document_detail_url returns the document's own CourtListener page when we have the file, and None otherwise -- never an externally-sourced URL."""
         entry = SCOTUSDocketEntryFactory(docket=self.docket)
         with_file = SCOTUSDocumentFactory(
             docket_entry=entry,
@@ -956,11 +957,35 @@ class ViewSCOTUSDocumentTest(TestCase):
         )
         self.assertIsNone(_scotus_document_detail_url(without_file))
 
+    async def test_download_redirect_to_source_court_website(self) -> None:
+        """redirect_to_download falls back to the source's own external URL when we don't have the file."""
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        path = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.id,
+                "doc_num": document.document_number,
+                "att_num": document.attachment_number,
+                "slug": self.docket.slug,
+            },
+        )
+        r = await self.async_client.get(path, {"redirect_to_download": True})
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertEqual(r["Location"], document.url)
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_flag_waffle")
 @override_flag("scotus_docket_page", active=False)
 class ScotusDocumentFlagDisabledTest(TestCase):
-    "With the flag off, a SCOTUS document page must 404"
+    """With the flag off, a SCOTUS document page must 404."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1240,7 +1265,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.context["cases"].number, 1)
 
     async def test_link_to_page_in_citation(self) -> None:
-        """Test link to page with star pagination"""
+        """Test link to page with star pagination."""
         # Here opinion cluster 2 has the citation 56 F.2d 9, but the
         # HTML with citations contains star pagination for pages 9 and 10.
         # This tests if we can find opinion cluster 2 with page 9 and 10
@@ -1261,7 +1286,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.url, "/opinion/2/case-name-cluster/")
 
     async def test_slugifying_reporters(self) -> None:
-        """Test reporter slugification"""
+        """Test reporter slugification."""
         r = await self.async_client.get(
             reverse(
                 "citation_redirector",
@@ -1271,7 +1296,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
     async def test_slugifying_reporters_collision(self) -> None:
-        """Test reporter collision-aware slugification"""
+        """Test reporter collision-aware slugification."""
         test_pairs = [("Vt.", "VT"), ("La.", "LA"), ("MSPB", "M.S.P.B.")]
         for r1, r2 in test_pairs:
             response1 = await self.async_client.get(
@@ -1335,7 +1360,6 @@ class CitationRedirectorTest(TestCase):
 
     async def test_volume_pagination(self) -> None:
         """Can we properly paginate reporter volume numbers?"""
-
         # Create test data using factories
         test_obj = await sync_to_async(CitationWithParentsFactory.create)(
             volume="2016",
@@ -1490,8 +1514,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_next, "72")
 
     def test_full_citation_redirect(self) -> None:
-        """Do we get redirected to the correct URL when we pass in a full
-        citation?"""
+        """Do we get redirected to the correct URL when we pass in a full citation?"""
         r = self.client.post(
             reverse("citation_homepage"),
             {
@@ -1509,9 +1532,7 @@ class CitationRedirectorTest(TestCase):
     async def test_avoid_exception_possible_matches_page_with_letter(
         self,
     ) -> None:
-        """Can we order the possible matches when page number contains a
-        letter without getting a DataError exception?"""
-
+        """Can we order the possible matches when page number contains a letter without getting a DataError exception?"""
         # See: freelawproject/courtlistener#2474
 
         # Create the citation that contains 40M as page number and was
@@ -1594,7 +1615,6 @@ class CitationRedirectorTest(TestCase):
         self,
     ) -> None:
         """Can we resolve correctly some reporter variants with collisions to slug?"""
-
         test_pairs = [
             ("Vr.", "vroom"),
             ("V.R.", "vt"),
@@ -1640,8 +1660,7 @@ class CitationRedirectorTest(TestCase):
                 )
 
     async def test_too_ambiguous_reporter_variations(self) -> None:
-        """Some abbreviations are too ambiguous to resolve safely"""
-
+        """Some abbreviations are too ambiguous to resolve safely."""
         test_pairs = [
             ("B.R.", "br"),
             ("BR", "br"),
@@ -1737,9 +1756,7 @@ class ViewRecapDocketTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_recap_docket_url(self) -> None:
-        """Can we redirect to a regular docket URL from a recap/uscourts.*
-        URL?
-        """
+        """Can we redirect to a regular docket URL from a recap/uscourts.* URL?"""
         r = await self.async_client.get(
             reverse(
                 "redirect_docket_recap",
@@ -1755,10 +1772,7 @@ class ViewRecapDocketTest(TestCase):
     async def test_pagination_returns_last_page_if_page_out_of_range(
         self,
     ) -> None:
-        """
-        Verify that the Docket view handles out-of-range page requests by returning
-        the last valid page.
-        """
+        """Verify that the Docket view handles out-of-range page requests by returning the last valid page."""
         entries = cast(
             dict[str, Any],
             DocketEntriesDataFactory(
@@ -1790,9 +1804,7 @@ class ViewRecapDocketTest(TestCase):
         self.assertNotIn(self.de_2.description, r.content.decode())
 
     async def test_recap_docket_invalid_entry_filed_filter(self) -> None:
-        """Confirm that invalid date values in the docket entry filed filter
-        produce a validation error for users.
-        """
+        """Confirm that invalid date values in the docket entry filed filter produce a validation error for users."""
         params = {
             "filed_after": "02/10/2025",
             "filed_before": ".",
@@ -1807,9 +1819,7 @@ class ViewRecapDocketTest(TestCase):
 
 
 class DocketEntrySourceTest(TestCase):
-    """The per-court config that lets view_docket entries
-    without hardcoding RECAP-only model names.
-    """
+    """The per-court DocketEntrySource config: which source serves each court and what each source returns."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1830,6 +1840,100 @@ class DocketEntrySourceTest(TestCase):
     def test_resolves_recap_source_for_other_courts(self) -> None:
         self.assertIs(
             self.recap_docket.get_entry_source(), docket_entry_sources.RECAP
+        )
+
+    def test_every_es_source_court_has_a_display_source(self) -> None:
+        """Courts listed by a non-RECAP ES source don't fall back to the RECAP display, and no court is listed by two ES sources."""
+        court_ids = [c for s in ALL_ES_SOURCES for c in s.court_ids]
+        for court_id in court_ids:
+            with self.subTest(court_id=court_id):
+                self.assertIsNot(
+                    docket_entry_sources.source_for_court_id(court_id),
+                    docket_entry_sources.RECAP,
+                )
+        duplicates = [c for c, n in Counter(court_ids).items() if n > 1]
+        self.assertEqual([], duplicates)
+
+    def test_initial_document_buttons_use_one_query_per_source(self) -> None:
+        """Each source answers for several dockets with one query."""
+        recap_ids, scotus_ids = [], []
+        for n in range(3):
+            entry = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.recap_court, source=Docket.RECAP
+                ),
+                entry_number=1,
+            )
+            RECAPDocumentFactory(
+                docket_entry=entry,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                pacer_doc_id=f"98765{n}",
+            )
+            recap_ids.append(entry.docket_id)
+            document = SCOTUSDocumentFactory(
+                docket_entry__docket__court=self.scotus_court,
+                attachment_number=1,
+                url="https://www.supremecourt.gov/DocketPDF/24/24-1/a.pdf",
+            )
+            scotus_ids.append(document.docket_entry.docket_id)
+        for source, docket_ids in [
+            (docket_entry_sources.RECAP, recap_ids),
+            (docket_entry_sources.SCOTUS, scotus_ids),
+        ]:
+            with self.subTest(source=source.component):
+                with self.assertNumQueries(1):
+                    buttons = source.initial_document_buttons(docket_ids)
+                self.assertEqual(set(docket_ids), set(buttons))
+
+    def test_scotus_initial_document_is_first_attachment_of_earliest_entry(
+        self,
+    ) -> None:
+        """The SCOTUS initial document is the first attachment of the earliest entry, linked to our copy when we have it. A docket with no documents gets no button."""
+        sample_file = SimpleUploadedFile("scotus_filename.pdf", b"file")
+        docket = DocketFactory(court=self.scotus_court)
+        # Create the later entry and the second attachment first, so a lower
+        # pk can't make them the initial document.
+        later_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-02-01.001",
+            date_filed=datetime.date(2024, 2, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=later_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        first_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            sequence_number="2024-01-01.001",
+            date_filed=datetime.date(2024, 1, 1),
+        )
+        SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=2,
+            filepath_local=sample_file,
+        )
+        initial_document = SCOTUSDocumentFactory(
+            docket_entry=first_entry,
+            attachment_number=1,
+            filepath_local=sample_file,
+        )
+        empty_docket = DocketFactory(court=self.scotus_court)
+
+        buttons = docket_entry_sources.SCOTUS.initial_document_buttons(
+            [docket.pk, empty_docket.pk]
+        )
+
+        self.assertEqual(
+            {
+                docket.pk: docket_entry_sources.InitialDocumentButton(
+                    initial_document.get_absolute_url(),
+                    None,
+                    "Initial Document",
+                )
+            },
+            buttons,
         )
 
     def test_scotus_source_callables_execute_without_raising(self) -> None:
@@ -1894,10 +1998,7 @@ class DocumentUrlTest(SimpleTestCase):
 
 
 class DocketSourceComponentTest(SimpleTestCase):
-    """Every DocketEntrySource needs a file in each per-source component
-    folder of both template stacks, or the dispatch (c-component on the
-    cotton side, {% include %} on the legacy side) only fails at render
-    time."""
+    """Every DocketEntrySource needs a file in each per-source component folder of both template stacks, or the dispatch (c-component on the cotton side, {% include %} on the legacy side) only fails at render time."""
 
     FOLDERS = {
         "cotton": (
@@ -1936,9 +2037,11 @@ class DocketSourceComponentTest(SimpleTestCase):
 
 
 class DocketSourceEmptyMessageTest(SimpleTestCase):
-    """Every DocketEntrySource must write its empty-state sentence. The
-    field is required, but an empty string would still render a blank
-    paragraph."""
+    """Every DocketEntrySource must write its empty-state sentence.
+
+    The field is required, but an empty string would still render a blank
+    paragraph.
+    """
 
     def test_every_source_has_an_empty_message(self) -> None:
         sources = {
@@ -1953,9 +2056,7 @@ class DocketSourceEmptyMessageTest(SimpleTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
 @override_flag("scotus_docket_page", active=False)
 class ScotusDocketFlagDisabledTest(TestCase):
-    """With the flag off, a SCOTUS docket must 404 so the
-    public can't tell the page exists yet.
-    """
+    """With the flag off, a SCOTUS docket must 404 so the public can't tell the page exists yet."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1977,8 +2078,7 @@ class ScotusDocketFlagDisabledTest(TestCase):
     async def test_other_court_docket_unaffected_by_scotus_flag(
         self,
     ) -> None:
-        """The flag is scoped to SCOTUS; every other court must render as
-        usual regardless of its state."""
+        """The flag is scoped to SCOTUS; every other court must render as usual regardless of its state."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -1990,9 +2090,7 @@ class ScotusDocketFlagDisabledTest(TestCase):
     async def test_sibling_tab_views_also_404_when_flag_disabled(
         self,
     ) -> None:
-        """The flag check lives in core_docket_data(), so
-        every view that shares it must 404 (not only view_docket).
-        """
+        """The flag check lives in core_docket_data(), so every view that shares it must 404 (not only view_docket)."""
         # view_download_docket requires login.
         user = await sync_to_async(UserFactory)()
         await self.async_client.aforce_login(user)
@@ -2021,9 +2119,7 @@ class ScotusDocketFlagDisabledTest(TestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_enabled_waffle")
 @override_flag("scotus_docket_page", active=True)
 class ScotusDocketFlagEnabledTest(TestCase):
-    """Users with the flag on should see the normal docket
-    page flow for SCOTUS dockets.
-    """
+    """Users with the flag on should see the normal docket page flow for SCOTUS dockets."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2037,12 +2133,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_docket_toolbar_renders_on_non_entries_tabs(self) -> None:
-        """The docket toolbar (notes/tags/alerts/source button) is gated on
-        docket_source_url or docket_entries. docket_entries is only in
-        context on the entries tab, and pacer_docket_url is None for
-        SCOTUS, so tabs like Parties must gate on the source-agnostic
-        docket_source_url or the toolbar silently disappears there.
-        """
+        """The docket toolbar (notes/tags/alerts/source button) is gated on docket_source_url or docket_entries. docket_entries is only in context on the entries tab, and pacer_docket_url is None for SCOTUS, so tabs like Parties must gate on the source-agnostic docket_source_url or the toolbar silently disappears there."""
         r = await self.async_client.get(
             reverse(
                 "docket_parties",
@@ -2056,9 +2147,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertIn("View in SCOTUS", r.content.decode())
 
     async def test_scotus_entries_and_documents_render(self) -> None:
-        """SCOTUSDocketEntry/SCOTUSDocument content shows up on the docket
-        page template, and PACER-only UI is hidden. Docket alerts are not
-        PACER-only, so that button stays."""
+        """SCOTUSDocketEntry/SCOTUSDocument content shows up on the docket page template, and PACER-only UI is hidden. Docket alerts are not PACER-only, so that button stays."""
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket,
             description="Petition for a writ of certiorari filed.",
@@ -2099,9 +2188,40 @@ class ScotusDocketFlagEnabledTest(TestCase):
             "sourced from the Supreme Court of the United States", content
         )
 
+    async def test_scotus_placeholder_documents_are_not_listed(self) -> None:
+        """An entry's placeholder document isn't listed under it on the docket page, while real attachments are."""
+        placeholder_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket, entry_number=None
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=placeholder_entry,
+            url="",
+            document_number=None,
+            attachment_number=None,
+        )
+        attachment_entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        attachment = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=attachment_entry
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        listed = {
+            entry.pk: [document.pk for document in entry.documents]
+            for entry in r.context["docket_entries"]
+        }
+        self.assertEqual(
+            listed,
+            {placeholder_entry.pk: [], attachment_entry.pk: [attachment.pk]},
+        )
+
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
-        """filters must work against SCOTUSDocketEntry field names
-        (entry_number/date_filed), not just DocketEntry's."""
+        """Filters must work against SCOTUSDocketEntry field names (entry_number/date_filed), not just DocketEntry's."""
         entry1 = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket, entry_number=1
         )
@@ -2121,10 +2241,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
     async def test_scotus_docket_default_order_matches_sort_flag(
         self,
     ) -> None:
-        """SCOTUSDocketEntry.Meta.ordering defaults to descending
-        (opposite of DocketEntry's ascending), so without an explicit
-        order_by the queryset must not silently contradict the
-        sort_order_asc flag rendered in the template."""
+        """SCOTUSDocketEntry.Meta.ordering defaults to descending (opposite of DocketEntry's ascending), so without an explicit order_by the queryset must not silently contradict the sort_order_asc flag rendered in the template."""
         entry_a = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket, sequence_number="00000001"
         )
@@ -2162,11 +2279,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
 @override_flag("scotus_docket_page", active=True)
 @override_flag("use_new_design", active=True)
 class ScotusDocketV2ContentRenderTest(TestCase):
-    """The v2/Cotton docket page must get the same SCOTUS treatment
-    as the legacy template - entries/documents/metadata render,
-    PACER-only UI is hidden. Docket alerts are not PACER-only, so that
-    button stays.
-    """
+    """The v2/Cotton docket page must get the same SCOTUS treatment as the legacy template - entries/documents/metadata render, PACER-only UI is hidden. Docket alerts are not PACER-only, so that button stays."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2212,8 +2325,7 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertIn(settings.WIKI_COVERAGE_SCOTUS_URL, content)
 
     async def test_scotus_empty_state_uses_scotus_copy_in_v2(self) -> None:
-        """An unfiltered SCOTUS docket with no entries gets SCOTUS's own
-        "no entries yet" sentence, not RECAP's."""
+        """An unfiltered SCOTUS docket with no entries gets SCOTUS's own "no entries yet" sentence, not RECAP's."""
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
@@ -2395,7 +2507,6 @@ class DocketSitemapTest(SitemapTest):
 
     def test_is_the_sitemap_generated_and_have_content(self) -> None:
         """Is content generated and read properly from the cache into the sitemap?"""
-
         with self.assertRaises(
             NotImplementedError,
             msg="Did not get a NotImplementedError exception before generating the sitemap.",
@@ -2447,7 +2558,6 @@ class DocketEmptySitemapTest(SitemapTest):
 
     def test_is_the_sitemap_generated_and_have_content(self) -> None:
         """Is content generated and read properly from the cache into the sitemap?"""
-
         with self.assertRaises(
             NotImplementedError,
             msg="Did not get a NotImplementedError exception before generating the sitemap.",
@@ -2826,7 +2936,6 @@ class UploadPublication(TestCase):
 
     def test_form_save(self, mock: MagicMock) -> None:
         """Can we save successfully to db?"""
-
         pre_count = Opinion.objects.all().count()
 
         form = TennWorkCompAppUploadForm(
@@ -2848,7 +2957,6 @@ class UploadPublication(TestCase):
 
     def test_me_form_save(self, mock: MagicMock) -> None:
         """Can we save maine form successfully to db?"""
-
         pre_count = Opinion.objects.all().count()
 
         form = MeCourtUploadForm(
@@ -2866,7 +2974,6 @@ class UploadPublication(TestCase):
 
     def test_mo_form_save(self, mock: MagicMock) -> None:
         """Can we save missouri form successfully to db?"""
-
         pre_count = Opinion.objects.filter(
             cluster__docket__court__id="mo"
         ).count()
@@ -2889,7 +2996,6 @@ class UploadPublication(TestCase):
 
     def test_miss_form_save(self, mock: MagicMock) -> None:
         """Can we save mississippi form successfully to db?"""
-
         pre_count = Opinion.objects.filter(
             cluster__docket__court__id="miss"
         ).count()
@@ -2913,9 +3019,7 @@ class UploadPublication(TestCase):
     def test_court_upload_strips_html_from_free_text_fields(
         self, mock: MagicMock
     ) -> None:
-        """Are case_title/disposition/summary stripped of HTML on upload
-        (GHSA-cvh7-rv7v-wx2j-class)?
-        """
+        """Are case_title/disposition/summary stripped of HTML on upload (GHSA-cvh7-rv7v-wx2j-class)?"""
         payload = "</script><script>alert(1)</script>"
         self.miss_data["case_title"] = f"Some Case {payload}"
         self.miss_data["disposition"] = payload
@@ -3039,7 +3143,7 @@ class TestBlockSearchItemAjax(TestCase):
         cls.docket_only.user.user_permissions.add(*docket_perms)
 
     async def test_return_404_for_invalid_type(self) -> None:
-        """is it returning 404 for invalid types?"""
+        """Is it returning 404 for invalid types?"""
         self.assertFalse(self.cluster.blocked)
         self.assertFalse(self.cluster.docket.blocked)
 
@@ -3055,7 +3159,7 @@ class TestBlockSearchItemAjax(TestCase):
         self.assertEqual(response.status_code, 400)
 
     async def test_block_docket_via_ajax_view(self) -> None:
-        """can a super_user block a docket?"""
+        """Can a super_user block a docket?"""
         self.assertFalse(self.cluster.docket.blocked)
 
         client = AsyncClient()
@@ -3073,7 +3177,7 @@ class TestBlockSearchItemAjax(TestCase):
         self.assertTrue(self.cluster.docket.blocked)
 
     async def test_block_cluster_and_docket_via_ajax_view(self) -> None:
-        """can a super_user block an opinion cluster?"""
+        """Can a super_user block an opinion cluster?"""
         self.assertFalse(self.cluster.blocked)
         self.assertFalse(self.cluster.docket.blocked)
 
@@ -3095,8 +3199,7 @@ class TestBlockSearchItemAjax(TestCase):
         self.assertTrue(self.cluster.blocked)
 
     async def test_block_item_denied_without_permission(self) -> None:
-        """Users without change_docket should get a 403 when trying
-        to block"""
+        """Users without change_docket should get a 403 when trying to block."""
         client = AsyncClient()
         await client.aforce_login(user=self.viewer.user)
         response = await client.post(
@@ -3109,9 +3212,7 @@ class TestBlockSearchItemAjax(TestCase):
     async def test_block_cluster_denied_without_cluster_permission(
         self,
     ) -> None:
-        """Users with change_docket but not change_opinioncluster should
-        get a 403 when trying to block a cluster using Block Cluster and
-        Docket button"""
+        """Users with change_docket but not change_opinioncluster should get a 403 when trying to block a cluster using Block Cluster and Docket button."""
         client = AsyncClient()
         await client.aforce_login(user=self.docket_only.user)
         response = await client.post(
@@ -3134,8 +3235,7 @@ class TestBlockSearchItemAjax(TestCase):
 
 
 class TestAdminButtonsVisibility(TestCase):
-    """Test that admin buttons are shown or hidden based on user permissions
-    across the opinion, docket, and RECAP document pages."""
+    """Test that admin buttons are shown or hidden based on user permissions across the opinion, docket, and RECAP document pages."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3228,8 +3328,7 @@ class TestAdminButtonsVisibility(TestCase):
         return reverse(f"admin:{route}", args=[pk])
 
     async def test_opinion_page_viewer_sees_admin_buttons(self) -> None:
-        """Users with view permissions should see Docket, Cluster,
-        and Opinion buttons but not the Block button."""
+        """Users with view permissions should see Docket, Cluster, and Opinion buttons but not the Block button."""
         await self.async_client.aforce_login(self.viewer.user)
         r = await self.async_client.get(self._get_opinion_url())
         docket_edit_url = self._admin_url(
@@ -3258,8 +3357,7 @@ class TestAdminButtonsVisibility(TestCase):
         self.assertContains(r, "block-item")
 
     async def test_opinion_page_docket_only_sees_docket_button(self) -> None:
-        """Users with only docket permissions should see the Docket
-        button but not Cluster, Opinion, or Block buttons."""
+        """Users with only docket permissions should see the Docket button but not Cluster, Opinion, or Block buttons."""
         await self.async_client.aforce_login(self.docket_only.user)
         r = await self.async_client.get(self._get_opinion_url())
         docket_edit_url = self._admin_url(
@@ -3274,8 +3372,7 @@ class TestAdminButtonsVisibility(TestCase):
         self.assertNotContains(r, "block-item")
 
     async def test_docket_page_viewer_sees_edit_no_block(self) -> None:
-        """Users with view-only permissions should see Edit Docket but
-        not the Block button."""
+        """Users with view-only permissions should see Edit Docket but not the Block button."""
         await self.async_client.aforce_login(self.viewer.user)
         r = await self.async_client.get(self._get_docket_url())
         docket_edit_url = self._admin_url(
@@ -3295,8 +3392,7 @@ class TestAdminButtonsVisibility(TestCase):
         self.assertContains(r, "block-item")
 
     async def test_recap_page_viewer_sees_admin_buttons(self) -> None:
-        """Users with view permissions should see Docket, Docket Entry,
-        and RECAP Document buttons."""
+        """Users with view permissions should see Docket, Docket Entry, and RECAP Document buttons."""
         await self.async_client.aforce_login(self.viewer.user)
         r = await self.async_client.get(self._get_recap_doc_url())
         docket_edit_url = self._admin_url(
@@ -3326,8 +3422,7 @@ class TestAdminButtonsVisibility(TestCase):
         self.assertContains(r, rd_edit_url)
 
     async def test_recap_page_docket_only_sees_docket_button(self) -> None:
-        """Users with only docket permissions should see the Docket
-        button but not Docket Entry or RECAP Document buttons."""
+        """Users with only docket permissions should see the Docket button but not Docket Entry or RECAP Document buttons."""
         await self.async_client.aforce_login(self.docket_only.user)
         r = await self.async_client.get(self._get_recap_doc_url())
         docket_edit_url = self._admin_url(
@@ -3445,7 +3540,7 @@ class DocketEntryFileDownload(TestCase):
         User.objects.all().delete()
 
     async def test_fetch_docket_entries(self) -> None:
-        """Verify that fetch entries function returns right docket_entries"""
+        """Verify that fetch entries function returns right docket_entries."""
         res = await fetch_docket_entries(self.mocked_docket)
         self.assertEqual(await res.acount(), len(self.mocked_docket_entries))
         self.assertTrue(await res.acontains(self.mocked_docket_entries[0]))
@@ -3454,7 +3549,7 @@ class DocketEntryFileDownload(TestCase):
         )
 
     def test_generate_docket_entries_csv_data(self) -> None:
-        """Verify str with csv data is created. Check column and data entry"""
+        """Verify str with csv data is created. Check column and data entry."""
         res = generate_docket_entries_csv_data(self.mocked_docket_entries)
         res_lines = res.split("\r\n")
         res_line_data = res_lines[1].split(",")
@@ -3495,8 +3590,7 @@ class DocketEntryFileDownload(TestCase):
         mock_core_docket_data: MagicMock,
         mock_user_has_alert: MagicMock,
     ) -> None:
-        """Test download_docket_entries_csv returns csv content"""
-
+        """Test download_docket_entries_csv returns csv content."""
         mock_download_function.return_value = (
             '"col1","col2","col3"\r\n"value1","value2","value3"'
         )
@@ -3531,21 +3625,59 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @mock.patch(
+        "django_ratelimit.decorators.is_ratelimited", return_value=False
+    )
+    def test_anonymous_requests_do_not_count_against_limit(
+        self, mock_is_ratelimited: MagicMock
+    ) -> None:
+        """Only signed-in requests may count against the shared export limit.
+
+        Anonymous requests are sent to sign in first.
+        """
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        response = self.client.get(download_path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_is_ratelimited.assert_not_called()
+
+        self.client.login(username=self.user.username, password="password")
+        self.client.get(download_path)
+        mock_is_ratelimited.assert_called_once()
+
+    def test_csv_export_when_first_entry_has_no_documents(self) -> None:
+        """The CSV header doesn't depend on the first entry having a document."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
+        empty_entry = SCOTUSDocketEntryFactory(docket=docket)
+        entry = SCOTUSDocketEntryFactory(docket=docket)
+        SCOTUSDocumentFactory(docket_entry=entry)
+
+        header, *rows = csv.reader(
+            io.StringIO(generate_docket_entries_csv_data([empty_entry, entry]))
+        )
+
+        self.assertIn("scotusdocument_id", header)
+        self.assertEqual([row[0] for row in rows], [str(entry.pk)])
+
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
     )
     @override_flag("scotus_docket_page", active=True)
-    def test_csv_export_return_gracefully_for_scotus_docket(self) -> None:
-        """SCOTUSDocketEntry/SCOTUSDocument don't implement CSV
-        export yet, but the button should stay visible. Clicking
-        it must return a handled error status.
-        """
+    def test_csv_export_for_scotus_docket(self) -> None:
+        """A SCOTUS docket exports its entries and their documents."""
         scotus_court = CourtFactory(id="scotus", jurisdiction="F")
         scotus_docket = DocketFactory(
             court=scotus_court, source=Docket.SCRAPER
         )
         entry = SCOTUSDocketEntryFactory(docket=scotus_docket)
-        SCOTUSDocumentFactory(docket_entry=entry)
+        document = SCOTUSDocumentFactory(
+            docket_entry=entry,
+            filepath_local="scotus/test.pdf",
+            ocr_status=SCOTUSDocument.OCR_COMPLETE,
+            sha1="a" * 40,
+        )
         self.client.login(username=self.user.username, password="password")
 
         response = self.client.get(
@@ -3554,28 +3686,280 @@ class DocketEntryFileDownload(TestCase):
                 kwargs={"docket_id": scotus_docket.id},
             )
         )
-        self.assertEqual(response.status_code, HTTPStatus.NOT_IMPLEMENTED)
 
-    def test_csv_export_real_bug_still_surfaces_for_recap_docket(
-        self,
-    ) -> None:
-        """The SCOTUS error catch must not mask a real bug in the
-        RECAP CSV path. That should still raise, not quietly
-        return a handled 501.
-        """
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        header, row = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(header[0], "scotusdocketentry_id")
+        self.assertEqual(row[0], str(entry.pk))
+        self.assertEqual(row[header.index("scotusdocument_url")], document.url)
+        self.assertEqual(
+            row[header.index("scotusdocument_filepath_local")],
+            "https://storage.courtlistener.com/scotus/test.pdf",
+        )
+        self.assertEqual(
+            row[header.index("scotusdocument_ocr_status")], "OCR Complete"
+        )
+        self.assertEqual(row[header.index("scotusdocument_sha1")], "a" * 40)
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_order_waffle"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    def test_csv_export_for_scotus_docket_is_oldest_first(self) -> None:
+        """SCOTUS entries export oldest first, like RECAP entries, even though SCOTUSDocketEntry's default ordering is newest first."""
+        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        scotus_docket = DocketFactory(
+            court=scotus_court, source=Docket.SCRAPER
+        )
+        older = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-01.001"
+        )
+        newer = SCOTUSDocketEntryFactory(
+            docket=scotus_docket, sequence_number="2024-01-02.001"
+        )
+        SCOTUSDocumentFactory(docket_entry=newer)
+        SCOTUSDocumentFactory(docket_entry=older)
         self.client.login(username=self.user.username, password="password")
 
-        with mock.patch(
-            "cl.opinion_page.views.generate_docket_entries_csv_data",
-            side_effect=AttributeError("boom"),
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": scotus_docket.id},
+            )
+        )
+
+        _, *rows = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(
+            [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
+
+
+class DocketFeedTest(TestCase):
+    """Does the docket RSS feed render the right content for RECAP and SCOTUS?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.recap_court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.recap_docket = DocketFactory(
+            court=cls.recap_court, docket_number="1:23-cv-456"
+        )
+        cls.scotus_court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-456"
+        )
+        # A SCOTUS docket that never gets entries, for the empty-feed test.
+        cls.empty_scotus_docket = DocketFactory(
+            court=cls.scotus_court, docket_number="23-457"
+        )
+
+    def setUp(self) -> None:
+        # Every test reuses these docket URLs and the view is cached
+        # (cache_page_ignore_params, keyed on md5(url_path)), so a stale
+        # response would leak between tests. Delete only our own keys --
+        # deleting everything would wipe a parallel worker's unrelated
+        # entry, since they share one Redis.
+        cache = caches["default"]
+        for docket in (
+            self.recap_docket,
+            self.scotus_docket,
+            self.empty_scotus_docket,
         ):
-            with self.assertRaises(AttributeError):
-                self.client.get(
-                    reverse(
-                        "view_download_docket",
-                        kwargs={"docket_id": self.mocked_docket.id},
-                    )
-                )
+            url_path = reverse("docket_feed", kwargs={"docket_id": docket.id})
+            hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
+            cache.delete(
+                f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+            )
+
+    async def get_feed(self, docket: Docket):
+        return await self.async_client.get(
+            reverse("docket_feed", kwargs={"docket_id": docket.id})
+        )
+
+    async def test_recap_entry_with_main_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=5,
+            date_filed="2024-01-01",
+            description="",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="5",
+            description="Motion to dismiss",
+            filepath_local="recap/test.pdf",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #5", body)
+        self.assertIn("Motion to dismiss", body)
+        self.assertIn("storage.courtlistener.com/recap/test.pdf", body)
+
+    async def test_recap_attachment_only_entry_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=6,
+            date_filed="2024-01-02",
+            description="Attachment-only entry",
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+            document_number="6",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn("Attachment-only entry", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_minute_entry_has_no_enclosure(self) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=None,
+            date_filed="2024-01-03",
+        )
+        r = await self.get_feed(self.recap_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_recap_main_document_without_local_file_uses_pacer_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket, entry_number=7, date_filed="2024-01-04"
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            document_number="7",
+            filepath_local="",
+            pacer_doc_id="998877",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertIn(rd.pacer_url, r.content.decode())
+
+    async def test_recap_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(DocketEntryFactory)(
+            docket=self.recap_docket,
+            entry_number=8,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.recap_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_scotus_entry_with_one_document_renders_full_entry(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=1,
+            date_filed="2024-02-01",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=1,
+            attachment_number=1,
+            description="Petition for writ of certiorari",
+            filepath_local="scotus/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("Entry #1", body)
+        self.assertIn("Petition for writ of certiorari", body)
+        self.assertIn("storage.courtlistener.com/scotus/test.pdf", body)
+
+    async def test_scotus_entry_with_multiple_documents_uses_lowest_attachment_number(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=2,
+            date_filed="2024-02-02",
+            description="",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=2,
+            description="Second document",
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=2,
+            attachment_number=1,
+            description="First document",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("First document", body)
+        self.assertNotIn("Second document", body)
+
+    async def test_scotus_entry_with_zero_documents_falls_back_to_entry_description(
+        self,
+    ) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=3,
+            date_filed="2024-02-03",
+            description="DISTRIBUTED for Conference",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn("DISTRIBUTED for Conference", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_document_without_local_file_uses_external_url_fallback(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket, entry_number=4, date_filed="2024-02-04"
+        )
+        await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=de,
+            document_number=4,
+            attachment_number=1,
+            filepath_local="",
+            url="https://www.supremecourt.gov/DocketPDF/test.pdf",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertIn(
+            "https://www.supremecourt.gov/DocketPDF/test.pdf",
+            r.content.decode(),
+        )
+
+    async def test_scotus_entry_without_entry_number_has_no_enclosure(
+        self,
+    ) -> None:
+        de = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=None,
+            date_filed="2024-02-06",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        body = r.content.decode()
+        self.assertIn(f"Minute entry from {de.date_filed}", body)
+        self.assertNotIn('rel="enclosure"', body)
+
+    async def test_scotus_entry_without_date_filed_is_excluded(self) -> None:
+        await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.scotus_docket,
+            entry_number=10,
+            date_filed=None,
+            description="Should not appear",
+        )
+        r = await self.get_feed(self.scotus_docket)
+        self.assertNotIn("Should not appear", r.content.decode())
+
+    async def test_empty_scotus_docket_renders_valid_empty_feed(self) -> None:
+        r = await self.get_feed(self.empty_scotus_docket)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotIn("<entry>", r.content.decode())
 
 
 class CachePageIgnoreParamsTest(TestCase):
@@ -3598,10 +3982,7 @@ class CachePageIgnoreParamsTest(TestCase):
             r.delete(*keys_to_delete)
 
     def test_cache_view_docket_feed(self) -> None:
-        """Confirm that cache_page_ignore_params can cache a view while ignoring
-        the GET params from the URL.
-        """
-
+        """Confirm that cache_page_ignore_params can cache a view while ignoring the GET params from the URL."""
         base_url = reverse(
             "docket_feed",
             kwargs={"docket_id": self.docket.id},
@@ -3673,6 +4054,77 @@ class ClusterRedirectionTest(TestCase):
             expected_redirect_url,
             status_code=301,
         )
+
+
+class BuildIdbRowsTest(SimpleTestCase):
+    """Test the build_idb_rows helper function."""
+
+    def test_every_field_gets_a_row(self) -> None:
+        """One row per IDB field, Office Number first and Pro Se last."""
+        rows = build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        self.assertEqual(len(rows), 28)
+        self.assertEqual(rows[0]["label"], "Office Number")
+        self.assertEqual(rows[-1]["label"], "Pro Se")
+
+    def test_values_are_display_ready(self) -> None:
+        """Dates use the site format, choice fields show their label, coded fields show code and label, False and 0 are values, and unset fields fall back."""
+        idb_data = FjcIntegratedDatabaseFactory.build(
+            office="3",
+            origin=FjcIntegratedDatabase.ORIG,
+            date_filed=date(2016, 4, 21),
+            jurisdiction=None,
+            class_action=False,
+            monetary_demand=0,
+            pro_se=FjcIntegratedDatabase.PRO_SE_NONE,
+        )
+        values = {
+            row["label"]: row["value"] for row in build_idb_rows(idb_data)
+        }
+        self.assertEqual(values["Office Number"], "3")
+        self.assertEqual(values["Origin"], "(1) Original Proceeding")
+        self.assertEqual(values["Date Filed"], "April 21, 2016")
+        self.assertEqual(values["Jurisdiction"], "Not Provided")
+        self.assertEqual(values["Class Action Status"], "False")
+        self.assertEqual(values["Monetary Demand"], "0")
+        self.assertEqual(values["Date Terminated"], "Not Provided")
+        self.assertEqual(
+            values["Pro Se"], "No pro se plaintiffs or defendants"
+        )
+
+    def test_judgment_missing_codes_fall_back(self) -> None:
+        """Judgment shows "Not Provided" for the FJC missing-data codes, the label for a known choice and the raw number for an unknown code."""
+        cases = [
+            (0, "Not Provided"),
+            (-8, "Not Provided"),
+            (FjcIntegratedDatabase.PLAINTIFF, "Plaintiff"),
+            (9, "9"),
+        ]
+        for judgment, expected in cases:
+            with self.subTest(judgment=judgment):
+                idb_data = FjcIntegratedDatabaseFactory.build(
+                    judgment=judgment
+                )
+                values = {
+                    row["label"]: row["value"]
+                    for row in build_idb_rows(idb_data)
+                }
+                self.assertEqual(values["Judgment"], expected)
+
+    def test_hints_are_safe_markup_with_the_choices(self) -> None:
+        """Hints carry their links unescaped and list the field's choices."""
+        hints = {
+            row["label"]: row.get("hint")
+            for row in build_idb_rows(FjcIntegratedDatabaseFactory.build())
+        }
+        self.assertIsInstance(hints["Office Number"], SafeString)
+        self.assertIn("<a ", hints["Office Number"])
+        self.assertIn(
+            "Denied or Granted", hints["Termination Class Action Status"]
+        )
+        self.assertIn(
+            "Formal Arbitration Program", hints["Arbitration at Filing"]
+        )
+        self.assertIsNone(hints["Date Filed"])
 
 
 class BuildDocketMetadataTest(TestCase):
@@ -3752,9 +4204,7 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         self.assertEqual(items, [])
 
     def test_appealed_from_links_lower_court_docket_number(self) -> None:
-        """When the lower court is known, the lower-court docket number
-        renders as a nofollow RECAP search link via data fields — never as
-        a raw HTML string in the value."""
+        """When the lower court is known, the lower-court docket number renders as a nofollow RECAP search link via data fields — never as a raw HTML string in the value."""
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="1:23-cv-456"
         )
@@ -3789,8 +4239,7 @@ class BuildOriginatingCourtMetadataTest(TestCase):
     def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
         self,
     ) -> None:
-        """When only the lower court name is known (no FK, no admin link),
-        the lower-court docket number is plain text with no link fields."""
+        """When only the lower court name is known (no FK, no admin link), the lower-court docket number is plain text with no link fields."""
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="42"
         )
@@ -3870,10 +4319,7 @@ class BuildScotusMetadataTest(TestCase):
         self.assertNotIn("is_external", qp)
 
     def test_omits_questions_presented_url_with_unsafe_scheme(self) -> None:
-        """questions_presented_url is ingested straight
-        from the SCOTUS scraper. A invalid URL must never reach
-        the rendered href.
-        """
+        """questions_presented_url is ingested straight from the SCOTUS scraper. A invalid URL must never reach the rendered href."""
         scotus_metadata = ScotusDocketMetadataFactory(
             docket=self.docket,
             questions_presented_url="javascript:alert(1)",
@@ -3978,6 +4424,99 @@ class BuildDocketTabsTest(SimpleTestCase):
             self.assertEqual(keys, ["entries", "idb"])
 
 
+class DocketTabViewsTest(TestCase):
+    """Context every tab view of a docket shares, whichever stack renders it."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
+
+    async def test_every_tab_view_gets_the_full_tab_list(self) -> None:
+        """Each tab view hands the template the same navigation, so a tab never disappears depending on which one is active."""
+        for url_name in (
+            "view_docket",
+            "docket_parties",
+            "docket_idb_data",
+            "docket_authorities",
+        ):
+            with self.subTest(view=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                keys = [tab["key"] for tab in r.context["tabs"]]
+                self.assertEqual(
+                    keys, ["entries", "parties", "idb", "authorities"]
+                )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_idb_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketIdbV2TemplateTest(TestCase):
+    """The v2 FJC Integrated Database tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(
+                office="3",
+                origin=FjcIntegratedDatabase.ORIG,
+                date_filed=date(2016, 4, 21),
+            ),
+        )
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the IDB tab and checks it rendered through the v2 template."""
+        r = await self.async_client.get(
+            reverse(
+                "docket_idb_data",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
+        return r
+
+    async def test_renders_the_idb_values(self) -> None:
+        """Set fields, choice displays and the fallback for unset fields all come through the table."""
+        content = (await self.get_page()).content.decode()
+        self.assertIn("(1) Original Proceeding", content)
+        self.assertIn("April 21, 2016", content)
+        self.assertIn("Not Provided", content)
+
+    async def test_idb_tab_is_current(self) -> None:
+        """The tab navigation marks the IDB tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
 class DocketPageV2TemplateTest(TestCase):
@@ -4035,9 +4574,7 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTrue(len(r.context["tabs"]) > 0)
 
     async def test_title_values_are_single_click_selectable(self) -> None:
-        """The case name and docket number each get their own select-all span,
-        so one click selects exactly one value for copying, as on the legacy
-        page."""
+        """The case name and docket number each get their own select-all span, so one click selects exactly one value for copying, as on the legacy page."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -4124,26 +4661,28 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn(" defer", tag.group(0))
         self.assertIn('nonce="', tag.group(0))
 
-    async def test_v2_body_carries_the_csrf_header_for_htmx(self) -> None:
-        """Every hx-post inherits the CSRF token from the body's hx-headers."""
+    async def test_v2_body_carries_the_htmx_headers(self) -> None:
+        """Every htmx request inherits the body's hx-headers.
+
+        They carry the CSRF token, and the design header that gets v2
+        partials back from IncrementalNewTemplateMiddleware.
+        """
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
         body = re.search(r"<body[^>]*>", r.content.decode())
         self.assertIsNotNone(body)
-        header = re.search(
-            r'hx-headers=\'\{"X-CSRFToken": "([^"]*)"\}\'', body.group(0)
-        )
-        self.assertIsNotNone(header)
+        hx_headers = re.search(r"hx-headers='([^']*)'", body.group(0))
+        self.assertIsNotNone(hx_headers)
+        headers = json.loads(hx_headers.group(1))
+        self.assertEqual(headers["X-CL-Design"], "v2")
         # The length rules out Django's NOTPROVIDED placeholder.
-        token = header.group(1)
+        token = headers["X-CSRFToken"]
         self.assertEqual(len(token), CSRF_TOKEN_LENGTH)
         self.assertTrue(token.isalnum())
 
     async def test_v2_docket_page_counts_views(self) -> None:
-        """A view decorated with track_view_counter hands the body the event
-        label and the increment endpoint, and loads the viewCount store that
-        POSTs them once per page load."""
+        """A view decorated with track_view_counter hands the body the event label and the increment endpoint, and loads the viewCount store that POSTs them once per page load."""
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
@@ -4185,8 +4724,7 @@ class DocketPageV2StaffLinksTest(TestCase):
 
     @staticmethod
     def _user_with(*perms: str) -> User:
-        """Builds a staff user holding exactly the given permissions, named
-        as has_perm() takes them, e.g. "search.view_docket"."""
+        """Builds a staff user holding exactly the given permissions, named as has_perm() takes them, e.g. "search.view_docket"."""
         user = UserProfileWithParentsFactory(user__is_staff=True).user
         for perm in perms:
             app_label, codename = perm.split(".")
@@ -4200,8 +4738,7 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def _get_docket_page(
         self, user: User | None = None
     ) -> "_MonkeyPatchedASGIResponse":
-        """Loads the v2 docket page, logged in as user when given and
-        anonymously otherwise, whatever the client's previous login."""
+        """Loads the v2 docket page, logged in as user when given and anonymously otherwise, whatever the client's previous login."""
         if user is None:
             await self.async_client.alogout()
         else:
@@ -4225,8 +4762,7 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def test_docket_permissions_show_the_edit_docket_link(
         self,
     ) -> None:
-        """Any one of view, change or delete on dockets shows a link to the
-        docket's admin change page."""
+        """Any one of view, change or delete on dockets shows a link to the docket's admin change page."""
         expected_href = reverse(
             "admin:search_docket_change", args=[self.docket.pk]
         )
@@ -4244,8 +4780,7 @@ class DocketPageV2StaffLinksTest(TestCase):
                 )
 
     async def test_edit_docket_link_binds_the_view_count(self) -> None:
-        """The link shows the count from the viewCount store, hidden until
-        the store has a value."""
+        """The link shows the count from the viewCount store, hidden until the store has a value."""
         user = await sync_to_async(self._user_with)("search.view_docket")
         r = await self._get_docket_page(user)
         link = self._admin_links(r.content.decode())[0]
@@ -4265,9 +4800,7 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def test_change_audio_shows_an_edit_link_per_recording(
         self,
     ) -> None:
-        """change_audio shows an icon-only Edit link to each recording's admin
-        change page, and nothing else from the admin. Each link names its
-        recording for screen readers."""
+        """change_audio shows an icon-only Edit link to each recording's admin change page, and nothing else from the admin. Each link names its recording for screen readers."""
         user = await sync_to_async(self._user_with)("audio.change_audio")
         r = await self._get_docket_page(user)
         links = {
@@ -4289,8 +4822,7 @@ class DocketPageV2StaffLinksTest(TestCase):
     async def test_users_without_permissions_see_no_admin_links(
         self,
     ) -> None:
-        """Anonymous visitors and users without the permissions see no link
-        into the admin at all."""
+        """Anonymous visitors and users without the permissions see no link into the admin at all."""
         for label, user in (
             ("anonymous", None),
             ("no permissions", self.no_perms_user),
@@ -4602,8 +5134,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn(self.rd_numberless.description, content)
 
     async def _get_empty_docket_page(self, query: str = "") -> str:
-        """Render a docket that has no entries at all, with the given query
-        string, and return its HTML."""
+        """Render a docket that has no entries at all, with the given query string, and return its HTML."""
         empty_docket = await sync_to_async(DocketFactory)(
             court=self.court,
             source=Docket.RECAP,
@@ -4620,8 +5151,7 @@ class DocketEntryRowsV2Test(TestCase):
         return r.content.decode()
 
     async def test_empty_state_without_filters_uses_source_copy(self) -> None:
-        """With no filter or search params, an empty docket explains that
-        the source has no entries yet, and the filter bar stays visible."""
+        """With no filter or search params, an empty docket explains that the source has no entries yet, and the filter bar stays visible."""
         content = await self._get_empty_docket_page()
         self.assertIn(
             escape(docket_entry_sources.RECAP.empty_message), content
@@ -4630,9 +5160,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn("Search this docket", content)
 
     async def test_empty_state_with_filters_uses_filter_copy(self) -> None:
-        """With a filter param present, an empty page blames the filters
-        rather than the source, and the filter bar stays visible so they can
-        be changed."""
+        """With a filter param present, an empty page blames the filters rather than the source, and the filter bar stays visible so they can be changed."""
         for query in ("?entry_gte=5", "?filed_after=01/01/2030"):
             with self.subTest(query=query):
                 content = await self._get_empty_docket_page(query)
@@ -4644,8 +5172,7 @@ class DocketEntryRowsV2Test(TestCase):
                 self.assertIn("Search this docket", content)
 
     async def test_sort_and_page_params_are_not_filters(self) -> None:
-        """Sorting and paging narrow nothing, so an empty docket under them
-        still gets the "no entries yet" copy."""
+        """Sorting and paging narrow nothing, so an empty docket under them still gets the "no entries yet" copy."""
         content = await self._get_empty_docket_page("?order_by=desc&page=1")
         self.assertIn(
             escape(docket_entry_sources.RECAP.empty_message), content
@@ -4654,8 +5181,7 @@ class DocketEntryRowsV2Test(TestCase):
     async def test_filters_that_exclude_every_entry_use_filter_copy(
         self,
     ) -> None:
-        """A docket with entries that the filters all exclude gets the
-        filter copy, not the "no entries yet" one."""
+        """A docket with entries that the filters all exclude gets the filter copy, not the "no entries yet" one."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -4670,12 +5196,65 @@ class DocketEntryRowsV2Test(TestCase):
             escape(docket_entry_sources.RECAP.empty_message), content
         )
 
+    def export_link(self, html: str) -> _Element:
+        """The Export entries CSV link, rendered for every user state."""
+        links = [
+            a
+            for a in fromstring(html).iter("a")
+            if " ".join(a.text_content().split()).startswith(
+                "Export entries CSV"
+            )
+        ]
+        self.assertEqual(len(links), 1)
+        return links[0]
+
     async def test_csv_export_for_authenticated_user(self) -> None:
-        """CSV export button should render for authenticated users."""
+        """A signed-in user gets the download link, fetched in place by Alpine.
+
+        The view answers 429 when rate limited, so the page declares a message
+        for it plus a fallback.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await sync_to_async(self.async_client.force_login)(user)
+        link = self.export_link(await self._get_docket_page())
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertEqual(link.get("href"), download_path)
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertIsNone(link.get("hx-get"))
+        self.assertNotIn("sign in required", link.text_content())
+        component = link.xpath('ancestor::*[@x-data="download"]')
+        self.assertEqual(len(component), 1)
+        for key in (
+            "data-error-message-429",
+            "data-error-message-default",
+        ):
+            self.assertTrue(component[0].get(key), key)
+        alerts = component[0].xpath('.//*[@role="alert"]')
+        self.assertEqual(
+            [alert.get("x-text") for alert in alerts], ["errorMessage"]
+        )
+
+    async def test_csv_export_for_anonymous_user(self) -> None:
+        """A visitor gets a plain link to sign in and come back to this docket."""
         content = await self._get_docket_page()
-        self.assertIn("Export entries CSV", content)
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.docket.pk}
+        )
+        self.assertNotIn(download_path, content)
+        link = self.export_link(content)
+        docket_path = reverse(
+            "view_docket", args=[self.docket.pk, self.docket.slug]
+        )
+        self.assertEqual(
+            link.get("href"), f"{reverse('sign-in')}?next={docket_path}"
+        )
+        self.assertEqual(link.get("rel"), "nofollow")
+        self.assertIsNone(link.get("x-on:click.prevent"))
+        self.assertIsNone(link.get("hx-get"))
+        self.assertIn("sign in required", link.text_content())
 
     async def test_entries_use_option_d_semantic_markup(self) -> None:
         """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
@@ -4692,8 +5271,7 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn('<ul role="list"', content)
 
     def test_document_detail_urls_are_internal(self) -> None:
-        """Detail URLs must be CourtListener paths, since the template renders
-        them unfiltered into an href.
+        """Detail URLs must be CourtListener paths, since the template renders them unfiltered into an href.
 
         SCOTUS is covered separately, in ViewSCOTUSDocumentTest's
         test_scotus_document_detail_urls_are_internal.
@@ -4715,8 +5293,7 @@ class DocketEntryRowsV2Test(TestCase):
 
 
 class DocketFilterRenderTestCase(TestCase):
-    """Renders `<c-docket-filter>` for a RECAP docket with no entries, so
-    subclasses can assert on the toolbar's markup."""
+    """Renders `<c-docket-filter>` for a RECAP docket with no entries, so subclasses can assert on the toolbar's markup."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -4724,7 +5301,7 @@ class DocketFilterRenderTestCase(TestCase):
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
         cls.empty_page = Paginator([], 100).get_page(1)
 
-    def _render(self, form: DocketEntryFilterForm) -> str:
+    def _render(self, form: forms_v2.DocketEntryFilterForm) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
         # child component, instead of rendering
         # cotton/docket_filter/index.html directly — the latter declares
@@ -4753,73 +5330,72 @@ class DocketFilterRenderTestCase(TestCase):
         )
 
 
-class DocketFilterDrawerAttrPropagationTest(DocketFilterRenderTestCase):
-    """The mobile filter drawer auto-opens when a filter submission fails
-    validation, so users can see the error messages inside it. That depends
-    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
-    element via Cotton's `{{ attrs }}` passthrough, and the
-    `x-on:open-filter-drawer` listener being wired up on the same element so
-    `docket_filter.js` can dispatch the open event. Lock both in.
+class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
+    """The mobile filter dialog auto-opens when a filter submission fails validation.
+
+    That depends on two pieces of plumbing — `data-has-errors` on the
+    `docketFilter` root, which `docket_filter.js` reads on init, and the
+    dialog listening for the `open-filter-dialog` window event the script
+    dispatches. Lock both in.
+
+    Elements are found by attribute instead of XPath because `:` in
+    attribute names isn't first-class in XPath.
     """
 
-    def _find_drawer(self, html: str) -> _Element | None:
-        """Return the element with `x-on:open-filter-drawer` (the drawer root).
-
-        Done element-wise instead of XPath because `:` in attribute names
-        isn't first-class in XPath.
-        """
+    def _find_by_attr(self, html: str, name: str) -> _Element | None:
+        """Return the first element that has the attribute `name`."""
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in cast(_Attrib, el.attrib):
+            if name in cast(_Attrib, el.attrib):
                 return el
         return None
 
-    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
-        request = RequestFactory().get("/?entry_gte=abc")
+    def _render_root(self, query: str) -> _Element | None:
+        request = RequestFactory().get(f"/{query}")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertFalse(form.is_valid())
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        form.is_valid()
+        html = self._render(form)
+        for el in fromstring(html).iter():
+            if cast(_Attrib, el.attrib).get("x-data") == "docketFilter":
+                return el
+        return None
 
-        drawer = self._find_drawer(self._render(form))
+    def test_root_has_errors_when_form_invalid(self) -> None:
+        root = self._render_root("?entry_gte=abc")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertIn("data-has-errors", root.attrib)
 
-        self.assertIsNotNone(
-            drawer, "drawer root with open listener not found"
-        )
-        self.assertIn(
-            "data-has-errors",
-            drawer.attrib,
-            "data-has-errors must land on the same element that listens "
-            "for open-filter-drawer — otherwise docket_filter.js can't "
-            "find the drawer to dispatch the open event",
-        )
-        self.assertEqual(
-            cast(_Attrib, drawer.attrib)["x-on:open-filter-drawer"], "open"
-        )
+    def test_root_has_no_errors_when_form_is_clean(self) -> None:
+        root = self._render_root("")
+        self.assertIsNotNone(root, "docketFilter root not found")
+        self.assertNotIn("data-has-errors", root.attrib)
 
-    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+    def test_dialog_opens_on_window_event(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
-        self.assertTrue(form.is_valid())
-
-        drawer = self._find_drawer(self._render(form))
-
-        self.assertIsNotNone(drawer)
-        self.assertNotIn("data-has-errors", drawer.attrib)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        dialog = self._find_by_attr(
+            self._render(form), "x-on:open-filter-dialog.window"
+        )
+        self.assertIsNotNone(
+            dialog,
+            "the dialog must listen for open-filter-dialog on window, "
+            "which docket_filter.js dispatches when the filters have errors",
+        )
+        self.assertEqual(
+            cast(_Attrib, dialog.attrib)["x-on:open-filter-dialog.window"],
+            "open",
+        )
 
 
 class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
-    """The "Search this docket" forms carry the docket scope in a hidden `q`
-    and keep the visible input unnamed and empty, so the scope never shows
-    and clearing the box can't widen the search to the whole corpus. Without
-    JavaScript the form still submits a scoped, term-less search.
-    """
+    """The "Search this docket" forms carry the docket scope in a hidden `q` and keep the visible input unnamed and empty, so the scope never shows and clearing the box can't widen the search to the whole corpus. Without JavaScript the form still submits a scoped, term-less search."""
 
     def test_scope_is_hidden_and_visible_input_is_unnamed(self) -> None:
-        """Both layouts render the hidden scope, the unnamed empty input, and
-        the submit hook that merges them."""
+        """Both layouts render the hidden scope, the unnamed empty input, and the submit hook that merges them."""
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
 
         tree = fromstring(self._render(form))
         # docket_filter.js reads the pristine scope from here on every
@@ -4877,9 +5453,7 @@ class DocketFilterSearchScopeTest(DocketFilterRenderTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
 @override_flag("use_new_design", active=True)
 class DocketFilterPaginationWiringTest(TestCase):
-    """Tests to ensure filter and pagination components appear as intended and
-    that filters are connected to queryset.
-    """
+    """Tests to ensure filter and pagination components appear as intended and that filters are connected to queryset."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -4903,9 +5477,7 @@ class DocketFilterPaginationWiringTest(TestCase):
     async def _get_docket_and_verify_v2(
         self, data: dict | None = None
     ) -> TemplateResponse:
-        """Fetch the docket page, assert that v2 actually rendered, and
-        return the response.
-        """
+        """Fetch the docket page, assert that v2 actually rendered, and return the response."""
         flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
         self.assertTrue(
             flag.everyone,
@@ -4923,9 +5495,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         return r
 
     async def test_filter_form_fields_render(self) -> None:
-        """Every named filter input must be in the rendered page so users
-        and form submissions both find it.
-        """
+        """Every named filter input must be in the rendered page so users and form submissions both find it."""
         r = await self._get_docket_and_verify_v2()
         content = r.content.decode()
         for field in (
@@ -4939,18 +5509,52 @@ class DocketFilterPaginationWiringTest(TestCase):
                 self.assertIn(field, content, f"filter field {field} missing")
 
     async def test_filter_params_narrow_queryset(self) -> None:
-        """`?entry_gte=3` must drop entries 1 and 2 from the page's
-        `docket_entries` queryset — proves the filter form is actually
-        wired to the view, not just rendered."""
+        """`?entry_gte=3` must drop entries 1 and 2 from the page's `docket_entries` queryset — proves the filter form is actually wired to the view, not just rendered."""
         r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
         numbers = sorted(e.entry_number for e in r.context["docket_entries"])  # type:ignore[attr-defined] Django inserts the context attribute in test envs
         self.assertEqual(numbers, [3, 4, 5])
 
+    async def test_profile_default_order_applies_without_order_by(
+        self,
+    ) -> None:
+        """A signed-in user who saved newest-first as their docket order gets the entries descending when the URL picks no order, and the toolbar checks the Desc radio to match."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        r = await self._get_docket_and_verify_v2()
+        numbers = [e.entry_number for e in r.context["docket_entries"]]  # type:ignore[attr-defined] Django inserts the context attribute in test envs
+        self.assertEqual(numbers, [5, 4, 3, 2, 1])
+        checked = [
+            el.get("value")
+            for el in fromstring(r.content.decode()).iter("input")
+            if el.get("type") == "radio"
+            and el.get("name") == "order_by"
+            and "checked" in cast(_Attrib, el.attrib)
+        ]
+        self.assertEqual(checked, ["desc"])
+
+    async def test_mobile_dialog_carries_current_order_by(self) -> None:
+        """The mobile filter dialog has no sort control, so its hidden order_by input must always carry the current order. Otherwise an ascending view submitted from the dialog falls back to the signed-in user's profile default and silently flips to descending."""
+        profile = await sync_to_async(UserProfileWithParentsFactory)(
+            docket_default_order_desc=True
+        )
+        await self.async_client.aforce_login(profile.user)
+        for order in ("asc", "desc"):
+            with self.subTest(order=order):
+                r = await self._get_docket_and_verify_v2(
+                    data={"order_by": order}
+                )
+                hidden = [
+                    el.get("value")
+                    for el in fromstring(r.content.decode()).iter("input")
+                    if el.get("type") == "hidden"
+                    and el.get("name") == "order_by"
+                ]
+                self.assertEqual(hidden, [order])
+
     async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
-        """The bottom <c-pagination> only renders its <nav> when
-        `page_obj.has_other_pages` is truthy. Create enough entries to
-        spill onto a second page and assert the nav landmark and a
-        page=2 link both appear."""
+        """The bottom <c-pagination> only renders its <nav> when `page_obj.has_other_pages` is truthy. Create enough entries to spill onto a second page and assert the nav landmark and a page=2 link both appear."""
         await sync_to_async(DocketEntry.objects.bulk_create)(
             [
                 DocketEntry(
@@ -4968,9 +5572,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         self.assertIn("page=2", content)
 
     async def test_pagination_links_preserve_filter_params(self) -> None:
-        """Paging to page 2 must keep the user's filter params — otherwise
-        page 2 would reset to the unfiltered set. This test catches regressions
-        where the tag stops seeing request.GET (e.g. wrong context)."""
+        """Paging to page 2 must keep the user's filter params — otherwise page 2 would reset to the unfiltered set. This test catches regressions where the tag stops seeing request.GET (e.g. wrong context)."""
         await sync_to_async(DocketEntry.objects.bulk_create)(
             [
                 DocketEntry(
@@ -4999,13 +5601,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         )
 
     async def test_filter_form_has_no_page_submit_control(self) -> None:
-        """Pressing Enter in a filter field triggers implicit submission,
-        which uses the first submit button in tree order as the submitter.
-        If the desktop Prev/Next controls were submit buttons named `page`,
-        every filter change made via Enter would carry the current page
-        number along with the new filter values and land on a stale page.
-        Assert that no submit control anywhere on the page carries `page`,
-        and that Prev/Next are plain links instead."""
+        """Pressing Enter in a filter field triggers implicit submission, which uses the first submit button in tree order as the submitter. If the desktop Prev/Next controls were submit buttons named `page`, every filter change made via Enter would carry the current page number along with the new filter values and land on a stale page. Assert that no submit control anywhere on the page carries `page`, and that Prev/Next are plain links instead."""
         # Enough entries that page 2 has both a previous and a next page
         # regardless of the paginator's page size.
         await sync_to_async(DocketEntry.objects.bulk_create)(
@@ -5055,11 +5651,7 @@ class DocketFilterPaginationWiringTest(TestCase):
                 self.assertIn("page=3", href)
 
     async def test_pagination_shows_entry_range(self) -> None:
-        """The bottom pagination shows "start–end of total" for the current
-        page. The paginator uses `orphans=10`, so the last page can hold more
-        than the page size; the range must come from the page object's
-        start/end index, not from `number * per_page`. Fill the docket so the
-        last page absorbs the orphans and check its range."""
+        """The bottom pagination shows "start–end of total" for the current page. The paginator uses `orphans=10`, so the last page can hold more than the page size; the range must come from the page object's start/end index, not from `number * per_page`. Fill the docket so the last page absorbs the orphans and check its range."""
         # 5 existing + 205 bulk = 210 entries. At 100 per page with
         # orphans=10 that is two pages: 1–100 and 101–210.
         await sync_to_async(DocketEntry.objects.bulk_create)(

@@ -11,63 +11,51 @@ def get_redis_interface(
 ) -> Redis:
     """Pick an existing redis connection from the global object.
 
-    :param db_name: The name of the database to use, as defined in our settings
-    :param decode_responses: Whether to decode responses with utf-8. If you're
-    putting binary data (like a picked object) into redis, don't try to decode
-    it.
-    :return Redis interface using django settings
+    Args:
+        db_name: The name of the database to use, as defined in our settings
+        decode_responses: Whether to decode responses with utf-8. If you're
+            putting binary data (like a picked object) into redis, don't try to decode
+            it.
+
+    Returns:
+        Redis interface using django settings
     """
     return settings.REDIS_CLIENTS[f"{db_name}-{decode_responses}"]
 
 
 def create_redis_semaphore(r: str | Redis, key: str, ttl: int) -> bool:
-    """Use a redis key to create a semaphore with a specified TTL
+    """Use a redis key to create a semaphore with a specified TTL.
 
-    Note that this function has a very small race condition between when it
-    checks for the key, discovers it doesn't exist, and then creates it. This
-    race condition is unfortunate. It can be fixed in one of two ways. A Lua
-    script could be set up in the Redis server as described here:
+    The key is created atomically with SET NX, so if several processes race
+    to create the same semaphore, exactly one of them gets True.
 
-      https://stackoverflow.com/a/36645586/64911
+    Args:
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
+        key: The key to create
+        ttl: How long the key should live in seconds.
 
-    Or Redis can be upgraded to a version where the SET command has a KEEPTTL
-    parameter. Using that, you can set the value while keeping the TTL it might
-    already have. In #1675 we learned that the obvious way of doing this, using
-    getset, deletes the TTL from a key, making that approach untenable. So,
-    instead of using that approach, or using a Lua script, we just accept the
-    possibility of a race condition.
-
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :param key: The key to create
-    :param ttl: How long the key should live in seconds.
-    :return: True if the key was created else False
+    Returns:
+        True if the key was created else False
     """
     if isinstance(r, str):
         r = get_redis_interface(r)
 
-    currently_enqueued = bool(r.get(key))
-    if currently_enqueued:
-        # We've got the semaphore already
-        return False
-
-    # We don't have a key for this yet. Set a new expiring key. Normally, the
-    # semaphores created by this function would be manually cleaned up by your
-    # code, but if you fail to do so, the expiration gives a safety so that the
-    # semaphore *will* eventually go away even if our task, server, whatever
-    # crashes.
-    # Redis doesn't do bools anymore, so use 1 as True.
-    r.set(key, 1, ex=ttl)
-    return True
+    # Normally, the semaphores created by this function would be manually
+    # cleaned up by your code, but if you fail to do so, the expiration gives a
+    # safety so that the semaphore *will* eventually go away even if our task,
+    # server, whatever crashes. Redis doesn't do bools anymore, so use 1 as
+    # True.
+    return bool(r.set(key, 1, ex=ttl, nx=True))
 
 
 def delete_redis_semaphore(r: str | Redis, key: str) -> None:
-    """Delete a redis key
+    """Delete a redis key.
 
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :param key: The key to delete
-    :return: None
+    Args:
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
+        key: The key to delete
     """
     if isinstance(r, str):
         r = get_redis_interface(r)
@@ -85,12 +73,14 @@ def acquire_redis_lock(r: Redis, key: str, ttl: int) -> str:
     If the lock is already in use by another process, it retries until the
     lock is acquired.
 
-    :param r: The Redis DB to connect to as a connection interface.
-    :param key: The key for the lock in Redis.
-    :param ttl: Time-to-live for the lock in milliseconds.
-    :return: A unique identifier for the lock.
-    """
+    Args:
+        r: The Redis DB to connect to as a connection interface.
+        key: The key for the lock in Redis.
+        ttl: Time-to-live for the lock in milliseconds.
 
+    Returns:
+        A unique identifier for the lock.
+    """
     identifier = str(uuid.uuid4())
     while True:
         if r.set(key, identifier, nx=True, px=ttl):
@@ -106,10 +96,10 @@ def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
     identifier matches the current lock value.
     This prevents other processes from mistakenly releasing the lock.
 
-    :param r: The Redis DB to connect to as a connection interface.
-    :param key: The key for the lock in Redis.
-    :param identifier: The unique identifier for the lock.
-    :return: None
+    Args:
+        r: The Redis DB to connect to as a connection interface.
+        key: The key for the lock in Redis.
+        identifier: The unique identifier for the lock.
     """
     # Lua script to release lock
     lua_script = """
@@ -123,3 +113,42 @@ def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
     end
     """
     return r.eval(lua_script, 1, key, identifier)
+
+
+def hset_if_lock_held(
+    r: Redis,
+    lock_key: str,
+    identifier: str,
+    writes: list[tuple[str, str, str | int]],
+) -> bool:
+    """Atomically apply hash writes only if we still hold a lock.
+
+    Use this for the writes made under a lock from acquire_redis_lock. The
+    lock's TTL can expire while its holder is still working, letting another
+    process acquire it. Writing through this function fences out the stale
+    holder so it can't overwrite newer values. Either all the writes are
+    applied or none are.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param lock_key: The key of the lock in Redis.
+    :param identifier: The identifier returned by acquire_redis_lock.
+    :param writes: A list of (hash name, field, value) tuples to HSET.
+    :return: True if the lock was held and the writes were applied, else
+    False.
+    """
+    # KEYS[i] for i >= 2 is a hash name, and its field and value are in
+    # ARGV[2i - 2] and ARGV[2i - 1].
+    lua_script = """
+    if redis.call("GET", KEYS[1]) ~= ARGV[1] then
+        return 0
+    end
+    for i = 2, #KEYS do
+        redis.call("HSET", KEYS[i], ARGV[2 * i - 2], ARGV[2 * i - 1])
+    end
+    return 1
+    """
+    keys = [lock_key] + [name for name, _, _ in writes]
+    args = [identifier] + [
+        arg for _, field, value in writes for arg in (field, value)
+    ]
+    return bool(r.eval(lua_script, len(keys), *keys, *args))

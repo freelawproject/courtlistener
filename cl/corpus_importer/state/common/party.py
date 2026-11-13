@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, ClassVar, cast
 
 from django.db.models import Model, QuerySet
@@ -6,22 +6,19 @@ from juriscraper.state.docket import Party as ScrapeParty
 from juriscraper.state.docket import Representative as ScrapeRepresentative
 
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Ancestor,
+    Fn,
     ManyStrategy,
     ManyToManyRelation,
     Merger,
+    Params,
     RelatedParams,
+    Scrape,
     ThroughParameters,
 )
+from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.models import Docket
-
-
-def _role_docket(
-    representative: ScrapeRepresentative,
-    params: ThroughParameters[ThroughParameters[Any]],
-) -> Docket:
-    return cast(Docket, params.params.parent)
 
 
 class RoleMerger[AttyType: ScrapeRepresentative, ParamType](
@@ -29,13 +26,7 @@ class RoleMerger[AttyType: ScrapeRepresentative, ParamType](
 ):
     model: ClassVar[type[Model]] = Role
 
-    docket: Docket = Attribute(_role_docket)
-
-
-def _representative_name(
-    representative: ScrapeRepresentative, params: Any
-) -> str:
-    return representative.name
+    docket: Docket = Ancestor(Docket)
 
 
 class AttorneyMerger[AttyType: ScrapeRepresentative, ParamType](
@@ -43,7 +34,7 @@ class AttorneyMerger[AttyType: ScrapeRepresentative, ParamType](
 ):
     model: ClassVar[type[Model]] = Attorney
 
-    name: str = Attribute(_representative_name)
+    name: str = Scrape(ScrapeRepresentative).name
 
     def query(self) -> QuerySet[Attorney]:
         # Attorneys have no natural key, so treat the name as unique within
@@ -60,10 +51,6 @@ def _party_representatives[RType: ScrapeRepresentative](
     return party.representatives
 
 
-def _party_name(party: ScrapeParty[ScrapeRepresentative], params: Any) -> str:
-    return party.name
-
-
 def AttorneyRelation(
     *,
     attorney: type[Merger[Any, Any, Any]] = AttorneyMerger,
@@ -71,7 +58,10 @@ def AttorneyRelation(
     transform: Callable[[Any, Any], list[Any]] = _party_representatives,
 ) -> list[Attorney]:
     return ManyToManyRelation(
-        attorney, role, transform, strategy=ManyStrategy.DISASSOCIATE
+        attorney,
+        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        role,
+        strategy=ManyStrategy.DISASSOCIATE,
     )
 
 
@@ -79,23 +69,19 @@ class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
     Merger[PType, RelatedParams[ParamType], Party]
 ):
     model: ClassVar[type[Model]] = Party
+    key: ClassVar[Iterable[str]] = ["name"]
 
     attorneys: list[Attorney] = AttorneyRelation()
-    name: str = Attribute(_party_name)
+    name: str = Scrape(ScrapeParty).name
 
     def query(self) -> QuerySet[Party]:
-        # Parties have no natural key, so treat the name as unique within the
-        # parent docket, like the RECAP mergers do.
+        """Find the party by its natural key within the parent docket.
+
+        The default key is the name, like the RECAP mergers use; a source that
+        identifies parties more reliably sets `key` to that field instead.
+        """
         docket = cast(Docket, self.params.parent)
-        return self.manager.filter(
-            name=self.transformed["name"], party_types__docket=docket
-        ).distinct()
-
-
-def _party_type_name(
-    party: ScrapeParty[ScrapeRepresentative], params: Any
-) -> str:
-    return party.party_type.value.title()
+        return super().query().filter(party_types__docket=docket).distinct()
 
 
 class PartyTypeMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
@@ -103,4 +89,4 @@ class PartyTypeMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
 ):
     model: ClassVar[type[Model]] = PartyType
 
-    name: str = Attribute(_party_type_name)
+    name: str = Scrape(ScrapeParty).party_type.value.title()

@@ -8,8 +8,7 @@ from elasticsearch.dsl import Join, Percolator
 
 
 class CharNullField(models.CharField):
-    """
-    Subclass of the CharField that allows empty strings to be stored as NULL.
+    """Subclass of the CharField that allows empty strings to be stored as NULL.
 
     https://stackoverflow.com/a/1934764/64911
     """
@@ -22,18 +21,14 @@ class CharNullField(models.CharField):
         expression: Expression,
         connection: BaseDatabaseWrapper,
     ) -> str:
-        """
-        Gets value right out of the db and changes it if its ``None``.
-        """
+        """Gets value right out of the db and changes it if its ``None``."""
         if value is None:
             return ""
         else:
             return value
 
     def to_python(self, value: Any) -> models.CharField | str:
-        """
-        Gets value right out of the db or an instance, and changes it if its ``None``.
-        """
+        """Gets value right out of the db or an instance, and changes it if its ``None``."""
         if isinstance(value, models.CharField):
             # If an instance, just return the instance.
             return value
@@ -45,9 +40,7 @@ class CharNullField(models.CharField):
         return value
 
     def get_prep_value(self, value: Any) -> str | None:
-        """
-        Catches value right before sending to db.
-        """
+        """Catches value right before sending to db."""
         if value == "":
             # If Django tries to save an empty string, send the db None (NULL).
             return None
@@ -58,6 +51,7 @@ class CharNullField(models.CharField):
 
 class PercolatorField(fields.DEDField, Percolator):
     """Subclass of DEDField and Percolator field.
+
     This subclass transforms the Percolator field into a field compatible with
     django_elasticsearch_dsl. This enables us to leverage DED Document methods
     like "prepare," which allows the field to be populated using the prepare
@@ -69,6 +63,7 @@ class PercolatorField(fields.DEDField, Percolator):
 
 class JoinField(fields.DEDField, Join):
     """Subclass of DEDField and Join field.
+
     This subclass transforms the Join field into a field compatible with
     django_elasticsearch_dsl. This enables us to leverage DED Document methods
     like "prepare," which allows the field to be populated using the prepare

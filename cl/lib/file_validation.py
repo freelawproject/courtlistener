@@ -41,7 +41,8 @@ def file_too_large_message() -> str:
     A function rather than a constant because `filesizeformat` translates
     its units, which Django cannot do at import time.
 
-    :return: The message, naming the limit in human terms.
+    Returns:
+        The message, naming the limit in human terms.
     """
     return (
         f"The file is too large. The maximum upload size is "
@@ -56,8 +57,11 @@ def content_is_pdf(f: File) -> bool:
     any size. The file is left at the position it arrived at, even if the
     read raises, so callers can read it afterwards.
 
-    :param f: The file to check.
-    :return: True if the file carries the PDF magic number near its start.
+    Args:
+        f: The file to check.
+
+    Returns:
+        True if the file carries the PDF magic number near its start.
     """
     position = f.tell()
     try:
@@ -70,8 +74,11 @@ def content_is_pdf(f: File) -> bool:
 def is_too_large(f: File) -> bool:
     """Check whether a file exceeds the maximum upload size.
 
-    :param f: The file to check.
-    :return: True if the file is larger than `MAX_UPLOAD_SIZE`.
+    Args:
+        f: The file to check.
+
+    Returns:
+        True if the file is larger than `MAX_UPLOAD_SIZE`.
     """
     return f.size is not None and f.size > MAX_UPLOAD_SIZE
 
@@ -83,9 +90,11 @@ def validate_file_size(f: File) -> None:
     runs before the form's `clean_<field>` method, which may read the whole
     file into memory.
 
-    :param f: The file to check.
-    :return: None
-    :raises ValidationError: If the file is over the size limit.
+    Args:
+        f: The file to check.
+
+    Raises:
+        ValidationError: If the file is over the size limit.
     """
     if is_too_large(f):
         raise ValidationError(file_too_large_message())

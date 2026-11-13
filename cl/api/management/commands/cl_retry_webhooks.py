@@ -21,9 +21,9 @@ HOURS_WEBHOOKS_CUT_OFF = 60
 def retry_webhook_events() -> int:
     """Retry Webhook events that need to be retried.
 
-    :return: Number of retried webhooks .
+    Returns:
+        Number of retried webhooks .
     """
-
     with transaction.atomic():
         created_date_cut_off = now() - timedelta(hours=HOURS_WEBHOOKS_CUT_OFF)
         base_events = WebhookEvent.objects.select_for_update().filter(
@@ -33,7 +33,7 @@ def retry_webhook_events() -> int:
         )
         # Mark as failed webhook events older than HOURS_WEBHOOKS_CUT_OFF hours
         # avoid retrying.
-        failed_webhook_events = base_events.filter(
+        base_events.filter(
             event_status__in=[
                 WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
@@ -43,7 +43,7 @@ def retry_webhook_events() -> int:
 
         # Restore retry counter to 0 for ENDPOINT_DISABLED events after
         # webhook is re-enabled.
-        webhook_events_to_restart = base_events.filter(
+        base_events.filter(
             event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
             date_created__gte=created_date_cut_off,
         ).update(retry_counter=0, date_modified=now())
@@ -62,11 +62,12 @@ def retry_webhook_events() -> int:
 
 def delete_old_webhook_events() -> int:
     """Delete webhook events older than DAYS_TO_DELETE days.
-    This is executed once a day at 12:00 UTC (4:00 PDT)
 
-    :return: The number of deleted webhooks events.
+    This is executed once a day at 12:00 UTC (4:00 PDT).
+
+    Returns:
+        The number of deleted webhooks events.
     """
-
     older_than = now() - timedelta(days=DAYS_TO_DELETE)
     webhooks_events_to_delete = WebhookEvent.objects.filter(
         date_created__lt=older_than
@@ -75,12 +76,11 @@ def delete_old_webhook_events() -> int:
 
 
 def notify_webhooks_still_disabled() -> int:
-    """Send a notification to webhook owners if one of their webhook endpoints
-    is still disabled after 1, 2, and 3 days.
+    """Send a notification to webhook owners if one of their webhook endpoints is still disabled after 1, 2, and 3 days.
 
-    :return: The number of notifications sent.
+    Returns:
+        The number of notifications sent.
     """
-
     four_days_ago = now() - timedelta(days=4)
     one_day_ago = now() - timedelta(days=1)
     webhooks_disabled = Webhook.objects.filter(
@@ -94,7 +94,8 @@ def notify_webhooks_still_disabled() -> int:
 def check_if_executed_today() -> bool:
     """Stores in redis a key to check if the task has been executed today.
 
-    :return: True if the task has already been executed today, otherwise False
+    Returns:
+        True if the task has already been executed today, otherwise False
     """
     daemon_key = "daemon:webhooks:executed"
     r = get_redis_interface("CACHE", decode_responses=False)
@@ -108,10 +109,10 @@ def check_if_executed_today() -> bool:
 def execute_additional_tasks() -> tuple[int | None, int | None]:
     """Wrapper to execute additional webhook tasks once a day.
 
-    :return: A two tuple of webhook events deleted, webhooks still disabled
-    notifications sent or None, None if it's not time to execute.
+    Returns:
+        A two tuple of webhook events deleted, webhooks still disabled
+        notifications sent or None, None if it's not time to execute.
     """
-
     webhook_events_deleted, notifications_sent = None, None
     if now().hour == 12 and now().minute < 10:
         # This check might be executed anytime between 12:00 UTC to 12:10 UTC

@@ -5,17 +5,20 @@ from importlib import import_module
 from urllib.parse import urlencode
 
 from celery import Task
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
+from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -38,7 +41,6 @@ from cl.api.tasks import (
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
-from cl.favorites.utils import build_dual_read_query
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
@@ -48,8 +50,23 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry, RECAPDocument
+from cl.search.es_docket_sources import (
+    SCOTUS_ES_SOURCE,
+    SOURCE_BY_MODEL,
+    ESDocketSource,
+    percolator_enabled,
+    source_for_court,
+)
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    DocketEntry,
+    RECAPDocument,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
+)
 from cl.search.types import (
+    ESDictDocument,
     ESDocumentNameType,
     SaveESDocumentReturn,
     SearchAlertHitType,
@@ -67,7 +84,7 @@ def make_alert_key(d_pk: int) -> str:
 
 
 def enqueue_docket_alert(d_pk: int) -> bool:
-    """Small wrapper to create keys for docket alerts"""
+    """Small wrapper to create keys for docket alerts."""
     key = make_alert_key(d_pk)
     return create_redis_semaphore("ALERTS", key, ttl=60 * 10)
 
@@ -89,17 +106,19 @@ def get_docket_alert_recipients(
 ) -> tuple[list[DocketAlertRecipient], list[int], list[str]]:
     """Get the notification's recipients for a docket alert.
 
-    :param d_pk: Docket primary key
-    :param recap_email_recipients: List of @recap.email addresses to send the
-    notification to.
-    :param recap_email_user_only: True if we need to get recipients only for
-    a recap.email user to send the alert independently and avoid sending
-    duplicate docket alerts for current subscribers.
-    :return: A list of DocketAlertRecipients objects, a list of User pks as
-    webhook recipients and a list of @recap.email addresses that don't belong
-    to any user if any.
-    """
+    Args:
+        d_pk: Docket primary key
+        recap_email_recipients: List of @recap.email addresses to send the
+            notification to.
+        recap_email_user_only: True if we need to get recipients only for
+            a recap.email user to send the alert independently and avoid sending
+            duplicate docket alerts for current subscribers.
 
+    Returns:
+        A list of DocketAlertRecipients objects, a list of User pks as
+        webhook recipients and a list of @recap.email addresses that don't belong
+        to any user if any.
+    """
     # List of DocketAlertRecipient objects to send docket alerts
     da_recipients_list = []
     # List of DocketAlertRecipient objects to send webhooks
@@ -181,16 +200,20 @@ def get_docket_notes_and_tags_by_user(
 ) -> tuple[str | None, list[UserTag]]:
     """Get user notes and tags for a docket.
 
-    :param d_pk: Docket primary key
-    :param user_pk: The User primary key
-    :return: A two tuple of docket notes or None if not available, a list of
-    tags assigned to the docket.
-    """
+    Args:
+        d_pk: Docket primary key
+        user_pk: The User primary key
 
+    Returns:
+        A two tuple of docket notes or None if not available, a list of
+        tags assigned to the docket.
+    """
     notes = None
     note = (
         Note.objects.filter(
-            build_dual_read_query(Docket, d_pk), user_id=user_pk
+            content_type=ContentType.objects.get_for_model(Docket),
+            object_id=d_pk,
+            user_id=user_pk,
         )
         .only("notes")
         .first()
@@ -204,20 +227,24 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: list[DocketEntry],
+    new_des: QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
-    """Make docket alert messages that can be sent to users
+    """Make docket alert messages that can be sent to users.
 
-    :param d: The docket to work on
-    :param new_des: The new docket entries
-    :param da_recipients: A list of DocketAlertRecipients objects
-    :return: A list of email messages to send
+    Args:
+        d: The docket to work on
+        new_des: The new docket entries (SCOTUSDocketEntry for a SCOTUS
+            docket, DocketEntry otherwise -- see Docket.get_alert_source())
+        da_recipients: A list of DocketAlertRecipients objects
+
+    Returns:
+        A list of email messages to send
     """
-
+    source = d.get_alert_source()
     case_name = trunc(best_case_name(d), 100, ellipsis="...")
-    txt_template = loader.get_template("docket_alert_email.txt")
-    html_template = loader.get_template("docket_alert_email.html")
+    txt_template = loader.get_template(source.email_txt_template)
+    html_template = loader.get_template(source.email_html_template)
     subject_template = loader.get_template("docket_alert_subject.txt")
     de_count = len(new_des)
     subject_context = {
@@ -227,7 +254,14 @@ def make_alert_messages(
     }
     # TODO: Might be good as a TypedDict, but that seems like overkill for now
     email_context: dict[
-        str, list[DocketEntry] | int | Docket | None | str | list[UserTag]
+        str,
+        QuerySet[DocketEntry]
+        | QuerySet[SCOTUSDocketEntry]
+        | int
+        | Docket
+        | None
+        | str
+        | list[UserTag],
     ] = {
         "new_des": new_des,
         "count": de_count,
@@ -281,7 +315,7 @@ def send_alert_and_webhook(
     recap_email_recipients: list[str] | None = None,
     des_pks: list[int] | None = None,
 ) -> None:
-    """Send an alert and webhook for a given docket
+    """Send an alert and webhook for a given docket.
 
     There are two methods to send docket alerts. The first one is based on the
     time *since* new docket entries for a docket were created. This method is
@@ -321,15 +355,18 @@ def send_alert_and_webhook(
      The second email comes in to atty1@recap.email. We:
      -Do nothing.
 
-    :param d_pk: The docket PK that was modified
-    :param since: If we run alerts, notify users about items *since* this time.
-    :param recap_email_recipients: The recap.email addresses if needed to send
-    the first case-user notification email.
-    :param des_pks: A list of docket entries pks used if we need to send an
-    alert again for a recap.email user independently
-    :return: None
-    """
+    Entries and email templates are resolved per docket source (RECAP vs.
+    SCOTUS) via Docket.get_alert_source() -- see
+    cl/alerts/docket_alert_sources.py.
 
+    Args:
+        d_pk: The docket PK that was modified
+        since: If we run alerts, notify users about items *since* this time.
+        recap_email_recipients: The recap.email addresses if needed to send
+            the first case-user notification email.
+        des_pks: A list of docket entries pks used if we need to send an
+            alert again for a recap.email user independently
+    """
     if recap_email_recipients is None:
         recap_email_recipients = []
     recap_email_user_only = False
@@ -353,12 +390,11 @@ def send_alert_and_webhook(
         return
 
     d = Docket.objects.get(pk=d_pk)
+    source = d.get_alert_source()
     if des_pks is not None:
-        new_des = DocketEntry.objects.filter(pk__in=des_pks)
+        new_des = source.entries_by_pk(des_pks)
     else:
-        new_des = list(
-            DocketEntry.objects.filter(date_created__gte=since, docket=d)
-        )
+        new_des = source.entries_since(d, since)
         des_pks = [de.pk for de in new_des]
     if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
@@ -377,22 +413,29 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook
-    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    # Send docket entries to webhook. SCOTUS webhooks stay off until
+    # send_docket_alert_webhook_events supports SCOTUSDocketEntry: it looks
+    # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
+    if (
+        source is not SCOTUS_ALERT_SOURCE
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+    ):
+        send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 
 @app.task(ignore_result=True)
 def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> list[int]:
-    """Send many docket alerts at one time without making numerous calls
-    to the send_alert_and_webhook function.
+    """Send many docket alerts at one time without making numerous calls to the send_alert_and_webhook function.
 
-    :param data: A list of tuples. Each tuple contains the docket ID, and
-        a time. The time indicates that alerts should be sent for
-        items *after* that point.
+    Args:
+        data: A list of tuples. Each tuple contains the docket ID, and
+            a time. The time indicates that alerts should be sent for
+            items *after* that point.
 
-    :returns: An empty list
+    Returns:
+        An empty list
     """
     for args in data:
         send_alert_and_webhook(*args)
@@ -404,13 +447,11 @@ def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> list[int]:
 def send_unsubscription_confirmation(
     da_pk: int,
 ) -> None:
-    """Send the unsubscription confirmation email after a user has unsubscribed
-    from an email link.
+    """Send the unsubscription confirmation email after a user has unsubscribed from an email link.
 
-    :param da_pk: The docket alert PK that was unsubscribed
-    :return: None
+    Args:
+        da_pk: The docket alert PK that was unsubscribed
     """
-
     docket_alert = DocketAlert.objects.get(pk=da_pk)
     docket = docket_alert.docket
     case_name = trunc(best_case_name(docket), 100, ellipsis="...")
@@ -442,14 +483,12 @@ def send_unsubscription_confirmation(
 
 
 def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
-    """Send a notification to the admins if a user does not exist for one or
-     more a recap email recipients.
+    """Send a notification to the admins if a user does not exist for one or more a recap email recipients.
 
-    :param recap_email_recipients: The list of @recap.email that doesn't belong
-    to any user
-    :return: None
+    Args:
+        recap_email_recipients: The list of @recap.email that doesn't belong
+            to any user
     """
-
     template = loader.get_template("recap_email_user_not_found.txt")
     send_mail(
         subject="@recap.email user not found",
@@ -465,12 +504,15 @@ def send_webhook_alert_hits(
     alert_user: User, hits: list[SearchAlertHitType]
 ) -> bool:
     """Send webhook alerts for search hits.
-    :param alert_user: The user profile object associated with the webhooks.
-    :param hits: A list of tuples, each containing information about an alert,
-    its associated search type, documents found, and the number of documents.
-    :return: True if at least one webhook was queued for delivery, else False.
-    """
 
+    Args:
+        alert_user: The user profile object associated with the webhooks.
+        hits: A list of tuples, each containing information about an alert,
+            its associated search type, documents found, and the number of documents.
+
+    Returns:
+        True if at least one webhook was queued for delivery, else False.
+    """
     webhook_sent = False
     for alert, search_type, documents, num_docs in hits:
         # pyrefly:ignore[missing-attribute]
@@ -494,14 +536,13 @@ def send_search_alert_emails(
 ) -> None:
     """Send search alert emails for multiple users.
 
-    :param email_alerts_to_send: A list of two tuples containing the user to
-    whom the alerts should be sent. A list of tuples containing the Search
-    Alert, (Alert, search type, documents, and number of documents)
-    :param scheduled_alert: A boolean indicating weather this alert has been
-    scheduled
-    :return: None
+    Args:
+        email_alerts_to_send: A list of two tuples containing the user to
+            whom the alerts should be sent. A list of tuples containing the Search
+            Alert, (Alert, search type, documents, and number of documents)
+        scheduled_alert: A boolean indicating weather this alert has been
+            scheduled
     """
-
     messages = []
     txt_template = loader.get_template("alert_email_es.txt")
     html_template = loader.get_template("alert_email_es.html")
@@ -565,8 +606,11 @@ def create_schedule_alerts_hits_in_bulk(
     a multi-batch insert in its own transaction, so the IntegrityError retry
     cannot re-insert batches that already committed.
 
-    :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
-    :return: The number of ScheduledAlertHit records created.
+    Args:
+        scheduled_hits: A list of ScheduledAlertHit instances to be created.
+
+    Returns:
+        The number of ScheduledAlertHit records created.
     """
     if not scheduled_hits:
         return 0
@@ -588,15 +632,14 @@ def create_schedule_alerts_hits_in_bulk(
     return len(hits_to_create)
 
 
-@app.task(ignore_result=True)
+@app.task(ignore_result=True, queue=settings.CELERY_SEARCH_ALERTS_QUEUE)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
-    """Process the response from the percolator and handle alerts triggered by
-     the percolator query.
+    """Process the response from the percolator and handle alerts triggered by the percolator query.
 
-    :param response: A `SendAlertsResponse` object containing A list of hits
-    for main, docket only and recap-only alerts, the document data that
-    triggered the alerts and The related app label model.
-    :return: None
+    Args:
+        response: A `SendAlertsResponse` object containing A list of hits
+            for main, docket only and recap-only alerts, the document data that
+            triggered the alerts and The related app label model.
     """
     if not response:
         return None
@@ -611,6 +654,14 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     app_label_str, model_str = app_label_model.split(".")
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
+    )
+    # SCOTUS search alert webhooks stay off with SCOTUS docket alert
+    # webhooks: their payloads would have id null and no uid until the
+    # SCOTUS search API (#8153).
+    send_webhooks = (
+        get_docket_source(app_label_model, document_content)
+        is not SCOTUS_ES_SOURCE
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
     )
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
@@ -642,15 +693,21 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         alert_user = alert_triggered.user
         # The (document_type, document_id) pairs to record in the alert_hits
         # Redis sets if this hit ends up being delivered or scheduled.
-        alert_set_writes: list[tuple[str, int]] = []
+        alert_set_writes: list[tuple[str, int | str]] = []
         # Set highlight if available in response.
         match app_label_model:
-            case "search.RECAPDocument":
-                # Filter out RECAPDocuments already seen by this alert.
+            case "search.RECAPDocument" | "search.SCOTUSDocument":
+                # SCOTUS pks can collide with RECAPDocument pks, so those
+                # documents are tracked by their namespaced uid instead.
+                document_hit_id = (
+                    document_content_copy.get("uid")
+                    or document_content_copy["id"]
+                )
+                # Filter out documents already seen by this alert.
                 if not include_recap_document_hit(
                     alert_triggered_id, recap_document_hits, docket_hits
                 ) or has_document_alert_hit_been_triggered(
-                    r, alert_triggered_id, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_hit_id
                 ):
                     continue
                 transform_percolator_child_document(
@@ -659,7 +716,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id = document_content_copy["docket_id"]
                 child_document = True
                 alert_set_writes = [
-                    ("r", document_content_copy["id"]),
+                    ("r", document_hit_id),
                     # Mark case-only alert as triggered.
                     ("co", object_id),
                 ]
@@ -722,7 +779,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         ]
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
-        webhook_sent = send_webhook_alert_hits(alert_user, hits)
+        webhook_sent = send_webhooks and send_webhook_alert_hits(
+            alert_user, hits
+        )
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
             and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
@@ -765,11 +824,52 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create)
 
 
+def get_docket_source(
+    app_label: str, document_content: ESDictDocument
+) -> ESDocketSource | None:
+    """Return the docket source (RECAP, SCOTUS) of a percolated document.
+
+    :param app_label: The percolated document's app label.
+    :param document_content: The percolated document's ES content.
+    :return: The document's ESDocketSource, or None if it isn't docket
+    content (e.g. an Opinion).
+    """
+    match app_label:
+        case "search.Docket":
+            return source_for_court(document_content.get("court_id", ""))
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
+            return SOURCE_BY_MODEL[apps.get_model(app_label)]
+        case _:
+            return None
+
+
+def search_alerts_percolation_enabled(response: SaveESDocumentReturn) -> bool:
+    """Check whether a document's search alerts percolation is enabled.
+
+    Each source has its own PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting;
+    opinions use PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED.
+
+    Args:
+        response: The indexed document to percolate.
+
+    Returns:
+        True if the document should be percolated.
+    """
+    if source := get_docket_source(
+        response.app_label, response.document_content
+    ):
+        return percolator_enabled(source)
+    if response.app_label == "search.Opinion":
+        return settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+    return True
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_SEARCH_ALERTS_QUEUE,
 )
 def send_or_schedule_search_alerts(
     self: Task, response: SaveESDocumentReturn | None
@@ -785,30 +885,26 @@ def send_or_schedule_search_alerts(
     additional results in chunks determined by settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE,
     until all results are retrieved or no more results are available.
 
-    :param self: The celery task
-    :param response: An optional `SaveESDocumentReturn` object containing the
-    ID of the document saved in the ES index, the content of the document and
-    the app label associated with the document.
-    :return: A SendAlertsResponse dataclass containing the main alerts
-    triggered, the recap documents alerts triggered, the docket alerts
-    triggered, the document content that triggered the alert, and the related
-    app label model or None.
-    """
+    Args:
+        self: The celery task
+        response: An optional `SaveESDocumentReturn` object containing the
+            ID of the document saved in the ES index, the content of the document and
+            the app label associated with the document.
 
+    Returns:
+        A SendAlertsResponse dataclass containing the main alerts
+        triggered, the recap documents alerts triggered, the docket alerts
+        triggered, the document content that triggered the alert, and the related
+        app label model or None.
+    """
     if not response:
         self.request.chain = None
         return None
 
-    if (
-        not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
-        and response.app_label in ["search.RECAPDocument", "search.Docket"]
-    ) or (
-        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        and response.app_label in ["search.Opinion"]
-    ):
-        # Disable percolation for RECAP Or Opinions search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        # is set to True. Useful to prevent conflicts in tests.
+    if not search_alerts_percolation_enabled(response):
+        # Disable percolation for RECAP, SCOTUS or Opinions search alerts
+        # until their PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting is True.
+        # Useful to prevent conflicts in tests.
         self.request.chain = None
         return None
 
@@ -821,13 +917,13 @@ def send_or_schedule_search_alerts(
         percolator_index, es_document_index, documents_to_percolate = (
             prepare_percolator_content(app_label, document_id)
         )
-    except RECAPDocument.DoesNotExist as exc:
+    except (RECAPDocument.DoesNotExist, SCOTUSDocument.DoesNotExist) as exc:
         if (
             self.request.retries
             >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
         ):
             logger.warning(
-                "RECAPDocument %s missing during alert trigger.", document_id
+                "%s %s missing during alert trigger.", app_label, document_id
             )
             self.request.chain = None
             return None
@@ -894,15 +990,17 @@ def es_save_alert_document(
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 
-    :param self: The celery task
-    :param alert_id: The Alert instance ID to be indexed.
-    :param es_document_name: The Elasticsearch document percolator name used
-    for indexing.
-    the Alert instance.
-    :param custom_index_name: Optional custom index name to use.
-    :return: Bool, True if document was properly indexed, otherwise None.
-    """
+    Args:
+        self: The celery task
+        alert_id: The Alert instance ID to be indexed.
+        es_document_name: The Elasticsearch document percolator name used
+            for indexing.
+            the Alert instance.
+        custom_index_name: Optional custom index name to use.
 
+    Returns:
+        Bool, True if document was properly indexed, otherwise None.
+    """
     es_document = getattr(es_document_module, es_document_name)
     document = es_document()
     try:
@@ -951,9 +1049,9 @@ def remove_alert_hits_set_task(self: Task, alert_id: int) -> None:
     This runs the cleanup in a worker so it doesn't block the request that
     deleted the Alert, and so a transient Redis ``ConnectionError`` is retried.
 
-    :param self: The celery task.
-    :param alert_id: The ID of the deleted Alert whose hit sets to remove.
-    :return: None
+    Args:
+        self: The celery task.
+        alert_id: The ID of the deleted Alert whose hit sets to remove.
     """
     r = get_redis_interface("CACHE")
     remove_alert_hits_set(r, alert_id)

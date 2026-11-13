@@ -9,10 +9,7 @@ from cl.search.models import BaseCitation, Citation, Opinion, RECAPDocument
 
 
 class BaseUnmatchedCitation(BaseCitation):
-    """
-    Track citations found in a citing Opinion or RECAPDocument that
-    couldn't be resolved to a cluster
-    """
+    """Track citations found in a citing Opinion or RECAPDocument that couldn't be resolved to a cluster."""
 
     NO_CITATION = 1
     FOUND = 2
@@ -75,17 +72,18 @@ class BaseUnmatchedCitation(BaseCitation):
         eyecite_citation: FullCaseCitation,
         has_multiple_matches: bool,
     ) -> Self:
-        """
-        Create an unmatched citation instance using an eyecite
-        FullCaseCitation
+        """Create an unmatched citation instance using an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: a UnmatchedCitation object, without a `citing_opinion` or
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            a UnmatchedCitation object, without a `citing_opinion` or
             `citing_recapdocument`
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
@@ -140,16 +138,19 @@ class UnmatchedCitation(BaseUnmatchedCitation):
         citing_opinion: Opinion,
         has_multiple_matches: bool,
     ) -> "UnmatchedCitation":
-        """Create an UnmatchedCitation from an eyecite FullCaseCitation
+        """Create an UnmatchedCitation from an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param citing_opinion: the Opinion that cites this unresolved citation
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: an UnmatchedCitation object
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            citing_opinion: the Opinion that cites this unresolved citation
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            an UnmatchedCitation object
         """
         unmatched_citation = cls.create_from_eyecite_base(
             eyecite_citation, has_multiple_matches
@@ -191,18 +192,20 @@ class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
         citing_recapdocument: RECAPDocument,
         has_multiple_matches: bool,
     ) -> "UnmatchedCitationFromRECAPDocument":
-        """Create an UnmatchedCitationFromRECAPDocument from an eyecite
-        FullCaseCitation
+        """Create an UnmatchedCitationFromRECAPDocument from an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param citing_recapdocument: the RECAPDocument that cites this
-            unresolved citation
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: an UnmatchedCitationFromRECAPDocument object
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            citing_recapdocument: the RECAPDocument that cites this
+                unresolved citation
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            an UnmatchedCitationFromRECAPDocument object
         """
         unmatched_citation = cls.create_from_eyecite_base(
             eyecite_citation, has_multiple_matches

@@ -6,22 +6,26 @@ from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
-from django.utils.safestring import SafeData, SafeString, mark_safe
+from django.utils.safestring import SafeString, mark_safe
 
 register = Library()
 
 
 @register.filter(is_safe=True, needs_autoescape=True)
 def oxford_join(items, conjunction="and", separator=",", autoescape=True):
-    """Join together items in a human-readable list
+    """Join together items in a human-readable list.
 
     Also works for django querysets due to not using negative indexing.
 
-    :param items: The list to be joined together.
-    :param conjunction: The word to join the items together with (typically
-    'and', but can be swapped for another word like 'but', or 'or'.
-    :param separator: The separator between the items. Typically a comma.
-    :returns s: A string with the items in the list joined together.
+    Args:
+        items: The list to be joined together.
+        conjunction: The word to join the items together with (typically
+            'and', but can be swapped for another word like 'but', or 'or'.
+        separator: The separator between the items. Typically a comma.
+        autoescape: Whether to escape the items. Set by Django's template engine.
+
+    Returns:
+        s: A string with the items in the list joined together.
     """
     items = list(map(force_str, items))
     if autoescape:
@@ -44,44 +48,44 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {conjunction} {item}"
             else:
                 # Items in the middle
+                # pyrefly: ignore [unbound-name]
                 s += f"{separator} {item}"
 
+    # pyrefly: ignore [unbound-name]
     return mark_safe(s)
 
 
 @register.filter(needs_autoescape=True)
 @stringfilter
 def nbsp(text, autoescape=None):
-    """Converts white space to non-breaking spaces
+    """Converts white space to non-breaking spaces.
 
     This creates a template filter that converts white space to html non-breaking
     spaces. It uses conditional_escape to escape any strings that are incoming
     and are not already marked as safe.
     """
-
-    if isinstance(text, SafeData) or not autoescape:
-        # This is an anonymous python identity function. Simply returns the
-        # value of x when x is given.
-        esc = lambda x: x
-    else:
-        esc = conditional_escape
-    return mark_safe(re.sub(r"\s", "&nbsp;", esc(text.strip())))
+    if isinstance(text, SafeString) or not autoescape:
+        return mark_safe(re.sub(r"\s", "&nbsp;", text.strip()))
+    return mark_safe(re.sub(r"\s", "&nbsp;", conditional_escape(text.strip())))
 
 
 @register.filter(needs_autoescape=True)
 @stringfilter
 def v_wrapper(text, autoescape=None):
-    """Wraps every v. in a string with a class of alt"""
+    """Wraps every v. in a string with a class of alt."""
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    return mark_safe(
-        re.sub(r" v\. ", '<span class="alt"> v. </span>', esc(text))
-    )
+        return mark_safe(
+            re.sub(
+                r" v\. ",
+                '<span class="alt"> v. </span>',
+                conditional_escape(text),
+            )
+        )
+    return mark_safe(re.sub(r" v\. ", '<span class="alt"> v. </span>', text))
 
 
 @register.filter(needs_autoescape=True)
@@ -89,16 +93,14 @@ def v_wrapper(text, autoescape=None):
 def underscore_to_space(text, autoescape=None):
     """Removed underscores from text."""
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    return mark_safe(re.sub("_", " ", esc(text)))
+        return mark_safe(re.sub("_", " ", conditional_escape(text)))
+    return mark_safe(re.sub("_", " ", text))
 
 
 @register.filter(needs_autoescape=True)
 @stringfilter
 def compress_whitespace(text, autoescape=None):
-    """Compress whitespace in a string as a browser does with HTML
+    """Compress whitespace in a string as a browser does with HTML.
 
     For example, this:
 
@@ -109,10 +111,8 @@ def compress_whitespace(text, autoescape=None):
     Becomes: 'text foo bar baz'
     """
     if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    text = esc(text)
+        text = conditional_escape(text)
+
     return mark_safe(" ".join(text.split()))
 
 
@@ -172,7 +172,7 @@ def naturalduration(
 
 @register.filter(is_safe=True)
 def OR_join(queryset):
-    """Take the input queryset, and return its PKs joined by ' OR '
+    """Take the input queryset, and return its PKs joined by ' OR '.
 
     This is a one-liner, but you can't do this kind of thing in a template.
     """
@@ -215,10 +215,9 @@ def read_more(s, show_words, autoescape=True):
     """
     show_words = int(show_words)
     if autoescape:
-        esc = conditional_escape
+        words = conditional_escape(s).split()
     else:
-        esc = lambda x: x
-    words = esc(s).split()
+        words = s.split()
 
     if len(words) <= show_words:
         return s

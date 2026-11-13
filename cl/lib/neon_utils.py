@@ -1,4 +1,4 @@
-from typing import NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 import requests
 from django.conf import settings
@@ -36,8 +36,7 @@ class NeonClient:
         )
 
     def get_account_by_id(self, account_id: int) -> dict:
-        """
-        Retrieves account data using the Neon API and the provided account ID.
+        """Retrieves account data using the Neon API and the provided account ID.
 
         Args:
             account_id (int): The ID of the account to retrieve.
@@ -73,10 +72,43 @@ class NeonClient:
         account_data["accountCustomFields"] = custom_fields
         return account_data
 
-    def search_account_by_email(self, email: str) -> list[dict[str, str]]:
+    def get_primary_active_membership(
+        self, account_id: str
+    ) -> dict[str, Any] | None:
+        """Retrieves the membership Neon considers an account's primary active one, using the account membership-history endpoint.
+
+        The ``primaryActiveMembership`` filter mirrors the "Active member"
+        flag on Neon's account detail page, which takes the instance's grace
+        period into account. Results are requested newest first, so a Neon
+        instance that ignores the filter still yields the most recent
+        membership rather than an arbitrary one.
+
+        Args:
+            account_id (str): The ID of the Neon account.
+
+        Returns:
+            dict[str, Any] | None: The membership record, shaped like the
+            response of ``GET /memberships/{id}`` (``id``, ``accountId``,
+            ``membershipLevel``, ``termEndDate``, ``status``, ``payments``...),
+            or None when the account has no active membership.
         """
-        Searches for Neon accounts that match the provided email address using
-        the Neon API search endpoint.
+        response = requests.get(
+            f"{NEON_API_URL}/accounts/{account_id}/memberships",
+            auth=self._basic,
+            timeout=self._timeout,
+            params={
+                "primaryActiveMembership": "true",
+                "sortColumn": "date",
+                "sortDirection": "DESC",
+                "pageSize": 1,
+            },
+        )
+        response.raise_for_status()
+        memberships = response.json().get("memberships") or []
+        return memberships[0] if memberships else None
+
+    def search_account_by_email(self, email: str) -> list[dict[str, str]]:
+        """Searches for Neon accounts that match the provided email address using the Neon API search endpoint.
 
         Args:
             email (str): The email address to search for.
@@ -114,9 +146,7 @@ class NeonClient:
     def get_individual_account_payload(
         self, user: User
     ) -> dict[str, dict[str, NeonContact]]:
-        """
-        Extracts relevant data from the provided user object to form a payload
-        for creating or updating an individual account.
+        """Extracts relevant data from the provided user object to form a payload for creating or updating an individual account.
 
         Args:
             user (User): The user object containing the information to be
@@ -173,8 +203,7 @@ class NeonClient:
         return json_data["id"]
 
     def update_account(self, user: User, account_id: str) -> str:
-        """
-        Updates an existing Neon account using the Neon API.
+        """Updates an existing Neon account using the Neon API.
 
         Args:
             user (User): The user object containing the updated information for

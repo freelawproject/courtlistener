@@ -57,7 +57,7 @@ if env("DB_READ_REPLICA_HOST", default=""):
         },
     }
 
-MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
+MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=10**8)  # 100MB
 SLACK_REPLICATION_WEBHOOK_URL = env(
     "SLACK_REPLICATION_WEBHOOK_URL", default=""
 )
@@ -158,6 +158,7 @@ MIDDLEWARE = [
     "waffle.middleware.WaffleMiddleware",
     "cl.api.middleware.ReplicaRoutingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
@@ -188,6 +189,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "oauth2_provider",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
+    "allauth.socialaccount.providers.saml",
     "django_filters",
     "django_prometheus",
     "storages",
@@ -218,6 +224,7 @@ INSTALLED_APPS = [
     "cl.search",
     "cl.simple_pages",
     "cl.sitemaps_infinite",
+    "cl.sso",
     "cl.stats",
     "cl.users",
     "cl.visualizations",

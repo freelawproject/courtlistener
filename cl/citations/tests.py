@@ -257,7 +257,7 @@ class CitationTextTest(TestCase):
                 )
 
     def test_create_html_with_citations_if_chunked(self):
-        """Test create html split over chunks"""
+        """Test create html split over chunks."""
         opinion = OpinionWithChildrenFactory(
             html="<html>Something something 1 U.S. 1 something something 1 U.S. 1 something something</html>",
             cluster=OpinionClusterWithChildrenAndParentsFactory(
@@ -299,7 +299,7 @@ class CitationTextTest(TestCase):
         self.assertEqual(opinion.html_with_citations, expected)
 
     def test_no_citations_found_or_resolved(self) -> None:
-        """Ensure that we get `html_with_citations` when no citations are found"""
+        """Ensure that we get `html_with_citations` when no citations are found."""
         # when no citations were found in `get_citations`
         self.assertEqual(do_resolve_citations([], None), {})
 
@@ -485,8 +485,7 @@ class CitationTextTest(TestCase):
                 )
 
     def test_make_html_from_harvard_and_scan_xml(self) -> None:
-        """Can we convert the Harvard or scanned XML of an opinion into
-        modified HTML?"""
+        """Can we convert the Harvard or scanned XML of an opinion into modified HTML?"""
         # fmt: off
 
         test_pairs = [
@@ -600,7 +599,7 @@ class CitationTextTest(TestCase):
                 )
 
     def test_unsafe_case_names(self) -> None:
-        """Test unsafe characters in aria descriptions"""
+        """Test unsafe characters in aria descriptions."""
         case_names = [
             (
                 # ampersand
@@ -705,10 +704,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
         )
 
     def test_opinionscited_recap_creation(self):
-        """
-        Tests that OpinionsCitedByRECAPDocument and UnmatchedCitationFromRECAP
-        objects are created in the database, with correct citation counts.
-        """
+        """Tests that OpinionsCitedByRECAPDocument and UnmatchedCitationFromRECAP objects are created in the database, with correct citation counts."""
         test_recap_document = self.recap_doc
 
         store_recap_citations(test_recap_document)
@@ -1084,13 +1080,11 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
     def test_case_name_and_reverse_match_query(self) -> None:
-        """Test refining match by case_name_query and reverse_match if full
-        citations results are > 1
-        """
+        """Test refining match by case_name_query and reverse_match if full citations results are > 1."""
         # Create 3 citations that match full_citation
         for i in range(3):
             with self.captureOnCommitCallbacks(execute=True):
-                citation = CitationWithParentsFactory.create(
+                CitationWithParentsFactory.create(
                     volume="3",
                     reporter="U.S.",
                     page="888",
@@ -1157,9 +1151,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
     def test_citation_resolution(self) -> None:
-        """Tests whether different types of citations (i.e., full, short form,
-        supra, id) resolve correctly to opinion matches.
-        """
+        """Tests whether different types of citations (i.e., full, short form, supra, id) resolve correctly to opinion matches."""
         opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
         opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
@@ -1384,7 +1376,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 )
 
     def test_citation_matching_issue621(self) -> None:
-        """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
+        """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1."""
         # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
@@ -1395,7 +1387,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
     def test_citation_resolve_with_corrected_reporter(self) -> None:
-        """Resolve to corrected reporter"""
+        """Resolve to corrected reporter."""
         cite_str = "8 B. 415"
         citation = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)[0]
         assert isinstance(citation, FullCaseCitation)
@@ -1423,7 +1415,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertEqual(results.pk, opinion12.pk, msg=results)
 
     def test_citation_multiple_matches(self) -> None:
-        """Make sure that we can identify multiple matches for a single citation"""
+        """Make sure that we can identify multiple matches for a single citation."""
         citation_str = "114 F.3d 1182"
         citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
             0
@@ -1462,8 +1454,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         self.assertIn(expected_citation_annotation, new_html)
 
     def test_citation_increment(self) -> None:
-        """Make sure that found citations update the increment on the cited
-        opinion's citation count"""
+        """Make sure that found citations update the increment on the cited opinion's citation count."""
         opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
 
@@ -1482,9 +1473,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         )
 
     def test_opinionscited_creation(self) -> None:
-        """Make sure that found citations are stored in the database as
-        OpinionsCited objects with the appropriate references and depth.
-        """
+        """Make sure that found citations are stored in the database as OpinionsCited objects with the appropriate references and depth."""
         # Here, opinion5 is our mock citing opinion, containing a number of references
         # to other mocked opinions, mixed about. It's hard to exhaustively
         # test all combinations, but this test case is made to be deliberately
@@ -1551,8 +1540,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                     )
 
     def test_opinionscited_no_self_creation(self) -> None:
-        """Make sure no OpinionsCited have been created when self citation is included in opinion
-        content from cluster"""
+        """Make sure no OpinionsCited have been created when self citation is included in opinion content from cluster."""
         opinion5a = Opinion.objects.get(cluster__pk=self.citation5a.cluster_id)
 
         citing = opinion5a
@@ -1594,7 +1582,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         3. When ordering_key is missing, documents fall back to ID-based sorting
         4. Cluster deduplication returns at most 2 results (size=2)
         """
-
         # Test Case 1: Both results have ordering_key (should sort by ordering_key)
         full_citation = case_citation(
             volume="307",
@@ -1680,7 +1667,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
     def test_signal_disconnection(self) -> None:
         """Can ParentheticalGroup signals be disconnected and reconnected?"""
-
         # from `test_opinionscited_creation` we know that opinion5 should
         # have Parentheticals for
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
@@ -1743,7 +1729,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
     def test_citation_string_volume(self) -> None:
         """Can we store volume numbers with letters or additional characters?"""
-
         self.alphanumeric_citation = CitationWithParentsFactory.create(
             volume="71A",
             reporter="A.F.T.R.2d (RIA)",
@@ -1795,9 +1780,7 @@ class CitationFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
         self._tree_has_content(r.content, expected_count)
 
     async def test_unicode_content(self) -> None:
-        """Does the citation feed continue working even when we have a unicode
-        case name?
-        """
+        """Does the citation feed continue working even when we have a unicode case name?"""
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & CO., \u2014"
         )
@@ -2053,11 +2036,7 @@ DescriptionUtilityTestCase = tuple[tuple[str, int], tuple[str, int], int]
 
 class DescriptionScoreTest(SimpleTestCase):
     def test_description_score_h2h(self) -> None:
-        """
-        Tests the functionality of the description utility metric by comparing
-        its accuracy at picking the better of two descriptions (as determined
-        by a human)
-        """
+        """Tests the functionality of the description utility metric by comparing its accuracy at picking the better of two descriptions (as determined by a human)."""
         minimum_accuracy = 0.9
         test_cases: list[DescriptionUtilityTestCase] = [
             (
@@ -2211,11 +2190,7 @@ class DescriptionScoreTest(SimpleTestCase):
 
 @dataclass(frozen=True)
 class DummyParenthetical:
-    """
-    A simple dummy version of the Parenthetical class that doesn't require
-    describing_opinion and described_opinion, and is hashable. It is useful for
-    testing GroupParenthetical functionality
-    """
+    """A simple dummy version of the Parenthetical class that doesn't require describing_opinion and described_opinion, and is hashable. It is useful for testing GroupParenthetical functionality."""
 
     id: int
     text: str
@@ -2233,11 +2208,7 @@ class DummyParenthetical:
 
 class GroupParentheticalsTest(SimpleTestCase):
     def test_get_parenthetical_groups(self):
-        """
-        Test whether get_parenthetical_groups correctly sub-divides a given
-        list of parentheticals into clusters of parentheticals that are
-        textually similar to each other.
-        """
+        """Test whether get_parenthetical_groups correctly sub-divides a given list of parentheticals into clusters of parentheticals that are textually similar to each other."""
         expected_groups = [
             (
                 [
@@ -2353,12 +2324,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
     def test_get_representative_parenthetical(self):
-        """
-        Tests whether get_representative parenthetical identifies the correct
-        parenthetical as the most representative of the given list of
-        parentheticals based on its similarity to others and descriptiveness
-        score.
-        """
+        """Tests whether get_representative parenthetical identifies the correct parenthetical as the most representative of the given list of parentheticals based on its similarity to others and descriptiveness score."""
         simgraph = {
             "0": ["3"],
             "1": ["2", "3", "7"],
@@ -2409,10 +2375,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
     def test_get_parenthetical_tokens(self):
-        """
-        Tests whether get_parenthetical_tokens correctly converts the text of a
-        parenthetical to a list of tokens
-        """
+        """Tests whether get_parenthetical_tokens correctly converts the text of a parenthetical to a list of tokens."""
         test_pairs = [
             (
                 "Concluding that a TDCA claim failed because the plaintiffs always knew the answers to those questions",
@@ -2458,11 +2421,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
     def test_get_graph_component(self):
-        """
-        Tests whether get_graph_component correctly identifies the full
-        "connected component" of a given node in the graph (i.e. a list of
-        itself plus any nodes directly or indirectly connected to it)
-        """
+        """Tests whether get_graph_component correctly identifies the full "connected component" of a given node in the graph (i.e. a list of itself plus any nodes directly or indirectly connected to it)."""
         test_pairs = [
             (("1", {"1": []}, set()), ["1"]),
             (("1", {"1": ["2"], "2": "1", "3": []}, set()), ["1", "2"]),
@@ -2921,8 +2880,7 @@ class CitationLookUpApiTest(SearchTestCase, TestCase):
     async def test_can_handle_full_citation_within_text(
         self, cache_key_mock
     ) -> None:
-        """Do we get redirected to the correct URL when we pass in a full
-        citation?"""
+        """Do we get redirected to the correct URL when we pass in a full citation?"""
         text_citation = (
             "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)"
         )
@@ -3229,7 +3187,7 @@ class CitationLookUpApiTest(SearchTestCase, TestCase):
 
 
 class UnmatchedCitationTest(TransactionTestCase):
-    """Test UnmatchedCitation model and related logic"""
+    """Test UnmatchedCitation model and related logic."""
 
     # this will produce 6 citations: 5 FullCase and 1 Id
     # last 2 should be ignored:
@@ -3357,7 +3315,6 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_saving_non_standard_year_format(self) -> None:
         """Can we prevent crash with atypical year format?"""
-
         cluster = OpinionClusterWithChildrenAndParentsFactory()
         eyecite_citations = get_citations(
             """2018 WL 1915078, at *2 (Mass. 1993-94).""",
@@ -3376,7 +3333,6 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_saving_volume_string(self) -> None:
         """Can we save volume numbers with letters or additional characters?"""
-
         cluster = OpinionClusterWithChildrenAndParentsFactory()
         eyecite_citations = get_citations(
             """71A A.F.T.R.2d (RIA) 3011""",
@@ -3398,7 +3354,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
 
 class TasksTest(TestCase):
-    """Test citations tasks"""
+    """Test citations tasks."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3439,8 +3395,7 @@ class TasksTest(TestCase):
     def test_operational_error_does_not_cause_recursion(
         self, mock_retry, mock_store
     ):
-        """Ensure retry of failed opinion ids by OperationalError triggers retry but does not cause recursion"""
-
+        """Ensure retry of failed opinion ids by OperationalError triggers retry but does not cause recursion."""
         # Simulate every call raises OperationalError
         mock_store.side_effect = OperationalError()
 
@@ -3471,15 +3426,17 @@ class TasksTest(TestCase):
     def test_operational_error_accumulates_failed_ids_and_retries_together(
         self, mock_store, mock_retry
     ):
-        """Ensure multiple OperationalError cases are retried in batch with self.retry"""
+        """Ensure multiple OperationalError cases are retried in batch with self.retry."""
 
         def side_effect(opinion, *_):
-            """Mocks store_opinion_citations_and_update_parentheticals call
-            Simulates a failure for opinion_1 and opinon_3
+            """Mocks store_opinion_citations_and_update_parentheticals call Simulates a failure for opinion_1 and opinon_3.
 
-            :param opinion: The opinion object being processed
-            :param *_: Ignored positional arguments passed by the task
-            :return: None for all other opinions to simulate success
+            Args:
+                opinion: The opinion object being processed
+                *_: Ignored positional arguments passed by the task
+
+            Returns:
+                None for all other opinions to simulate success
             """
             if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
                 raise OperationalError()

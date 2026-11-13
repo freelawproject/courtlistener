@@ -35,6 +35,7 @@ from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -116,7 +117,6 @@ class PeopleSearchAPICommonTests(PeopleTestCase):
     @skip_if_common_tests_skipped
     async def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
-
         params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
         # API
         await self._test_api_results_count(params, 1, "dob_city")
@@ -303,7 +303,6 @@ class PeopleV3APISearchTest(
 
     async def test_api_fields(self) -> None:
         """Confirm the search API for People return the expected fields."""
-
         params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
         r = await self._test_api_results_count(params, 1, "API")
         keys_to_check = [
@@ -364,7 +363,7 @@ class PeopleV3APISearchTest(
             )
 
     def test_merge_unavailable_fields_api(self) -> None:
-        """Confirm unavailable ES fields are properly merged from DB in the API"""
+        """Confirm unavailable ES fields are properly merged from DB in the API."""
         with self.captureOnCommitCallbacks(execute=True):
             # prevent Faker from putting people in Lake Susan
             person = PersonFactory.create(
@@ -580,6 +579,7 @@ class PeopleV3APISearchTest(
 
 
 class PeopleV4APISearchTest(
+    AuthenticatedClientMixin,
     PeopleSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
@@ -651,7 +651,6 @@ class PeopleV4APISearchTest(
 
     def test_results_api_empty_fields(self) -> None:
         """Confirm  empty fields values in V4 People Search API results."""
-
         mock_date = now().replace(day=15, hour=0)
         with (
             time_machine.travel(mock_date, tick=False),
@@ -702,9 +701,7 @@ class PeopleV4APISearchTest(
 
     @override_settings(PEOPLE_HITS_PER_RESULT=5)
     def test_match_positions_by_parent_and_child_field(self) -> None:
-        """Confirm positions can be matched properly by different combinations
-        of queries in V4 People Search API results."""
-
+        """Confirm positions can be matched properly by different combinations of queries in V4 People Search API results."""
         with self.captureOnCommitCallbacks(execute=True):
             person = PersonFactory.create(name_first="John American")
             PositionFactory.create(
@@ -799,12 +796,7 @@ class PeopleV4APISearchTest(
         person.delete()
 
     def test_verify_empty_lists_type_fields_after_partial_update(self):
-        """Verify that list fields related to foreign keys are returned as
-        empty lists after a partial update that removes the related instance
-        and empties the list field. Due to a bug in ES DSL partial updates
-        convert list fields to None. https://github.com/elastic/elasticsearch-dsl-py/issues/1819
-        At serialization time, we correct this value to maintain consistent
-        field type and return an empty list."""
+        """Verify that list fields related to foreign keys are returned as empty lists after a partial update that removes the related instance and empties the list field. Due to a bug in ES DSL partial updates convert list fields to None. https://github.com/elastic/elasticsearch-dsl-py/issues/1819 At serialization time, we correct this value to maintain consistent field type and return an empty list."""
         with self.captureOnCommitCallbacks(execute=True):
             person = PersonFactory.create(
                 name_first="John American",
@@ -917,8 +909,7 @@ class PeopleV4APISearchTest(
         )
 
     def test_people_specific_sorting_keys(self) -> None:
-        """Test if the dob and dod sorting keys work properly in
-        the V4 People Search API."""
+        """Test if the dob and dod sorting keys work properly in the V4 People Search API."""
         with self.captureOnCommitCallbacks(execute=True):
             person_4 = PersonFactory.create(
                 name_first="John",
@@ -1060,10 +1051,9 @@ class PeopleV4APISearchTest(
     @override_settings(SEARCH_API_PAGE_SIZE=3)
     def test_opinion_results_cursor_api_pagination(self) -> None:
         """Test cursor pagination for V4 People Search API."""
-
         created_persons = []
         persons_to_create = 7
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             person_4 = PersonFactory.create(
                 date_granularity_dob="%Y-%m-%d",
                 date_granularity_dod="%Y-%m-%d",
@@ -1222,7 +1212,6 @@ class PeopleV4APISearchTest(
 
     def test_people_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 People Search API."""
-
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "order_by": "score desc",
@@ -1261,7 +1250,7 @@ class PeopleV4APISearchTest(
 
 
 class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
-    """People search tests for Elasticsearch"""
+    """People search tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -1311,7 +1300,6 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
 
     def test_index_parent_and_child_objects(self) -> None:
         """Confirm Parent object and child objects are properly indexed."""
-
         # Judges are indexed.
         s = PersonDocument.search()
         s = s.query(Q("match", person_child="person"))
@@ -1328,10 +1316,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
             )
 
     def test_has_child_filters(self) -> None:
-        """Test the build_join_es_filters has child filter, it returns a
-        list of parent documents where their child's documents or the parent
-        document itself match the filter.
-        """
+        """Test the build_join_es_filters has child filter, it returns a list of parent documents where their child's documents or the parent document itself match the filter."""
         position_5 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             court=self.court_2,
@@ -1431,7 +1416,6 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
 
     def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
-
         params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
         # Frontend
         self._test_article_count(
@@ -1640,7 +1624,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(aba_ratings, self.aba_rating_1.get_rating_display())
 
     def test_merge_unavailable_fields_on_parent_document(self):
-        """Confirm unavailable ES fields are properly merged from DB in fronted"""
+        """Confirm unavailable ES fields are properly merged from DB in fronted."""
         params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": "name:Judith Sheindlin Olivia",
@@ -1670,7 +1654,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(predecessors, self.person_3.name_full_reverse)
 
         person = PersonFactory.create(name_first="John American")
-        position_5 = PositionFactory.create(
+        PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             court=self.court_1,
             date_start=datetime.date(2015, 12, 14),
@@ -1715,9 +1699,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
     def test_has_child_queries_combine_filters(
         self, mock_get_child_top_hits_limit
     ) -> None:
-        """Test confirm if we can combine multiple has child filter inner hits
-        into a single dict.
-        """
+        """Test confirm if we can combine multiple has child filter inner hits into a single dict."""
         cd = {
             "type": SEARCH_TYPES.PEOPLE,
             "appointer": "clinton",
@@ -1900,7 +1882,6 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
 
     def test_results_highlights(self) -> None:
         """Test highlighting for Judge results."""
-
         # name query highlights in text query.
         params = {
             "q": "Sheindlin Olivia",
@@ -1970,8 +1951,9 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Independent</mark>", r.content.decode())
 
     def test_frontend_judges_count(self) -> None:
-        """Assert Judges search results counts in the fronted. Below and
-        above the estimation threshold.
+        """Assert Judges search results counts in the fronted.
+
+        Below and above the estimation threshold.
         """
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
@@ -2001,7 +1983,7 @@ class PeopleSearchTestElasticSearch(PeopleTestCase, ESIndexTestCase, TestCase):
 class IndexJudgesPositionsCommandTest(
     PeopleTestCase, ESIndexTestCase, TestCase
 ):
-    """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
+    """test_cl_index_parent_and_child_docs_command tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2011,9 +1993,7 @@ class IndexJudgesPositionsCommandTest(
         cls.create_index("people_db.Person")
 
     def test_cl_index_parent_and_child_docs_command(self):
-        """Confirm the command can properly index Judges and their positions
-        into the ES."""
-
+        """Confirm the command can properly index Judges and their positions into the ES."""
         s = PersonDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
 
@@ -2156,10 +2136,7 @@ class PeopleIndexingTest(
         )
 
     def test_index_all_person_positions(self) -> None:
-        """Confirm we can index all the person positions in ES after a
-        judiciary position is created for the person.
-        """
-
+        """Confirm we can index all the person positions in ES after a judiciary position is created for the person."""
         person = PersonFactory.create(
             gender="f",
             name_first="Ava",
@@ -2281,9 +2258,7 @@ class PeopleIndexingTest(
         person.delete()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
-        """Confirm join child objects are removed from the index when the
-        parent objects is deleted.
-        """
+        """Confirm join child objects are removed from the index when the parent objects is deleted."""
         person = PersonFactory.create(name_first="John Deer")
         pos_1 = PositionFactory.create(
             person=person,
@@ -2332,10 +2307,7 @@ class PeopleIndexingTest(
         )
 
     def test_remove_nested_objects_from_index(self) -> None:
-        """Confirm that child objects are removed from the index when they are
-        deleted independently of their parent object
-        """
-
+        """Confirm that child objects are removed from the index when they are deleted independently of their parent object."""
         person = PersonFactory.create(name_first="John Deer")
         pos_1 = PositionFactory.create(
             person=person,
@@ -2669,10 +2641,7 @@ class PeopleIndexingTest(
         self.assertEqual([], pos_doc.aba_rating)
 
     def test_person_indexing_and_tasks_count(self) -> None:
-        """Confirm a Person is properly indexed in ES with the right number of
-        indexing tasks.
-        """
-
+        """Confirm a Person is properly indexed in ES with the right number of indexing tasks."""
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(

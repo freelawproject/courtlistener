@@ -1,6 +1,35 @@
 
 # Tests should be removed from the exclusions eventually, but for now they're just noise
-project-excludes = ["**/migrations/**", "**/tests.py", "**/tests/**", "tests/**"]
+project-excludes = [
+  "**/migrations/**",
+  "**/tests/**",
+  "tests/**",
+  "cl/ai/**/tests.py",
+  "cl/alerts/**/tests.py",
+  "cl/api/**/tests.py",
+  "cl/audio/**/tests.py",
+  "cl/citations/**/tests.py",
+  "cl/corpus_importer/tests.py",
+  "cl/custom_filters/**/tests.py",
+  "cl/disclosures/**/tests.py",
+  "cl/donate/**/tests.py",
+  "cl/favorites/**/tests.py",
+  "cl/lasc/**/tests.py",
+  "cl/lib/**/tests.py",
+  "cl/oauth/**/tests.py",
+  "cl/opinion_page/**/tests.py",
+  "cl/people_db/**/tests.py",
+  "cl/recap/**/tests.py",
+  "cl/recap_rss/**/tests.py",
+  "cl/scrapers/**/tests.py",
+  "cl/search/**/tests.py",
+  "cl/simple_pages/**/tests.py",
+  "cl/sitemaps_infinite/**/tests.py",
+  "cl/sso/**/tests.py",
+  "cl/stats/**/tests.py",
+  "cl/users/**/tests.py",
+  "cl/visualizations/**/tests.py"
+]
 # Honor `# type: ignore` comments.
 permissive-ignores = true
 # Pre-existing errors are grandfathered here; only new errors fail the check.
@@ -13,3 +42,4 @@ infer-return-types = "checked"
 [errors]
 non-exhaustive-match = "error"
 non-exhaustive-match-open-type = "warn" # Beneficial, but there are ~10 violations and this is a low priority
+redundant-condition = "error" # move to `warn` if `min-severity` ever decreases to `warn`

@@ -222,7 +222,7 @@ class OpinionClusterWithChildrenFactory(OpinionClusterFactory):
 
 
 class OpinionClusterWithParentsFactory(OpinionClusterFactory):
-    """Make an OpinionCluster with Docket parents"""
+    """Make an OpinionCluster with Docket parents."""
 
     docket = SubFactory(
         DocketFactory,
@@ -241,7 +241,7 @@ class OpinionClusterWithChildrenAndParentsFactory(
 class OpinionClusterWithMultipleOpinionsFactory(
     OpinionClusterWithParentsFactory
 ):
-    """Make an OpinionCluster with Docket parent and multiple opinions"""
+    """Make an OpinionCluster with Docket parent and multiple opinions."""
 
     class Meta:
         skip_postgeneration_save = True
@@ -284,10 +284,7 @@ class RECAPDocumentFactory(DjangoModelFactory):
 
     @classmethod
     def _generate(cls, strategy, params):
-        """
-        If document_number is specified, also set the DocketEntry's
-        entry_number.
-        """
+        """If document_number is specified, also set the DocketEntry's entry_number."""
         if params.get("document_number", ""):
             params["docket_entry__entry_number"] = params["document_number"]
         return super()._generate(strategy, params)
@@ -301,11 +298,7 @@ class RECAPDocumentFactory(DjangoModelFactory):
 
     @classmethod
     def _fixup(cls, obj):
-        """
-        If the document has a DocketEntry that is part of a Docket and it
-        doesn't have an entry_number, set it to the highest entry in the docket
-        and then set the document_number to match.
-        """
+        """If the document has a DocketEntry that is part of a Docket and it doesn't have an entry_number, set it to the highest entry in the docket and then set the document_number to match."""
         if (
             not obj.document_number
             and (de := obj.docket_entry)
@@ -328,10 +321,7 @@ class RECAPAttachmentFactory(RECAPDocumentFactory):
 
     @classmethod
     def _fixup(cls, obj):
-        """
-        If an attachment_number wasn't specified, then set it to the highest
-        for the docket entry.
-        """
+        """If an attachment_number wasn't specified, then set it to the highest for the docket entry."""
         super()._fixup(obj)
         if not obj.attachment_number and (de := obj.docket_entry):
             obj.attachment_number = 1
@@ -349,7 +339,7 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
-        """Override default docket"""
+        """Override default docket."""
         docket_id = kwargs.pop("parent_id", None)
         if not docket_id:
             return None
@@ -361,7 +351,7 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
 
 
 class DocketEntryReuseParentsFactory(DocketEntryFactory):
-    """Make a DocketEntry using existing Dockets as parents"""
+    """Make a DocketEntry using existing Dockets as parents."""
 
     docket = Iterator(Docket.objects.all())
 
@@ -374,7 +364,7 @@ class DocketWithChildrenFactory(DocketFactory):
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
-    """Make a OpinionCited with Opinion parents"""
+    """Make a OpinionCited with Opinion parents."""
 
     class Meta:
         model = OpinionsCited
@@ -435,7 +425,7 @@ class ScotusDocketMetadataFactory(DjangoModelFactory):
 
 
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
-    """Make a OpinionsCitedByRECAPDocument with parents"""
+    """Make a OpinionsCitedByRECAPDocument with parents."""
 
     class Meta:
         model = OpinionsCitedByRECAPDocument

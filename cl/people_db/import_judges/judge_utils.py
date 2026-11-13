@@ -1,5 +1,4 @@
-"""
-Created on Wed Feb 17 12:31:34 2016
+"""Created on Wed Feb 17 12:31:34 2016.
 
 @author: elliott
 """
@@ -17,7 +16,7 @@ from cl.people_db.models import (
 
 
 def process_date(year, month, day):
-    """return date object and accompanying granularity"""
+    """Return date object and accompanying granularity."""
     if not year or year in ["n/a", "N/A", "present"]:
         pdate = None
         granularity = ""
@@ -34,7 +33,7 @@ def process_date(year, month, day):
 
 
 def process_date_string(date_input):
-    """Return date as YYYY-MM-DD"""
+    """Return date as YYYY-MM-DD."""
     if not date_input:
         return None
     date_object = datetime.strptime(date_input, "%Y-%m-%d")
@@ -45,9 +44,7 @@ C = Counter()  # for fixing school names.
 
 
 def get_school(schoolname, testing=False):
-    """Takes the name of a school from judges data and tries to match to a
-    unique School object."""
-
+    """Takes the name of a school from judges data and tries to match to a unique School object."""
     if schoolname.isspace():
         return None
 
@@ -276,13 +273,6 @@ def get_aba(abastr):
 
 
 def get_select(state, year):
-    select_dict = {
-        "P": "e_part",
-        "NP": "e_non_part",
-        "G": "a_gov",
-        "L": "a_legis",
-        "M": "a_gov",
-    }
     return "P"
 
 

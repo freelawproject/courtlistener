@@ -13,17 +13,16 @@ from cl.search.models import Opinion, OpinionCluster
 
 
 def sort_harvard_opinions(options: dict) -> None:
-    """Sort harvard opinions
+    """Sort harvard opinions.
 
     We assume that harvard data is already ordered, we just need to fill
     the order field in each opinion
 
     The harvard importer created the opinions in order of appearance in the file
 
-    :param options: dict of arguments passed to the command
-    :return: None
+    Args:
+        options: dict of arguments passed to the command
     """
-
     skip_until = options.get("skip_until", None)
     limit = options.get("limit", None)
 
@@ -87,10 +86,13 @@ def sort_harvard_opinions(options: dict) -> None:
 
 
 def fetch_cleaned_columbia_text(filepath: str) -> str:
-    """Get cleaned columbia content to compare opinions against
+    """Get cleaned columbia content to compare opinions against.
 
-    :param filepath: the filepath
-    :return: the opinion text cleaned up
+    Args:
+        filepath: the filepath
+
+    Returns:
+        the opinion text cleaned up
     """
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
@@ -109,8 +111,11 @@ def generate_ngrams(words: list[str]) -> list[list[str]]:
 
     Default to a 5 word n-gram unless opinion is very small
 
-    :param words: a list of words obtained splitting the opinion
-    :return: n-grams
+    Args:
+        words: a list of words obtained splitting the opinion
+
+    Returns:
+        n-grams
     """
     width = 5
     if len(words) <= 5:
@@ -121,15 +126,18 @@ def generate_ngrams(words: list[str]) -> list[list[str]]:
 
 
 def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
-    """Identify a unique set of text in opinions to identify order of opinions
+    """Identify a unique set of text in opinions to identify order of opinions.
 
     In a small subset of opinions, duplicate text or bad data fails and assign the
     end of the index. These opinions are usually short dissents that we add to be the
     back of the order.
 
-    :param opinions: Opinions to sort
-    :param xml_dir: Path to directory of the xml files
-    :return: Ordered opinion list
+    Args:
+        opinions: Opinions to sort
+        xml_dir: Path to directory of the xml files
+
+    Returns:
+        Ordered opinion list
     """
     _, _, _, local_path = opinions[0]
     filepath = local_path.replace("/home/mlissner/columbia/opinions", xml_dir)
@@ -158,10 +166,10 @@ def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
 
 
 def sort_columbia_opinions(options: dict) -> None:
-    """Update opinion ordering for columbia clusters
+    """Update opinion ordering for columbia clusters.
 
-    :param options: dict of arguments passed to the command
-    :return: None
+    Args:
+        options: dict of arguments passed to the command
     """
     xml_dir = options["xml_dir"]
     skip_until = options.get("skip_until", None)
@@ -226,7 +234,7 @@ class Command(VerboseCommand):
     help = "Add ordering Key for sub opinions"
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:

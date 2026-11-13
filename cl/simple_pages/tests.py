@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,7 @@ from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -186,8 +188,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     async def test_spam_message_is_rejected(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Do we reject it if people put a phone number in the phone_number
-        field?
+        """Do we reject it if people put a phone number in the phone_number field?
 
         We should! The phone_number field is labeled as the Subject field in the
         UI. Anything putting a phone number in here is a bot to be rejected.
@@ -287,7 +288,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
 
 class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
-        """Make sure a page has a valid HTML title"""
+        """Make sure a page has a valid HTML title."""
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -304,9 +305,12 @@ class PageLoadTestMixin(TestCase):
     async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
-        :param reverse_param: Params that can be sent to Django's reverse
-        function to get a URL path.
-        :return: The response object.
+        Args:
+            reverse_param: Params that can be sent to Django's reverse
+                function to get a URL path.
+
+        Returns:
+            The response object.
         """
         path = reverse(**reverse_param)
         r = await self.async_client.get(path)
@@ -399,6 +403,9 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     Adding a page here is part of the definition of done for a
     redesigned template. The homepage is excluded — it has dedicated
     tests in cl/search/tests/test_v2_pages.py.
+
+    Unfinished pages go in WIP_PAGES instead, and move to V2_PAGES when
+    their template is promoted from the WIP prefix to v2_.
     """
 
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
@@ -410,6 +417,14 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
+    # (reverse_param, expected WIP template)
+    WIP_PAGES: list[tuple[dict[str, Any], str]] = []
+
+    # WIP pages that redirect anonymous visitors to sign in
+    AUTHENTICATED_WIP_PAGES: list[tuple[dict[str, Any], str]] = [
+        ({"viewname": "view_api"}, "wip_profile/api.html"),
+    ]
+
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
         """Returns the legacy template a v2 one replaces, None otherwise."""
@@ -419,6 +434,34 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             return legacy
         except TemplateDoesNotExist:
             return None
+
+    @staticmethod
+    def _get_wip_fallback(wip_template: str) -> str | None:
+        """Returns the template a WIP page shows without the WIP flag.
+
+        Mirrors the middleware: the page's v2_ template when it has one,
+        otherwise its legacy one. None means it has neither and is a 404.
+        """
+        name = wip_template.removeprefix(WIP_PROPS["prefix"])
+        for candidate in (f"v2_{name}", name):
+            try:
+                get_template(candidate)
+                return candidate
+            except TemplateDoesNotExist:
+                continue
+        return None
+
+    def _iter_wip_pages(self) -> Iterator[tuple[dict[str, Any], str]]:
+        """Yields every registered WIP page, anonymous ones first.
+
+        Logs self.client in before yielding AUTHENTICATED_WIP_PAGES, so
+        callers must request each page with self.client as they iterate.
+        """
+        yield from self.WIP_PAGES
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        yield from self.AUTHENTICATED_WIP_PAGES
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -446,6 +489,36 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
 
+    @override_flag(WIP_PROPS["flag"], active=True)
+    def test_wip_pages(self) -> None:
+        """Do all registered WIP pages load with both redesign flags?"""
+        for reverse_param, wip_template in self._iter_wip_pages():
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, wip_template)
+
+    @override_flag(WIP_PROPS["flag"], active=False)
+    def test_wip_pages_without_the_wip_flag(self) -> None:
+        """Do registered WIP pages stay hidden with only use_new_design?
+
+        Each one falls back to its v2_ template, then its legacy one, or is
+        a 404 when the page has neither.
+        """
+        for reverse_param, wip_template in self._iter_wip_pages():
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                fallback = self._get_wip_fallback(wip_template)
+                if fallback is None:
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    continue
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, fallback)
+
 
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
@@ -458,8 +531,7 @@ class NewBaseViewCountTest(TestCase):
     """
 
     async def test_untracked_page_sends_no_view_count(self) -> None:
-        """A v2 page whose view is not decorated carries no label, no endpoint
-        and no store, so the browser makes no request."""
+        """A v2 page whose view is not decorated carries no label, no endpoint and no store, so the browser makes no request."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertTemplateUsed(r, "new_base.html")
         html = r.content.decode()
@@ -467,6 +539,35 @@ class NewBaseViewCountTest(TestCase):
         self.assertIsNone(body.get("data-view-count-label"))
         self.assertIsNone(body.get("data-view-count-url"))
         self.assertNotIn("view_count.js", html)
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_new_base_recap_waffle")
+class NewBaseRecapDetectionTest(TestCase):
+    """new_base.html loads the RECAP extension detector and reflects its cookie.
+
+    The class on <html> is what the stylesheet keys on to hide RECAP pleas;
+    rendering it from the cookie keeps later page loads from flashing them.
+    """
+
+    async def test_detector_is_loaded_on_every_page(self) -> None:
+        """A v2 page requires the detector whether or not the cookie is set."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertTemplateUsed(r, "new_base.html")
+        self.assertIn("recap_detection.js", r.content.decode())
+
+    async def test_html_class_follows_the_cookie(self) -> None:
+        """<html> carries recap-installed only when the cookie is present."""
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertNotIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
+
+        self.async_client.cookies["recap_installed"] = "true"
+        r = await self.async_client.get(reverse("help_home"))
+        self.assertIn(
+            "recap-installed", fromstring(r.content.decode()).get("class", "")
+        )
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)

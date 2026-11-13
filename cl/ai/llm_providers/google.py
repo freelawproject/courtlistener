@@ -95,8 +95,7 @@ class _ResponseValidator:
 
     @staticmethod
     def normalize_response(result: dict) -> dict:
-        """
-        Normalize batch or single response to consistent format.
+        """Normalize batch or single response to consistent format.
 
         Batch responses wrap the actual response in a "response" field:
         {"key": "...", "response": {"candidates": [...]}}
@@ -106,8 +105,11 @@ class _ResponseValidator:
 
         This method extracts the inner response for consistent parsing.
 
-        :param result: Response dict from Google GenAI API
-        :return: The normalized response dict (without batch wrapper)
+        Args:
+            result: Response dict from Google GenAI API
+
+        Returns:
+            The normalized response dict (without batch wrapper)
         """
         if "response" in result:
             # Batch response - unwrap it
@@ -117,13 +119,15 @@ class _ResponseValidator:
 
     @staticmethod
     def get_text(result: dict) -> str | None:
-        """
-        Extracts the text content from a successful result.
+        """Extracts the text content from a successful result.
 
         Works with both batch and single API responses.
 
-        :param result: A dict from Google GenAI API (batch or single)
-        :return: The extracted text, or None if not found.
+        Args:
+            result: A dict from Google GenAI API (batch or single)
+
+        Returns:
+            The extracted text, or None if not found.
         """
         try:
             normalized = _ResponseValidator.normalize_response(result)
@@ -133,13 +137,15 @@ class _ResponseValidator:
 
     @staticmethod
     def get_error(result: dict) -> str | None:
-        """
-        Extracts the error message from a failed result.
+        """Extracts the error message from a failed result.
 
         Works with both batch and single API responses.
 
-        :param result: A dict from Google GenAI API (batch or single)
-        :return: A formatted error string, or a default error message.
+        Args:
+            result: A dict from Google GenAI API (batch or single)
+
+        Returns:
+            A formatted error string, or a default error message.
         """
         if "error" in result:
             error = result["error"]
@@ -148,20 +154,20 @@ class _ResponseValidator:
 
 
 class GoogleGenAIBatchWrapper:
-    """
-    A stateless wrapper for Google GenAI batch operations, decoupled from Django.
-    """
+    """A stateless wrapper for Google GenAI batch operations, decoupled from Django."""
 
     def __init__(self, api_key: str, model_name: str | None = None):
-        """
-        Initializes the Google GenAI client.
+        """Initializes the Google GenAI client.
 
-        :param api_key: The Google API key (required, no fallback).
-        :param model_name: Optional model name. When provided, it is
-            validated and stored for later use by ``execute_batch`` and
-            ``get_or_create_cache``.
-        :raises ValueError: If the API key is not provided or the model
-            is invalid.
+        Args:
+            api_key: The Google API key (required, no fallback).
+            model_name: Optional model name. When provided, it is
+                validated and stored for later use by ``execute_batch`` and
+                ``get_or_create_cache``.
+
+        Raises:
+            ValueError: If the API key is not provided or the model
+                is invalid.
         """
         if not api_key:
             raise ValueError("API key is required for GoogleGenAIBatchWrapper")
@@ -178,9 +184,12 @@ class GoogleGenAIBatchWrapper:
         Logs a warning when the model has no announced shutdown date,
         prompting the caller to verify manually.
 
-        :param model: The Gemini model name to validate.
-        :raises ValueError: If the model is not supported or past its
-            shutdown date.
+        Args:
+            model: The Gemini model name to validate.
+
+        Raises:
+            ValueError: If the model is not supported or past its
+                shutdown date.
         """
         if model not in SUPPORTED_GEMINI_MODELS:
             raise ValueError(
@@ -209,16 +218,20 @@ class GoogleGenAIBatchWrapper:
         cache_display_name: str,
         cache_ttl: str = "3600s",
     ) -> str:
-        """
-        Retrieves an existing cache by display name, or creates a new one.
+        """Retrieves an existing cache by display name, or creates a new one.
 
         Requires ``model_name`` to have been set at construction time.
 
-        :param system_prompt: The system prompt text to cache.
-        :param cache_display_name: The human-readable name for the cache.
-        :param cache_ttl: TTL for cache
-        :return: The full resource name of the valid cache.
-        :raises ValueError: If ``model_name`` was not provided at init.
+        Args:
+            system_prompt: The system prompt text to cache.
+            cache_display_name: The human-readable name for the cache.
+            cache_ttl: TTL for cache
+
+        Returns:
+            The full resource name of the valid cache.
+
+        Raises:
+            ValueError: If ``model_name`` was not provided at init.
         """
         if not self.model_name:
             raise ValueError(
@@ -248,15 +261,17 @@ class GoogleGenAIBatchWrapper:
     def prepare_batch_requests(
         self, tasks_data: list[BatchTask], user_prompt: str
     ) -> list[BatchRequest]:
-        """
-        Prepares batch input lines for a batch job from task data.
+        """Prepares batch input lines for a batch job from task data.
 
         For each task, it uploads its input file (if provided) to the Google
         File Service and constructs the request payload.
 
-        :param tasks_data: The tasks to build requests for.
-        :param user_prompt: The user prompt text to be appended to each request.
-        :return: A list of batch requests ready for JSONL formatting.
+        Args:
+            tasks_data: The tasks to build requests for.
+            user_prompt: The user prompt text to be appended to each request.
+
+        Returns:
+            A list of batch requests ready for JSONL formatting.
         """
         batch_requests: list[BatchRequest] = []
         for task_data in tasks_data:
@@ -304,18 +319,24 @@ class GoogleGenAIBatchWrapper:
         cache_display_name: str | None = "cl-default-cache",
         batch_display_name: str | None = "CourtListener Batch Job",
     ) -> str:
-        """
-        Creates and executes a batch job with Google GenAI. If a system prompt
-        is provided, it will be cached and applied to all requests in the batch.
+        """Creates and executes a batch job with Google GenAI.
+
+        If a system prompt is provided, it will be cached and applied to all
+        requests in the batch.
 
         Requires ``model_name`` to have been set at construction time.
 
-        :param requests: Batch requests from ``prepare_batch_requests``.
-        :param system_prompt: The system prompt text to use for this batch.
-        :param cache_display_name: An optional, stable name for the system prompt cache.
-        :param batch_display_name: An optional display name for the job in the Google Cloud console.
-        :return: The unique name (ID) of the created batch job.
-        :raises ValueError: If ``model_name`` was not provided at init.
+        Args:
+            requests: Batch requests from ``prepare_batch_requests``.
+            system_prompt: The system prompt text to use for this batch.
+            cache_display_name: An optional, stable name for the system prompt cache.
+            batch_display_name: An optional display name for the job in the Google Cloud console.
+
+        Returns:
+            The unique name (ID) of the created batch job.
+
+        Raises:
+            ValueError: If ``model_name`` was not provided at init.
         """
         if not self.model_name:
             raise ValueError(
@@ -356,21 +377,27 @@ class GoogleGenAIBatchWrapper:
         return job.name
 
     def get_job(self, batch_id: str) -> types.BatchJob:
-        """
-        Retrieves the full BatchJob object, including its status, from Google.
+        """Retrieves the full BatchJob object, including its status, from Google.
 
-        :param batch_id: The unique name (ID) of the batch job.
-        :return: The Google GenAI BatchJob object.
+        Args:
+            batch_id: The unique name (ID) of the batch job.
+
+        Returns:
+            The Google GenAI BatchJob object.
         """
         return self.client.batches.get(name=batch_id)
 
     def download_results(self, job: types.BatchJob) -> str:
-        """
-        Downloads the result file of a completed job and returns its raw content.
+        """Downloads the result file of a completed job and returns its raw content.
 
-        :param job: A completed Google GenAI BatchJob object.
-        :return: The raw JSONL content of the result file as a string.
-        :raises ValueError: If the job has not succeeded.
+        Args:
+            job: A completed Google GenAI BatchJob object.
+
+        Returns:
+            The raw JSONL content of the result file as a string.
+
+        Raises:
+            ValueError: If the job has not succeeded.
         """
         if job.state not in DOWNLOADABLE_JOB_STATES:
             raise ValueError(
@@ -383,37 +410,37 @@ class GoogleGenAIBatchWrapper:
         )
 
     def process_results(self, jsonl_content: str) -> list[ProcessedResult]:
-        """
-        Parses a raw JSONL result string and validates each line item.
+        """Parses a raw JSONL result string and validates each line item.
 
-        :param jsonl_content: The raw JSONL content from a completed batch job.
-        :return: A list of structured dictionaries, one for each task result,
+        Args:
+            jsonl_content: The raw JSONL content from a completed batch job.
+
+        Returns:
+            A list of structured dictionaries, one for each task result,
                  containing the key, status, content, and any error messages.
         """
         if not jsonl_content or not jsonl_content.strip():
             return []
 
-        processed_results = []
         results = [
             json.loads(line)
             for line in jsonl_content.splitlines()
             if line.strip()
         ]
 
-        for result in results:
+        def process_result(result: dict) -> ProcessedResult:
             key = result.get("key")
             text = _ResponseValidator.get_text(result)
 
             status = "SUCCEEDED" if text else "FAILED"
-            processed_results.append(
-                {
-                    "key": key,
-                    "status": status,
-                    "content": text,
-                    "error_message": None
-                    if status == "SUCCEEDED"
-                    else _ResponseValidator.get_error(result),
-                    "raw_result": result,
-                }
-            )
-        return processed_results
+            return {
+                "key": key,
+                "status": status,
+                "content": text,
+                "error_message": None
+                if status == "SUCCEEDED"
+                else _ResponseValidator.get_error(result),
+                "raw_result": result,
+            }
+
+        return [process_result(result) for result in results]

@@ -2,12 +2,12 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Callable, Generator, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, Mock, call, patch
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -32,14 +32,9 @@ from cl.corpus_importer.state.loader import (
     WaitOutcome,
 )
 from cl.corpus_importer.state.merger import (
-    Attribute,
-    ManyStrategy,
-    ManyToManyRelation,
+    Constant,
     Merger,
-    OneToManyRelation,
-    OneToOneRelation,
-    RelatedParams,
-    ThroughParameters,
+    Scrape,
 )
 from cl.corpus_importer.state.preflight import (
     STANDARD_CHECKS,
@@ -71,16 +66,11 @@ from cl.lib.indexing_utils import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import AWSMediaStorage
-from cl.people_db.factories import PersonFactory
-from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import CourtFactory
 from cl.search.models import (
     Court,
     Docket,
-    DocketEntry,
-    OriginatingCourtInformation,
-    TrialCourtData,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
@@ -110,7 +100,7 @@ def merger_test[**P, R](
                 # Skip savepoint bookkeeping from transaction.atomic(); it only
                 # appears because tests already run inside a transaction.
                 if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
-                    if merge_depth:
+                    if merge_depth:  # pyrefly:ignore[redundant-condition] See https://github.com/meta/pyrefly/issues/5563
                         counts["merger"] += 1
                         merger_sql.append(sql)
                     else:
@@ -127,13 +117,13 @@ def merger_test[**P, R](
                     # It's okay if the query count is below the expect amount, but we still assert it isn't to force
                     # the expectation to be updated whenever performance is improved.
                     if isinstance(expected_query_count, int):
-                        cast(TestCase, args[0]).assertEqual(
+                        args[0].assertEqual(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be equal to expectation.",
                         )
                     elif isinstance(expected_query_count, range):
-                        cast(TestCase, args[0]).assertIn(
+                        args[0].assertIn(
                             counts["merger"],
                             expected_query_count,
                             "Merger query count should be in expected range.",
@@ -146,761 +136,17 @@ def merger_test[**P, R](
     return decorator
 
 
-class BaseMergerTest(TestCase):
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.court = CourtFactory.create()
-        cls.docket = DocketFactory.create()
-
-    @merger_test(expected_query_count=1)
-    def test_merger_creates_object(self) -> None:
-        start_count = Docket.objects.count()
-
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default="ABCDEFG")
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        r = TestMerger({}, params=None).merge()
-
-        self.assertEqual(
-            Docket.objects.count(),
-            start_count + 1,
-            "Docket should be created when it doesn't exist.",
-        )
-        self.assertEqual(r.success, True, "Merger should signal success.")
-        self.assertEqual(
-            r.create, True, "Merger should signal object was created."
-        )
-        self.assertEqual(
-            r.update, False, "Merger should not signal object was updated."
-        )
-        self.assertEqual(
-            ["Docket"], list(r.creates), "Merger should only create a Docket."
-        )
-        self.assertEqual(
-            len(r.creates["Docket"]),
-            1,
-            "Exactly one Docket should be created.",
-        )
-        created_docket = Docket.objects.get(pk=r.creates["Docket"].pop())
-        self.assertEqual(created_docket.docket_number, "ABCDEFG")
-        self.assertEqual(created_docket.court_id, self.court.id)
-        self.assertEqual(created_docket.source, DocketSources.SCRAPER)
-
-    @merger_test(expected_query_count=2)
-    def test_merger_updates_docket(self) -> None:
-        tc = self
-        dn = self.docket.docket_number
-        new_dn = dn + "New"
-        start_docket_count = Docket.objects.count()
-
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court_id: Court = Attribute(default=self.court.id)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default=new_dn)
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        r = TestMerger({}, params=None).merge()
-
-        self.assertEqual(
-            Docket.objects.count(),
-            start_docket_count,
-            "Docket should not be created when it exists.",
-        )
-        self.assertEqual(r.success, True, "Merger should signal success.")
-        self.assertEqual(
-            r.create, False, "Merger should not signal object was created."
-        )
-        self.assertEqual(
-            r.update, True, "Merger should signal object was updated."
-        )
-        self.assertEqual(
-            ["Docket"], list(r.updates), "Merger should only update a Docket."
-        )
-        self.assertEqual(
-            len(r.updates["Docket"]),
-            1,
-            "Exactly one Docket should be updated.",
-        )
-        updated_pk = r.updates["Docket"].pop()
-        self.assertEqual(
-            updated_pk, self.docket.pk, "The correct Docket should be updated."
-        )
-        self.docket.refresh_from_db()
-        self.assertEqual(
-            self.docket.docket_number,
-            new_dn,
-            "The correct Docket should be updated.",
-        )
-        self.assertEqual(
-            self.docket.source,
-            DocketSources.SCRAPER,
-        )
-        self.assertEqual(
-            self.docket.court_id,
-            self.court.id,
-        )
-
-    @merger_test(expected_query_count=1)
-    def test_mappings_called(self) -> None:
-        map_calls = 0
-        dn = "ABCDEFG"
-
-        def test_mapping(i: dict[str, str], params) -> str:
-            nonlocal map_calls
-            map_calls += 1
-            return dn
-
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(test_mapping)
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        r = TestMerger({}, params=None).merge()
-        self.assertEqual(map_calls, 1)
-        docket = Docket.objects.get(pk=r.creates["Docket"].pop())
-        self.assertEqual(docket.docket_number, dn)
-
-    @merger_test(expected_query_count=3)
-    def test_related_mergers_1to1(self) -> None:
-        class TestRelatedMerger(
-            Merger[
-                dict[str, str],
-                RelatedParams[None],
-                OriginatingCourtInformation,
-            ]
-        ):
-            model: ClassVar[type[Model]] = OriginatingCourtInformation
-
-            docket_number: str = Attribute(lambda d, params: d["sr"])
-
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> OriginatingCourtInformation | None:
-                return None
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                default=self.docket.docket_number + "New"
-            )
-            originating_court_information: OriginatingCourtInformation = (
-                OneToOneRelation(
-                    TestRelatedMerger,
-                    lambda d, params: d["mctest"],
-                )
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        i = {"mctest": {"sr": "test"}}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertIn("OriginatingCourtInformation", result.creates)
-        self.assertEqual(len(result.creates["OriginatingCourtInformation"]), 1)
-        oci_pk = result.creates["OriginatingCourtInformation"].pop()
-        oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
-        self.assertEqual(oci.docket_number, i["mctest"]["sr"])
-        self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
-
-    @merger_test(expected_query_count=6)
-    def test_related_mergers_reverse_1to1_creates(self) -> None:
-        """Does a reverse one-to-one relation, where the OneToOneField lives on
-        the child, create the child pointing at the parent? The child merger
-        does not declare the foreign key; the relation sets it."""
-        tc = self
-
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], TrialCourtData]
-        ):
-            model: ClassVar[type[Model]] = TrialCourtData
-
-            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            trialcourtdata: TrialCourtData = OneToOneRelation(
-                TestRelatedMerger, lambda d, params: d["trial"]
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        result = TestMerger({"trial": {"dn": "CR-123"}}, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.assertIn("TrialCourtData", result.creates)
-        self.docket.refresh_from_db()
-        self.assertEqual(
-            self.docket.trialcourtdata.docket_number_trial, "CR-123"
-        )
-
-    @merger_test(expected_query_count=5)
-    def test_related_mergers_reverse_1to1_updates(self) -> None:
-        """Does a reverse one-to-one relation update the row the parent already
-        has instead of creating a second one?"""
-        existing = TrialCourtData.objects.create(
-            docket=self.docket, docket_number_trial="CR-000"
-        )
-        tc = self
-
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], TrialCourtData]
-        ):
-            model: ClassVar[type[Model]] = TrialCourtData
-
-            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            trialcourtdata: TrialCourtData = OneToOneRelation(
-                TestRelatedMerger, lambda d, params: d["trial"]
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        result = TestMerger({"trial": {"dn": "CR-999"}}, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.assertNotIn("TrialCourtData", result.creates)
-        self.assertEqual(TrialCourtData.objects.count(), 1)
-        existing.refresh_from_db()
-        self.assertEqual(existing.docket_number_trial, "CR-999")
-
-    def test_one_to_one_relation_must_be_a_one_to_one_field(self) -> None:
-        """A one-to-one spec reads its direction off the model, so the field it
-        names has to be one-to-one in the first place. Is a spec pointed at
-        anything else refused when the merger is defined?"""
-
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], DocketEntry]
-        ):
-            model: ClassVar[type[Model]] = DocketEntry
-
-            description: str = Attribute(lambda d, params: d["df"])
-
-        with self.assertRaises(TypeError):
-
-            class TestMerger(Merger[dict[str, Any], None, Docket]):
-                model: ClassVar[type[Model]] = Docket
-
-                docket_entries: list[DocketEntry] = OneToOneRelation(
-                    TestRelatedMerger
-                )
-
-    @merger_test(expected_query_count=5)
-    def test_related_mergers_child(self) -> None:
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], DocketEntry]
-        ):
-            model: ClassVar[type[Model]] = DocketEntry
-
-            description: str = Attribute(lambda d, params: d["df"])
-
-            def query(self) -> QuerySet[DocketEntry]:
-                return DocketEntry.objects.none()
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                default=self.docket.docket_number + "New"
-            )
-            docket_entries: list[DocketEntry] = OneToManyRelation(
-                TestRelatedMerger,
-                lambda d, params: d["mctest"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        i = {
-            "mctest": [
-                {"df": "test1"},
-                {"df": "test2"},
-                {"df": "test3"},
-            ]
-        }
-        result = TestMerger(i, params=None).merge()
-
-        self.assertIn("DocketEntry", result.creates)
-        self.assertEqual(len(result.creates["DocketEntry"]), 3)
-        des = list(
-            DocketEntry.objects.filter(pk__in=result.creates["DocketEntry"])
-        )
-        self.assertEqual(len(des), 3)
-        self.assertEqual(
-            set(de.description for de in des),
-            set(mctest["df"] for mctest in i["mctest"]),
-        )
-        self.assertEqual(
-            set(de.docket.pk for de in des), set(result.creates["Docket"])
-        )
-
-    @merger_test(expected_query_count=9)
-    def test_related_mergers_m2m_simple(self) -> None:
-        """Does a plain (no-through) many-to-many relation create the targets
-        and link them to the parent? Uses batched candidate lookups so the
-        bulk-linking path is exercised."""
-
-        class TestPersonMerger(
-            Merger[dict[str, str], RelatedParams[None], Person]
-        ):
-            model: ClassVar[type[Model]] = Person
-
-            name_first: str = Attribute(lambda d, params: d["first"])
-            name_last: str = Attribute(lambda d, params: d["last"])
-            slug: str = Attribute(lambda d, params: d["slug"])
-            key = ["slug"]
-
-            @classmethod
-            def candidates(
-                cls, parent: Model, params: RelatedParams[None]
-            ) -> QuerySet[Person]:
-                return Person.objects.filter(empanelled_dockets=parent)
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default="M2M-SIMPLE")
-            panel: list[Person] = ManyToManyRelation(
-                TestPersonMerger,
-                transform=lambda d, params: d["panel"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        i = {
-            "panel": [
-                {"first": "Jane", "last": "Doe", "slug": "jane-doe-m2m"},
-                {"first": "John", "last": "Roe", "slug": "john-roe-m2m"},
-            ]
-        }
-        result = TestMerger(i, params=None).merge()
-
-        self.assertIn("Person", result.creates)
-        self.assertEqual(len(result.creates["Person"]), 2)
-        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
-        self.assertEqual(
-            set(docket.panel.values_list("name_last", flat=True)),
-            {"Doe", "Roe"},
-        )
-
-    @merger_test(expected_query_count=9)
-    def test_related_mergers_m2m_through(self) -> None:
-        """Does a many-to-many relation with a `through` model create the
-        targets, link them to the parent, and populate the through row's own
-        fields from the same scrape?"""
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            model: ClassVar[type[Model]] = Party
-            key: ClassVar[Iterable[str]] = ["name"]
-
-            name: str = Attribute(lambda d, params: d["name"])
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            model: ClassVar[type[Model]] = PartyType
-            key: ClassVar[Iterable[str]] = ["name"]
-
-            name: str = Attribute(lambda d, params: d["type"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default="M2M-THROUGH")
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                TestPartyTypeMerger,
-                lambda d, params: d["parties"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        i = {
-            "parties": [
-                {"name": "Alice", "type": "Plaintiff"},
-                {"name": "Bob", "type": "Defendant"},
-            ]
-        }
-        result = TestMerger(i, params=None).merge()
-
-        self.assertIn("Party", result.creates)
-        self.assertEqual(len(result.creates["Party"]), 2)
-        self.assertIn("PartyType", result.creates)
-        self.assertEqual(len(result.creates["PartyType"]), 2)
-
-        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
-        self.assertEqual(
-            set(docket.parties.values_list("name", flat=True)),
-            {"Alice", "Bob"},
-        )
-        self.assertEqual(
-            {
-                (pt.party.name, pt.name)
-                for pt in PartyType.objects.filter(docket=docket)
-            },
-            {("Alice", "Plaintiff"), ("Bob", "Defendant")},
-        )
-
-    @merger_test(expected_query_count=9)
-    def test_related_mergers_m2m_simple_disassociate(self) -> None:
-        """Does DISASSOCIATE on a plain many-to-many remove stale
-        associations while keeping the objects themselves?"""
-        stale = PersonFactory.create()
-        self.docket.panel.add(stale)
-        tc = self
-
-        class TestPersonMerger(
-            Merger[dict[str, str], RelatedParams[None], Person]
-        ):
-            model: ClassVar[type[Model]] = Person
-            key: ClassVar[Iterable[str]] = ["slug"]
-
-            name_first: str = Attribute(lambda d, params: d["first"])
-            name_last: str = Attribute(lambda d, params: d["last"])
-            slug: str = Attribute(lambda d, params: d["slug"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.docket.court)
-            source: int = Attribute(default=tc.docket.source)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            panel: list[Person] = ManyToManyRelation(
-                TestPersonMerger,
-                transform=lambda d, params: d["panel"],
-                strategy=ManyStrategy.DISASSOCIATE,
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        i = {
-            "panel": [
-                {"first": "Jane", "last": "Doe", "slug": "jane-doe-dis"},
-            ]
-        }
-        result = TestMerger(i, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.docket.refresh_from_db()
-        self.assertTrue(
-            Person.objects.filter(pk=stale.pk).exists(),
-            "DISASSOCIATE must not delete the stale person.",
-        )
-        self.assertEqual(
-            set(self.docket.panel.values_list("name_last", flat=True)),
-            {"Doe"},
-            "The stale association should be removed.",
-        )
-
-    @merger_test(expected_query_count=10)
-    def test_related_mergers_m2m_through_disassociate(self) -> None:
-        """Does DISASSOCIATE on a through many-to-many prune the stale
-        through rows while keeping the related objects themselves?"""
-        stale_party = Party.objects.create(name="Stale Party")
-        PartyType.objects.create(
-            docket=self.docket, party=stale_party, name="Plaintiff"
-        )
-        tc = self
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            model: ClassVar[type[Model]] = Party
-            key: ClassVar[Iterable[str]] = ["name"]
-
-            name: str = Attribute(lambda d, params: d["name"])
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            model: ClassVar[type[Model]] = PartyType
-
-            name: str = Attribute(lambda d, params: d["type"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.docket.court)
-            source: int = Attribute(default=tc.docket.source)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                TestPartyTypeMerger,
-                lambda d, params: d["parties"],
-                strategy=ManyStrategy.DISASSOCIATE,
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.docket.refresh_from_db()
-        self.assertTrue(
-            Party.objects.filter(pk=stale_party.pk).exists(),
-            "DISASSOCIATE must not delete the stale party itself.",
-        )
-        self.assertFalse(
-            PartyType.objects.filter(
-                docket=self.docket, party=stale_party
-            ).exists(),
-            "The stale party's link to the docket should be removed.",
-        )
-        self.assertEqual(
-            set(self.docket.parties.values_list("name", flat=True)),
-            {"Alice"},
-        )
-
-    @merger_test(expected_query_count=16)
-    def test_related_mergers_m2m_through_replace_deletes(self) -> None:
-        """Characterization: does REPLACE on a through many-to-many delete
-        the stale related objects outright?"""
-        stale_party = Party.objects.create(name="Stale Party")
-        PartyType.objects.create(
-            docket=self.docket, party=stale_party, name="Plaintiff"
-        )
-        tc = self
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            model: ClassVar[type[Model]] = Party
-            key: ClassVar[Iterable[str]] = ["name"]
-
-            name: str = Attribute(lambda d, params: d["name"])
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            model: ClassVar[type[Model]] = PartyType
-
-            name: str = Attribute(lambda d, params: d["type"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.docket.court)
-            source: int = Attribute(default=tc.docket.source)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                TestPartyTypeMerger,
-                lambda d, params: d["parties"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.assertFalse(
-            Party.objects.filter(pk=stale_party.pk).exists(),
-            "REPLACE deletes stale related objects outright.",
-        )
-
-    @merger_test(expected_query_count=4)
-    def test_related_mergers_child_replace_keeps_rows_on_invalid_child(
-        self,
-    ) -> None:
-        """Does REPLACE leave existing rows alone when a child's input is
-        invalid? The child gives up before looking anything up, so the row it
-        would have matched isn't known and can't be pruned safely."""
-        stale = DocketEntry.objects.create(
-            docket=self.docket, description="Stale"
-        )
-        tc = self
-
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], DocketEntry]
-        ):
-            model: ClassVar[type[Model]] = DocketEntry
-            key: ClassVar[Iterable[str]] = ["description"]
-
-            description: str = Attribute(lambda d, params: d["df"])
-
-            @staticmethod
-            def validate(scrape: dict[str, str]) -> bool:
-                return scrape["df"] != "Invalid"
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.docket.court)
-            source: int = Attribute(default=tc.docket.source)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            docket_entries: list[DocketEntry] = OneToManyRelation(
-                TestRelatedMerger,
-                lambda d, params: d["entries"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertFalse(result.success)
-        self.assertTrue(
-            DocketEntry.objects.filter(pk=stale.pk).exists(),
-            "A failed child merge must not let REPLACE delete existing rows.",
-        )
-        self.assertEqual(
-            set(
-                self.docket.docket_entries.values_list(
-                    "description", flat=True
-                )
-            ),
-            {"Stale", "Fresh"},
-        )
-
-    @merger_test(expected_query_count=3)
-    def test_related_mergers_m2m_replace_keeps_rows_on_ambiguous_child(
-        self,
-    ) -> None:
-        """Does REPLACE leave existing rows alone when a child's lookup
-        matches several rows? The merger can't pick one, so it never learns
-        which row belongs to this scrape."""
-        stale_party = Party.objects.create(name="Stale Party")
-        PartyType.objects.create(
-            docket=self.docket, party=stale_party, name="Plaintiff"
-        )
-        Party.objects.create(name="Ambiguous")
-        Party.objects.create(name="Ambiguous")
-        tc = self
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            model: ClassVar[type[Model]] = Party
-            key: ClassVar[Iterable[str]] = ["name"]
-
-            name: str = Attribute(lambda d, params: d["name"])
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            model: ClassVar[type[Model]] = PartyType
-
-            name: str = Attribute(lambda d, params: d["type"])
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=tc.docket.court)
-            source: int = Attribute(default=tc.docket.source)
-            docket_number: str = Attribute(default=tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                TestPartyTypeMerger,
-                lambda d, params: d["parties"],
-            )
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(pk=tc.docket.pk)
-
-        i = {"parties": [{"name": "Ambiguous", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertFalse(result.success)
-        self.assertTrue(
-            Party.objects.filter(pk=stale_party.pk).exists(),
-            "An ambiguous child lookup must not let REPLACE delete existing "
-            "rows.",
-        )
-        self.assertTrue(
-            PartyType.objects.filter(
-                docket=self.docket, party=stale_party
-            ).exists(),
-            "An ambiguous child lookup must not let REPLACE prune existing "
-            "through rows.",
-        )
-
-    @merger_test(expected_query_count=1)
-    def test_merger_subclassing(self) -> None:
-        class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):
-            model: ClassVar[type[Model]] = Docket
-
-            court: Court = Attribute(default=self.court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(default="ABCDEFG")
-
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.none()
-
-        class TestMerger2(TestMerger):
-            court: Court = Attribute(default=self.court)
-            docket_number: str = Attribute(default="ABCDEFGH")
-            assigned_to_str: str = Attribute(
-                lambda d, params: params["assigned_to_str"]
-            )
-
-        ats = "test"
-        result = TestMerger2({}, params={"assigned_to_str": ats}).merge()
-
-        self.assertIn("Docket", result.creates)
-        self.assertEqual(len(result.creates["Docket"]), 1)
-        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
-        self.assertEqual(docket.docket_number, "ABCDEFGH")
-        self.assertEqual(docket.source, DocketSources.SCRAPER)
-        self.assertEqual(docket.assigned_to_str, ats)
-
-
 def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
     """Write a minimal stand-in for a jkent run database.
 
     Only the columns `JKentScrapeLoader` reads are created, since the loader's
     contract is with the `results` table rather than with the whole schema.
 
-    :param path: Where to write the database.
-    :param payloads: One entry per row. A dict is serialized; a string is
-        stored as given, so a test can write a blob that will not decode."""
+    Args:
+        path: Where to write the database.
+        payloads: One entry per row. A dict is serialized; a string is
+            stored as given, so a test can write a blob that will not decode.
+    """
     with closing(sqlite3.connect(path)) as connection:
         connection.execute(
             "CREATE TABLE results ("
@@ -962,8 +208,9 @@ class LoaderTestCase(TestCase):
     def clear_run_keys(self, key: str | None = None) -> None:
         """Take away a run's checkpoint and every part of its ledger.
 
-        :param key: The run key to clear, defaulting to the test's own. A load
-            left to key itself off the run database needs its own cleanup.
+        Args:
+            key: The run key to clear, defaulting to the test's own. A load
+                left to key itself off the run database needs its own cleanup.
         """
         key = key or self.key
         self.redis.delete(key, *(f"{key}:{part}" for part in LEDGER_PARTS))
@@ -981,9 +228,12 @@ class LoaderTestCase(TestCase):
         merge task is handed a loader's name and looks the class back up by
         it -- a loader nothing has registered cannot be merged.
 
-        :param attributes: Overrides for the returned class, so a test can
-            supply its own `normalize` or merger.
-        :return: The loader class.
+        Args:
+            attributes: Overrides for the returned class, so a test can
+                supply its own `normalize` or merger.
+
+        Returns:
+            The loader class.
         """
         # Not named `court`: a class body cannot close over an enclosing local
         # whose name it also assigns.
@@ -992,12 +242,10 @@ class LoaderTestCase(TestCase):
         class TestMerger(Merger[LoaderScrape, None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = Attribute(default=test_court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                lambda scrape, params: scrape.docket_number
-            )
-            case_name: str = Attribute(lambda scrape, params: scrape.case_name)
+            court: Court = Constant(test_court)
+            source: int = Constant(DocketSources.SCRAPER)
+            docket_number: str = Scrape(LoaderScrape).docket_number
+            case_name: str = Scrape(LoaderScrape).case_name
 
             def query(self) -> QuerySet[Docket]:
                 return Docket.objects.filter(
@@ -1032,10 +280,13 @@ class LoaderTestCase(TestCase):
         zero `in_flight_time` says. Tests that want the other exit set
         `in_flight_time` high and leave `verify_timeout` at zero.
 
-        :param loader_class: The class to build, defaulting to a fresh
-            `loader_class()`.
-        :param kwargs: Passed through to the loader.
-        :return: The loader.
+        Args:
+            loader_class: The class to build, defaulting to a fresh
+                `loader_class()`.
+            kwargs: Passed through to the loader.
+
+        Returns:
+            The loader.
         """
         kwargs.setdefault("run_key", self.key)
         kwargs.setdefault("in_flight_time", 0)
@@ -1047,8 +298,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
     """Tests for the generic jkent run-database loader."""
 
     def test_missing_database(self) -> None:
-        """Is a run database that isn't there reported as such, rather than
-        counted as an empty run?"""
+        """Is a run database that isn't there reported as such, rather than counted as an empty run?"""
         loader = self.loader()
 
         with self.assertRaises(FileNotFoundError):
@@ -1077,9 +327,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_every_row_goes_to_the_queue_in_its_own_task(self) -> None:
-        """Merging a docket per task is what lets one that fails cost only
-        itself. Is one task dispatched per row, carrying the row's own
-        payload?"""
+        """Merging a docket per task is what lets one that fails cost only itself. Is one task dispatched per row, carrying the row's own payload?"""
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
@@ -1103,8 +351,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         task.return_value.set.assert_called_with(queue="batch2")
 
     def test_scrapes_yields_without_writing(self) -> None:
-        """`scrapes()` is the seam for inspecting a run. Does it produce the
-        validated scrapes and leave the database alone?"""
+        """`scrapes()` is the seam for inspecting a run.
+
+        Does it produce the validated scrapes and leave the database alone?
+        """
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
@@ -1128,8 +378,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(Docket.objects.count(), 2)
 
     def test_limit_of_zero_loads_nothing(self) -> None:
-        """A limit computed at runtime can come out zero. Does that load no
-        rows at all, rather than the one row an off-by-one would let through?"""
+        """A limit computed at runtime can come out zero.
+
+        Does that load no rows at all, rather than the one row an off-by-one
+        would let through?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -1141,9 +394,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertFalse(Docket.objects.exists())
 
     def test_normalize_returning_none_is_invalid(self) -> None:
-        """`normalize` returning `None` is the loader's own judgment that there
-        is nothing to do with a row. Is it counted as invalid, and left
-        undispatched?"""
+        """`normalize` returning `None` is the loader's own judgment that there is nothing to do with a row. Is it counted as invalid, and left undispatched?"""
 
         def normalize(
             self: Any, payload: dict[str, Any], row: sqlite3.Row
@@ -1165,9 +416,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_normalize_raising_unusable_scrape_is_refused(self) -> None:
-        """`UnusableScrape` says the run needs looking at. Is the row counted
-        as refused and never dispatched, since merging it is exactly what the
-        loader objected to?"""
+        """`UnusableScrape` says the run needs looking at.
+
+        Is the row counted as refused and never dispatched, since merging it is
+        exactly what the loader objected to?
+        """
 
         def normalize(
             self: Any, payload: dict[str, Any], row: sqlite3.Row
@@ -1187,8 +440,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertFalse(Docket.objects.exists())
 
     def test_payload_that_does_not_fit_the_model_is_invalid(self) -> None:
-        """A payload the scrape model rejects usually means scraper drift. Is
-        it reported rather than raised, so one bad row doesn't cost the run?"""
+        """A payload the scrape model rejects usually means scraper drift.
+
+        Is it reported rather than raised, so one bad row doesn't cost the run?
+        """
         _run_database(
             self.database,
             [{"case_name": "No docket number here"}, {"docket_number": "A-2"}],
@@ -1206,8 +461,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_payload_that_will_not_decode_is_invalid(self) -> None:
-        """A scrape that stopped mid-write leaves a truncated blob behind. Is
-        it counted rather than raised, so the rest of the run still loads?"""
+        """A scrape that stopped mid-write leaves a truncated blob behind.
+
+        Is it counted rather than raised, so the rest of the run still loads?
+        """
         _run_database(
             self.database,
             ['{"docket_number": "A-1', {"docket_number": "A-2"}],
@@ -1226,9 +483,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_bad_row_is_named_in_the_log(self) -> None:
-        """A count of bad rows says something drifted; only the row number
-        says where to go and look, and it is what `--start-row` would need to
-        reach that row again. Does the log carry it?"""
+        """A count of bad rows says something drifted; only the row number says where to go and look, and it is what `--start-row` would need to reach that row again. Does the log carry it?"""
         _run_database(
             self.database,
             [
@@ -1250,10 +505,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
     def test_a_bad_payload_is_named_by_its_docket_where_it_has_one(
         self,
     ) -> None:
-        """A row number gets you back to the row, but a docket number is what
-        anybody actually searches for. Does a validation failure carry both
-        where the payload decoded far enough to have a docket number, and fall
-        back to the row number where it did not?"""
+        """A row number gets you back to the row, but a docket number is what anybody actually searches for. Does a validation failure carry both where the payload decoded far enough to have a docket number, and fall back to the row number where it did not?"""
         for label, payload, expected in (
             (
                 "has a docket number",
@@ -1282,9 +534,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
                 self.assertIn("LoaderScrape", logs.output[0])
 
     def test_merger_declining_a_scrape_is_a_failure(self) -> None:
-        """A merger refuses a scrape in its own `validate`, which it reports as
-        a failure. Does the row come back from the queue counted as one, with
-        the rest of the run left to merge?"""
+        """A merger refuses a scrape in its own `validate`, which it reports as a failure. Does the row come back from the queue counted as one, with the rest of the run left to merge?"""
 
         class RejectingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             @staticmethod
@@ -1312,8 +562,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_a_row_that_raises_does_not_cost_the_run(self) -> None:
-        """Each row is merged in a task of its own. Is a merge that raises
-        recorded as a failure while the rest of the run continues?"""
+        """Each row is merged in a task of its own.
+
+        Is a merge that raises recorded as a failure while the rest of the run
+        continues?
+        """
 
         class RaisingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             def merge(self) -> Any:
@@ -1347,9 +600,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
     def test_a_merge_out_of_retries_is_recorded_rather_than_dropped(
         self,
     ) -> None:
-        """Celery says nothing when a task's retries run out, which is the
-        whole reason for the ledger. Is the row written off as failed rather
-        than left looking like it never ran?"""
+        """Celery says nothing when a task's retries run out, which is the whole reason for the ledger. Is the row written off as failed rather than left looking like it never ran?"""
 
         class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             def merge(self) -> Any:
@@ -1386,11 +637,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_merger_bug_is_not_mistaken_for_a_dropped_task(self) -> None:
-        """An exception the task does not expect is a bug in the merger, not a
-        broker that lost a message. Left to propagate it would take its row
-        with it, and reconciliation would report the docket as one celery
-        dropped -- sending somebody to the broker for a fault in the code. Is
-        it written off as a merge failure instead?"""
+        """An exception the task does not expect is a bug in the merger, not a broker that lost a message. Left to propagate it would take its row with it, and reconciliation would report the docket as one celery dropped -- sending somebody to the broker for a fault in the code. Is it written off as a merge failure instead?"""
 
         class BuggyMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             def merge(self) -> Any:
@@ -1424,7 +671,9 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
     def test_a_merge_that_never_reports_is_missing(self) -> None:
         """A worker killed mid-merge takes its task with it and tells no one.
-        Does the load name the row rather than reporting a clean run?"""
+
+        Does the load name the row rather than reporting a clean run?
+        """
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
@@ -1443,10 +692,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertTrue(report.dropped)
 
     def test_dropped_rows_get_their_own_sentry_issue(self) -> None:
-        """A dropped task is the one failure nothing else in the system
-        reports, so it has to be findable on its own rather than mixed in with
-        the merges that failed loudly. Is it filed under its own fingerprint,
-        keyed on the loader rather than the run?"""
+        """A dropped task is the one failure nothing else in the system reports, so it has to be findable on its own rather than mixed in with the merges that failed loudly. Is it filed under its own fingerprint, keyed on the loader rather than the run?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         logging.disable(logging.NOTSET)
         self.addCleanup(logging.disable)
@@ -1471,9 +717,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_settled_row_leaves_nothing_behind(self) -> None:
-        """The ledger is what keeps a long run from costing Redis a row per
-        docket. Does a row that reported back take itself off, whichever way
-        it went, leaving only counters?"""
+        """The ledger is what keeps a long run from costing Redis a row per docket. Does a row that reported back take itself off, whichever way it went, leaving only counters?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -1490,10 +734,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(self.ledger().totals().merged, 5, "Only the count.")
 
     def test_file_counts_share_the_run_s_counter_hash(self) -> None:
-        """A load moves a file per document, so anything the ledger spent per
-        file would dwarf what it spends per docket. Do the file tallies ride
-        along in the counter hash the row's own outcome is written to, rather
-        than taking a key or a round trip of their own?"""
+        """A load moves a file per document, so anything the ledger spent per file would dwarf what it spends per docket. Do the file tallies ride along in the counter hash the row's own outcome is written to, rather than taking a key or a round trip of their own?"""
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
 
@@ -1507,9 +748,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(ledger.totals().files, FileTally(moved=2, missing=1))
 
     def test_a_merge_that_moved_no_files_counts_none(self) -> None:
-        """Most loaders publish nothing at all, and most merges of the one that
-        does move no files. Is the usual merge left writing exactly what it
-        wrote before?"""
+        """Most loaders publish nothing at all, and most merges of the one that does move no files. Is the usual merge left writing exactly what it wrote before?"""
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
 
@@ -1523,8 +762,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertFalse(ledger.totals().files)
 
     def test_file_counts_add_up_across_rows(self) -> None:
-        """The tally spans the run rather than any one docket. Does each row's
-        merge add to it?"""
+        """The tally spans the run rather than any one docket.
+
+        Does each row's merge add to it?
+        """
         ledger = self.ledger()
 
         for row, files in enumerate(
@@ -1542,9 +783,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_rejected_row_still_counts_the_files_it_moved(self) -> None:
-        """Publishing happens before the write that can fail, so a merge that
-        went on to be rejected has still left files in the public bucket. Are
-        they counted, rather than lost with the row?"""
+        """Publishing happens before the write that can fail, so a merge that went on to be rejected has still left files in the public bucket. Are they counted, rather than lost with the row?"""
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
 
@@ -1558,8 +797,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
     def test_a_falling_count_is_waited_on(self) -> None:
         """A count still coming down means somebody is working on our rows.
+
         Does the load keep waiting, and poll the count rather than dragging
-        every pending row across on each pass?"""
+        every pending row across on each pass?
+        """
         loader = self.loader(in_flight_time=600, verify_timeout=600)
         counts = [3, 2, 1, 0]
 
@@ -1577,8 +818,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         rows.assert_not_called()
 
     def test_a_steady_count_is_a_stall(self) -> None:
-        """A count that stops moving says the work is gone. Is that reported
-        as a stall rather than waited out to the timeout?"""
+        """A count that stops moving says the work is gone.
+
+        Is that reported as a stall rather than waited out to the timeout?
+        """
         loader = self.loader(in_flight_time=0, verify_timeout=600)
 
         with patch.object(LoadLedger, "outstanding_count", return_value=4):
@@ -1590,8 +833,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertTrue(wait.conclusive)
 
     def test_a_count_still_moving_at_the_deadline_times_out(self) -> None:
-        """Giving up on a queue that was still working is not a finding. Is it
-        told apart from a stall?"""
+        """Giving up on a queue that was still working is not a finding.
+
+        Is it told apart from a stall?
+        """
         loader = self.loader(in_flight_time=600, verify_timeout=0)
 
         with patch.object(LoadLedger, "outstanding_count", return_value=4):
@@ -1607,8 +852,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
     def test_skipping_verification_reports_only_what_was_dispatched(
         self,
     ) -> None:
-        """A load meant to be left running should not sit waiting on its
-        queues. Does `verify=False` return the dispatch counts alone?"""
+        """A load meant to be left running should not sit waiting on its queues. Does `verify=False` return the dispatch counts alone?"""
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
@@ -1627,9 +871,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_a_load_given_no_run_key_still_keeps_a_ledger(self) -> None:
-        """Every load is worth being able to check up on, whether or not
-        anyone meant to resume it. Does a loader built without a run key key
-        one off the run database and verify itself out of it?"""
+        """Every load is worth being able to check up on, whether or not anyone meant to resume it. Does a loader built without a run key key one off the run database and verify itself out of it?"""
         # The derived key names the run database, and the suite runs in
         # parallel against one Redis, so this run needs a name of its own.
         self.database = self.database.with_name(f"{self.id()}.db")
@@ -1650,8 +892,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_report_str_names_every_count(self) -> None:
-        """The report is what an operator reads off a load. Does its summary
-        state every count, keeping the two ways a merge fails apart?"""
+        """The report is what an operator reads off a load.
+
+        Does its summary state every count, keeping the two ways a merge fails
+        apart?
+        """
         report = LoadReport(
             seen=8,
             dispatched=5,
@@ -1672,8 +917,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(report.failed, 2, "Both, for a caller wanting one.")
 
     def test_db_delay_waits_between_rows(self) -> None:
-        """A long load has to leave the queue room to drain. Does `db_delay`
-        wait after each row?"""
+        """A long load has to leave the queue room to drain.
+
+        Does `db_delay` wait after each row?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(3)],
@@ -1685,8 +932,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(sleep.call_args_list, [call(0.25)] * 3)
 
     def test_no_db_delay_does_not_wait(self) -> None:
-        """The default is to run flat out. Does a zero delay skip the wait
-        rather than sleeping zero seconds three thousand times?"""
+        """The default is to run flat out.
+
+        Does a zero delay skip the wait rather than sleeping zero seconds three
+        thousand times?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(3)],
@@ -1698,8 +948,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         sleep.assert_not_called()
 
     def test_both_queues_get_a_throttle(self) -> None:
-        """Merges dispatch their own extraction, so a load can bury either
-        queue. Is a throttle built for each one it was given a rate for?"""
+        """Merges dispatch their own extraction, so a load can bury either queue. Is a throttle built for each one it was given a rate for?"""
         with patch(
             "cl.corpus_importer.state.loader.CeleryThrottle"
         ) as throttle_class:
@@ -1719,8 +968,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
 
     def test_every_throttle_gets_its_say_before_a_row_goes_out(self) -> None:
-        """A throttle only holds a load back if it is consulted. Does each one
-        get asked before every dispatch?"""
+        """A throttle only holds a load back if it is consulted.
+
+        Does each one get asked before every dispatch?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(3)],
@@ -1735,8 +986,10 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(throttle_class.return_value.maybe_wait.call_count, 6)
 
     def test_skipping_extraction_leaves_its_queue_unthrottled(self) -> None:
-        """Building a throttle polls the celery queue. Does a load dispatching
-        no extraction leave that queue alone?"""
+        """Building a throttle polls the celery queue.
+
+        Does a load dispatching no extraction leave that queue alone?
+        """
         loader = self.loader(extract=False, extraction_throttle=6)
 
         self.assertEqual(loader.throttles, [])
@@ -1765,8 +1018,7 @@ class JKentScrapeLoaderExtractionTest(LoaderTestCase):
         return document
 
     def test_only_documents_actually_sent_are_expected_back(self) -> None:
-        """A document with no file to read is never dispatched and will never
-        change status. Is it left out of what the load waits on?"""
+        """A document with no file to read is never dispatched and will never change status. Is it left out of what the load waits on?"""
         model = self.document_model()
         model._default_manager.filter.return_value = [
             self.document(1),
@@ -1809,7 +1061,7 @@ class StateStorageTest(SimpleTestCase):
         self.storage.get_object_parameters.return_value = {
             "CacheControl": "max-age=315360000"
         }
-        self.client = self.storage.connection.meta.client
+        self.client: MagicMock = self.storage.connection.meta.client
         patcher = patch(
             "cl.corpus_importer.state.storage.AWSMediaStorage",
             return_value=self.storage,
@@ -1833,8 +1085,7 @@ class StateStorageTest(SimpleTestCase):
         )
 
     def test_copy_describes_how_the_file_should_be_served(self) -> None:
-        """Does the copy land in the public bucket with the ACL, cache headers
-        and content type a file served from there needs?"""
+        """Does the copy land in the public bucket with the ACL, cache headers and content type a file served from there needs?"""
         self.assertIs(self.copy("application/pdf"), PublishOutcome.PUBLISHED)
 
         self.client.copy_object.assert_called_once_with(
@@ -1851,15 +1102,17 @@ class StateStorageTest(SimpleTestCase):
         )
 
     def test_copy_leaves_the_original_alone(self) -> None:
-        """The loader deletes the original only once the document points at
-        the copy. Does copying alone delete nothing?"""
+        """The loader deletes the original only once the document points at the copy. Does copying alone delete nothing?"""
         self.copy()
 
         self.client.delete_object.assert_not_called()
 
     def test_copy_without_a_content_type_leaves_it_to_s3(self) -> None:
-        """A scrape does not always state a MIME type. Is the argument left
-        off rather than sent empty, which would serve the file as nothing?"""
+        """A scrape does not always state a MIME type.
+
+        Is the argument left off rather than sent empty, which would serve the
+        file as nothing?
+        """
         self.copy()
 
         self.assertNotIn(
@@ -1867,10 +1120,7 @@ class StateStorageTest(SimpleTestCase):
         )
 
     def test_copy_reports_how_it_failed(self) -> None:
-        """A source that is not there will not appear on a re-run, unlike a
-        refusal, so the two are reported apart. A `BotoCoreError` never got an
-        answer out of S3, so it counts as the retriable kind. Is each read off
-        the error the copy raised, without asking the bucket again?"""
+        """A source that is not there will not appear on a re-run, unlike a refusal, so the two are reported apart. A `BotoCoreError` never got an answer out of S3, so it counts as the retriable kind. Is each read off the error the copy raised, without asking the bucket again?"""
         for error, expected in (
             (self.error("AccessDenied"), PublishOutcome.FAILED),
             (self.error("NoSuchKey"), PublishOutcome.MISSING),
@@ -1883,8 +1133,10 @@ class StateStorageTest(SimpleTestCase):
         self.client.head_object.assert_not_called()
 
     def test_delete_names_the_bucket(self) -> None:
-        """Files are deleted from both buckets. Does the delete go to the one
-        it was asked to?"""
+        """Files are deleted from both buckets.
+
+        Does the delete go to the one it was asked to?
+        """
         delete_file(settings.AWS_PRIVATE_STORAGE_BUCKET_NAME, self.SOURCE_KEY)
 
         self.client.delete_object.assert_called_once_with(
@@ -1893,8 +1145,7 @@ class StateStorageTest(SimpleTestCase):
         )
 
     def test_delete_swallows_a_refusal(self) -> None:
-        """The document is settled by the time this runs, so a file left
-        behind must not fail the load."""
+        """The document is settled by the time this runs, so a file left behind must not fail the load."""
         self.client.delete_object.side_effect = self.error("AccessDenied")
 
         delete_file(settings.AWS_STORAGE_BUCKET_NAME, self.PUBLISHED_KEY)
@@ -1913,8 +1164,11 @@ class PreflightCheckTest(SimpleTestCase):
 
         Each call gets a database of its own, so one test can build two.
 
-        :param rows: One `(result_type, is_valid)` pair per row.
-        :return: The open connection.
+        Args:
+            rows: One `(result_type, is_valid)` pair per row.
+
+        Returns:
+            The open connection.
         """
         self.database = (
             Path(self.directory.name) / f"run-{len(rows)}-{id(rows)}.db"
@@ -1940,8 +1194,7 @@ class PreflightCheckTest(SimpleTestCase):
         return opened
 
     def test_a_database_with_nothing_invalid_passes(self) -> None:
-        """Does a clean run database come back as passing, with nothing to
-        report?"""
+        """Does a clean run database come back as passing, with nothing to report?"""
         result = InvalidRows().run(self.results([("Docket", 1)] * 3))
 
         self.assertEqual(result.outcome, CheckOutcome.PASSED)
@@ -1949,9 +1202,7 @@ class PreflightCheckTest(SimpleTestCase):
         self.assertFalse(result.outcome.stops_the_load)
 
     def test_invalid_rows_are_reported_per_result_type(self) -> None:
-        """The counts are what an operator acts on, and which result type they
-        belong to is what says whether it matters. Is there one finding per
-        type, carrying both counts?"""
+        """The counts are what an operator acts on, and which result type they belong to is what says whether it matters. Is there one finding per type, carrying both counts?"""
         result = InvalidRows().run(
             self.results(
                 [("Docket", 1), ("Docket", 1), ("Docket", 0), ("File", 0)]
@@ -1968,8 +1219,10 @@ class PreflightCheckTest(SimpleTestCase):
         )
 
     def test_a_result_type_with_nothing_invalid_is_not_reported(self) -> None:
-        """A report naming every result type would bury the one that is
-        wrong. Is only the type with invalid rows named?"""
+        """A report naming every result type would bury the one that is wrong.
+
+        Is only the type with invalid rows named?
+        """
         result = InvalidRows().run(self.results([("Docket", 1), ("File", 0)]))
 
         self.assertEqual(
@@ -1977,18 +1230,14 @@ class PreflightCheckTest(SimpleTestCase):
         )
 
     def test_invalid_rows_do_not_stop_a_load(self) -> None:
-        """The loader's own query passes over these rows, so the rest of the
-        run is still worth loading. Is this a partial finding rather than one
-        that stops the load?"""
+        """The loader's own query passes over these rows, so the rest of the run is still worth loading. Is this a partial finding rather than one that stops the load?"""
         result = InvalidRows().run(self.results([("Docket", 0)]))
 
         self.assertFalse(result.outcome.stops_the_load)
         self.assertTrue(result.outcome.is_failure)
 
     def test_a_question_the_database_cannot_answer_is_a_failure(self) -> None:
-        """A column the check names and the database has not got is one the
-        loader's own query names too. Is that reported as a database this
-        loader cannot read, rather than raised out of the check?"""
+        """A column the check names and the database has not got is one the loader's own query names too. Is that reported as a database this loader cannot read, rather than raised out of the check?"""
         with closing(sqlite3.connect(self.database)) as connection:
             connection.execute("CREATE TABLE results (id INTEGER)")
             connection.commit()
@@ -2005,9 +1254,7 @@ class PreflightCheckTest(SimpleTestCase):
     def test_findings_outlive_the_connection_they_were_read_from(
         self,
     ) -> None:
-        """The findings are logged, sent to Sentry and printed in the report,
-        all after the run database has been closed. Are they read off the
-        cursor rather than left to be read from a closed one?"""
+        """The findings are logged, sent to Sentry and printed in the report, all after the run database has been closed. Are they read off the cursor rather than left to be read from a closed one?"""
         connection = self.results([("Docket", 0)])
 
         result = InvalidRows().run(connection)
@@ -2021,8 +1268,7 @@ class PreflightCheckTest(SimpleTestCase):
         )
 
     def test_every_check_runs_even_after_one_fails(self) -> None:
-        """An operator fixing a run database wants everything wrong with it
-        from one attempt. Does a failing check stop the ones after it?"""
+        """An operator fixing a run database wants everything wrong with it from one attempt. Does a failing check stop the ones after it?"""
 
         class Failing(PreflightCheck):
             description = "a thing that is wrong"
@@ -2050,9 +1296,12 @@ class PreflightCheckTest(SimpleTestCase):
     def archive(self, hashes: list[str]) -> sqlite3.Connection:
         """A run database whose archive holds a file per entry in `hashes`.
 
-        :param hashes: One content hash per downloaded file. An empty string
-            stands for a file the scraper stored without hashing it.
-        :return: The open connection.
+        Args:
+            hashes: One content hash per downloaded file. An empty string
+                stands for a file the scraper stored without hashing it.
+
+        Returns:
+            The open connection.
         """
         self.database = Path(self.directory.name) / f"archive-{id(hashes)}.db"
         with closing(sqlite3.connect(self.database)) as connection:
@@ -2075,24 +1324,23 @@ class PreflightCheckTest(SimpleTestCase):
         return opened
 
     def test_every_file_hashed_passes(self) -> None:
-        """Does a run whose scraper hashed everything it downloaded come back
-        clean?"""
+        """Does a run whose scraper hashed everything it downloaded come back clean?"""
         result = UnhashedFiles().run(self.archive(["a" * 64, "b" * 64]))
 
         self.assertEqual(result.outcome, CheckOutcome.PASSED)
 
     def test_a_run_that_downloaded_nothing_passes(self) -> None:
-        """A scrape with no files has no files missing hashes. Does an empty
-        archive pass rather than dividing by nothing?"""
+        """A scrape with no files has no files missing hashes.
+
+        Does an empty archive pass rather than dividing by nothing?
+        """
         result = UnhashedFiles().run(self.archive([]))
 
         self.assertEqual(result.outcome, CheckOutcome.PASSED)
         self.assertEqual(result.errors, ())
 
     def test_anything_short_of_every_file_is_a_finding(self) -> None:
-        """One unhashed file is a document that will be written with no file
-        at all, so the bar is every file rather than most of them. Is a single
-        one reported, with both counts?"""
+        """One unhashed file is a document that will be written with no file at all, so the bar is every file rather than most of them. Is a single one reported, with both counts?"""
         result = UnhashedFiles().run(self.archive(["a" * 64, "", "c" * 64]))
 
         self.assertEqual(result.outcome, CheckOutcome.PARTIAL)
@@ -2102,8 +1350,10 @@ class PreflightCheckTest(SimpleTestCase):
         )
 
     def test_a_null_hash_counts_as_unhashed(self) -> None:
-        """The column is nullable and the scraper may leave it either way. Are
-        NULL and empty string both counted as no hash?"""
+        """The column is nullable and the scraper may leave it either way.
+
+        Are NULL and empty string both counted as no hash?
+        """
         with closing(sqlite3.connect(self.database)) as connection:
             connection.execute(
                 "CREATE TABLE archived_files ("
@@ -2126,15 +1376,19 @@ class PreflightCheckTest(SimpleTestCase):
         self.assertEqual(result.errors[0].detail["unhashed"], 1)
 
     def test_unhashed_files_do_not_stop_a_load(self) -> None:
-        """The documents still merge, they just have no file. Is the rest of
-        the run still worth loading?"""
+        """The documents still merge, they just have no file.
+
+        Is the rest of the run still worth loading?
+        """
         result = UnhashedFiles().run(self.archive([""]))
 
         self.assertFalse(result.outcome.stops_the_load)
 
     def test_a_result_says_what_was_checked(self) -> None:
-        """A report names what ran as well as what it found. Does a result
-        carry the check's description either way?"""
+        """A report names what ran as well as what it found.
+
+        Does a result carry the check's description either way?
+        """
         passing = InvalidRows().run(self.results([("Docket", 1)]))
         partial = InvalidRows().run(self.results([("Docket", 0)]))
 
@@ -2159,8 +1413,9 @@ class LoaderPreflightTest(LoaderTestCase):
     def archive(self, hashes: list[str]) -> None:
         """Record a downloaded file per entry in `hashes`.
 
-        :param hashes: One content hash per file, an empty string standing for
-            a file the scraper stored without hashing it.
+        Args:
+            hashes: One content hash per file, an empty string standing for
+                a file the scraper stored without hashing it.
         """
         with closing(sqlite3.connect(self.database)) as connection:
             connection.executemany(
@@ -2173,10 +1428,7 @@ class LoaderPreflightTest(LoaderTestCase):
     def test_unhashed_files_are_reported_before_any_merge_finds_them(
         self,
     ) -> None:
-        """A merge already declines to publish a file it cannot name by
-        content, one file at a time, deep into a run. Does the load say how
-        much of the run is like that before it dispatches anything, and go
-        ahead anyway?"""
+        """A merge already declines to publish a file it cannot name by content, one file at a time, deep into a run. Does the load say how much of the run is like that before it dispatches anything, and go ahead anyway?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         self.archive(["a" * 64, ""])
 
@@ -2191,8 +1443,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_the_standard_checks_run_for_every_loader(self) -> None:
-        """A loader that declares no checks of its own still has a run
-        database that can be wrong. Do the standard checks run anyway?"""
+        """A loader that declares no checks of its own still has a run database that can be wrong. Do the standard checks run anyway?"""
         _run_database(
             self.database, [{"docket_number": f"A-{n}"} for n in range(3)]
         )
@@ -2205,9 +1456,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_a_loader_s_own_checks_run_after_the_standard_ones(self) -> None:
-        """A loader adds checks rather than replacing them, so that one
-        declaring its own cannot drop the standard ones by forgetting to
-        repeat them. Are both run?"""
+        """A loader adds checks rather than replacing them, so that one declaring its own cannot drop the standard ones by forgetting to repeat them. Are both run?"""
 
         class Extra(PreflightCheck):
             description = "something only this court can get wrong"
@@ -2229,9 +1478,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_invalid_rows_are_reported_without_stopping_the_load(self) -> None:
-        """Rows the scrape marked invalid are dropped inside the loader's own
-        query, so nothing downstream would ever say they were there. Are they
-        reported, with the rest of the run still loaded?"""
+        """Rows the scrape marked invalid are dropped inside the loader's own query, so nothing downstream would ever say they were there. Are they reported, with the rest of the run still loaded?"""
         _run_database(
             self.database, [{"docket_number": f"A-{n}"} for n in range(3)]
         )
@@ -2251,9 +1498,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_a_finding_reaches_sentry_with_its_fields(self) -> None:
-        """A Sentry issue is read by its fields rather than by parsing the
-        summary back apart. Does the finding's detail ride along, under the
-        loader's own issue for a run that will land incomplete?"""
+        """A Sentry issue is read by its fields rather than by parsing the summary back apart. Does the finding's detail ride along, under the loader's own issue for a run that will land incomplete?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         self.invalidate(1)
         logging.disable(logging.NOTSET)
@@ -2273,8 +1518,10 @@ class LoaderPreflightTest(LoaderTestCase):
         self.assertEqual(record.invalid, 1)  # type: ignore[attr-defined]
 
     def test_a_check_that_passes_says_so(self) -> None:
-        """A check nobody hears about is a check nobody trusts. Is a clean
-        run database reported as having been checked?"""
+        """A check nobody hears about is a check nobody trusts.
+
+        Is a clean run database reported as having been checked?
+        """
         _run_database(self.database, [{"docket_number": "A-1"}])
         logging.disable(logging.NOTSET)
         self.addCleanup(logging.disable)
@@ -2290,8 +1537,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_a_failed_check_dispatches_nothing(self) -> None:
-        """A run database the loader cannot read is worse than one it will not
-        finish. Does a failing check stop the load before anything is sent?"""
+        """A run database the loader cannot read is worse than one it will not finish. Does a failing check stop the load before anything is sent?"""
 
         class Failing(PreflightCheck):
             description = "a database this loader can read"
@@ -2342,9 +1588,12 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
     def failing_loader(self, failing: set[str]) -> Any:
         """A loader whose merger refuses the dockets named in `failing`.
 
-        :param failing: Docket numbers to raise on, read at merge time so a
-            test can empty it and retry the same rows successfully.
-        :return: The loader class.
+        Args:
+            failing: Docket numbers to raise on, read at merge time so a
+                test can empty it and retry the same rows successfully.
+
+        Returns:
+            The loader class.
         """
 
         class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
@@ -2356,8 +1605,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         return self.loader_class(merger=RefusingMerger)
 
     def test_a_row_with_no_verdict_is_held_for_retry(self) -> None:
-        """A merge that never reached a verdict leaves nothing in the database
-        to find it by again. Is the row written down so a retry can?"""
+        """A merge that never reached a verdict leaves nothing in the database to find it by again. Is the row written down so a retry can?"""
         ledger = self.ledger()
         ledger.dispatched(4, "A-4")
 
@@ -2366,8 +1614,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.merge_retry(), {"4"})
 
     def test_a_row_that_reached_a_verdict_is_not_held(self) -> None:
-        """A rejected scrape is one to go and fix, not one to re-run, and a
-        merged row wants nothing at all. Is neither held for retry?"""
+        """A rejected scrape is one to go and fix, not one to re-run, and a merged row wants nothing at all. Is neither held for retry?"""
         ledger = self.ledger()
 
         ledger.dispatched(1, "A-1")
@@ -2378,8 +1625,11 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.merge_retry(), set())
 
     def test_a_retry_takes_the_rows_it_reads(self) -> None:
-        """The set is drained rather than pruned as rows succeed. Does reading
-        it take it away, so a second retry finds nothing left to do?"""
+        """The set is drained rather than pruned as rows succeed.
+
+        Does reading it take it away, so a second retry finds nothing left to
+        do?
+        """
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
         ledger.errored(1)
@@ -2392,9 +1642,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_a_retry_also_takes_the_rows_celery_lost(self) -> None:
-        """A row that was dispatched and never reported back is the one most
-        worth re-running, and it is still sitting in `pending` rather than in
-        the retry set. Is it drained alongside?"""
+        """A row that was dispatched and never reported back is the one most worth re-running, and it is still sitting in `pending` rather than in the retry set. Is it drained alongside?"""
         ledger = self.ledger()
         ledger.dispatched(7, "A-7")
         ledger.dispatched(8, "A-8")
@@ -2416,8 +1664,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_counting_what_is_waiting_takes_none_of_it(self) -> None:
-        """The command asks how much there is to retry before it pays for the
-        run database. Does asking leave the work where it is?"""
+        """The command asks how much there is to retry before it pays for the run database. Does asking leave the work where it is?"""
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
         ledger.errored(1)
@@ -2432,8 +1679,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_a_retry_redispatches_only_what_was_held(self) -> None:
-        """Does a retry merge the row that failed, and leave the rows that
-        already merged alone?"""
+        """Does a retry merge the row that failed, and leave the rows that already merged alone?"""
         failing = {"A-2"}
         _run_database(
             self.database,
@@ -2459,8 +1705,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_a_row_that_merges_on_retry_is_not_held_again(self) -> None:
-        """Nothing prunes the set as rows succeed, so a retry that works has
-        to leave it empty by not writing to it. Does it?"""
+        """Nothing prunes the set as rows succeed, so a retry that works has to leave it empty by not writing to it. Does it?"""
         failing = {"A-1"}
         _run_database(self.database, [{"docket_number": "A-1"}])
         loader_class = self.failing_loader(failing)
@@ -2477,8 +1722,10 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_a_row_that_errors_again_is_held_again(self) -> None:
-        """A retry that does not settle a row has to leave it retryable. Is
-        the row written back by the same path that recorded it first?"""
+        """A retry that does not settle a row has to leave it retryable.
+
+        Is the row written back by the same path that recorded it first?
+        """
         _run_database(self.database, [{"docket_number": "A-1"}])
         loader_class = self.failing_loader({"A-1"})
         with patch.object(merge_state_scrape_row, "max_retries", 0):
@@ -2490,9 +1737,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.merge_retry(), {"1"})
 
     def test_a_retry_leaves_the_run_s_totals_standing(self) -> None:
-        """A retry adds to what the run already did rather than replacing it,
-        so it must not clear the ledger the way a fresh load does. Does the
-        moment the run began survive one?"""
+        """A retry adds to what the run already did rather than replacing it, so it must not clear the ledger the way a fresh load does. Does the moment the run began survive one?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         loader = self.loader()
         loader.load()
@@ -2503,12 +1748,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.ledger().started(), started)
 
     def test_holding_work_for_retry_keeps_the_run_s_anchor_alive(self) -> None:
-        """Every retry set has its expiry pushed out each time something is
-        held in it, while `started` is written once and never refreshed. A run
-        whose retries keep it alive longer than one TTL would therefore lose
-        the moment it began -- which its extraction re-check is scoped by --
-        while it still had documents held to re-check. Is the anchor kept
-        alive alongside the work that needs it?
+        """Every retry set has its expiry pushed out each time something is held in it, while `started` is written once and never refreshed. A run whose retries keep it alive longer than one TTL would therefore lose the moment it began -- which its extraction re-check is scoped by -- while it still had documents held to re-check. Is the anchor kept alive alongside the work that needs it?
 
         Redis expires keys on a clock of its own that `time_machine` cannot
         move, so this runs against a ledger whose TTL is seconds rather than
@@ -2534,10 +1774,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
     def test_a_row_that_merges_on_retry_stops_counting_as_an_error(
         self,
     ) -> None:
-        """The ledger's counters only ever go up, and nothing prunes them as
-        rows recover. A row that errored and then merged on retry would go on
-        being counted -- and alerted on -- as a failure for the rest of the
-        run's life. Is the error taken back when the row goes back?"""
+        """The ledger's counters only ever go up, and nothing prunes them as rows recover. A row that errored and then merged on retry would go on being counted -- and alerted on -- as a failure for the rest of the run's life. Is the error taken back when the row goes back?"""
         failing = {"A-2"}
         _run_database(
             self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
@@ -2561,10 +1798,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_a_row_that_errors_again_still_counts_as_an_error(self) -> None:
-        """Taking the error back as the row is re-dispatched leans on the
-        retry's own merge to count it again if it fails again. Does a row that
-        errored twice report as the one error it still is, rather than as two
-        or as none?"""
+        """Taking the error back as the row is re-dispatched leans on the retry's own merge to count it again if it fails again. Does a row that errored twice report as the one error it still is, rather than as two or as none?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         loader_class = self.failing_loader({"A-1"})
         with patch.object(merge_state_scrape_row, "max_retries", 0):
@@ -2581,8 +1815,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
     def test_a_retry_does_not_count_its_rows_as_dispatched_again(
         self,
     ) -> None:
-        """A row a retry puts back was counted as dispatched when it first
-        went. Does the run's total stay at the number of rows it has?"""
+        """A row a retry puts back was counted as dispatched when it first went. Does the run's total stay at the number of rows it has?"""
         failing = {"A-2"}
         _run_database(
             self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
@@ -2598,10 +1831,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.ledger().totals().dispatched, 2)
 
     def test_a_row_the_retry_cannot_use_is_withdrawn(self) -> None:
-        """A row the retry finds it can no longer use never goes back on the
-        queue, and has been drained from the retry set, so nothing will ever
-        settle it. Is its error taken back, rather than alerted on by every
-        later verification of the run?"""
+        """A row the retry finds it can no longer use never goes back on the queue, and has been drained from the retry set, so nothing will ever settle it. Is its error taken back, rather than alerted on by every later verification of the run?"""
         unusable: set[str] = set()
 
         class UnusableOnRetry(self.failing_loader({"A-1"})):  # type: ignore[misc, valid-type]
@@ -2630,9 +1860,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.merge_retry(), set())
 
     def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
-        """A row held for retry that the run database does not have means the
-        wrong database was handed over. Is that raised rather than passed over
-        in silence?"""
+        """A row held for retry that the run database does not have means the wrong database was handed over. Is that raised rather than passed over in silence?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         ledger = self.ledger()
         ledger.dispatched(99, "A-99")
@@ -2651,9 +1879,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         )
 
     def test_an_errored_row_the_run_database_lacks_is_withdrawn(self) -> None:
-        """The retry says once that a held row is not in the run database and
-        drops it. Is its error dropped with it, so later verifications do not
-        keep alerting on a row nothing can retry?"""
+        """The retry says once that a held row is not in the run database and drops it. Is its error dropped with it, so later verifications do not keep alerting on a row nothing can retry?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         ledger = self.ledger()
         ledger.dispatched(99, "A-99")
@@ -2681,9 +1907,12 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
     def document_model(self, outstanding: list[int]) -> Any:
         """A stand-in document model reporting `outstanding` unextracted PKs.
 
-        :param outstanding: The PKs `unextracted` reports, both when a load
-            verifies itself and when a retry re-checks.
-        :return: The model.
+        Args:
+            outstanding: The PKs `unextracted` reports, both when a load
+                verifies itself and when a retry re-checks.
+
+        Returns:
+            The model.
         """
         model = Mock(__name__="Doc")
         unextracted = model.unextracted.return_value
@@ -2704,10 +1933,13 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         is what verification records, and a merger writing rows the stand-in
         model would claim is a fixture of its own.
 
-        :param outstanding: The PKs `unextracted` reports.
-        :param dispatched: How many documents the run says it sent, since a
-            run that sent none never asks the database anything.
-        :return: The model.
+        Args:
+            outstanding: The PKs `unextracted` reports.
+            dispatched: How many documents the run says it sent, since a
+                run that sent none never asks the database anything.
+
+        Returns:
+            The model.
         """
         model = self.document_model(outstanding)
         ledger = self.ledger()
@@ -2719,8 +1951,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         return model
 
     def test_outstanding_documents_are_held_for_retry(self) -> None:
-        """A run's verification already asks which of its documents are still
-        unextracted. Are they written down while it has them?"""
+        """A run's verification already asks which of its documents are still unextracted. Are they written down while it has them?"""
         self.verified([11, 12])
 
         self.assertEqual(
@@ -2729,9 +1960,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         )
 
     def test_a_retry_re_checks_before_dispatching(self) -> None:
-        """The set is a snapshot, and by retry time a later load or a sweep
-        may have extracted some of it. Is the batch put back through
-        `unextracted` rather than dispatched as it stands?"""
+        """The set is a snapshot, and by retry time a later load or a sweep may have extracted some of it. Is the batch put back through `unextracted` rather than dispatched as it stands?"""
         model = self.document_model([11, 12])
         ledger = self.ledger()
         ledger.start()
@@ -2756,8 +1985,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         )
 
     def test_a_retry_takes_the_documents_it_reads(self) -> None:
-        """Does reading the set take it away, so a second retry has nothing
-        left to re-check?"""
+        """Does reading the set take it away, so a second retry has nothing left to re-check?"""
         ledger = self.ledger()
         ledger.retry_documents([11, 12])
 
@@ -2765,10 +1993,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         self.assertEqual(ledger.documents_to_retry(), set())
 
     def test_a_retry_that_lost_its_anchor_keeps_the_documents(self) -> None:
-        """Without the moment the run began there is no window to ask
-        `unextracted` about, so the retry cannot tell which of its documents
-        are still outstanding. Are they left in the ledger for a later sweep
-        to find, rather than drained into a retry that cannot check them?"""
+        """Without the moment the run began there is no window to ask `unextracted` about, so the retry cannot tell which of its documents are still outstanding. Are they left in the ledger for a later sweep to find, rather than drained into a retry that cannot check them?"""
         model = self.document_model([11, 12])
         ledger = self.ledger()
         # Held for retry, but nothing ever recorded when the run began.
@@ -2790,8 +2015,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         model.unextracted.return_value.filter.assert_not_called()
 
     def test_a_run_with_nothing_outstanding_holds_nothing(self) -> None:
-        """A run whose documents all came back extracted should leave no retry
-        set behind at all. Does it?"""
+        """A run whose documents all came back extracted should leave no retry set behind at all. Does it?"""
         self.verified([])
 
         self.assertEqual(
@@ -2817,9 +2041,7 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         return get_last_parent_document_id_processed(self.key)
 
     def test_a_load_checkpoints_the_rows_it_dispatched(self) -> None:
-        """A load that dies is resumed from its last checkpoint, so the
-        checkpoint must never name a row the load had not reached. Does it name
-        the last row it sent?"""
+        """A load that dies is resumed from its last checkpoint, so the checkpoint must never name a row the load had not reached. Does it name the last row it sent?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -2840,8 +2062,7 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         self.assertEqual(self.checkpoint(), 1)
 
     def test_a_checkpoint_resumes_the_rows_it_left(self) -> None:
-        """A checkpoint is only worth writing if it starts the next load in
-        the right place. Does resuming from one merge exactly the rest?"""
+        """A checkpoint is only worth writing if it starts the next load in the right place. Does resuming from one merge exactly the rest?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -2857,8 +2078,7 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         )
 
     def test_a_resumed_load_keeps_the_ledger_it_is_adding_to(self) -> None:
-        """The rows a load merged before it died are in its ledger, and only
-        that ledger says so. Does resuming add to it rather than wipe it?"""
+        """The rows a load merged before it died are in its ledger, and only that ledger says so. Does resuming add to it rather than wipe it?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(4)],
@@ -2870,8 +2090,7 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         self.assertEqual(self.ledger().totals().merged, 4)
 
     def test_a_load_starting_over_drops_the_last_one_s_ledger(self) -> None:
-        """A run from the top is a fresh pass, and last time's outcomes say
-        nothing about it. Are they cleared before anything is dispatched?"""
+        """A run from the top is a fresh pass, and last time's outcomes say nothing about it. Are they cleared before anything is dispatched?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(3)],
@@ -2884,9 +2103,7 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         self.assertTrue(report.accounted_for, "The stale row is gone.")
 
     def test_a_finished_load_clears_its_checkpoint(self) -> None:
-        """A checkpoint left behind by a load that finished would send the
-        next load of the same run database straight to the end, merging
-        nothing. Is it dropped?"""
+        """A checkpoint left behind by a load that finished would send the next load of the same run database straight to the end, merging nothing. Is it dropped?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -2898,7 +2115,9 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
 
     def test_a_limited_run_leaves_no_checkpoint(self) -> None:
         """A limited run stops at a row that means nothing to a full load.
-        Does it neither record that position nor clear a real one?"""
+
+        Does it neither record that position nor clear a real one?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -2910,8 +2129,10 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         self.assertEqual(self.checkpoint(), 2, "The real load's position.")
 
     def test_a_load_given_no_key_checkpoints_under_its_own(self) -> None:
-        """A load nobody named still has to be resumable. Does it checkpoint
-        under the key it derived from the run database?"""
+        """A load nobody named still has to be resumable.
+
+        Does it checkpoint under the key it derived from the run database?
+        """
         # The derived key names the run database, and the suite runs in
         # parallel against one Redis, so this run needs a name of its own.
         self.database = self.database.with_name(f"{self.id()}.db")
@@ -2936,8 +2157,11 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         )
 
     def test_a_load_survives_a_checkpoint_it_cannot_write(self) -> None:
-        """A checkpoint is a convenience, not the load. Does an unreachable
-        Redis cost the run its resume point and nothing more?"""
+        """A checkpoint is a convenience, not the load.
+
+        Does an unreachable Redis cost the run its resume point and nothing
+        more?
+        """
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
@@ -2956,7 +2180,8 @@ class FakeBucket:
     """Stands in for the bucket `downloaded_run_database` fetches through.
 
     Records what was asked for so a test can assert on it, and writes
-    `contents` where the real bucket would write the object."""
+    `contents` where the real bucket would write the object.
+    """
 
     def __init__(
         self,
@@ -2975,8 +2200,7 @@ class FakeBucket:
 
 
 class FakeStorage:
-    """Stands in for the storage backend the scrape bucket is reached
-    through, which `downloaded_run_database` asks only for its bucket."""
+    """Stands in for the storage backend the scrape bucket is reached through, which `downloaded_run_database` asks only for its bucket."""
 
     def __init__(self, bucket: FakeBucket) -> None:
         self.bucket = bucket
@@ -2995,7 +2219,8 @@ class RunDatabaseTest(SimpleTestCase):
         """`downloaded_run_database` with `bucket` standing in for S3.
 
         The patch has to outlive the download, so this wraps the whole context
-        rather than handing one back."""
+        rather than handing one back.
+        """
         with patch(
             "cl.corpus_importer.state.run_db.scrape_bucket_storage",
             return_value=FakeStorage(bucket),
@@ -3004,8 +2229,7 @@ class RunDatabaseTest(SimpleTestCase):
                 yield database
 
     def test_downloads_the_key_to_a_temporary_file(self) -> None:
-        """Does the database arrive on local disk, under its own name, from
-        the configured bucket?"""
+        """Does the database arrive on local disk, under its own name, from the configured bucket?"""
         bucket = FakeBucket(contents=b"a run")
 
         with self.download(bucket, "nycourts_gov/2026-08-08.db") as database:
@@ -3018,8 +2242,10 @@ class RunDatabaseTest(SimpleTestCase):
             )
 
     def test_takes_the_download_away_afterwards(self) -> None:
-        """A run database is hundreds of megabytes. Is the temporary copy
-        cleaned up when the caller is done with it?"""
+        """A run database is hundreds of megabytes.
+
+        Is the temporary copy cleaned up when the caller is done with it?
+        """
         with self.download(FakeBucket(), "nycourts_gov/run.db") as database:
             self.assertTrue(database.exists())
 
@@ -3038,8 +2264,7 @@ class RunDatabaseTest(SimpleTestCase):
         self.assertFalse(path.exists())
 
     def test_reports_a_key_that_cannot_be_fetched(self) -> None:
-        """A missing key, or credentials that cannot read it, is all an
-        operator can act on. Is it reported with the key named?"""
+        """A missing key, or credentials that cannot read it, is all an operator can act on. Is it reported with the key named?"""
         bucket = FakeBucket(
             error=ClientError(
                 {"Error": {"Code": "404", "Message": "Not Found"}},
@@ -3056,8 +2281,7 @@ class RunDatabaseTest(SimpleTestCase):
         )
 
     def test_rejects_a_key_that_names_no_database(self) -> None:
-        """Is a prefix handed over in place of a database refused before
-        anything is downloaded?"""
+        """Is a prefix handed over in place of a database refused before anything is downloaded?"""
         bucket = FakeBucket()
 
         with self.assertRaises(RunDatabaseUnavailable):
@@ -3067,11 +2291,7 @@ class RunDatabaseTest(SimpleTestCase):
         self.assertEqual(bucket.calls, [])
 
     def test_the_fetch_goes_through_courtlistener_storage(self) -> None:
-        """A run database is fetched with Django's storage backend rather than
-        a client of the loader's own, so that everything a deployment
-        configures for S3 -- a session token, a role, an endpoint -- reaches
-        the fetch too, which a client built from the key pair alone leaves
-        off and is refused for. Is that what the fetch reaches for?"""
+        """A run database is fetched with Django's storage backend rather than a client of the loader's own, so that everything a deployment configures for S3 -- a session token, a role, an endpoint -- reaches the fetch too, which a client built from the key pair alone leaves off and is refused for. Is that what the fetch reaches for?"""
         self.assertIsInstance(scrape_bucket_storage(), AWSMediaStorage)
 
 
@@ -3080,7 +2300,8 @@ def _fake_download(key: str) -> Generator[Path]:
     """Stand in for the fetch out of the scrape bucket.
 
     Yields a path nothing reads: the command's argument handling is what these
-    tests are about, and the loader under it is a mock."""
+    tests are about, and the loader under it is a mock.
+    """
     yield Path("/nonexistent") / key
 
 
@@ -3128,9 +2349,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         return self.loader.call_args.kwargs["start_row"]
 
     def test_retry_refuses_the_flags_that_pick_rows_for_it(self) -> None:
-        """A retry works from the rows the ledger is holding, so anything that
-        says which rows to work on instead is asking for something a retry
-        cannot do. Is each one refused rather than quietly ignored?"""
+        """A retry works from the rows the ledger is holding, so anything that says which rows to work on instead is asking for something a retry cannot do. Is each one refused rather than quietly ignored?"""
         for flag in (
             ("--start-row", "5"),
             ("--auto-resume",),
@@ -3147,9 +2366,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
     def test_a_retry_with_no_dockets_leaves_the_run_database_alone(
         self,
     ) -> None:
-        """Run databases run to hundreds of megabytes and a retry only wants
-        one for a docket's payload. Is the fetch skipped when the ledger is
-        holding documents but no dockets?"""
+        """Run databases run to hundreds of megabytes and a retry only wants one for a docket's payload. Is the fetch skipped when the ledger is holding documents but no dockets?"""
         self.loader.return_value.ledger.retry_counts.return_value = (0, 12)
         self.loader.return_value.retry.return_value = LoadReport(
             rows_read=False
@@ -3171,8 +2388,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
 
     def test_a_retry_with_dockets_fetches_the_run_database(self) -> None:
-        """A docket held for retry is named by position, so its payload has to
-        be read back out of the run database. Is it fetched then?"""
+        """A docket held for retry is named by position, so its payload has to be read back out of the run database. Is it fetched then?"""
         self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
         self.loader.return_value.retry.return_value = LoadReport()
 
@@ -3186,8 +2402,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
 
     def test_a_retry_is_not_told_where_to_start(self) -> None:
-        """`start_row` and `limit` would each narrow what a retry re-dispatches
-        behind the ledger's back. Is the retry loader built without them?"""
+        """`start_row` and `limit` would each narrow what a retry re-dispatches behind the ledger's back. Is the retry loader built without them?"""
         self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
         self.loader.return_value.retry.return_value = LoadReport()
 
@@ -3197,9 +2412,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertNotIn("limit", self.loader.call_args.kwargs)
 
     def test_a_run_database_that_fails_its_checks_is_reported(self) -> None:
-        """A load that will not run is an operator's problem to act on, and a
-        traceback buries what to act on. Is a failed check reported the way an
-        unfetchable database is?"""
+        """A load that will not run is an operator's problem to act on, and a traceback buries what to act on. Is a failed check reported the way an unfetchable database is?"""
         self.loader.return_value.load.side_effect = PreflightFailed(
             "run.db failed 1 of 2 checks, so nothing was dispatched"
         )
@@ -3210,9 +2423,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertIn("nothing was dispatched", str(raised.exception))
 
     def test_start_row_and_auto_resume_are_contradictory(self) -> None:
-        """Each says to start somewhere the other says not to, and honouring
-        either one quietly does what the other asked against. Is the operator
-        made to pick, rather than one of them being guessed at?"""
+        """Each says to start somewhere the other says not to, and honouring either one quietly does what the other asked against. Is the operator made to pick, rather than one of them being guessed at?"""
         with self.assertRaises(CommandError) as raised:
             self.load("--auto-resume", "--start-row", "5")
 
@@ -3226,8 +2437,11 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.loader.assert_not_called()
 
     def test_the_report_names_what_was_checked(self) -> None:
-        """A check that found nothing is still worth saying ran. Does the
-        report name every check, and send the ones with findings to stderr?"""
+        """A check that found nothing is still worth saying ran.
+
+        Does the report name every check, and send the ones with findings to
+        stderr?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             preflight=(
                 CheckResult("a clean thing", CheckOutcome.PASSED),
@@ -3248,9 +2462,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
 
     def test_both_queues_are_throttled_by_default(self) -> None:
-        """An unthrottled load puts a whole run's dockets in the broker at
-        once, and every other import command paces itself out of the box. Do
-        the queues start throttled here too, at the same figure?"""
+        """An unthrottled load puts a whole run's dockets in the broker at once, and every other import command paces itself out of the box. Do the queues start throttled here too, at the same figure?"""
         self.load()
 
         kwargs = self.loader.call_args.kwargs
@@ -3264,15 +2476,16 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
 
     def test_throttling_can_still_be_turned_off(self) -> None:
-        """A backfill wants throughput over a clear queue. Is zero honoured
-        rather than falling back to the default?"""
+        """A backfill wants throughput over a clear queue.
+
+        Is zero honoured rather than falling back to the default?
+        """
         self.load("--ingest-throttle", "0")
 
         self.assertEqual(self.loader.call_args.kwargs["ingest_throttle"], 0)
 
     def test_auto_resume_starts_from_the_checkpoint(self) -> None:
-        """Does --auto-resume on its own pick the load up where the last one
-        left off?"""
+        """Does --auto-resume on its own pick the load up where the last one left off?"""
         self.load("--auto-resume")
 
         self.assertEqual(self.started_at(), self.CHECKPOINT)
@@ -3284,15 +2497,19 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertEqual(self.started_at(), 5)
 
     def test_a_zero_start_row_does_not_stand_in_the_way(self) -> None:
-        """--start-row defaults to zero, which asks for nothing. Is it left
-        out of the objection?"""
+        """--start-row defaults to zero, which asks for nothing.
+
+        Is it left out of the objection?
+        """
         self.load("--auto-resume", "--start-row", "0")
 
         self.assertEqual(self.started_at(), self.CHECKPOINT)
 
     def test_dropped_dockets_are_named(self) -> None:
         """Rows celery lost are the whole reason the load verifies itself.
-        Does the command say which ones, rather than leaving them in the log?"""
+
+        Does the command say which ones, rather than leaving them in the log?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=2,
             dispatched=2,
@@ -3313,10 +2530,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
     def test_skip_load_checks_a_stored_ledger_without_a_download(
         self,
     ) -> None:
-        """A run that gave up while its queues were still moving has to be
-        settleable later. Does --skip-load do that from the ledger alone,
-        without fetching a run database that can run to hundreds of
-        megabytes?"""
+        """A run that gave up while its queues were still moving has to be settleable later. Does --skip-load do that from the ledger alone, without fetching a run database that can run to hundreds of megabytes?"""
         self.loader.return_value.verify_only.return_value = LoadReport(
             rows_read=False, dispatched=9, merged=9
         )
@@ -3332,9 +2546,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.loader.return_value.load.assert_not_called()
 
     def test_skip_load_does_not_claim_rows_it_never_read(self) -> None:
-        """Printing `0 invalid` for a run whose rows were never opened reads as
-        "no bad rows" when it means "did not look". Are those counts left out,
-        and said to be left out?"""
+        """Printing `0 invalid` for a run whose rows were never opened reads as "no bad rows" when it means "did not look". Are those counts left out, and said to be left out?"""
         self.loader.return_value.verify_only.return_value = LoadReport(
             rows_read=False, dispatched=9, merged=8, rejected=1
         )
@@ -3351,8 +2563,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertIn("no run database was opened", written)
 
     def test_skipping_both_phases_leaves_nothing_to_do(self) -> None:
-        """The two flags each skip one half of the command, and are otherwise
-        free to combine. Is the operator made to pick when they skip both?"""
+        """The two flags each skip one half of the command, and are otherwise free to combine. Is the operator made to pick when they skip both?"""
         with self.assertRaises(CommandError) as raised:
             self.load("--skip-load", "--skip-verification")
 
@@ -3362,8 +2573,10 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.loader.assert_not_called()
 
     def test_counts_line_up_under_one_another(self) -> None:
-        """A run touching several models is read down a column. Are the model
-        names and their counts padded to a common width?"""
+        """A run touching several models is read down a column.
+
+        Are the model names and their counts padded to a common width?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=2,
             dispatched=2,
@@ -3386,8 +2599,10 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
 
     def test_a_timed_out_wait_is_not_reported_as_lost_work(self) -> None:
         """Giving up on a queue that was still coming down is not a finding.
-        Does the output name the timeout as the reason it stopped watching,
-        and point at the flag that settles it?"""
+
+        Does the output name the timeout as the reason it stopped watching, and
+        point at the flag that settles it?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=9,
             dispatched=9,
@@ -3404,8 +2619,10 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertIn("--skip-load", errors)
 
     def test_a_stalled_wait_is_reported_as_lost_work(self) -> None:
-        """A queue that stopped moving is a finding. Does the output say so
-        rather than hedging?"""
+        """A queue that stopped moving is a finding.
+
+        Does the output say so rather than hedging?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=9,
             dispatched=9,
@@ -3422,8 +2639,10 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertNotIn("--skip-load", errors)
 
     def test_the_files_a_run_moved_are_written_out(self) -> None:
-        """A load that publishes files does work no row count shows. Is what
-        became of them written where the model counts are?"""
+        """A load that publishes files does work no row count shows.
+
+        Is what became of them written where the model counts are?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=2, dispatched=2, merged=2, files=FileTally(moved=17)
         )
@@ -3443,9 +2662,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
     def test_files_that_never_reached_the_bucket_are_warned_about(
         self,
     ) -> None:
-        """A document pointing at nothing serves nothing and extracts nothing,
-        which no other count in the report shows. Does the warning say how many
-        re-running the load would mend, and how many it would not?"""
+        """A document pointing at nothing serves nothing and extracts nothing, which no other count in the report shows. Does the warning say how many re-running the load would mend, and how many it would not?"""
         self.loader.return_value.load.return_value = LoadReport(
             seen=2,
             dispatched=2,
@@ -3461,8 +2678,11 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertIn("the 2 it could not find", errors)
 
     def test_a_run_that_moved_no_files_says_nothing_about_them(self) -> None:
-        """Most loaders publish nothing at all. Is the files line held back
-        rather than printing three zeroes on every load?"""
+        """Most loaders publish nothing at all.
+
+        Is the files line held back rather than printing three zeroes on every
+        load?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=2, dispatched=2, merged=2
         )
@@ -3473,7 +2693,9 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
 
     def test_an_unverified_load_does_not_claim_a_clean_run(self) -> None:
         """A load that skipped verification knows only what it dispatched.
-        Does it say so instead of reporting nothing merged?"""
+
+        Does it say so instead of reporting nothing merged?
+        """
         self.loader.return_value.load.return_value = LoadReport(
             seen=2, dispatched=2
         )

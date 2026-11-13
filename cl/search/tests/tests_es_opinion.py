@@ -81,6 +81,7 @@ from cl.search.tests.test_generate_opinion_embeddings import (
     FakeS3IntelligentTieringStorage,
 )
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -157,7 +158,7 @@ class OpinionSearchAPICommonTests(SearchTestCase):
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
-        """Get the result count in a API query response"""
+        """Get the result count in a API query response."""
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v3"}), params
         )
@@ -200,8 +201,7 @@ class OpinionSearchAPICommonTests(SearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_can_query_with_an_old_date(self) -> None:
-        """Do we have any recurrent issues with old dates and strftime (issue
-        220)?"""
+        """Do we have any recurrent issues with old dates and strftime (issue 220)?"""
         search_params = {"q": "*", "filed_after": "1890"}
 
         r = await self._test_api_results_count(search_params, 4, "filed_after")
@@ -328,9 +328,7 @@ class OpinionSearchAPICommonTests(SearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_can_use_docket_number_proximity(self) -> None:
-        """Test docket_number proximity query, so that docket numbers like
-        1:21-cv-1234 can be matched by queries like: 21-1234
-        """
+        """Test docket_number proximity query, so that docket numbers like 1:21-cv-1234 can be matched by queries like: 21-1234."""
         # Query 21-1234, return results for 1:21-bk-1234
         search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
 
@@ -385,7 +383,7 @@ class OpinionSearchAPICommonTests(SearchTestCase):
 
     @skip_if_common_tests_skipped
     async def test_api_results_count(self) -> None:
-        """Test the results count returned by the API"""
+        """Test the results count returned by the API."""
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             f"stat_{PRECEDENTIAL_STATUS.PUBLISHED}": "on",
@@ -479,10 +477,9 @@ class OpinionV3APISearchTest(
 
     def test_o_results_api_pagination(self) -> None:
         """Test pagination for V3 Opinion Search API."""
-
         created_opinions = []
         opinions_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for i in range(opinions_to_create):
                 opinion = OpinionWithParentsFactory(
                     cluster__date_filed=datetime.date(2000, 6, i + 1)
@@ -554,7 +551,6 @@ class OpinionV3APISearchTest(
 
     async def test_bad_syntax_error(self) -> None:
         """Can we properly raise the ElasticServerError exception?"""
-
         # Bad syntax due to the / char in the query.
         params = {
             "type": SEARCH_TYPES.OPINION,
@@ -571,6 +567,7 @@ class OpinionV3APISearchTest(
 
 
 class OpinionV4APISearchTest(
+    AuthenticatedClientMixin,
     OpinionSearchAPICommonTests,
     ESIndexTestCase,
     TestCase,
@@ -650,10 +647,7 @@ class OpinionV4APISearchTest(
         )
 
     def test_extract_snippet_from_db_highlight_disabled(self) -> None:
-        """Confirm that the snippet can be properly extracted from the database,
-        prioritizing the different text fields available in the content when
-        highlighting is disabled."""
-
+        """Confirm that the snippet can be properly extracted from the database, prioritizing the different text fields available in the content when highlighting is disabled."""
         with (
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -802,10 +796,9 @@ class OpinionV4APISearchTest(
     @override_settings(SEARCH_API_PAGE_SIZE=3)
     def test_opinion_results_cursor_api_pagination(self) -> None:
         """Test cursor pagination for V4 Opinion Search API."""
-
         created_clusters = []
         cluster_to_create = 6
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(cluster_to_create):
                 cluster = OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(
@@ -941,7 +934,6 @@ class OpinionV4APISearchTest(
 
     def test_opinion_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 Opinion Search API."""
-
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "order_by": "score desc",
@@ -978,7 +970,6 @@ class OpinionV4APISearchTest(
 
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 Opinion Search API results."""
-
         # Confirm expected values for empty fields.
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -1004,9 +995,7 @@ class OpinionV4APISearchTest(
         )
 
     def test_date_created_without_microseconds_parsing(self) -> None:
-        """Confirm a date_created filed without microseconds can be properly
-        parsed by TimeStampField"""
-
+        """Confirm a date_created filed without microseconds can be properly parsed by TimeStampField."""
         no_micro_second_cluster = OpinionClusterFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
             docket=self.docket_empty,
@@ -1046,8 +1035,7 @@ class OpinionV4APISearchTest(
     @override_settings(OPINION_HITS_PER_RESULT=6)
     def test_nested_opinions_limit(self) -> None:
         """Test nested opinions limit for V4 Opinion Search API."""
-
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
@@ -1074,11 +1062,7 @@ class OpinionV4APISearchTest(
         cluster.delete()
 
     def test_opinions_specific_sorting_keys(self) -> None:
-        """Test if the dateFiled and citeCount sorting keys work properly in
-        the V4 Opinions Search API. Note that no function score is used in the
-        Opinions search because it is not required; dateFiled is a mandatory
-        field in the OpinionCluster model."""
-
+        """Test if the dateFiled and citeCount sorting keys work properly in the V4 Opinions Search API. Note that no function score is used in the Opinions search because it is not required; dateFiled is a mandatory field in the OpinionCluster model."""
         # Query string, order by dateFiled desc
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -1148,11 +1132,8 @@ class OpinionV4APISearchTest(
             self._test_results_ordering(test, "cluster_id")
 
     def test_verify_empty_lists_type_fields_after_partial_update(self):
-        """Verify that list fields related to foreign keys are returned as
-        empty lists after a partial update that removes the related instance
-        and empties the list field.
-        """
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        """Verify that list fields related to foreign keys are returned as empty lists after a partial update that removes the related instance and empties the list field."""
+        with self.captureOnCommitCallbacks(execute=True):
             person = PersonFactory.create(
                 gender="m",
                 name_first="Bill",
@@ -1203,7 +1184,7 @@ class OpinionV4APISearchTest(
             r.data["results"][0]["opinions"][0]["joined_by_ids"], []
         )
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             citation_1.delete()
             opinion.delete()
 
@@ -1310,9 +1291,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     def _assert_missing_citations_query(
         self, html_content, suggested_query, missing_citations
     ):
-        """Assert that a message with missing citations is present in search
-        results.
-        """
+        """Assert that a message with missing citations is present in search results."""
         p_element = html.fromstring(html_content).xpath(
             '//p[@id="missing-citations"]'
         )
@@ -1451,7 +1430,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         },
     )
     def test_last_opinions_home_page(self) -> None:
-        """Test last opinions in home page"""
+        """Test last opinions in home page."""
         cache.delete("homepage-data-o-es")
         with self.captureOnCommitCallbacks(execute=True):
             o_1 = OpinionClusterWithChildrenAndParentsFactory(
@@ -1537,8 +1516,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("case name cluster 3", r.content.decode())
 
     async def test_can_query_with_an_old_date(self) -> None:
-        """Do we have any recurrent issues with old dates and strftime (issue
-        220)?"""
+        """Do we have any recurrent issues with old dates and strftime (issue 220)?"""
         search_params = {"q": "*", "filed_after": "1890"}
 
         # Frontend
@@ -1558,7 +1536,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
-
         # Regular docket_number filtering.
         search_params = {"q": "*", "docket_number": "2"}
 
@@ -1656,8 +1633,9 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         )
 
     async def test_faceted_queries(self) -> None:
-        """Does querying in a given court return the document? Does querying
-        the wrong facets exclude it?
+        """Does querying in a given court return the document?
+
+        Does querying the wrong facets exclude it?
         """
         r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "court_test": "on"}
@@ -1671,9 +1649,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("Debbas", r.content.decode())
 
     async def test_facet_fields_counts(self) -> None:
-        """Confirm that the facet fields contain the correct aggregation
-        counts, regardless of the selected status.
-        """
+        """Confirm that the facet fields contain the correct aggregation counts, regardless of the selected status."""
 
         def assert_facet_fields(facet_fields, expected_vals):
             for field in facet_fields:
@@ -1870,9 +1846,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         await self._test_article_count(search_params, 0, "docket_number")
 
     async def test_issue_1296_abnormal_citation_type_queries(self) -> None:
-        """Does search work OK when there are supra, id, or non-opinion
-        citations in the query?
-        """
+        """Does search work OK when there are supra, id, or non-opinion citations in the query?"""
         params = (
             {"type": SEARCH_TYPES.OPINION, "q": "42 U.S.C. § ·1383a(a)(3)(A)"},
             {"type": SEARCH_TYPES.OPINION, "q": "supra, at 22"},
@@ -1893,10 +1867,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("Code, §", r.content.decode())
 
     async def test_can_use_docket_number_proximity(self) -> None:
-        """Test docket_number proximity query, so that docket numbers like
-        1:21-cv-1234 can be matched by queries like: 21-1234
-        """
-
+        """Test docket_number proximity query, so that docket numbers like 1:21-cv-1234 can be matched by queries like: 21-1234."""
         # Query 21-1234, return results for 1:21-bk-1234
         search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
         # Frontend
@@ -1926,7 +1897,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     async def test_can_filter_with_docket_number_suffixes(self) -> None:
         """Test docket_number with suffixes can be found."""
-
         # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
         # Frontend
         search_params = {
@@ -1951,7 +1921,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("Lorem", r.content.decode())
 
     async def test_can_use_intersection_in_query(self) -> None:
-        """Does AND queries work"""
+        """Does AND queries work."""
         search_params = {"q": "Howard AND Honda"}
         r = await self._test_article_count(
             search_params, 1, "intersection query"
@@ -1961,7 +1931,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("1 Opinion", r.content.decode())
 
     async def test_can_use_union_query(self) -> None:
-        """Does OR queries work"""
+        """Does OR queries work."""
         search_params = {"q": "Howard OR Lissner"}
         r = await self._test_article_count(search_params, 2, "union query")
         self.assertIn("Howard", r.content.decode())
@@ -1969,7 +1939,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("2 Opinions", r.content.decode())
 
     async def test_can_use_negation_in_queries(self) -> None:
-        """Does negation query work"""
+        """Does negation query work."""
         search_params = {"q": "Howard"}
         r = await self._test_article_count(search_params, 1, "simple query")
         self.assertIn("Howard", r.content.decode())
@@ -1984,7 +1954,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("had no results", r.content.decode())
 
     async def test_can_use_phrases_to_query(self) -> None:
-        """Can we query by phrase"""
+        """Can we query by phrase."""
         search_params = {"q": '"Harvey Howard v. Antonin Honda"'}
         r = await self._test_article_count(search_params, 1, "phrases query")
         self.assertIn("Harvey Howard", r.content.decode())
@@ -1995,7 +1965,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("had no results", r.content.decode())
 
     async def test_can_use_grouped_and_sub_queries(self) -> None:
-        """Does grouped and sub queries work"""
+        """Does grouped and sub queries work."""
         search_params = {"q": "(Lissner OR Honda) AND Howard"}
         r = await self._test_article_count(search_params, 1, "grouped query")
         self.assertIn("Howard", r.content.decode())
@@ -2004,7 +1974,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("1 Opinion", r.content.decode())
 
     async def test_query_fielded(self) -> None:
-        """Does fielded queries work"""
+        """Does fielded queries work."""
         search_params = {"q": 'status:"published"'}
         r = await self._test_article_count(search_params, 4, "status")
         self.assertIn("docket number 2", r.content.decode())
@@ -2016,13 +1986,13 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("docket number 1 005", r.content.decode())
 
     async def test_query_by_type(self) -> None:
-        """Does fielded queries work"""
+        """Does fielded queries work."""
         search_params = {"q": f"type:{o_type_index_map.get(Opinion.REMITTUR)}"}
         r = await self._test_article_count(search_params, 1, "type")
         self.assertIn("1:21-cv-1234", r.content.decode())
 
     async def test_a_wildcard_query(self) -> None:
-        """Does a wildcard query work"""
+        """Does a wildcard query work."""
         search_params = {"q": "Was*"}
         r = await self._test_article_count(search_params, 1, "wildcard query")
         self.assertIn("Strickland", r.content.decode())
@@ -2035,7 +2005,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("1 Opinion", r.content.decode())
 
     async def test_a_fuzzy_query(self) -> None:
-        """Does a fuzzy query work"""
+        """Does a fuzzy query work."""
         search_params = {"q": "ond~"}
         r = await self._test_article_count(search_params, 4, "fuzzy query")
         self.assertIn("docket number 2", r.content.decode())
@@ -2043,14 +2013,14 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("4 Opinions", r.content.decode())
 
     async def test_proximity_query(self) -> None:
-        """Does a proximity query work"""
+        """Does a proximity query work."""
         search_params = {"q": '"Testing Court"~3'}
         r = await self._test_article_count(search_params, 1, "proximity query")
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
     async def test_can_filter_using_citation_range(self) -> None:
-        """Does a range query work"""
+        """Does a range query work."""
         search_params = {"q": "citation:([22 TO 33])"}
         r = await self._test_article_count(
             search_params, 2, "citation range query"
@@ -2061,7 +2031,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     async def test_cites_query(self) -> None:
         """Does a cites:(*) query work?"""
-
         search_params = {"q": f"cites:({self.opinion_1.pk})"}
         r = await self._test_article_count(search_params, 1, "cites:() query")
 
@@ -2078,7 +2047,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("1 reference to this case", r.content.decode())
 
     async def test_can_filter_using_date_ranges(self) -> None:
-        """Does a date query work"""
+        """Does a date query work."""
         search_params = {
             "q": "dateFiled:[2015-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"
         }
@@ -2099,8 +2068,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("2 Opinions", r.content.decode())
 
     async def test_results_highlights(self) -> None:
-        """Confirm highlights are shown properly"""
-
+        """Confirm highlights are shown properly."""
         # Highlight case name.
         params = {"q": "'Howard v. Honda'"}
 
@@ -2147,7 +2115,6 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     @override_settings(OPINION_HITS_PER_RESULT=6)
     def test_nested_opinions_limit_frontend(self) -> None:
         """Test nested opinions limit for Opinion Search in the frontend."""
-
         with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -2181,8 +2148,9 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         cluster.delete()
 
     def test_frontend_opinions_count(self) -> None:
-        """Assert Opinions search results counts in the fronted. Below and
-        above the estimation threshold.
+        """Assert Opinions search results counts in the fronted.
+
+        Below and above the estimation threshold.
         """
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -2209,9 +2177,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertIn("About 5,300 Opinions", counts_text)
 
     def test_display_query_citation_frontend(self) -> None:
-        """Confirm if the query citation alert is shown on the frontend when
-        querying a single citation, and it's found into ES."""
-
+        """Confirm if the query citation alert is shown on the frontend when querying a single citation, and it's found into ES."""
         # Cluster with citation and multiple sibling opinions is properly matched.
         with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
@@ -2277,10 +2243,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         cluster.delete()
 
     def test_drop_missing_citation_from_query(self) -> None:
-        """If a query contains a citation that we don't have,
-        drop the citation(s) from the query, perform the query, and inform the
-        users about this behavior."""
-
+        """If a query contains a citation that we don't have, drop the citation(s) from the query, perform the query, and inform the users about this behavior."""
         # Cluster with citation and multiple sibling opinions is properly matched.
         with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
@@ -2360,10 +2323,7 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         cluster.delete()
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
-        """Confirm that stemming is disabled on the case_name
-        filter and text query.
-        """
-
+        """Confirm that stemming is disabled on the case_name filter and text query."""
         with self.captureOnCommitCallbacks(execute=True):
             cluster_1 = OpinionClusterFactory.create(
                 case_name="Maecenas Howell",
@@ -2427,11 +2387,9 @@ class OpinionsESSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
 
 class OpinionSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
-    """
-    Opinion Search Decay Relevancy Tests
-    """
+    """Opinion Search Decay Relevancy Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2679,8 +2637,7 @@ class OpinionSearchDecayRelevancyTest(
         ]
 
     def test_relevancy_decay_scoring_frontend(self) -> None:
-        """Test relevancy decay scoring for Opinion search Frontend"""
-
+        """Test relevancy decay scoring for Opinion search Frontend."""
         for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
@@ -2693,24 +2650,20 @@ class OpinionSearchDecayRelevancyTest(
                 )
 
     def test_relevancy_decay_scoring_v4_api(self) -> None:
-        """Test relevancy decay scoring for Opinion search V4 API"""
-
+        """Test relevancy decay scoring for Opinion search V4 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id")
 
     def test_relevancy_decay_scoring_v3_api(self) -> None:
-        """Test relevancy decay scoring for Opinion search V3 API"""
-
+        """Test relevancy decay scoring for Opinion search V3 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id", version="v3")
 
 
 class OpinionSearchJurisdictionRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
-    """
-    Opinion Search Jurisdiction Relevance Tests
-    """
+    """Opinion Search Jurisdiction Relevance Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2922,8 +2875,7 @@ class OpinionSearchJurisdictionRelevancyTest(
         }
 
     def test_relevancy_jurisdiction_scoring_frontend(self) -> None:
-        """Test jurisdiction relevancy scoring for Opinion search Frontend"""
-
+        """Test jurisdiction relevancy scoring for Opinion search Frontend."""
         for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
@@ -2936,25 +2888,18 @@ class OpinionSearchJurisdictionRelevancyTest(
                 )
 
     def test_relevancy_decay_scoring_v4_api(self) -> None:
-        """Test jurisdiction decay scoring for Opinion search V4 API"""
-
+        """Test jurisdiction decay scoring for Opinion search V4 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id")
 
     def test_relevancy_decay_scoring_v3_api(self) -> None:
-        """Test jurisdiction decay scoring for Opinion search V3 API"""
-
+        """Test jurisdiction decay scoring for Opinion search V3 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id", version="v3")
 
     @override_settings(JURISDICTION_BOOST=0.1)
     def test_tune_jurisdiction_factor_frontend(self) -> None:
-        """Test tuning the jurisdiction boost for Opinion search Frontend
-        JURISDICTION_BOOST = 0.1
-        This means that the jurisdiction weight is less significant, so the
-        date decay relevance becomes more important.
-        """
-
+        """Test tuning the jurisdiction boost for Opinion search Frontend JURISDICTION_BOOST = 0.1 This means that the jurisdiction weight is less significant, so the date decay relevance becomes more important."""
         r = async_to_sync(self._test_article_count)(
             self.tune_factor_case["search_params"],
             len(self.tune_factor_case["expected_order_frontend"]),
@@ -2967,12 +2912,7 @@ class OpinionSearchJurisdictionRelevancyTest(
 
     @override_settings(JURISDICTION_BOOST=0.1)
     def test_tune_jurisdiction_factor_api(self) -> None:
-        """Test tuning the jurisdiction boost for Opinion search API
-        JURISDICTION_BOOST = 0.1
-        This means that the jurisdiction weight is less significant, so the
-        date decay relevance becomes more important.
-        """
-
+        """Test tuning the jurisdiction boost for Opinion search API JURISDICTION_BOOST = 0.1 This means that the jurisdiction weight is less significant, so the date decay relevance becomes more important."""
         self._test_results_ordering(self.tune_factor_case, "cluster_id")
 
 
@@ -3049,13 +2989,11 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         super().setUp()
 
     def get_article_count(self, r):
-        """Get the article count in a query response"""
+        """Get the article count in a query response."""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_more_like_this_opinion(self) -> None:
-        """Does the MoreLikeThis query return the correct number and order of
-        articles."""
-
+        """Does the MoreLikeThis query return the correct number and order of articles."""
         seed_1_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
         seed_2_pk = self.opinion_7.pk  # "Voutila v. Bonvini"
         expected_article_count = 2
@@ -3117,7 +3055,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
-        """MoreLikeThis query on opinion detail page with status filter"""
+        """MoreLikeThis query on opinion detail page with status filter."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3162,7 +3100,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     async def test_more_like_this_opinion_detail_no_filter(self) -> None:
-        """MoreLikeThis query on opinion detail page (without filter)"""
+        """MoreLikeThis query on opinion detail page (without filter)."""
         seed_pk = self.opinion_cluster_1.pk  # Paul Debbas v. Franklin
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3210,8 +3148,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     async def test_more_like_this_opinion_detail_multiple_sub_opinions(
         self,
     ) -> None:
-        """MoreLikeThis query on opinion detail page on a cluster with multiple
-        sub_opinions."""
+        """MoreLikeThis query on opinion detail page on a cluster with multiple sub_opinions."""
         seed_pk = self.cluster_4.pk  # Voutila v. Bonvini
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3258,8 +3195,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     async def test_es_get_citing_and_related_clusters_no_cache_timeout(
         self,
     ) -> None:
-        """Confirm that 'Unable to retrieve clusters...' message is shown if
-        the MLT and citing query time out and there is no cache available."""
+        """Confirm that 'Unable to retrieve clusters...' message is shown if the MLT and citing query time out and there is no cache available."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3326,10 +3262,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     async def test_es_get_citing_and_related_clusters_no_cache_connection_error(
         self,
     ) -> None:
-        """Confirm that there are no related clusters, no cached results, and display 'This case
-        has not yet been cited in our system.' if the query raised a
-        connection error."""
-
+        """Confirm that there are no related clusters, no cached results, and display 'This case has not yet been cited in our system.' if the query raised a connection error."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3358,9 +3291,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
     async def test_es_get_citing_and_related_clusters_cache_timeout(
         self,
     ) -> None:
-        """Confirm that related and citing clusters are properly displayed if
-        the MLT and citing queries time out but cached results are available.
-        """
+        """Confirm that related and citing clusters are properly displayed if the MLT and citing queries time out but cached results are available."""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
@@ -3456,7 +3387,7 @@ class RelatedSearchTest(ESIndexTestCase, SearchTestCase, TestCase):
 class IndexOpinionDocumentsCommandTest(
     ESIndexTestCase, SearchTestCase, TestCase
 ):
-    """cl_index_parent_and_child_docs command tests for Elasticsearch"""
+    """cl_index_parent_and_child_docs command tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3476,9 +3407,7 @@ class IndexOpinionDocumentsCommandTest(
         self.create_index("search.OpinionCluster")
 
     def test_cl_index_parent_and_child_docs_command(self):
-        """Confirm the command can properly index OpinionCluster and their
-        Opinions into the ES."""
-
+        """Confirm the command can properly index OpinionCluster and their Opinions into the ES."""
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
         # Call cl_index_parent_and_child_docs command.
@@ -3512,10 +3441,7 @@ class IndexOpinionDocumentsCommandTest(
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
     def test_index_parent_or_child_docs_in_es(self):
-        """Confirm the command can properly index missing clusters when
-        indexing only Opinions.
-        """
-
+        """Confirm the command can properly index missing clusters when indexing only Opinions."""
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
         # Call cl_index_parent_and_child_docs command for OpinionCluster.
@@ -3572,7 +3498,6 @@ class IndexOpinionDocumentsCommandTest(
 
     def test_opinions_indexing_missing_flag(self):
         """Confirm the command can properly index missing Opinions."""
-
         # Call cl_index_parent_and_child_docs command for Opinions.
         call_command(
             "cl_index_parent_and_child_docs",
@@ -3638,10 +3563,7 @@ class IndexOpinionDocumentsCommandTest(
         )
 
     def test_opinions_indexing_non_null_field(self):
-        """Confirm that the indexing command properly filters out instances to
-        be indexed based on the non-null field value provided as a parameter.
-        """
-
+        """Confirm that the indexing command properly filters out instances to be indexed based on the non-null field value provided as a parameter."""
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
 
@@ -3730,9 +3652,7 @@ class EsOpinionsIndexingTest(
         super().setUp()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
-        """Confirm join child objects are removed from the index when the
-        parent objects is deleted.
-        """
+        """Confirm join child objects are removed from the index when the parent objects is deleted."""
         cluster = OpinionClusterFactory.create(
             case_name_full="Paul Debbas v. Franklin",
             case_name_short="Debbas",
@@ -3778,9 +3698,7 @@ class EsOpinionsIndexingTest(
         )
 
     def test_remove_nested_objects_from_index(self) -> None:
-        """Confirm that child objects are removed from the index when they are
-        deleted independently of their parent object
-        """
+        """Confirm that child objects are removed from the index when they are deleted independently of their parent object."""
         cluster = OpinionClusterFactory.create(
             case_name_full="Paul Debbas v. Franklin",
             case_name_short="Debbas",
@@ -3821,8 +3739,7 @@ class EsOpinionsIndexingTest(
         cluster.delete()
 
     def test_child_document_update_properly(self) -> None:
-        """Confirm that child fields are properly update when changing DB records"""
-
+        """Confirm that child fields are properly update when changing DB records."""
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -4062,7 +3979,7 @@ class EsOpinionsIndexingTest(
         opinion.delete()
 
     def test_parent_document_update_fields_properly(self) -> None:
-        """Confirm that parent fields are properly update when changing DB records"""
+        """Confirm that parent fields are properly update when changing DB records."""
         docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
@@ -4144,7 +4061,7 @@ class EsOpinionsIndexingTest(
         opinion_cluster.delete()
 
     def test_update_shared_fields_related_documents(self) -> None:
-        """Confirm that related document are properly update using bulk approach"""
+        """Confirm that related document are properly update using bulk approach."""
         docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
@@ -4458,7 +4375,6 @@ class EsOpinionsIndexingTest(
 
     def test_remove_control_chars_on_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
-
         o_c = OpinionClusterFactory.create(
             case_name_full="Testing v. Cluster",
             date_filed=datetime.date(2034, 8, 14),
@@ -4686,7 +4602,7 @@ class EsOpinionsIndexingTest(
 
 
 class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
-    """Tests for Opinion Search Feed"""
+    """Tests for Opinion Search Feed."""
 
     def setUp(self) -> None:
         self.good_item = {
@@ -4752,7 +4668,6 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     def test_do_opinion_search_feed_have_content(self) -> None:
         """Can we make an Opinion Search Feed?"""
-
         # Text query case.
         params = {
             "q": "docket number",
@@ -4906,10 +4821,7 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
         )
 
     def test_item_enclosure_mime_type_handles_bogus_files(self) -> None:
-        """
-        Does the mime type detection safely return a good default value when
-        given a file it can't detect the mime type for?
-        """
+        """Does the mime type detection safely return a good default value when given a file it can't detect the mime type for?"""
         self.assertEqual(
             self.feed.item_enclosure_mime_type(self.zero_item),
             "application/octet-stream",
@@ -4920,11 +4832,7 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
         )
 
     def test_feed_renders_with_item_without_file_path(self) -> None:
-        """
-        For Opinions without local_path attributes (that is they don't have a
-        corresponding original PDF/txt/doc file) can we render the feed without
-        the enclosures
-        """
+        """For Opinions without local_path attributes (that is they don't have a corresponding original PDF/txt/doc file) can we render the feed without the enclosures."""
         fake_results = [self.null_item]
 
         class FakeFeed(JurisdictionFeed):
@@ -4947,9 +4855,7 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
             self.fail(f"Could not call get_feed(): {e}")
 
     def test_cleanup_control_characters_for_xml_rendering(self) -> None:
-        """Can we clean up control characters in the text for a proper XML
-        rendering?
-        """
+        """Can we clean up control characters in the text for a proper XML rendering?"""
         with (
             mock.patch(
                 "cl.search.documents.escape",
@@ -5023,7 +4929,6 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
 
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empty feed?"""
-
         # Bad syntax error.
         params = {
             "q": "Leave /:",

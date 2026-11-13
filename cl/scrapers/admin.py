@@ -33,8 +33,7 @@ admin.site.register(UrlHash)
 
 
 class MVLatestOpinion(models.Model):
-    """
-    Model linked to materialized view for monitoring scrapers
+    """Model linked to materialized view for monitoring scrapers.
 
     The SQL for creating the view is on it's migration file.
 
@@ -57,7 +56,7 @@ class MVLatestOpinion(models.Model):
 
 @admin.register(MVLatestOpinion)
 class MVLatestOpinionAdmin(admin.ModelAdmin):
-    """Admin page to look at the latest opinion for each court
+    """Admin page to look at the latest opinion for each court.
 
     Use this to monitor silently failing scrapers
     """

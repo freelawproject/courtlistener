@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import call_command
 from django.http import HttpResponse
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from elasticsearch.dsl import Document
 from lxml import html as lhtml
@@ -35,12 +35,11 @@ from cl.search.models import (
     Opinion,
     SearchQuery,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import AuthenticatedClientMixin, ESIndexTestCase, TestCase
 
 
 def mock_read_from_s3(file_path, r):
-    """Mock bucket.open() to return fake embeddings JSON content for
-    a given opinion ID."""
+    """Mock bucket.open() to return fake embeddings JSON content for a given opinion ID."""
     opinion_id_str = Path(file_path).stem.split("_")[-1]
     opinion_id = int(opinion_id_str)
     fake_embedding_data = EmbeddingsDataFactory.build(id=opinion_id)
@@ -56,7 +55,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             id="canb",
             jurisdiction="FB",
         )
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_cluster_2 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=cls.court,
@@ -68,7 +67,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
     def test_opinion_embeddings_field(self) -> None:
         """Test index embeddings into an opinion document."""
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_1 = OpinionClusterFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -116,7 +115,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
         )
 
     def test_cl_index_embeddings(self) -> None:
-        """Test cl_index_embeddings command"""
+        """Test cl_index_embeddings command."""
         with self.captureOnCommitCallbacks(execute=True):
             opinion_2 = OpinionFactory(
                 cluster=self.opinion_cluster_2,
@@ -282,7 +281,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 @override_settings(KNN_SEARCH_ENABLED=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
-class SemanticSearchTests(ESIndexTestCase, TestCase):
+class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test index and test data."""
@@ -303,7 +302,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
 
         # Create opinions and clusters
-        with cls.captureOnCommitCallbacks(execute=True) as callbacks:
+        with cls.captureOnCommitCallbacks(execute=True):
             cls.opinion_2 = OpinionFactory(
                 cluster=OpinionClusterFactory(
                     docket=DocketFactory(
@@ -397,7 +396,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
-        """Get the result count in a API query response"""
+        """Get the result count in a API query response."""
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v4"}), params
         )
@@ -419,7 +418,6 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self, inception_mock
     ) -> None:
         """Can we perform a semantic search using the API?"""
-
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
         )
@@ -541,7 +539,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
 
     async def test_is_semantic_score_standarized(self, inception_mock) -> None:
-        """Ensure that semantic scores are consistently returned as floats"""
+        """Ensure that semantic scores are consistently returned as floats."""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
         )
@@ -754,8 +752,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
     @override_flag("semantic_search_frontend", active=False)
     def test_frontend_flag_off_disables_semantic(self, inception_mock) -> None:
-        """Semantic search is disabled on the frontend when the waffle
-        flag is inactive, even if semantic=true is in the URL."""
+        """Semantic search is disabled on the frontend when the waffle flag is inactive, even if semantic=true is in the URL."""
         inception_mock.return_value = self._get_mock_for_inception(
             self.situational_query_vectors
         )
@@ -847,12 +844,10 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
 @override_settings(KNN_SEARCH_ENABLED=True)
 class SemanticFormCleanTest(TestCase):
-    """Tests that SearchForm preserves the semantic field correctly
-    when used from the frontend (without a request object)."""
+    """Tests that SearchForm preserves the semantic field correctly when used from the frontend (without a request object)."""
 
     def test_semantic_preserved_when_knn_enabled(self) -> None:
-        """semantic=True survives clean() when KNN_SEARCH_ENABLED=True
-        and the frontend flag is active."""
+        """semantic=True survives clean() when KNN_SEARCH_ENABLED=True and the frontend flag is active."""
         form = SearchForm(
             {
                 "q": "free speech",
@@ -865,8 +860,7 @@ class SemanticFormCleanTest(TestCase):
         self.assertTrue(form.cleaned_data["semantic"])
 
     def test_semantic_disabled_when_flag_inactive(self) -> None:
-        """semantic is forced to False on the frontend when the flag
-        is inactive, even if KNN_SEARCH_ENABLED=True."""
+        """Semantic is forced to False on the frontend when the flag is inactive, even if KNN_SEARCH_ENABLED=True."""
         form = SearchForm(
             {
                 "q": "free speech",
@@ -880,7 +874,7 @@ class SemanticFormCleanTest(TestCase):
 
     @override_settings(KNN_SEARCH_ENABLED=False)
     def test_semantic_disabled_when_knn_disabled(self) -> None:
-        """semantic is forced to False when KNN_SEARCH_ENABLED=False."""
+        """Semantic is forced to False when KNN_SEARCH_ENABLED=False."""
         form = SearchForm(
             {
                 "q": "free speech",
@@ -905,8 +899,7 @@ class HasSemanticParamsTest(TestCase):
         self.assertFalse(has_semantic_params(params))
 
     def test_whitespace_quotes_not_semantic(self) -> None:
-        """A query with only whitespace inside quotes has no embeddable
-        text."""
+        """A query with only whitespace inside quotes has no embeddable text."""
         params = {
             "q": '" "',
             "type": SEARCH_TYPES.OPINION,
