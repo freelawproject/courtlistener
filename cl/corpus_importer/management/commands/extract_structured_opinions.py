@@ -100,19 +100,21 @@ def extract_structured_opinion(
     """Extract an opinion's PDF with Centralia and store the result.
 
     Sends the opinion's PDF to Doctor's structured opinion endpoint, which
-    is backed by Centralia, and saves the returned HTML in `Opinion.html`
-    along with the opinion's ordering key, type, per curiam flag and author
-    string. Citations in the new content are then found by a Celery task.
+    is backed by Centralia, and saves the first writing's HTML in
+    `Opinion.html` along with the opinion's ordering key, type, per curiam
+    flag and author string. Each further writing, such as a concurrence or
+    dissent, becomes a new opinion in the cluster. Citations in the new
+    content are then found by a Celery task.
 
-    The opinion must be its cluster's only one. Centralia must also find
-    exactly one opinion, and its read must pass should_ingest: a "valid"
-    status, no scanned, textless or CID-encoded pages, and at least half the
-    text of the opinion's current `plain_text`. Anything else is logged and
-    skipped without changing the database. See cl.corpus_importer.centralia
-    for the details. With `skip_validation`, only the single writing with
-    HTML is required, so a partial or garbled read can replace the
-    opinion's existing content, but opinions with text in a field that
-    outranks `html` are still skipped.
+    The opinion must be its cluster's only one when Centralia finds several
+    writings, and the read must pass should_ingest: a "valid" status, no
+    scanned, textless or CID-encoded pages, and at least half the text of
+    the opinion's current `plain_text`. Anything else is logged and skipped
+    without changing the database. See cl.corpus_importer.centralia for the
+    details. With `skip_validation`, only writings with HTML are required,
+    so a partial or garbled read can replace the opinion's existing content,
+    but opinions with text in a field that outranks `html` are still
+    skipped.
 
     Error responses from Doctor are logged and reported in the result. Other
     errors, such as connection errors, timeouts or database errors while
@@ -128,7 +130,8 @@ def extract_structured_opinion(
     :param skip_validation: Whether to skip Centralia's quality checks. It
     also lets Centralia read courts it has not released yet.
     :return: A dict with the "cluster_id", the StructuredExtractionStatus as
-    "status", the "reason" for it, and the "metrics" from
+    "status", the "reason" for it, the number of "writings" Centralia found
+    (0 when Doctor failed), and the "metrics" from
     compare_structured_extraction (empty unless `compare` is set and Doctor
     succeeded).
     """
@@ -136,6 +139,7 @@ def extract_structured_opinion(
         "cluster_id": opinion.cluster_id,
         "status": StructuredExtractionStatus.ERROR,
         "reason": "",
+        "writings": 0,
         "metrics": {},
     }
     court_id = opinion.cluster.docket.court_id
@@ -175,6 +179,7 @@ def extract_structured_opinion(
         result["reason"] = f"{data.get('error_code')}: {data.get('msg')}"
         return result
 
+    result["writings"] = len(data.get("opinions") or [])
     if compare:
         # Before merging, which replaces the opinion's current content
         result["metrics"] = compare_structured_extraction(opinion, data)
@@ -190,16 +195,16 @@ def extract_structured_opinion(
         )
         return result
 
-    merged, result["reason"] = merge_structured_opinion_into_cl_opinion(
+    opinion_pks, result["reason"] = merge_structured_opinion_into_cl_opinion(
         opinion, data, skip_validation=skip_validation
     )
-    if not merged:
+    if not opinion_pks:
         result["status"] = StructuredExtractionStatus.SKIPPED
         return result
 
     result["status"] = StructuredExtractionStatus.INGESTED
     find_citations_and_parentheticals_for_opinion_by_pks.si(
-        [opinion.pk]
+        opinion_pks
     ).apply_async(queue=queue)
     return result
 
@@ -212,7 +217,9 @@ class Command(VerboseCommand):
     Sends the PDF of each matching cluster to Doctor's structured opinion
     endpoint, one at a time, and, when the read passes the quality checks,
     stores its HTML on the cluster's only opinion and queues a task to find
-    its citations. See extract_structured_opinion.
+    its citations. When the PDF holds several writings, such as a majority
+    and a dissent, each writing after the first becomes a new opinion in
+    the cluster. See extract_structured_opinion.
 
     Only courts in CENTRALIA_ENABLED_COURTS, and clusters whose only source
     is a court website scraper, with exactly one opinion and no anon 2020
@@ -360,6 +367,7 @@ class Command(VerboseCommand):
                     "cluster_id": opinion.cluster_id,
                     "status": StructuredExtractionStatus.ERROR,
                     "reason": f"{type(e).__name__}: {e}",
+                    "writings": 0,
                     "metrics": {},
                 }
             results.append(result)
@@ -396,6 +404,17 @@ class Command(VerboseCommand):
         )
         for status in StructuredExtractionStatus:
             self.stdout.write(f"  {status}: {statuses[status]}")
+        split = sum(
+            1
+            for r in results
+            if r["writings"] > 1
+            and r["status"]
+            in (
+                StructuredExtractionStatus.INGESTED,
+                StructuredExtractionStatus.WOULD_INGEST,
+            )
+        )
+        self.stdout.write(f"  split into several opinions: {split}")
 
         compared = [r for r in results if r["metrics"]]
         if not compared:

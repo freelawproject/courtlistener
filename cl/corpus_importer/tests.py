@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -40,6 +41,7 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.corpus_importer.centralia import (
+    StructuredExtractionStatus,
     merge_structured_opinion_into_cl_opinion,
     should_ingest,
 )
@@ -56,6 +58,9 @@ from cl.corpus_importer.management.commands.claims_activity_project import (
 )
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
+)
+from cl.corpus_importer.management.commands.extract_structured_opinions import (
+    extract_structured_opinion,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
@@ -6327,27 +6332,109 @@ class CentraliaIngestTest(TestCase):
             html="",
             xml_harvard="<sentinel/>",
             download_url="https://example.com/opinion.pdf",
+            local_path="pdf/2024/01/01/opinion.pdf",
         )
 
-    @patch("cl.corpus_importer.centralia.logger")
-    def test_rejects_a_multi_writing_payload(self, mock_logger) -> None:
-        """Is a payload with several writings refused, leaving the cluster untouched?
+    def test_a_multi_writing_payload_splits_the_opinion(self) -> None:
+        """Does each writing after the first become a sibling opinion?
 
-        Only single-opinion documents are supported for now, so the extra
-        writings are neither merged into the seed nor created as siblings.
+        The seed keeps the first writing, so citations to it still point at
+        the decision. Siblings share its PDF but not its sha1 or download
+        URL, which duplicate and version detection group opinions by.
         """
-        ingested, reason = merge_structured_opinion_into_cl_opinion(
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
             self.seed, self.multi_payload
         )
 
-        self.assertFalse(ingested)
-        self.assertIn("found 2 opinions", reason)
-        mock_logger.warning.assert_called_once()
-        self.assertEqual(mock_logger.warning.call_args.args[2], reason)
-        self.assertEqual(self.cluster.sub_opinions.count(), 1)
+        self.assertEqual(len(opinion_pks), 2, msg=reason)
+        self.assertEqual(opinion_pks[0], self.seed.pk)
         self.seed.refresh_from_db()
-        self.assertEqual(self.seed.html, "")
-        self.assertEqual(self.seed.type, Opinion.COMBINED)
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertEqual(self.seed.author_str, "Walker")
+        self.assertEqual(self.seed.ordering_key, 1)
+        self.assertIn("The judgment of the district court", self.seed.html)
+        self.assertEqual(self.seed.plain_text, "The judgment is affirmed.")
+
+        dissent = Opinion.objects.get(pk=opinion_pks[1])
+        self.assertEqual(dissent.cluster_id, self.cluster.pk)
+        self.assertEqual(dissent.type, Opinion.DISSENT)
+        self.assertEqual(dissent.author_str, "Lee")
+        self.assertFalse(dissent.per_curiam)
+        self.assertEqual(dissent.ordering_key, 2)
+        self.assertTrue(
+            dissent.html.startswith('<div class="centralia">'),
+            msg=dissent.html[:80],
+        )
+        self.assertEqual(dissent.plain_text, "I respectfully dissent.")
+        self.assertEqual(dissent.local_path.name, self.seed.local_path.name)
+        self.assertEqual(dissent.sha1, "")
+        self.assertIsNone(dissent.download_url)
+        self.assertEqual(self.cluster.sub_opinions.count(), 2)
+
+    def test_orders_fall_back_to_position(self) -> None:
+        """Are unusable Centralia orders replaced by 1 to N?
+
+        Ordering keys must be unique within a cluster, so duplicate or
+        missing orders must not stop the split.
+        """
+        for orders in ([1, 1], [None, 2], [0, 1]):
+            with self.subTest(orders=orders):
+                cluster = OpinionClusterFactory(
+                    docket=DocketFactory(court=self.court)
+                )
+                seed = OpinionFactory(cluster=cluster, html="", plain_text="")
+                payload = copy.deepcopy(self.multi_payload)
+                for writing, order in zip(payload["opinions"], orders):
+                    writing["order"] = order
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
+                )
+
+                self.assertEqual(len(opinion_pks), 2, msg=reason)
+                self.assertEqual(
+                    list(
+                        cluster.sub_opinions.order_by(
+                            "ordering_key"
+                        ).values_list("type", "ordering_key")
+                    ),
+                    [(Opinion.LEAD, 1), (Opinion.DISSENT, 2)],
+                )
+
+    @patch("cl.corpus_importer.centralia.logger")
+    def test_refuses_to_split_unsafely(self, mock_logger) -> None:
+        """Is a split refused when it isn't safe, leaving the cluster as is?
+
+        A split is unsafe when a writing has no HTML or the cluster already
+        has several opinions. The second case is also what stops a split cluster from being split
+        again, since its siblings share the original PDF.
+        """
+        no_html = copy.deepcopy(self.multi_payload)
+        no_html["opinions"][1]["html"] = " "
+        for name, payload, add_sibling, expected in (
+            ("blank writing", no_html, False, "a writing carries no html"),
+            ("existing sibling", self.multi_payload, True, "already has 2"),
+        ):
+            with self.subTest(name):
+                cluster = OpinionClusterFactory(
+                    docket=DocketFactory(court=self.court)
+                )
+                seed = OpinionFactory(cluster=cluster, html="", plain_text="")
+                if add_sibling:
+                    OpinionFactory(cluster=cluster)
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
+                )
+
+                self.assertEqual(opinion_pks, [])
+                self.assertIn(expected, reason)
+                self.assertEqual(mock_logger.warning.call_args.args[2], reason)
+                self.assertEqual(
+                    cluster.sub_opinions.count(), 2 if add_sibling else 1
+                )
+                seed.refresh_from_db()
+                self.assertEqual(seed.html, "")
 
     def test_a_lone_writing_ingests_as_the_lead(self) -> None:
         """Does a single-writing paper become the lead opinion?
@@ -6377,3 +6464,81 @@ class CentraliaIngestTest(TestCase):
             msg="xml_harvard must never be touched",
         )
         self.assertEqual(self.cluster.sub_opinions.count(), 1)
+
+
+class ExtractStructuredOpinionTest(TestCase):
+    """Test extracting a scraped opinion's PDF with Centralia."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with open(
+            CentraliaIngestTest.test_dir / "centralia_payload_multi.json",
+            encoding="utf-8",
+        ) as f:
+            cls.multi_payload = json.load(f)
+
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterFactory(
+            docket=DocketFactory(court=self.court)
+        )
+        self.seed = OpinionFactory(
+            cluster=self.cluster,
+            html="",
+            plain_text="",
+            local_path="pdf/2024/01/01/opinion.pdf",
+        )
+        response = mock.MagicMock(is_success=True)
+        response.json.return_value = {"success": True, **self.multi_payload}
+        patches = [
+            patch(
+                "cl.corpus_importer.management.commands."
+                "extract_structured_opinions.microservice",
+                new_callable=mock.AsyncMock,
+                return_value=response,
+            ),
+            # The PDF is only streamed to the mocked microservice
+            patch("django.db.models.fields.files.FieldFile.open"),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    @patch(
+        "cl.corpus_importer.management.commands.extract_structured_opinions."
+        "find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    def test_a_split_finds_citations_for_every_opinion(
+        self, mock_find_citations
+    ) -> None:
+        """Are citations found for the seed and its new siblings?
+
+        A dry run must save nothing and queue nothing.
+        """
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                result = extract_structured_opinion(self.seed, dry_run=dry_run)
+
+                self.assertEqual(result["writings"], 2)
+                if dry_run:
+                    self.assertEqual(
+                        result["status"],
+                        StructuredExtractionStatus.WOULD_INGEST,
+                        msg=result["reason"],
+                    )
+                    self.assertEqual(self.cluster.sub_opinions.count(), 1)
+                    mock_find_citations.si.assert_not_called()
+                    continue
+                self.assertEqual(
+                    result["status"],
+                    StructuredExtractionStatus.INGESTED,
+                    msg=result["reason"],
+                )
+                self.assertEqual(self.cluster.sub_opinions.count(), 2)
+                mock_find_citations.si.assert_called_once_with(
+                    list(
+                        self.cluster.sub_opinions.order_by(
+                            "ordering_key"
+                        ).values_list("pk", flat=True)
+                    )
+                )
