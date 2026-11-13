@@ -1,8 +1,39 @@
-<div
-  data-tab-id="{{ name }}"
-  x-init="registerTab"
-  x-show="isActive"
-  class="text-sm font-normal"
->
-  {{ slot }}
-</div>
+{% load svg_tags %}
+
+<c-vars tab tabs_id="" active_tab="" />
+
+{% if tab.url %}
+<li class="-mb-px">
+  <a
+    href="{{ tab.url }}"
+    id="{{ tabs_id }}-tab-{{ tab.key }}"
+    class="flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self aria-[current=page]:border-primary-600 aria-[current=page]:font-medium aria-[current=page]:text-greyscale-900"
+    {% if tab.key == active_tab %} aria-current="page"{% endif %}
+  >
+    {% if tab.icon %}
+      {% svg tab.icon aria_hidden="true" class="size-5" %}
+    {% endif %}
+    {{ tab.label }}
+  </a>
+</li>
+{% else %}
+  <button
+    type="button"
+    role="tab"
+    id="{{ tabs_id }}-tab-{{ tab.key }}"
+    aria-controls="{{ tabs_id }}-panel-{{ tab.key }}"
+    aria-selected="{% if tab.key == active_tab %}true{% else %}false{% endif %}"
+    tabindex="{% if tab.key == active_tab %}0{% else %}-1{% endif %}"
+    data-tab-key="{{ tab.key }}"
+    x-bind:aria-selected="isSelected"
+    x-bind:tabindex="tabIndex"
+    x-on:click="selectTab"
+    x-on:focus="selectTab"
+    class="-mb-px flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self aria-selected:border-primary-600 aria-selected:font-medium aria-selected:text-greyscale-900"
+  >
+    {{ tab.label }}
+    {% if tab.count %}
+      <span class="size-6 rounded-full bg-greyscale-100 py-1 text-xs font-normal text-center text-greyscale-600">{{ tab.count }}</span>
+    {% endif %}
+  </button>
+{% endif %}

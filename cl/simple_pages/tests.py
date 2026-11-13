@@ -10,7 +10,7 @@ from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
 from django_cotton.compiler_regex import CottonCompiler
-from lxml.html import fromstring
+from lxml.html import HtmlElement, fromstring
 from waffle.testutils import override_flag
 
 from cl.lib.middleware import WIP_PROPS
@@ -19,6 +19,7 @@ from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+from cl.users.utils import TabItem
 
 
 class ChangePasswordWellKnownTests(SimpleTestCase):
@@ -847,3 +848,184 @@ class DialogComponentTest(SimpleTestCase):
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
+
+
+class TabsComponentTest(SimpleTestCase):
+    """c-tabs renders link tabs or panel tabs, depending on its tab list."""
+
+    ROOT_ID = "my-tabs-tabs"
+    LINK_SOURCE = (
+        '<c-tabs label="My tabs" :tabs="tabs" :active_tab="active_tab">'
+        "Page content</c-tabs>"
+    )
+    PANEL_SOURCE = (
+        '<c-tabs label="My tabs" :tabs="tabs" :active_tab="active_tab">'
+        '<c-tabs.panel key="first" tabs_label="My tabs" :active_tab="active_tab">One</c-tabs.panel>'
+        '<c-tabs.panel key="second" tabs_label="My tabs" :active_tab="active_tab">Two</c-tabs.panel>'
+        "</c-tabs>"
+    )
+
+    def panel_tabs(self) -> list[TabItem]:
+        """Two tabs without urls; the first has a count."""
+        return [
+            {"key": "first", "label": "First", "count": 3},
+            {"key": "second", "label": "Second"},
+        ]
+
+    def link_tabs(self) -> list[TabItem]:
+        """The panel tabs, each with a url."""
+        url = reverse("components")
+        return [
+            {**tab, "url": f"{url}?link_tab={tab['key']}"}
+            for tab in self.panel_tabs()
+        ]
+
+    def render(self, source: str, **context: Any) -> HtmlElement:
+        """Compiles a Cotton snippet, renders it and parses the result."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        context["request"] = RequestFactory().get("/")
+        return fromstring(template.render(context))
+
+    def test_link_tabs_render_a_nav_of_links(self) -> None:
+        """Link tabs are links in a nav, and htmx targets the component's root."""
+        tabs = self.link_tabs()
+        root = self.render(self.LINK_SOURCE, tabs=tabs, active_tab="first")
+
+        self.assertEqual(root.get("id"), self.ROOT_ID)
+        nav = root.xpath("//nav")[0]
+        self.assertEqual(nav.get("aria-label"), "My tabs")
+        self.assertEqual(nav.get("hx-target"), f"#{self.ROOT_ID}")
+        self.assertEqual(nav.get("hx-select"), f"#{self.ROOT_ID}")
+        for tab in tabs:
+            with self.subTest(key=tab["key"]):
+                link = root.get_element_by_id(
+                    f"{self.ROOT_ID}-tab-{tab['key']}"
+                )
+                self.assertEqual(link.tag, "a")
+                self.assertEqual(link.get("href"), tab["url"])
+
+    def test_only_the_active_link_is_current(self) -> None:
+        """Only the active tab's link has aria-current="page"."""
+        for active in ("first", "second"):
+            with self.subTest(active=active):
+                root = self.render(
+                    self.LINK_SOURCE, tabs=self.link_tabs(), active_tab=active
+                )
+                current = root.xpath('//nav//a[@aria-current="page"]/@id')
+                self.assertEqual(current, [f"{self.ROOT_ID}-tab-{active}"])
+
+    def test_tabs_without_urls_render_as_tab_buttons(self) -> None:
+        """A list without urls renders a tablist of buttons and no links."""
+        root = self.render(
+            self.PANEL_SOURCE, tabs=self.panel_tabs(), active_tab="first"
+        )
+
+        self.assertEqual(
+            root.xpath('//*[@role="tablist"]/@aria-label'), ["My tabs"]
+        )
+        self.assertEqual(
+            [tab.tag for tab in root.xpath('//*[@role="tab"]')],
+            ["button", "button"],
+        )
+        self.assertFalse(root.xpath("//a"))
+
+    def test_only_the_active_tab_is_selected_and_focusable(self) -> None:
+        """The active tab starts selected and in the Tab order; the rest don't."""
+        for active in ("first", "second"):
+            with self.subTest(active=active):
+                root = self.render(
+                    self.PANEL_SOURCE,
+                    tabs=self.panel_tabs(),
+                    active_tab=active,
+                )
+                for button in root.xpath('//*[@role="tab"]'):
+                    is_active = button.get("data-tab-key") == active
+                    self.assertEqual(
+                        button.get("aria-selected"),
+                        "true" if is_active else "false",
+                    )
+                    self.assertEqual(
+                        button.get("tabindex"), "0" if is_active else "-1"
+                    )
+
+    def test_tabs_and_panels_reference_each_other(self) -> None:
+        """Each tab controls its panel, and each panel is labelled by its tab."""
+        root = self.render(
+            self.PANEL_SOURCE, tabs=self.panel_tabs(), active_tab="first"
+        )
+        for key in ("first", "second"):
+            with self.subTest(key=key):
+                tab_id = f"{self.ROOT_ID}-tab-{key}"
+                panel_id = f"{self.ROOT_ID}-panel-{key}"
+                panel = root.get_element_by_id(panel_id)
+                self.assertEqual(
+                    root.get_element_by_id(tab_id).get("aria-controls"),
+                    panel_id,
+                )
+                self.assertEqual(panel.get("aria-labelledby"), tab_id)
+                self.assertEqual(panel.get("role"), "tabpanel")
+                self.assertEqual(panel.get("tabindex"), "0")
+
+    def test_only_the_active_panel_is_visible(self) -> None:
+        """Inactive panels are hidden on the server, so they never flash on load."""
+        for active in ("first", "second"):
+            with self.subTest(active=active):
+                root = self.render(
+                    self.PANEL_SOURCE,
+                    tabs=self.panel_tabs(),
+                    active_tab=active,
+                )
+                for panel in root.xpath('//*[@role="tabpanel"]'):
+                    self.assertEqual(
+                        "hidden" in panel.attrib,
+                        panel.get("data-tab-key") != active,
+                    )
+
+    def test_first_tab_is_selected_without_active_tab(self) -> None:
+        """Panel tabs fall back to the first tab when no active_tab is passed."""
+        root = self.render(
+            '<c-tabs label="My tabs" :tabs="tabs">One</c-tabs>',
+            tabs=self.panel_tabs(),
+        )
+
+        self.assertEqual(root.get("data-active-tab"), "first")
+        self.assertEqual(
+            root.xpath('//*[@aria-selected="true"]/@data-tab-key'), ["first"]
+        )
+
+    def test_count_shows_in_a_chip(self) -> None:
+        """A tab's count shows in a chip, and tabs without one have no chip."""
+        root = self.render(
+            self.PANEL_SOURCE, tabs=self.panel_tabs(), active_tab="first"
+        )
+
+        first = root.get_element_by_id(f"{self.ROOT_ID}-tab-first")
+        second = root.get_element_by_id(f"{self.ROOT_ID}-tab-second")
+        self.assertEqual([chip.text for chip in first.xpath("span")], ["3"])
+        self.assertFalse(second.xpath("span"))
+
+    def test_dropdown_lists_every_tab(self) -> None:
+        """The mobile dropdown has one option per tab, with the active one selected."""
+        cases = [
+            ("link", self.LINK_SOURCE, self.link_tabs()),
+            ("panel", self.PANEL_SOURCE, self.panel_tabs()),
+        ]
+        for mode, source, tabs in cases:
+            with self.subTest(mode=mode):
+                root = self.render(source, tabs=tabs, active_tab="second")
+                select = root.get_element_by_id(f"{self.ROOT_ID}-select")
+                options = select.xpath("option")
+
+                self.assertEqual(select.get("aria-label"), "My tabs")
+                self.assertEqual(
+                    [option.get("value") for option in options],
+                    ["first", "second"],
+                )
+                self.assertEqual(
+                    [option.text_content() for option in options],
+                    ["First (3)", "Second"],
+                )
+                self.assertEqual(
+                    select.xpath("option[@selected]/@value"), ["second"]
+                )

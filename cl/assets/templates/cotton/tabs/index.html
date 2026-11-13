@@ -1,59 +1,75 @@
 {% load component_tags %}
 {% require_script "js/alpine/components/tabs.js" %}
-{% require_script "js/alpine/composables/focus.js" %}
-{% require_script "js/alpine/plugins/focus" defer=True %}
 
-<c-vars title="" class=""></c-vars>
+<c-vars label="" tabs="" active_tab="" class="" />
 
-<div
-  x-data="tabsComponent"
-  class="w-full {{ class }}"
-  {{ attrs }}
->
-  {# DESKTOP tabs #}
-  <div
-    data-title="{{ title }}"
-    role="tablist"
-    class="w-full gap-1 hidden md:flex"
-    x-data="focus"
-    x-on:keydown.left="focusPrevious"
-    x-on:keydown.right="focusNext"
-    x-on:keydown.home.prevent="focusFirst"
-    x-on:keydown.end.prevent="focusLast"
-  >
-    <template x-for="tab in tabs">
-      <div>
-        <button
-          x-on:click="setActiveTab"
-          x-bind:aria-selected="isActive"
-          x-bind:class="tabClass"
-          x-bind:data-tab-id="tab"
-          x-text="tab"
-          type="button"
-          role="tab"
-          class="px-5 py-3 text-sm font-normal rounded-t-2xl text-greyscale-600"
-        >
-        </button>
+{% with tabs_id=label|slugify|add:"-tabs" %}
+  {% if tabs.0.url %}
+    {% require_script "js/third_party/htmx" defer=True %}
+    <div
+      id="{{ tabs_id }}"
+      class="w-full {{ class }}"
+      x-data="tabsComponent"
+      data-active-tab="{{ active_tab }}"
+      x-on:htmx:before-request="startRequest"
+      x-on:htmx:after-request="endRequest"
+      x-on:htmx:send-error="handleSendError"
+      x-on:htmx:response-error="handleResponseError"
+      x-on:htmx:before-swap="handleBeforeSwap"
+      hx-history="false"
+    >
+      <nav
+        aria-label="{{ label }}"
+        hx-boost="true"
+        hx-target="#{{ tabs_id }}"
+        hx-select="#{{ tabs_id }}"
+        hx-swap="outerHTML show:none"
+        hx-sync="this:replace"
+        class="flex flex-wrap items-center"
+      >
+        <ul role="list" class="hidden md:flex items-center list-none pl-0 border-greyscale-200">
+          {% for tab in tabs %}
+            <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
+          {% endfor %}
+        </ul>
+        <c-tabs.select :tabs="tabs" :active_tab="active_tab" :tabs_id="tabs_id" :label="label" />
+      </nav>
+      <div role="status">
+        <template x-if="errorMessage">
+          <p class="py-[10px] px-4 mt-4 border rounded-lg-10 bg-red-100/75 border-red-400 text-red-800" x-text="errorMessage"></p>
+        </template>
       </div>
-    </template>
-  </div>
-
-  {# MOBILE tabs #}
-  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
-    <select aria-label="Select {{ title }} tabs" x-on:change="handleChange" class="w-full">
-      <template x-for="tab in tabs">
-        <option
-          x-text="tab"
-          x-bind:aria-selected="isActive"
-          x-bind:data-tab-id="tab"
-          class="appearance-none"
-        ></option>
-      </template>
-    </select>
-  </div>
-
-  {# Active panel content #}
-  <div aria-label="Active {{ title }} panel" role="tabpanel" class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
-    {{ slot }}
-  </div>
-</div>
+      <div x-bind:aria-busy="isBusy">
+        {{ slot }}
+      </div>
+    </div>
+  {% else %}
+    {% require_script "js/alpine/composables/focus.js" %}
+    {% require_script "js/alpine/plugins/focus" defer=True %}
+    {# Falls back to the first tab when the caller omits active_tab. Panels can't see this fallback, so they stay hidden until Alpine shows the first one; pass active_tab from resolve_active_tab to render the right panel from the start. #}
+    {% firstof active_tab tabs.0.key as current_tab %}
+    <div
+      id="{{ tabs_id }}"
+      class="w-full {{ class }}"
+      x-data="tabsComponent"
+      data-active-tab="{{ current_tab }}"
+    >
+      <div
+        role="tablist"
+        aria-label="{{ label }}"
+        class="hidden md:flex items-center border-b border-greyscale-200"
+        x-data="focus"
+        x-on:keydown.left="focusPrevious"
+        x-on:keydown.right="focusNext"
+        x-on:keydown.home.prevent="focusFirst"
+        x-on:keydown.end.prevent="focusLast"
+      >
+        {% for tab in tabs %}
+          <c-tabs.tab :tab="tab" :active_tab="current_tab" :tabs_id="tabs_id" />
+        {% endfor %}
+      </div>
+      <c-tabs.select :tabs="tabs" :active_tab="current_tab" :tabs_id="tabs_id" :label="label" />
+      {{ slot }}
+    </div>
+  {% endif %}
+{% endwith %}

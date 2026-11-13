@@ -8,7 +8,8 @@
   <meta name="language" content="en_us"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   {# htmx is not loaded here. Components that use hx-* attributes require it with require_script and inherit this hardened config. #}
-  <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false}'/>
+  {# refreshOnHistoryMiss: pages that opt out of htmx's history cache (hx-history="false") reload on Back, so the template middleware and every script run as on a normal visit. #}
+  <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false, "refreshOnHistoryMiss": true}'/>
 
   {% block meta %}
   <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>

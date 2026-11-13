@@ -152,7 +152,12 @@ from cl.users.models import (
     UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
-from cl.users.utils import create_stub_account, message_dict
+from cl.users.utils import (
+    TabItem,
+    create_stub_account,
+    message_dict,
+    resolve_active_tab,
+)
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
 
@@ -6162,3 +6167,25 @@ class MembershipHeaderLinkTest(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(self.url)
         self.assertContains(response, "Join FLP")
+
+
+class ResolveActiveTabTest(SimpleTestCase):
+    """Tests for resolve_active_tab."""
+
+    tabs: list[TabItem] = [
+        {"key": "search", "label": "Search Alerts", "icon": "search"},
+        {"key": "docket", "label": "Docket Alerts", "icon": "bell"},
+    ]
+
+    def test_resolves_requested_or_first_tab(self) -> None:
+        """A known key is kept; an unknown or missing one opens the first."""
+        cases = [
+            ("docket", "docket"),
+            ("unknown", "search"),
+            (None, "search"),
+        ]
+        for requested, expected in cases:
+            with self.subTest(requested=requested):
+                self.assertEqual(
+                    resolve_active_tab(self.tabs, requested), expected
+                )

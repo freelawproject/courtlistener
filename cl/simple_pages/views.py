@@ -28,6 +28,7 @@ from cl.opinion_page.forms_v2 import DocketEntryFilterForm
 from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
+from cl.users.utils import TabItem, resolve_active_tab
 
 logger = logging.getLogger(__name__)
 
@@ -355,6 +356,27 @@ async def components(request: HttpRequest) -> HttpResponse:
     demo_disabled_filter_form = DocketEntryFilterForm(initial={"entry_gte": 5})
     demo_disabled_filter_form.fields["entry_gte"].disabled = True
 
+    demo_panel_tabs: list[TabItem] = [
+        {"key": "first", "label": "First tab"},
+        {"key": "second", "label": "Second tab"},
+        {"key": "third", "label": "Third tab"},
+    ]
+    components_url = reverse("components")
+    demo_link_tabs: list[TabItem] = [
+        {
+            "key": "search",
+            "label": "Search Alerts",
+            "icon": "magnifier",
+            "url": f"{components_url}?link_tab=search#tabbed-cards",
+        },
+        {
+            "key": "docket",
+            "label": "Docket Alerts",
+            "icon": "file_text",
+            "url": f"{components_url}?link_tab=docket#tabbed-cards",
+        },
+    ]
+
     return TemplateResponse(
         request,
         "components.html",
@@ -368,6 +390,14 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_filter_form": DocketEntryFilterForm(),
             "demo_invalid_filter_form": demo_invalid_filter_form,
             "demo_disabled_filter_form": demo_disabled_filter_form,
+            "demo_panel_tabs": demo_panel_tabs,
+            "demo_panel_active_tab": resolve_active_tab(
+                demo_panel_tabs, request.GET.get("tab")
+            ),
+            "demo_link_tabs": demo_link_tabs,
+            "demo_link_active_tab": resolve_active_tab(
+                demo_link_tabs, request.GET.get("link_tab")
+            ),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {

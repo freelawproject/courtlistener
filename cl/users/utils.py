@@ -1,3 +1,5 @@
+from typing import NotRequired, TypedDict
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -451,3 +453,46 @@ def is_search_history_on_cached(user_pk: int) -> bool:
     return UserProfile.objects.values_list(
         "save_query_history", flat=True
     ).get(user_id=user_pk)
+
+
+class TabItem(TypedDict):
+    """One entry of the list passed to the c-tabs component.
+
+    The component picks its mode from the entries: when they have a `url`,
+    each tab is a link to its own page; when none do, each tab is a button
+    that shows the c-tabs.panel with the same `key`. A list where only some
+    entries have a `url` is not supported.
+
+    :key: Identifies the tab. It's compared with the component's `active_tab`
+        and used to build its ids, so it must be unique within the list.
+    :label: Text shown on the tab and in the mobile dropdown.
+    :icon: Name of an SVG in cl/assets/static-global/svg/ for the {% svg %}
+        tag. Only shown in link mode.
+    :url: Page the tab links to. Only in link mode.
+    :count: Number shown after the label: in a chip on panel-mode tabs and in
+        brackets in the mobile dropdown.
+    """
+
+    key: str
+    label: str
+    icon: NotRequired[str]
+    url: NotRequired[str]
+    count: NotRequired[int]
+
+
+def resolve_active_tab(tabs: list[TabItem], active_tab: str | None) -> str:
+    """Pick the key of the tab a panel-mode c-tabs component opens on.
+
+    Use it in views that read the requested tab from the query string, so a
+    missing or unknown value opens the first tab instead of an empty section.
+    Link-mode views don't need it: each page already knows its own tab.
+
+    :param tabs: The entries passed to the component. Must not be empty.
+    :param active_tab: The key asked for, usually request.GET.get("tab").
+    :return: `active_tab` when it matches a tab's key, else the first tab's key.
+    """
+    for tab in tabs:
+        if tab["key"] == active_tab:
+            return tab["key"]
+
+    return tabs[0]["key"]
