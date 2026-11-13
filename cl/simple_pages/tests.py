@@ -851,9 +851,7 @@ class DialogComponentTest(SimpleTestCase):
 
 
 class IconComponentTest(SimpleTestCase):
-    """The c-icon component sizes the icon, picks its variant and sets its
-    accessibility attributes.
-    """
+    """Tests sizing, variant selection and accessibility of c-icon."""
 
     def render(
         self, source: str, context: dict[str, Any] | None = None
@@ -944,9 +942,7 @@ class IconComponentTest(SimpleTestCase):
         )
 
     def test_custom_size_leaves_sizing_to_class(self) -> None:
-        """A custom size sets no size class, so the caller's size can't
-        compete with one.
-        """
+        """A custom size sets no size class, leaving sizing to `class`."""
         icon = fromstring(
             self.render(
                 '<c-icon name="chevron" size="custom" class="size-3" />'
