@@ -31,6 +31,7 @@ from cl.search.models import (
     SCOTUSDocument,
     TexasDocketEntry,
     TexasDocument,
+    TrialCourtData,
 )
 
 # The entry and document models a DocketEntrySource can serve.
@@ -752,6 +753,25 @@ def _texas_entry_display_text(entry: TexasDocketEntry) -> SafeString:
     )
 
 
+def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Build the metadata sections specific to a Texas docket."""
+    # Imported here rather than at module scope because cl.opinion_page.utils
+    # imports from this module.
+    from cl.opinion_page.utils import build_trial_court_metadata
+
+    trial_court = (
+        TrialCourtData.objects.filter(docket=docket)
+        .select_related("court", "judge")
+        .first()
+    )
+    return [
+        {
+            "items": build_trial_court_metadata(trial_court),
+            "title": "Trial Court Information",
+        },
+    ]
+
+
 def _texas_main_docs_prefetch() -> Prefetch:
     """Prefetch each entry's first document into `main_docs`.
 
@@ -880,6 +900,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     launch_flag="texas_docket_page",
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
+    metadata_sections=_texas_metadata_sections,
 )
 
 # Courts whose dockets use a source other than RECAP. source_for_court_id

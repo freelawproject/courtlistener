@@ -58,6 +58,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     SCOTUSDocketEntry,
+    TrialCourtData,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -430,6 +431,69 @@ def build_originating_court_metadata(
                 "value": date_format(og_info.date_received_coa),
             }
         )
+
+    return items
+
+
+def build_trial_court_metadata(
+    trial_court: TrialCourtData | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the trial court information section.
+
+    Callers SHOULD load the trial court data with its court and judge
+    (select_related) so building the items adds no queries.
+
+    Args:
+        trial_court: The docket's trial court data, or None if it has none.
+    """
+    if not trial_court:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if court_name := (
+        trial_court.court.short_name
+        if trial_court.court
+        else trial_court.court_name
+    ):
+        items.append({"label": "Court", "value": court_name})
+
+    if docket_number := (
+        trial_court.docket_number_trial or trial_court.docket_number_raw_trial
+    ):
+        items.append({"label": "Docket Number", "value": docket_number})
+
+    if trial_court.county:
+        items.append({"label": "County", "value": trial_court.county})
+
+    # Unlike _person_item, a judge known only by name isn't linked to a
+    # RECAP search: state trial court cases aren't in the RECAP Archive.
+    if trial_court.judge:
+        items.append(
+            {
+                "label": "Judge",
+                "value": trial_court.judge.name_full,
+                "url": trial_court.judge.get_absolute_url(),
+            }
+        )
+    elif trial_court.judge_str:
+        items.append({"label": "Judge", "value": trial_court.judge_str})
+
+    if trial_court.reporter:
+        items.append(
+            {"label": "Court Reporter", "value": trial_court.reporter}
+        )
+
+    if trial_court.date_filed:
+        items.append(
+            {
+                "label": "Date Filed",
+                "value": date_format(trial_court.date_filed),
+            }
+        )
+
+    if trial_court.punishment:
+        items.append({"label": "Punishment", "value": trial_court.punishment})
 
     return items
 

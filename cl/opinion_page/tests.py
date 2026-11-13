@@ -91,6 +91,7 @@ from cl.opinion_page.utils import (
     build_docket_tabs,
     build_idb_rows,
     build_originating_court_metadata,
+    build_trial_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
     es_get_related_clusters_with_cache,
@@ -139,6 +140,7 @@ from cl.search.factories import (
     SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
+    TrialCourtDataFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -2160,6 +2162,65 @@ class TexasEntryDisplayTextTest(SimpleTestCase):
                 )
 
 
+class TrialCourtMetadataTest(TestCase):
+    """Does the Texas source build a Trial Court Information section from a docket's TrialCourtData?"""
+
+    def test_every_field(self) -> None:
+        """Are all the trial court fields listed in order, with the judge linked to their page?"""
+        trial_court = TrialCourtDataFactory(
+            court=CourtFactory(short_name="Travis County District Court"),
+            docket_number_trial="D-1-GN-24-001234",
+            county="Travis",
+            reporter="Ann Smith",
+            date_filed=date(2024, 3, 1),
+            punishment="Five years",
+        )
+        items = build_trial_court_metadata(trial_court)
+        self.assertEqual(
+            [(item["label"], item["value"]) for item in items],
+            [
+                ("Court", "Travis County District Court"),
+                ("Docket Number", "D-1-GN-24-001234"),
+                ("County", "Travis"),
+                ("Judge", trial_court.judge.name_full),
+                ("Court Reporter", "Ann Smith"),
+                ("Date Filed", "March 1, 2024"),
+                ("Punishment", "Five years"),
+            ],
+        )
+        self.assertEqual(items[3]["url"], trial_court.judge.get_absolute_url())
+
+    def test_falls_back_to_scraped_names(self) -> None:
+        """Without a matched court or judge, are the names from the source shown, with no link for the judge?"""
+        trial_court = TrialCourtDataFactory(
+            court=None,
+            court_name="261st District Court",
+            judge=None,
+            judge_str="Jane Roe",
+        )
+        items = {
+            item["label"]: item
+            for item in build_trial_court_metadata(trial_court)
+        }
+        self.assertEqual(items["Court"]["value"], "261st District Court")
+        self.assertEqual(items["Judge"]["value"], "Jane Roe")
+        self.assertNotIn("url", items["Judge"])
+
+    def test_no_trial_court_data(self) -> None:
+        """Is there nothing to show for a docket without trial court data?"""
+        self.assertEqual(build_trial_court_metadata(None), [])
+
+    def test_section_loads_in_one_query(self) -> None:
+        """Does the Texas source load the trial court with its court and judge in a single query?"""
+        trial_court = TrialCourtDataFactory()
+        with self.assertNumQueries(1):
+            sections = docket_entry_sources.TEXAS.metadata_sections(
+                trial_court.docket
+            )
+        self.assertEqual(sections[0]["title"], "Trial Court Information")
+        self.assertEqual(len(sections[0]["items"]), 7)
+
+
 class TexasDocketEntrySourceTest(TestCase):
     """Is every TAMES court served by the Texas source, and does that source load a page of entries in a fixed number of queries?"""
 
@@ -2251,7 +2312,26 @@ class TexasDocketPageTest(TestCase):
             ),
             url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
         )
+        TrialCourtDataFactory(
+            docket=cls.docket,
+            court=None,
+            court_name="261st District Court",
+            county="Travis",
+        )
         cls.url = reverse("view_docket", args=[cls.docket.pk, cls.docket.slug])
+
+    def test_trial_court_section_in_both_stacks(self) -> None:
+        """Does each stack show the Trial Court Information section with the docket's trial court data?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Trial Court Information", content)
+                self.assertIn("261st District Court", content)
+                self.assertIn("Travis", content)
 
     def test_entry_shows_type_disposition_and_escaped_remarks(self) -> None:
         """Does each stack show the entry's type and disposition, and escape scraped remarks even where the legacy stack renders the text unescaped?"""
