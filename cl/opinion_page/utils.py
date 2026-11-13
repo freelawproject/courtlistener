@@ -1,6 +1,7 @@
 import csv
 import logging
 import traceback
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from io import StringIO
@@ -53,6 +54,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     BankruptcyInformation,
+    CaseTransfer,
     Docket,
     DocketEntry,
     OpinionCluster,
@@ -496,6 +498,53 @@ def build_trial_court_metadata(
         items.append({"label": "Punishment", "value": trial_court.punishment})
 
     return items
+
+
+# Labels for a transfer seen from the docket it arrived at, and from the
+# docket it left.
+_TRANSFER_LABELS: dict[int, tuple[str, str]] = {
+    CaseTransfer.APPEAL: ("Appealed From", "Appealed To"),
+    CaseTransfer.WORKLOAD: ("Transferred From", "Transferred To"),
+    CaseTransfer.JURISDICTION: ("Transferred From", "Transferred To"),
+    CaseTransfer.MERGE: ("Merged From", "Merged Into"),
+}
+
+
+def build_case_transfer_metadata(
+    docket: Docket, transfers: Iterable[CaseTransfer]
+) -> list[MetadataItem]:
+    """Build metadata items for the case transfers section: one per transfer, naming the other court and linking to its docket when we have it.
+
+    Transfers that arrived at the docket come first, then the ones that
+    left it, each in date order. Callers SHOULD load the transfers with
+    their courts and dockets (select_related) so this adds no queries.
+
+    Args:
+        docket: The docket whose page shows the section.
+        transfers: The transfers whose origin or destination is the docket.
+    """
+    rows = []
+    for transfer in transfers:
+        arrived = transfer.destination_docket_id == docket.pk
+        if arrived:
+            court = transfer.origin_court
+            other_docket = transfer.origin_docket
+            other_docket_number = transfer.origin_docket_number
+        else:
+            court = transfer.destination_court
+            other_docket = transfer.destination_docket
+            other_docket_number = transfer.destination_docket_number
+        from_label, to_label = _TRANSFER_LABELS[transfer.transfer_type]
+        item: MetadataItem = {
+            "label": from_label if arrived else to_label,
+            "value": f"{court.short_name}, {date_format(transfer.transfer_date)}",
+        }
+        if other_docket_number:
+            item["suffix_text"] = other_docket_number
+            if other_docket:
+                item["suffix_url"] = other_docket.get_absolute_url()
+        rows.append((not arrived, transfer.transfer_date, item))
+    return [item for *_, item in sorted(rows, key=lambda row: row[:2])]
 
 
 class IdbRow(TypedDict):

@@ -29,6 +29,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.db.models import Q
 from django.http import HttpResponse, QueryDict
 from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
@@ -73,6 +74,7 @@ from cl.lib.test_helpers import (
 )
 from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
+    MetadataItem,
     _recap_document_detail_url,
     _scotus_document_detail_url,
     build_scotus_metadata,
@@ -87,6 +89,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_case_transfer_metadata,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -125,6 +128,7 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.constants import TAMES_COURT_IDS
 from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
+    CaseTransferFactory,
     CitationWithParentsFactory,
     CourtFactory,
     DocketEntryFactory,
@@ -145,6 +149,7 @@ from cl.search.factories import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    CaseTransfer,
     Citation,
     ClusterRedirection,
     Docket,
@@ -2210,15 +2215,105 @@ class TrialCourtMetadataTest(TestCase):
         """Is there nothing to show for a docket without trial court data?"""
         self.assertEqual(build_trial_court_metadata(None), [])
 
-    def test_section_loads_in_one_query(self) -> None:
-        """Does the Texas source load the trial court with its court and judge in a single query?"""
+    def test_sections_load_in_two_queries(self) -> None:
+        """Does the Texas source load the trial court and every case transfer, with their courts, judge and dockets, in two queries?"""
         trial_court = TrialCourtDataFactory()
-        with self.assertNumQueries(1):
-            sections = docket_entry_sources.TEXAS.metadata_sections(
-                trial_court.docket
-            )
-        self.assertEqual(sections[0]["title"], "Trial Court Information")
+        docket = trial_court.docket
+        for _ in range(3):
+            CaseTransferFactory(destination_docket=docket)
+        with self.assertNumQueries(2):
+            sections = docket_entry_sources.TEXAS.metadata_sections(docket)
+        self.assertEqual(
+            [section["title"] for section in sections],
+            ["Trial Court Information", "Case Transfers"],
+        )
         self.assertEqual(len(sections[0]["items"]), 7)
+        self.assertEqual(len(sections[1]["items"]), 3)
+
+
+class CaseTransferMetadataTest(TestCase):
+    """Does the case transfers section list every transfer of a docket from that docket's point of view?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(docket_number="26-0999")
+        cls.coa = CourtFactory(short_name="Tex. App. - Houston [1st Dist.]")
+        cls.coa_docket = DocketFactory(
+            court=cls.coa, docket_number="01-24-00123-CV"
+        )
+
+    def items_for(self) -> list[MetadataItem]:
+        """Build the section the docket's page would show."""
+        return build_case_transfer_metadata(
+            self.docket,
+            CaseTransfer.objects.filter(
+                Q(origin_docket=self.docket)
+                | Q(destination_docket=self.docket)
+            ),
+        )
+
+    def test_appeal_from_a_docket_we_have_links_to_it(self) -> None:
+        """Does an appeal into the docket name the lower court and its date, and link its docket number to that docket's page?"""
+        CaseTransferFactory(
+            origin_court=self.coa,
+            origin_docket=self.coa_docket,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 1, 5),
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        [item] = self.items_for()
+        self.assertEqual(item["label"], "Appealed From")
+        self.assertEqual(
+            item["value"], "Tex. App. - Houston [1st Dist.], Jan. 5, 2026"
+        )
+        self.assertEqual(item["suffix_text"], "01-24-00123-CV")
+        self.assertEqual(
+            item["suffix_url"], self.coa_docket.get_absolute_url()
+        )
+
+    def test_transfer_without_the_other_docket_has_no_link(self) -> None:
+        """When the other court's docket isn't in CourtListener, is its docket number shown without a link?"""
+        CaseTransferFactory(
+            origin_court=self.coa,
+            origin_docket=None,
+            origin_docket_number="01-24-00999-CV",
+            destination_docket=self.docket,
+            transfer_type=CaseTransfer.WORKLOAD,
+        )
+        [item] = self.items_for()
+        self.assertEqual(item["label"], "Transferred From")
+        self.assertEqual(item["suffix_text"], "01-24-00999-CV")
+        self.assertNotIn("suffix_url", item)
+
+    def test_arrivals_come_before_departures_in_date_order(self) -> None:
+        """Are transfers into the docket listed first, then the ones out of it, each by date, with labels for their direction?"""
+        later_court = CourtFactory(short_name="Later Court")
+        CaseTransferFactory(
+            origin_docket=self.docket,
+            destination_court=later_court,
+            transfer_date=date(2026, 3, 1),
+            transfer_type=CaseTransfer.MERGE,
+        )
+        CaseTransferFactory(
+            origin_court=self.coa,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 2, 1),
+            transfer_type=CaseTransfer.JURISDICTION,
+        )
+        CaseTransferFactory(
+            origin_court=self.coa,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 1, 1),
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        self.assertEqual(
+            [item["label"] for item in self.items_for()],
+            ["Appealed From", "Transferred From", "Merged Into"],
+        )
+
+    def test_no_transfers(self) -> None:
+        """Is the section empty for a docket that was never transferred?"""
+        self.assertEqual(self.items_for(), [])
 
 
 class TexasDocketEntrySourceTest(TestCase):
@@ -2318,7 +2413,32 @@ class TexasDocketPageTest(TestCase):
             court_name="261st District Court",
             county="Travis",
         )
+        cls.coa_docket = DocketFactory(
+            court=CourtFactory(short_name="Tex. App. - Austin"),
+            docket_number="03-25-00042-CV",
+        )
+        CaseTransferFactory(
+            origin_court=cls.coa_docket.court,
+            origin_docket=cls.coa_docket,
+            destination_court=cls.docket.court,
+            destination_docket=cls.docket,
+            transfer_type=CaseTransfer.APPEAL,
+        )
         cls.url = reverse("view_docket", args=[cls.docket.pk, cls.docket.slug])
+
+    def test_case_transfers_section_in_both_stacks(self) -> None:
+        """Does each stack show the Case Transfers section, linking the lower court's docket number to its page?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Case Transfers", content)
+                self.assertIn("Tex. App. - Austin", content)
+                self.assertIn(self.coa_docket.get_absolute_url(), content)
+                self.assertIn("03-25-00042-CV", content)
 
     def test_trial_court_section_in_both_stacks(self) -> None:
         """Does each stack show the Trial Court Information section with the docket's trial court data?"""

@@ -20,6 +20,7 @@ from django.utils.safestring import SafeString, mark_safe
 from cl.custom_filters.templatetags.extras import http_url
 from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
 from cl.search.models import (
+    CaseTransfer,
     Court,
     Docket,
     DocketEntry,
@@ -757,17 +758,45 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a Texas docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
     # imports from this module.
-    from cl.opinion_page.utils import build_trial_court_metadata
+    from cl.opinion_page.utils import (
+        build_case_transfer_metadata,
+        build_trial_court_metadata,
+    )
 
     trial_court = (
         TrialCourtData.objects.filter(docket=docket)
         .select_related("court", "judge")
         .first()
     )
+    transfers = (
+        CaseTransfer.objects.filter(
+            Q(origin_docket=docket) | Q(destination_docket=docket)
+        )
+        .select_related(
+            "origin_court",
+            "destination_court",
+            "origin_docket",
+            "destination_docket",
+        )
+        .only(
+            "transfer_type",
+            "transfer_date",
+            "origin_docket_number",
+            "destination_docket_number",
+            "origin_court__short_name",
+            "destination_court__short_name",
+            "origin_docket__slug",
+            "destination_docket__slug",
+        )
+    )
     return [
         {
             "items": build_trial_court_metadata(trial_court),
             "title": "Trial Court Information",
+        },
+        {
+            "items": build_case_transfer_metadata(docket, transfers),
+            "title": "Case Transfers",
         },
     ]
 
