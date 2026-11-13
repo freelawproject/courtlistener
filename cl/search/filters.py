@@ -19,6 +19,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 
@@ -232,4 +233,34 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
             "sha1": ["exact"],
             "ocr_status": INTEGER_LOOKUPS,
             "is_free_on_pacer": ["exact"],
+        }
+
+
+class BaseSourceFilter(NoEmptyFilterSet):
+    """Base filterset for models of a single docket source.
+
+    django-filter doesn't merge Meta.fields through inheritance, so
+    subclasses must spread their parent's fields into their own:
+    fields = {**BaseSourceFilter.Meta.fields, ...}
+    """
+
+    class Meta:
+        fields: dict[str, list[str]] = {
+            "id": INTEGER_LOOKUPS,
+            "date_created": DATETIME_LOOKUPS,
+            "date_modified": DATETIME_LOOKUPS,
+        }
+
+
+class ScotusDocketMetadataFilter(BaseSourceFilter):
+    """Filters for SCOTUS docket metadata."""
+
+    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
+
+    class Meta(BaseSourceFilter.Meta):
+        model = ScotusDocketMetadata
+        fields = {
+            **BaseSourceFilter.Meta.fields,
+            "capital_case": ["exact"],
+            "date_discretionary_court_decision": DATE_LOOKUPS,
         }
