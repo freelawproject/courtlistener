@@ -746,7 +746,12 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
 # Texas
 def _texas_entries(docket: Docket) -> QuerySet[TexasDocketEntry]:
     """Return this docket's TexasDocketEntry queryset, with its documents prefetched for the docket page's entry list."""
-    return TexasDocketEntry.objects.filter(docket=docket).prefetch_related(
+    # Going through the docket's reverse manager, like RECAP and SCOTUS do,
+    # gives every entry this docket instance, so callers that read
+    # entry.docket (like the RSS feed) don't query it once per entry.
+    # pyrefly can't see the reverse accessor of an FK without related_name.
+    # pyrefly: ignore[missing-attribute]
+    return docket.texasdocketentry_set.all().prefetch_related(
         Prefetch(
             "texasdocument_set",
             queryset=TexasDocument.objects.defer("plain_text"),

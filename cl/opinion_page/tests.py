@@ -2359,6 +2359,22 @@ class TexasDocketEntrySourceTest(TestCase):
             ]
         self.assertEqual(len(documents), 3)
 
+    def test_entries_reuse_their_docket(self) -> None:
+        """Do the entries come with their docket already loaded, so reading entry.docket, as the RSS feed does for each item, takes no extra query?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        for n in (1, 2, 3):
+            TexasDocketEntryFactory(
+                docket=docket, sequence_number=f"2026-10-0{n}.001"
+            )
+        entries = list(
+            docket_entry_sources.TEXAS.entries_queryset(
+                docket
+            ).prefetch_related(None)
+        )
+        with self.assertNumQueries(0):
+            urls = {entry.docket.get_absolute_url() for entry in entries}
+        self.assertEqual(urls, {docket.get_absolute_url()})
+
     def test_initial_document_buttons_link_to_tames(self) -> None:
         """Does the initial-document button point at the first document of the earliest entry, on TAMES, in one query?"""
         docket = DocketFactory(court=CourtFactory(id="tex"))
