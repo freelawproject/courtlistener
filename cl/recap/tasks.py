@@ -38,7 +38,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
-from juriscraper.pacer.email import DocketType
+from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
@@ -3335,7 +3335,7 @@ class DocketUpdatedData:
 def open_and_validate_email_notification(
     self: Task,
     epq: EmailProcessingQueue,
-) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
+) -> tuple[NotificationEmailData | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's a valid NEF or NDA.
 
     Args:
@@ -3365,7 +3365,7 @@ def open_and_validate_email_notification(
     report._parse_text(body)
     data = report.data
     if (
-        data == {}
+        not data
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
         or (

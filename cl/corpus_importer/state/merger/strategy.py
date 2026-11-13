@@ -1,3 +1,10 @@
+from collections.abc import Callable
+
+type Strategy[Scrape, Existing, Output = Scrape | Existing] = Callable[
+    [Scrape, Existing], Output
+]
+
+
 def overwrite[T](scrape: T | None, db: T | None) -> T | None:
     """Merge strategy that always overwrites the existing value with the scraped value."""
     return scrape

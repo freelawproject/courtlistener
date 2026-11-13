@@ -98,7 +98,6 @@ from cl.search.es_docket_sources import (
     ES_SOURCE_BY_NAME,
     RECAP_ES_SOURCE,
     SOURCE_BY_MODEL,
-    skips_percolation,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -110,6 +109,7 @@ from cl.search.models import (
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
+    SCOTUSDocument,
 )
 from cl.search.types import (
     ESDictDocument,
@@ -120,7 +120,22 @@ from cl.search.types import (
     SaveESDocumentReturn,
 )
 
-percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
+# The models of every docket source, used to decide what's percolated.
+SOURCE_DOCUMENT_MODELS = tuple(
+    source.document_model for source in ALL_ES_SOURCES
+)
+SOURCE_METADATA_MODELS = tuple(
+    source.metadata_model
+    for source in ALL_ES_SOURCES
+    if source.metadata_model is not None
+)
+
+percolator_alerts_models_supported = [
+    Audio,
+    RECAPDocument,
+    SCOTUSDocument,
+    Docket,
+]
 
 logger = logging.getLogger(__name__)
 
@@ -235,9 +250,6 @@ def es_save_document(
         # Abort task the instance is not found in DB.
         self.request.chain = None
         return None
-    skip_percolator_request = skip_percolator_request or skips_percolation(
-        instance
-    )
     match app_label:
         case "people_db.Position":
             parent_id = getattr(instance.person, "pk", None)
@@ -558,9 +570,6 @@ def update_es_document(
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
         return
-    skip_percolator_request = skip_percolator_request or skips_percolation(
-        main_model_instance
-    )
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:
@@ -609,23 +618,10 @@ def update_es_document(
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
-    fields_to_omit_percolation = {
-        "plain_text",
-        "filepath_local",
-    }
-    if (
-        (
-            related_instance_app_label == "search.BankruptcyInformation"
-            or (
-                main_app_label in ("search.RECAPDocument", "search.Docket")
-                and related_instance_app_label != "search.DocketEntry"
-                and not fields_to_omit_percolation
-                & set(
-                    fields_to_update
-                )  # Percolation upon plain_text extraction will be delayed until citation matching completes.
-            )
-        )
-        and not skip_percolator_request
+    if not skip_percolator_request and should_percolate_update(
+        main_model_instance,
+        related_instance_app_label,
+        fields_to_update,
     ):
         doc = es_doc.prepare(main_model_instance)
         return SaveESDocumentReturn(
@@ -637,6 +633,42 @@ def update_es_document(
     # Abort subsequent percolation tasks for not supported models.
     self.request.chain = None
     return None
+
+
+def should_percolate_update(
+    main_instance: ESModelType,
+    related_instance_app_label: str | None,
+    fields_to_update: list[str],
+) -> bool:
+    """Decide whether a partial ES update should trigger search alerts.
+
+    Covers dockets and docket-source documents (RECAP, SCOTUS).
+
+    Args:
+        main_instance: The updated main instance.
+        related_instance_app_label: The app label of the related instance
+            whose change triggered the update, if any.
+        fields_to_update: The ES fields updated.
+
+    Returns:
+        True if the update should be percolated.
+    """
+    if related_instance_app_label and (
+        apps.get_model(related_instance_app_label) in SOURCE_METADATA_MODELS
+    ):
+        # Docket metadata changes (BankruptcyInformation,
+        # ScotusDocketMetadata) update the Docket.
+        return True
+    if not isinstance(main_instance, (Docket, *SOURCE_DOCUMENT_MODELS)):
+        return False
+    if related_instance_app_label == "search.DocketEntry":
+        # A RECAP entry change would re-percolate every document of the
+        # entry, so RECAP skips it. SCOTUS entry changes are percolated.
+        return False
+    # Updates that bring a document's file or text are percolated once its
+    # text is ready instead: after citation matching for RECAP, and after
+    # the PDF processing for SCOTUS (percolate_scotus_document).
+    return not {"plain_text", "filepath_local"} & set(fields_to_update)
 
 
 def get_es_doc_id_and_parent_id(
