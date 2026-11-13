@@ -2228,97 +2228,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2333,31 +2242,10 @@
       "severity": "error"
     },
     {
-      "column": 14,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
       "severity": "error"
     },
     {
@@ -2368,69 +2256,6 @@
       "severity": "error"
     },
     {
-      "column": 45,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
       "column": 59,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2438,24 +2263,10 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[DocketEntryType] | Unknown` is not assignable to parameter `docket_entries` with type `list[dict[str, Any]]`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
       "severity": "error"
     },
     {
