@@ -10,6 +10,7 @@
       id="{{ tabs_id }}"
       class="w-full {{ class }}"
       x-data="tabsComponent"
+      data-active-tab="{{ active_tab }}"
       x-on:htmx:before-request="startRequest"
       x-on:htmx:after-request="endRequest"
       x-on:htmx:send-error="handleSendError"

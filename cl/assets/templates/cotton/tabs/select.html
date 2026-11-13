@@ -4,6 +4,7 @@
   id="{{ tabs_id }}-select"
   aria-label="{{ label }}"
   x-on:change="navigateToTab"
+  x-bind:value="activeTab"
   class="w-full md:hidden rounded-lg border border-greyscale-300 bg-white py-2.5 px-3.5 text-base font-normal text-greyscale-700 outline-none hover:bg-greyscale-50 hover:border-primary-400 focus-visible:ring-4 focus-visible:ring-primary-300"
 >
   {% for tab in tabs %}
