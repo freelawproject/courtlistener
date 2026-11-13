@@ -76,14 +76,14 @@
                       <span class="text-greyscale-900 text-sm font-medium">{{ document.label }}</span>
                     {% endif %}
                     {# Mobile: description below badge #}
-                    {% if document.description %}
-                      <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ document.description }}</p>
+                    {% if document.display_description %}
+                      <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ document.display_description }}</p>
                     {% endif %}
                   </div>
 
                   {# Desktop: description in its own column (or empty spacer to preserve flex layout) #}
-                  {% if document.description %}
-                    <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ document.description }}</p>
+                  {% if document.display_description %}
+                    <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ document.display_description }}</p>
                   {% else %}
                     <div class="hidden md:block flex-1"></div>
                   {% endif %}

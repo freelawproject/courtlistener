@@ -2470,6 +2470,23 @@ class TexasDocketPageTest(TestCase):
                 )
                 self.assertNotIn("<script>alert(1)</script>", content)
 
+    def test_document_description_is_escaped(self) -> None:
+        """Does each stack escape a scraped document description, even where the legacy stack renders descriptions unescaped?"""
+        TexasDocumentFactory(
+            docket_entry=self.document.docket_entry,
+            description="<img src=x onerror=alert(1)>",
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=2",
+        )
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("&lt;img src=x onerror=alert(1)&gt;", content)
+                self.assertNotIn("<img src=x onerror=alert(1)>", content)
+
     def test_docket_returns_404_while_flag_is_off(self) -> None:
         """Is the page a 404, like SCOTUS before its launch, while texas_docket_page is off?"""
         with override_flag("texas_docket_page", active=False):

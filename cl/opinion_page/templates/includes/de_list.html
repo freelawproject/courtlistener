@@ -97,11 +97,11 @@
             {% endif %}
             {% if rd.has_actions %}
               <div class="col-xs-6 col-sm-5 col-md-6">
-                <p>{{ rd.description|safe|default:'' }}</p>
+                <p>{{ rd.display_description|safe|default:'' }}</p>
               </div>
             {% else %}
               <div class="col-xs-8 col-lg-7">
-                <p>{{ rd.description|safe|default:'' }}</p>
+                <p>{{ rd.display_description|safe|default:'' }}</p>
               </div>
             {% endif %}
 

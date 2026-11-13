@@ -14,7 +14,7 @@ from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from django.urls import reverse
 from django.utils.formats import date_format
-from django.utils.html import format_html, format_html_join
+from django.utils.html import conditional_escape, format_html, format_html_join
 from django.utils.safestring import SafeString, mark_safe
 
 from cl.custom_filters.templatetags.extras import http_url
@@ -179,6 +179,11 @@ def _entry_description(entry: Any) -> str:
     return entry.description
 
 
+def _document_description(document: Any) -> str:
+    """Return the document's own description, as the docket page has always shown it."""
+    return document.description
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -258,6 +263,12 @@ class DocketEntrySource:
     source that builds it from scraped fields MUST escape them, e.g. with
     ``format_html``, as ``_texas_entry_display_text`` does.
 
+    ``document_display_description`` does the same for each document's
+    description, which ``attach_display_fields`` puts on
+    ``document.display_description``. The legacy stack renders it unescaped
+    too, so a source whose descriptions come from a scraper MUST escape
+    them.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -304,6 +315,7 @@ class DocketEntrySource:
     has_entry_numbers: bool = True
     supports_docket_alerts: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
+    document_display_description: Callable[[Any], str] = _document_description
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -313,6 +325,9 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
     document.detail_url = source.document_detail_url(document)
     document.external_url = source.document_external_url(document)
     document.has_actions = source.document_has_actions(document)
+    document.display_description = source.document_display_description(
+        document
+    )
 
 
 # RECAP
@@ -754,6 +769,11 @@ def _texas_entry_display_text(entry: TexasDocketEntry) -> SafeString:
     )
 
 
+def _texas_document_display_description(document: TexasDocument) -> str:
+    """Return the document's description escaped, since it comes from TAMES and the legacy stack renders it unescaped."""
+    return conditional_escape(document.description)
+
+
 def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a Texas docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
@@ -929,6 +949,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     launch_flag="texas_docket_page",
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
+    document_display_description=_texas_document_display_description,
     metadata_sections=_texas_metadata_sections,
 )
 
