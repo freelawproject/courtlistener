@@ -45,6 +45,7 @@ from cl.search.documents import (
     ESRECAPSweepDocument,
     RECAPSweepDocument,
 )
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
@@ -226,13 +227,19 @@ def index_daily_recap_documents(
         query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
     )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
-    # Temporary: search alerts don't support SCOTUS content yet.
-    exclude_scotus = [{"term": {"court_id.raw": "scotus"}}]
+    # Sources outside the sweep trigger alerts only through the percolator.
+    excluded_courts = sorted(
+        court_id
+        for source in ALL_ES_SOURCES
+        if not source.in_alerts_sweep
+        for court_id in source.court_ids
+    )
+    exclude_percolator_only = [{"terms": {"court_id.raw": excluded_courts}}]
     # Re Index API query.
     query = (
         {
             "bool": {
-                "must_not": exclude_scotus,
+                "must_not": exclude_percolator_only,
                 "should": [
                     # Dockets added/modified today
                     {
@@ -300,7 +307,7 @@ def index_daily_recap_documents(
         if not only_rd
         else {
             "bool": {
-                "must_not": exclude_scotus,
+                "must_not": exclude_percolator_only,
                 "should": [
                     # RECAPDocuments with parents added/modified today
                     {
