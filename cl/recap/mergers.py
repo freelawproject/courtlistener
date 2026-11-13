@@ -844,7 +844,7 @@ def normalize_long_description(docket_entry):
 
 
 async def merge_unnumbered_docket_entries(
-    des: QuerySet, docket_entry: dict[str, Any]
+    des: QuerySet[DocketEntry], docket_entry: dict[str, Any]
 ) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
 
@@ -1135,7 +1135,7 @@ async def get_or_make_docket_entry(
     return de, de_created
 
 
-async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
+async def keep_latest_rd_document(queryset: QuerySet[RECAPDocument]) -> RECAPDocument:
     """Retains the most recent item with a PDF, if available otherwise, retains the most recent item overall.
 
     Args:

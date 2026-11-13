@@ -44,7 +44,7 @@ from cl.stats.constants import StatMetric
 logger = logging.getLogger(__name__)
 
 
-async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
+async def get_cached_court_counts(courts_queryset: QuerySet[Court]) -> dict[str, int]:
     """Fetch court counts from cache or ES if not available.
 
     Returns:
