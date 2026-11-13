@@ -11,7 +11,7 @@ class AudioSitemap(sitemaps.Sitemap):
     priority = 0.4
     limit = 50_000
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[Audio]:
         q = (
             Audio.objects.filter(blocked=False)
             .select_related("docket")
@@ -29,7 +29,7 @@ class BlockedAudioSitemap(sitemaps.Sitemap):
     limit = 50_000
     priority = 0.6
 
-    def items(self) -> QuerySet:
+    def items(self) -> QuerySet[Audio]:
         q = (
             Audio.objects.filter(
                 blocked=True,
