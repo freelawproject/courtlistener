@@ -1,5 +1,4 @@
-"""
-Cycle through all of our read databases for API requests.
+"""Cycle through all of our read databases for API requests.
 
 This code borrows from the https://github.com/jbalogh/django-multidb-router/
 package, but instead of using that whole package, we just create a little tool
@@ -96,8 +95,7 @@ class ReplicaRouter:
     """
 
     def db_for_read(self, model, **hints) -> str | None:
-        """
-        Return the replica DB alias for read queries when replica routing is active.
+        """Return the replica DB alias for read queries when replica routing is active.
 
         Checks the _use_replica ContextVar; if set, delegates to get_api_read_db()
         to select the appropriate replica. Returns None to fall back to Django's
@@ -108,14 +106,11 @@ class ReplicaRouter:
         return None
 
     def db_for_write(self, model, **hints) -> str | None:
-        """
-        Always defer write routing to Django's default behavior (primary database).
-        """
+        """Always defer write routing to Django's default behavior (primary database)."""
         return None
 
     def allow_relation(self, obj1, obj2, **hints) -> bool | None:
-        """
-        Unconditionally allow relations between any two model instances.
+        """Unconditionally allow relations between any two model instances.
 
         Prevents the router from blocking cross-database relations that may arise
         when reads and writes are split across primary and replica databases.
@@ -125,8 +120,7 @@ class ReplicaRouter:
     def allow_migrate(
         self, db, app_label, model_name=None, **hints
     ) -> bool | None:
-        """
-        Defer migration routing entirely to Django's default behavior.
+        """Defer migration routing entirely to Django's default behavior.
 
         Returning None ensures migrations are applied only to the primary database
         without this router interfering.

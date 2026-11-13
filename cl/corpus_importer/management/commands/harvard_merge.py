@@ -46,11 +46,14 @@ class HarvardConversionUtil:
 
 
 def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
-    """Find field by tag name or data-type attribute
+    """Find field by tag name or data-type attribute.
 
-    :param soup: parsed document
-    :param field_name: field to find
-    :return: list of all fields found
+    Args:
+        soup: parsed document
+        field_name: field to find
+
+    Returns:
+        list of all fields found
     """
     return soup.find_all(
         lambda tag: (
@@ -61,12 +64,14 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
 
 
 def read_json(cluster: OpinionCluster) -> dict[str, Any] | None:
-    """Helper method to read json into object
+    """Helper method to read json into object.
 
-    :param cluster: the cluster to fetch the filepath for
-    :return: Harvard data as a json object or None
+    Args:
+        cluster: the cluster to fetch the filepath for
+
+    Returns:
+        Harvard data as a json object or None
     """
-
     if cluster.filepath_json_harvard:
         try:
             local_data = json.load(cluster.filepath_json_harvard)
@@ -98,12 +103,15 @@ def read_json(cluster: OpinionCluster) -> dict[str, Any] | None:
 
 
 def get_data_source(harvard_data: dict[str, Any]) -> str:
-    """Get json data source: Fastcase or CAP
+    """Get json data source: Fastcase or CAP.
 
     The default is CAP/Harvard
 
-    :param harvard_data: case data as dict
-    :return: data source
+    Args:
+        harvard_data: case data as dict
+
+    Returns:
+        data source
     """
     data_source = "CAP"
     data_provenance = harvard_data.get("provenance")
@@ -114,10 +122,13 @@ def get_data_source(harvard_data: dict[str, Any]) -> str:
 
 
 def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
-    """Get data from harvard casebody and preprocess
+    """Get data from harvard casebody and preprocess.
 
-    :param harvard_data:
-    :return: dict with values extracted from casebody
+    Args:
+        harvard_data: case data as dict
+
+    Returns:
+        dict with values extracted from casebody
     """
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
 
@@ -194,11 +205,14 @@ def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
 def combine_non_overlapping_data(
     cluster: OpinionCluster, harvard_data: dict
 ) -> dict[str, tuple]:
-    """Combine non overlapping data and return dictionary of data for merging
+    """Combine non overlapping data and return dictionary of data for merging.
 
-    :param cluster: Cluster to merge
-    :param harvard_data: The harvard data as json
-    :return: Optional dictionary of data to continue to merge
+    Args:
+        cluster: Cluster to merge
+        harvard_data: The harvard data as json
+
+    Returns:
+        Optional dictionary of data to continue to merge
     """
     all_data = fetch_non_harvard_data(harvard_data)
     changed_values_dictionary: dict[str, tuple] = {}
@@ -225,13 +239,12 @@ def merge_cluster_dates(
     field_name: str,
     overlapping_data: tuple | None,
 ) -> dict[str, Any]:
-    """Compare two dates and choose the best to update the opinion cluster
-    the value if one value is better than the other
+    """Compare two dates and choose the best to update the opinion cluster the value if one value is better than the other.
 
-    :param cluster: Cluster to update
-    :param field_name: field name to update in opinion cluster
-    :param overlapping_data: data to compare
-    :return: None
+    Args:
+        cluster: Cluster to update
+        field_name: field name to update in opinion cluster
+        overlapping_data: data to compare
     """
     if not overlapping_data:
         return {}
@@ -258,13 +271,12 @@ def merge_cluster_dates(
 def merge_date_filed(
     cluster: OpinionCluster, harvard_data: dict
 ) -> dict[str, Any]:
-    """Merge date filed
+    """Merge date filed.
 
-    :param cluster: The cluster of the merging item
-    :param harvard_data: json data from harvard case
-    :return: None
+    Args:
+        cluster: The cluster of the merging item
+        harvard_data: json data from harvard case
     """
-
     harvard_date_filed = harvard_data.get("decision_date")
     cluster_date_filed = cluster.date_filed
     return merge_cluster_dates(
@@ -273,10 +285,10 @@ def merge_date_filed(
 
 
 def update_docket_source(cluster: OpinionCluster) -> None:
-    """Update docket source and complete
+    """Update docket source and complete.
 
-    :param cluster: the cluster object
-    :return: None
+    Args:
+        cluster: the cluster object
     """
     docket = cluster.docket
     if docket.source in Docket.NON_HARVARD_SOURCES():
@@ -289,10 +301,10 @@ def update_docket_source(cluster: OpinionCluster) -> None:
 
 
 def update_cluster_source(cluster: OpinionCluster) -> None:
-    """Update cluster source
+    """Update cluster source.
 
-    :param cluster: cluster object
-    :return: None
+    Args:
+        cluster: cluster object
     """
     cluster.source = ClusterSources.merge_sources(
         cluster.source, ClusterSources.HARVARD_CASELAW
@@ -301,12 +313,12 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
 
 
 def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
-    """Save and update headmatter
+    """Save and update headmatter.
 
     Clean up the headmatter content - (pre opinion content) and save it
 
-    :param harvard_data: json data from harvard case
-    :return: None
+    Args:
+        harvard_data: json data from harvard case
     """
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
     for op in soup.find_all("opinion"):
@@ -337,12 +349,12 @@ def merge_opinion_clusters(
     only_fastcase: bool = False,
     skip_judge_merger: bool = False,
 ) -> None:
-    """Merge opinion cluster, docket and opinion data from Harvard
+    """Merge opinion cluster, docket and opinion data from Harvard.
 
-    :param cluster_id: The cluster ID to merger
-    :param only_fastcase: Only process fastcase data
-    :param skip_judge_merger: skip judge merger
-    :return: None
+    Args:
+        cluster_id: The cluster ID to merger
+        only_fastcase: Only process fastcase data
+        skip_judge_merger: skip judge merger
     """
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     harvard_data = read_json(opinion_cluster)
@@ -460,13 +472,16 @@ def merge_opinion_clusters(
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
-    """Fetch CL opinion Content
+    """Fetch CL opinion Content.
 
     This is a simple helper function to grab an opinion content to compare
     against the harvard xml
 
-    :param sub_opinions: Sub opinions for a cluster
-    :return: Opinion text as a list
+    Args:
+        sub_opinions: Sub opinions for a cluster
+
+    Returns:
+        Opinion text as a list
     """
     cl_opinions = []
 
@@ -495,12 +510,15 @@ def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
 
 
 def fix_pagination(soup: Tag) -> Tag:
-    """Add pagination to harvard XML
+    """Add pagination to harvard XML.
 
     Add star pagination to page number XML/HTML
 
-    :param soup: The content to clean up
-    :return: soup
+    Args:
+        soup: The content to clean up
+
+    Returns:
+        soup
     """
     for pgnmbr in soup.find_all("page-number"):
         pgnmbr.name = "span"
@@ -510,11 +528,15 @@ def fix_pagination(soup: Tag) -> Tag:
 
 
 def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
-    """Make Footnotes work with CL
+    """Make Footnotes work with CL.
 
     Enable footnote linking between footnotes and footnotemark
-    :param soup: Bs4 object to clean up
-    :return:Content with working footnotes
+
+    Args:
+        soup: Bs4 object to clean up
+
+    Returns:
+        Content with working footnotes
     """
     for fn in soup.find_all("footnotemark"):
         fn.name = "a"
@@ -562,12 +584,12 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
 def update_matching_opinions(
     matches: dict, cluster_sub_opinions: list, harvard_opinions: list
 ) -> None:
-    """Update matching opinions
+    """Update matching opinions.
 
-    :param matches: dict with matching position from queryset and harvard opinions
-    :param cluster_sub_opinions: queryset of opinions
-    :param harvard_opinions: list of harvard opinions
-    :return: None
+    Args:
+        matches: dict with matching position from queryset and harvard opinions
+        cluster_sub_opinions: queryset of opinions
+        harvard_opinions: list of harvard opinions
     """
     for k, v in matches.items():
         op = cluster_sub_opinions[int(v)]
@@ -601,7 +623,7 @@ def update_matching_opinions(
 def map_and_merge_opinions(
     cluster: OpinionCluster, harvard_data: dict[str, Any]
 ) -> None:
-    """Map and merge opinion data
+    """Map and merge opinion data.
 
     Map and merge opinions in clusters. If an opinion cluster has multiple
     opinions, we attempt to map the opinions to each other. In some
@@ -609,11 +631,10 @@ def map_and_merge_opinions(
     In those cases we do not create new opinions and just rely on the data
     that we previously had and log that we did not create new opinions.
 
-    :param cluster: Cluster object
-    :param harvard_data: json data from harvard case
-    :return: None
+    Args:
+        cluster: Cluster object
+        harvard_data: json data from harvard case
     """
-
     map_types = HarvardConversionUtil.types_mapping
     cl_opinions = Opinion.objects.filter(cluster__id=cluster.id)
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")

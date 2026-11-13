@@ -217,13 +217,13 @@ def get_cand_full(options):
 def get_dockets(options, items, tags: list[str], sample_size=0):
     """Download dockets from PACER.
 
-    :param options: Options provided by argparse
-    :param items: Items from our FJC IDB database
-    :param tags: A list of tag names to associate with the purchased content.
-    :param sample_size: The number of items to get. If 0, get them all. Else,
-    get only this many and do it randomly.
+    Args:
+        options: Options provided by argparse
+        items: Items from our FJC IDB database
+        tags: A list of tag names to associate with the purchased content.
+        sample_size: The number of items to get. If 0, get them all. Else,
+            get only this many and do it randomly.
     """
-
     if sample_size > 0:
         items = items.order_by("?")[:sample_size]
 

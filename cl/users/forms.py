@@ -156,8 +156,8 @@ def validate_username_is_not_an_email(value: str) -> None:
     mistaken for an address at sign-in. Something like "mal@ory" is fine; it
     has no domain.
 
-    :param value: The submitted username.
-    :return: None
+    Args:
+        value: The submitted username.
     """
     if LOOKS_LIKE_EMAIL.match(value):
         raise ValidationError(
@@ -167,10 +167,7 @@ def validate_username_is_not_an_email(value: str) -> None:
 
 
 class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
-    """A bit of an unusual form because instead of creating it ourselves,
-    we are overriding the one from Django. Thus, instead of declaring
-    everything explicitly like we normally do, we just override the
-    specific parts we want to, after calling the super class's __init__().
+    """A bit of an unusual form because instead of creating it ourselves, we are overriding the one from Django. Thus, instead of declaring everything explicitly like we normally do, we just override the specific parts we want to, after calling the super class's __init__().
 
     Only one account may hold an email address, but the form never reports
     that an address is taken: "this email is already in use" would let anyone
@@ -245,8 +242,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         }
 
     def _email_is_taken(self, value: str) -> bool:
-        """Report whether an account other than the bound instance holds
-        `value` as its email address.
+        """Report whether an account other than the bound instance holds `value` as its email address.
 
         Address matching goes through filter_by_email, the one definition of
         "same address" that sign-in, confirmation and password reset share, so
@@ -257,8 +253,11 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         the form is bound to the stub that already holds the address, is not
         mistaken for a duplicate.
 
-        :param value: The string to compare against the email column.
-        :return: True if some other account already has that address.
+        Args:
+            value: The string to compare against the email column.
+
+        Returns:
+            True if some other account already has that address.
         """
         users = filter_by_email(User.objects.all(), value)
         if self.instance.pk:
@@ -266,8 +265,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         return users.exists()
 
     def clean_email(self) -> str:
-        """Run the shared email checks, then record whether another account
-        already holds this address in ``email_taken``.
+        """Run the shared email checks, then record whether another account already holds this address in ``email_taken``.
 
         A taken address is deliberately not a validation error. See the class
         docstring for why.
@@ -358,11 +356,7 @@ class PasswordConfirmForm(forms.Form):
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
-    """
-    A form that lets a user change his/her password by entering
-    their old password. Overrides Django default form to allow
-    the customization of attributes.
-    """
+    """A form that lets a user change his/her password by entering their old password. Overrides Django default form to allow the customization of attributes."""
 
     old_password = forms.CharField(
         label="Old password",
@@ -388,9 +382,7 @@ class CustomPasswordChangeForm(PasswordChangeForm):
 
 
 class CustomPasswordResetForm(PasswordResetForm):
-    """A simple subclassing of a Django form in order to change class
-    attributes.
-    """
+    """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -420,8 +412,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         we have already asked, and this is an unauthenticated endpoint that
         shouldn't run the same query three times per request.
 
-        :param email: The submitted address.
-        :return: The matching accounts, each with its profile loaded.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The matching accounts, each with its profile loaded.
         """
         if self._accounts_at != email:
             self._accounts = [
@@ -439,8 +434,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         select-relates it, so the two can't drift apart and turn this into a
         query per account.
 
-        :param email: The submitted address.
-        :return: The accounts at that address that have confirmed it.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The accounts at that address that have confirmed it.
         """
         return [
             user
@@ -462,8 +460,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         ``email_confirmed`` (see ``cl.users.views.view_settings``), so this
         check bites the moment the address is repointed.
 
-        :param email: The submitted address.
-        :return: The accounts to mail a reset link to.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The accounts to mail a reset link to.
         """
         return iter(self.confirmed_accounts_at_address(email))
 
@@ -505,9 +506,7 @@ class CustomPasswordResetForm(PasswordResetForm):
 
 
 class CustomSetPasswordForm(SetPasswordForm):
-    """A simple subclassing of a Django form in order to change class
-    attributes.
-    """
+    """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, user, *args, **kwargs):
         super().__init__(user, *args, **kwargs)

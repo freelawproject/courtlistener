@@ -13,10 +13,12 @@
 {% block navbar-oa %}active{% endblock %}
 
 {% block head %}
+    {% if af.local_path_mp3 %}
     <meta property="og:audio:url"
           content="{{ af.local_path_mp3.url }}">
     <meta property="og:audio:secure_url" content="{{ af.local_path_mp3.url }}">
     <meta property="og:audio:type" content="audio/mp3">
+    {% endif %}
 
     <link type="text/css" href="{% static "skin/jplayer.blue.monday.css" %}"
           rel="stylesheet"/>
@@ -51,7 +53,7 @@
         ready: function (event) {
           $(this).jPlayer("setMedia", {
             title: "{{ af|best_case_name }}",
-            mp3: "{{ af.local_path_mp3.url }}"
+            mp3: "{% if af.local_path_mp3 %}{{ af.local_path_mp3.url }}{% endif %}"
           });
           // Set initial speed bar position
           updateSpeedBar(event.jPlayer.options.playbackRate);
@@ -218,7 +220,7 @@
                         court website</a>.
                 </p>
             </div>
-        {% else %}
+        {% elif af.local_path_mp3 %}
             <div id="jquery_jplayer_1" class="jp-jplayer"></div>
             <div id="jp_container_1" class="jp-audio">
                 <div class="jp-type-single">

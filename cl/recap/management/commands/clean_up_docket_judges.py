@@ -17,10 +17,13 @@ def cached_lookup_judge_by_full_name(
 ) -> Person | None:
     """Fetch a judge by full name with LRU caching. Store 30,000 judge lookups.
 
-    :param full_name: The full name of the judge.
-    :param court_id: The ID of the court.
-    :param date_filed: The date the case was filed.
-    :return: A Person object if the judge is found, otherwise None.
+    Args:
+        full_name: The full name of the judge.
+        court_id: The ID of the court.
+        date_filed: The date the case was filed.
+
+    Returns:
+        A Person object if the judge is found, otherwise None.
     """
     return async_to_sync(lookup_judge_by_full_name)(
         full_name, court_id, date_filed
@@ -32,12 +35,11 @@ def find_and_fix_docket_judges(
 ) -> None:
     """Find and fix Dockets referred_to and assigned_to judges.
 
-    :param iteration_wait: A float that indicates the time to wait between iterations.
-    :param testing_mode: True if testing mode is enabled to avoid wait between
-    iterations.
-    :return: None
+    Args:
+        iteration_wait: A float that indicates the time to wait between iterations.
+        testing_mode: True if testing mode is enabled to avoid wait between
+            iterations.
     """
-
     logger.info("Finding dockets with judges.")
     dockets_with_judges = Docket.objects.filter(
         Q(referred_to__isnull=False) | Q(assigned_to__isnull=False)

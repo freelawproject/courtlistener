@@ -25,11 +25,10 @@ class SearchConfig(AppConfig):
 
 @retry((ConnectionError, ConnectionTimeout), tries=5, delay=5)
 def check_and_create_es_index(es_document) -> None:
-    """Check Elasticsearch cluster availability and create the index if it
-    doesn't exist.
+    """Check Elasticsearch cluster availability and create the index if it doesn't exist.
 
-    :param es_document: The Elasticsearch document type.
-    :return: None
+    Args:
+        es_document: The Elasticsearch document type.
     """
     model_label = f"{es_document.django.model._meta.app_label}.{es_document.django.model.__name__}"
     es = connections.get_connection()
@@ -43,13 +42,7 @@ def check_and_create_es_index(es_document) -> None:
 
 
 def create_search_indices(sender, **kwargs):
-    """Runs the Elasticsearch index creation process for a predefined set of
-    document models. Iterates through a list of Elasticsearch document models,
-    and for each, it checks if the corresponding index exists in the ES cluster.
-    If an index does not exist, it attempts to create it.
-
-    :return: None
-    """
+    """Runs the Elasticsearch index creation process for a predefined set of document models. Iterates through a list of Elasticsearch document models, and for each, it checks if the corresponding index exists in the ES cluster. If an index does not exist, it attempts to create it."""
     from cl.search.documents import (
         AudioDocument,
         AudioPercolator,

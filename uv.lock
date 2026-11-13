@@ -1962,7 +1962,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "4.0.2"
+version = "4.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1979,9 +1979,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/53/23/39ec50a88331969ec5c907f9df1801eb4c0647c221e06158f831caa02820/juriscraper-4.0.2.tar.gz", hash = "sha256:6835e671022e4fe2d7b3cdfd82a3f696658891233a0a813f5c209611e83252bb", size = 481094, upload-time = "2026-10-30T02:43:39.639Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/c3/086ed157b9ce3d0a5fd49a227d2e9210154e96b011dc46968a6f686e4dab/juriscraper-4.0.3.tar.gz", hash = "sha256:2aebd6438cf194e6cec7a42417a4cff6c39003fbb7e7bd9dd9645a6174c35a7d", size = 490690, upload-time = "2026-11-13T15:37:27.875Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/a1/132db39efe55a9dc0d78e637c9243e7ccd354ffd7bee1e682bf0772442e9/juriscraper-4.0.2-py3-none-any.whl", hash = "sha256:568289f3264489bb2207f3fa372f62b3993db279c79d61b226a093586baee934", size = 722806, upload-time = "2026-10-30T02:43:37.829Z" },
+    { url = "https://files.pythonhosted.org/packages/70/82/cb9a67074f2965a2771c9b79a09621d8a533ae38f52e3542763d5573e82e/juriscraper-4.0.3-py3-none-any.whl", hash = "sha256:dbdfddd905212ff059d6ee8af1e0f7933d7747a778b1a5e0c58063b7a79e225d", size = 735508, upload-time = "2026-11-13T15:37:26.183Z" },
 ]
 
 [[package]]
@@ -3265,11 +3265,11 @@ wheels = [
 
 [[package]]
 name = "soupsieve"
-version = "2.9"
+version = "4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/80/f1/93422647dd7e461f23d254e6b2bfa687a85b53aeb4903fcdbb74474d4584/soupsieve-2.9.tar.gz", hash = "sha256:acee8417325c5653e1377dc31eccad59eb82cbc65942afe6174c53b3aaad63fc", size = 122122, upload-time = "2026-07-19T01:35:18.425Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/5e/19b7c5d20bc2f226c44f33a9d9aab9740efed7555b96e656231fd564e514/soupsieve-4.0.tar.gz", hash = "sha256:ccd6470b256394ac44b08b86fd94b30a17d335a5335c8a3d15565f7b03d3c8cf", size = 151929, upload-time = "2026-11-03T14:28:55.388Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/d6/3185ab5ad1280319b31986898f3206dd7227cd75e293d4dba2a5e6bf27a0/soupsieve-2.9-py3-none-any.whl", hash = "sha256:a2b2c76d67df2382d245409fd71e321a571717e58463efa32ace87dcadac2c12", size = 37387, upload-time = "2026-07-19T01:35:17.106Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/18/d24df2f733ee0655c58717d51add4118a70e64692d0e47d403b9aac4cf98/soupsieve-4.0-py3-none-any.whl", hash = "sha256:5e7494bfce90e06676cfb4c5c2cf22243e98e5cf24646bb1ecdda46d318550a0", size = 50158, upload-time = "2026-11-03T14:28:53.988Z" },
 ]
 
 [[package]]

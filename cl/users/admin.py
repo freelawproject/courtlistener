@@ -128,10 +128,13 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 
         Domain or partial terms keep the default icontains search.
 
-        :param request: The current HTTP request.
-        :param queryset: The changelist queryset to filter.
-        :param search_term: The raw string typed into the search box.
-        :return: Two-tuple of the filtered queryset and whether the caller
+        Args:
+            request: The current HTTP request.
+            queryset: The changelist queryset to filter.
+            search_term: The raw string typed into the search box.
+
+        Returns:
+            Two-tuple of the filtered queryset and whether the caller
             needs to de-duplicate the results.
         """
         term = search_term.strip()
@@ -143,8 +146,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         description="Refresh API throttles from active Neon membership"
     )
     def refresh_api_throttles(self, request, queryset):
-        """Resync MEMBERSHIP-source API throttles for the selected users
-        from each user's current active Neon membership.
+        """Resync MEMBERSHIP-source API throttles for the selected users from each user's current active Neon membership.
 
         MANUAL-source throttles are never touched (the helper only
         manages MEMBERSHIP rows).
@@ -240,8 +242,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         Links are only returned for records we have a Neon ID for, so users
         without a Neon account or membership get no link.
 
-        :param user_id: The pk of the user whose admin page is being rendered.
-        :return: Zero, one, or two links to the Neon admin site.
+        Args:
+            user_id: The pk of the user whose admin page is being rendered.
+
+        Returns:
+            Zero, one, or two links to the Neon admin site.
         """
         base_url = settings.NEON_ADMIN_URL.rstrip("/")
         links: list[AdminLink] = []

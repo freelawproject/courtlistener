@@ -11,9 +11,7 @@ def reverse_endpoints_if_needed(start, end):
 
 
 def within_max_hops(good_nodes, child_authority_id, hops_taken, max_hops):
-    """Determine if a new route to a node that's already in the network is
-    within the max_hops of the start_point.
-    """
+    """Determine if a new route to a node that's already in the network is within the max_hops of the start_point."""
     shortest_path = good_nodes[child_authority_id]["shortest_path"]
     if (shortest_path + hops_taken) > max_hops:
         return False
@@ -32,9 +30,7 @@ def graphs_intersect(good_nodes, main_graph, sub_graph):
 
 
 def set_shortest_path_to_end(good_nodes, node_id, target_id) -> bool:
-    """Determine if a path is to the end is shorter, and if so, update the
-    current value.
-    """
+    """Determine if a path is to the end is shorter, and if so, update the current value."""
     is_shorter = False
     if node_id in good_nodes:
         current_length = good_nodes[node_id]["shortest_path"]

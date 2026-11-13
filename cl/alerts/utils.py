@@ -135,12 +135,14 @@ def create_percolator_search_query(
 ):
     """Create an Elasticsearch search query with pagination.
 
-    :param index_name: The name of the Elasticsearch index to search.
-    :param final_query: Elasticsearch DSL Query object, or None.
-    :param search_after: An optional parameter for search_after pagination.
-    :return: An Elasticsearch search object with the specified query and pagination settings.
-    """
+    Args:
+        index_name: The name of the Elasticsearch index to search.
+        final_query: Elasticsearch DSL Query object, or None.
+        search_after: An optional parameter for search_after pagination.
 
+    Returns:
+        An Elasticsearch search object with the specified query and pagination settings.
+    """
     s = Search(index=index_name)
     s = s.query(final_query)
     s = s.source(includes=["id"])
@@ -168,25 +170,27 @@ def percolate_es_document(
 ) -> PercolatorResponses:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
-    :param document_id: The document ID in ES index to be percolated.
-    :param percolator_index: The ES percolator index name.
-    :param document_index: The ES document index where the document lives.
-    :param documents_to_percolate:A three-tuple containing the documents to
-    percolate: the full document, the document with only child fields,
-    and the document with only parent fields.
-    :param app_label: The app label and model that belongs to the document
-    being percolated.
-    :param main_search_after: Optional the ES main percolator query
-    search_after param  for deep pagination.
-    :param rd_search_after: Optional the ES RECAPDocument percolator query
-    search_after param  for deep pagination.
-    :param d_search_after: Optional the ES Docket document percolator query
-    search_after param  for deep pagination.
-    :return: A PercolatorResponses dataclass containing the main percolator
-    response, the RECAPDocument percolator response (if applicable), and the
-    Docket percolator response (if applicable).
-    """
+    Args:
+        document_id: The document ID in ES index to be percolated.
+        percolator_index: The ES percolator index name.
+        document_index: The ES document index where the document lives.
+        documents_to_percolate: A three-tuple containing the documents to
+            percolate: the full document, the document with only child fields,
+            and the document with only parent fields.
+        app_label: The app label and model that belongs to the document
+            being percolated.
+        main_search_after: Optional the ES main percolator query
+            search_after param  for deep pagination.
+        rd_search_after: Optional the ES RECAPDocument percolator query
+            search_after param  for deep pagination.
+        d_search_after: Optional the ES Docket document percolator query
+            search_after param  for deep pagination.
 
+    Returns:
+        A PercolatorResponses dataclass containing the main percolator
+        response, the RECAPDocument percolator response (if applicable), and the
+        Docket percolator response (if applicable).
+    """
     percolate_query_child = percolate_query_parent = None
     if document_index:
         # If document_index is provided, use it along with the document_id to refer
@@ -242,7 +246,7 @@ def percolate_es_document(
         percolator_index, final_query, search_after=main_search_after
     )
     match app_label:
-        case "search.RECAPDocument":
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
             child_highlight_options, _ = build_highlights_dict(
                 SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
             )
@@ -320,16 +324,17 @@ def percolate_es_document(
 def fetch_all_search_alerts_results(
     initial_responses: PercolatorResponses, *args
 ) -> tuple[list[Hit], list[Hit], list[Hit]]:
-    """Fetches all search alerts results based on a given percolator query and
-    the initial responses. It retrieves all the search results that exceed the
-    initial batch size by iteratively calling percolate_es_document method with
-    the necessary pagination parameters.
-    :param initial_responses: A PercolatorResponses dataclass containing the
-    initial ES Percolator Responses.
-    :param args: Additional arguments to pass to the percolate_es_document method.
-    :return: A three-tuple containing the main percolator results, the
-    RECAPDocument percolator results (if applicable), and the Docket
-    percolator results (if applicable).
+    """Fetches all search alerts results based on a given percolator query and the initial responses. It retrieves all the search results that exceed the initial batch size by iteratively calling percolate_es_document method with the necessary pagination parameters.
+
+    Args:
+        initial_responses: A PercolatorResponses dataclass containing the
+            initial ES Percolator Responses.
+        args: Additional arguments to pass to the percolate_es_document method.
+
+    Returns:
+        A three-tuple containing the main percolator results, the
+        RECAPDocument percolator results (if applicable), and the Docket
+        percolator results (if applicable).
     """
 
     def get_search_after(response: Response | None) -> Any:
@@ -397,9 +402,12 @@ def add_cutoff_timestamp_filter(
 ) -> str:
     """Append a timestamp range filter to an existing Elasticsearch query.
 
-    :param query: The original query string.
-    :param cut_off_date: The lower bound datetime for the timestamp filter.
-    :return: The query string with the appended timestamp range filter.
+    Args:
+        query: The original query string.
+        cut_off_date: The lower bound datetime for the timestamp filter.
+
+    Returns:
+        The query string with the appended timestamp range filter.
     """
     if not cut_off_date:
         return query
@@ -416,14 +424,15 @@ def add_cutoff_timestamp_filter(
 def override_alert_query(
     alert: Alert, cut_off_date: date | None = None
 ) -> QueryDict:
-    """Override the query parameters for a given alert based on its type and an
-     optional cut-off date.
+    """Override the query parameters for a given alert based on its type and an optional cut-off date.
 
-    :param alert: The Alert object for which the query will be overridden.
-    :param cut_off_date: An optional date used to set a threshold in the query.
-    :return: A QueryDict object containing the modified query parameters.
+    Args:
+        alert: The Alert object for which the query will be overridden.
+        cut_off_date: An optional date used to set a threshold in the query.
+
+    Returns:
+        A QueryDict object containing the modified query parameters.
     """
-
     qd = QueryDict(alert.query.encode(), mutable=True)
     qd["q"] = add_cutoff_timestamp_filter(qd.get("q", ""), cut_off_date)
     return qd
@@ -436,22 +445,23 @@ def scheduled_alert_hits_limit_reached(
     object_id: int | None = None,
     child_document: bool = False,
 ) -> bool:
-    """Check if the alert hits limit has been reached for a specific alert-user
-     combination.
+    """Check if the alert hits limit has been reached for a specific alert-user combination.
 
     For child documents (RECAPDocument, Opinion), two limits are checked:
         1. Per-parent limit: caps child hits per parent object.
         2. Global alert limit: caps distinct parent objects per alert.
     If either limit is reached, returns True.
 
-    :param alert_pk: The alert_id.
-    :param user_pk: The user_id.
-    :param content_type: The related content_type.
-    :param object_id: The related object_id.
-    :param child_document: True if the document to schedule is a child document.
-    :return: True if the limit has been reached, otherwise False.
-    """
+    Args:
+        alert_pk: The alert_id.
+        user_pk: The user_id.
+        content_type: The related content_type.
+        object_id: The related object_id.
+        child_document: True if the document to schedule is a child document.
 
+    Returns:
+        True if the limit has been reached, otherwise False.
+    """
     base_filter = ScheduledAlertHit.objects.filter(
         alert_id=alert_pk,
         user_id=user_pk,
@@ -501,6 +511,7 @@ def scheduled_alert_hits_limit_reached(
 
 def get_alerts_set_prefix() -> str:
     """Simple tool for getting the prefix for the alert hits set.
+
     Useful for avoiding test collisions.
     """
     return "alert_hits"
@@ -509,23 +520,27 @@ def get_alerts_set_prefix() -> str:
 def make_alert_set_key(alert_id: int, document_type: str) -> str:
     """Generate a Redis key for storing alert hits.
 
-    :param alert_id: The ID of the alert.
-    :param document_type: The type of document associated with the alert.
-    :return: A Redis key string in the format "alert_hits:{alert_id}.{document_type}".
+    Args:
+        alert_id: The ID of the alert.
+        document_type: The type of document associated with the alert.
+
+    Returns:
+        A Redis key string in the format "alert_hits:{alert_id}.{document_type}".
     """
     return f"{get_alerts_set_prefix()}:{alert_id}.{document_type}"
 
 
 def add_document_hit_to_alert_set(
-    r: Redis, alert_id: int, document_type: str, document_id: int
+    r: Redis, alert_id: int, document_type: str, document_id: int | str
 ) -> None:
     """Add a document ID to the Redis SET associated with an alert ID.
 
-    :param r: Redis client instance.
-    :param alert_id: The alert identifier.
-    :param document_type: The type of document associated with the alert.
-    :param document_id: The docket identifier to add.
-    :return: None
+    Args:
+        r: Redis client instance.
+        alert_id: The alert identifier.
+        document_type: The type of document associated with the alert.
+        document_id: The document identifier to add: a pk, or a uid like
+            "scotus_123" for documents whose pk could collide with RECAP pks.
     """
     alert_key = make_alert_set_key(alert_id, document_type)
     r.sadd(alert_key, document_id)
@@ -538,9 +553,9 @@ def remove_alert_hits_set(r: Redis, alert_id: int) -> None:
     "alert_hits:5.r"). When an Alert is deleted these sets are no longer used
     and would otherwise leak Redis memory, so we scan and delete all of them.
 
-    :param r: Redis client instance.
-    :param alert_id: The alert identifier.
-    :return: None
+    Args:
+        r: Redis client instance.
+        alert_id: The alert identifier.
     """
     match_pattern = f"{get_alerts_set_prefix()}:{alert_id}.*"
     keys = list(r.scan_iter(match=match_pattern))
@@ -549,30 +564,34 @@ def remove_alert_hits_set(r: Redis, alert_id: int) -> None:
 
 
 def has_document_alert_hit_been_triggered(
-    r: Redis, alert_id: int, document_type: str, document_id: int
+    r: Redis, alert_id: int, document_type: str, document_id: int | str
 ) -> bool:
-    """Check if a document ID is a member of the Redis SET associated with an
-     alert ID.
+    """Check if a document ID is a member of the Redis SET associated with an alert ID.
 
-    :param r: Redis client instance.
-    :param alert_id: The alert identifier.
-    :param document_type: The type of document associated with the alert.
-    :param document_id: The docket identifier to check.
-    :return: True if the docket ID is a member of the set, False otherwise.
+    Args:
+        r: Redis client instance.
+        alert_id: The alert identifier.
+        document_type: The type of document associated with the alert.
+        document_id: The document identifier to check: a pk, or a uid like
+            "scotus_123" for documents whose pk could collide with RECAP pks.
+
+    Returns:
+        True if the docket ID is a member of the set, False otherwise.
     """
     alert_key = make_alert_set_key(alert_id, document_type)
     return r.sismember(alert_key, document_id)
 
 
 def build_plain_percolator_query(cd: CleanData) -> Query | None:
-    """Build a plain query based on the provided clean data for its use in the
-    Percolator
+    """Build a plain query based on the provided clean data for its use in the Percolator.
 
-    :param cd: The query CleanedData.
-    :return: An ES Query object representing the built query, or None for search
-    types the Percolator does not support.
+    Args:
+        cd: The query CleanedData.
+
+    Returns:
+        An ES Query object representing the built query, or None for search
+        types the Percolator does not support.
     """
-
     match cd["type"]:
         case (
             SEARCH_TYPES.RECAP
@@ -634,14 +653,15 @@ def build_plain_percolator_query(cd: CleanData) -> Query | None:
 def transform_percolator_child_document(
     es_document: ESDictDocument, hit_meta: dict[str, Any]
 ) -> None:
-    """Transform the given ES document by adding a child document with
-    highlights.
+    """Transform the given ES document by adding a child document with highlights.
 
-    :param es_document: The ES document to be transformed.
-    :param hit_meta: The hit meta from the percolator hit, containing highlights
-    :return: None, document is modified in place.
+    Args:
+        es_document: The ES document to be transformed.
+        hit_meta: The hit meta from the percolator hit, containing highlights
+
+    Returns:
+        None, document is modified in place.
     """
-
     child_document = copy.deepcopy(es_document)
     if hasattr(hit_meta, "highlight"):
         merge_highlights_into_result(
@@ -654,8 +674,7 @@ def transform_percolator_child_document(
 def include_recap_document_hit(
     alert_id: int, recap_document_hits: list[int], docket_hits: list[int]
 ) -> bool:
-    """Determine if an alert should include the percolated RECAPDocument
-     based on its presence in the given lists:
+    """Determine if an alert should include the percolated RECAPDocument based on its presence in the given lists.
 
     If an alert hit reached this method it was found in the main percolator request.
     So we just need to confirm the following conditions to avoid including a
@@ -667,12 +686,14 @@ def include_recap_document_hit(
         True                     False           False Docket-only queries.
         True                     True            True  OR Cross-object queries
 
-    :param alert_id: The ID of the alert to check.
-    :param recap_document_hits: A list RECAPDocument alert hits IDs.
-    :param docket_hits:  A list Docket alert hits IDs.
-    :return: True if the alert should include a RECAP document hit, otherwise False.
-    """
+    Args:
+        alert_id: The ID of the alert to check.
+        recap_document_hits: A list RECAPDocument alert hits IDs.
+        docket_hits: A list Docket alert hits IDs.
 
+    Returns:
+        True if the alert should include a RECAP document hit, otherwise False.
+    """
     alert_in_rd_hits = alert_id in recap_document_hits
     alert_in_docket_hits = alert_id in docket_hits
     if alert_in_docket_hits and not alert_in_rd_hits:
@@ -698,14 +719,16 @@ def select_es_document_fields(
 ) -> ESDictDocument:
     """Select specific required fields from an Elasticsearch document.
 
-    :param es_document_class: The class of the ES document mapping.
-    :param main_document: The main ES document from which fields are to be
-    selected.
-    :param fields_to_ignore: A set of field names to be ignored when selecting
-    fields from the document.
-    :return: A new ESDictDocument containing only the selected fields.
-    """
+    Args:
+        es_document_class: The class of the ES document mapping.
+        main_document: The main ES document from which fields are to be
+            selected.
+        fields_to_ignore: A set of field names to be ignored when selecting
+            fields from the document.
 
+    Returns:
+        A new ESDictDocument containing only the selected fields.
+    """
     mapping_dict = es_document_class._doc_type.mapping.to_dict()
     fields_to_select = set(get_field_names(mapping_dict))
     fields_to_select -= set(fields_to_ignore)
@@ -726,16 +749,18 @@ def prepare_percolator_content(
     document to percolate is prepared based on the ESRECAPDocumentPlain mapping
     that includes docket fields like parties.
 
-    :param app_label: The label of the app to determine the percolator and
-    document indices.
-    :param document_id: The ID of the document to fetch and prepare, used for
-    RECAP documents.
-    :return: A three tuple containing the percolator index name, document index
-    name, and a tuple containing the documents to percolate: the full document,
-    the document with only child fields, and the document with only parent fields
-    or None if no dict documents to percolate.
-    """
+    Args:
+        app_label: The label of the app to determine the percolator and
+            document indices.
+        document_id: The ID of the document to fetch and prepare, used for
+            RECAP documents.
 
+    Returns:
+        A three tuple containing the percolator index name, document index
+        name, and a tuple containing the documents to percolate: the full document,
+        the document with only child fields, and the document with only parent fields
+        or None if no dict documents to percolate.
+    """
     percolator_index: str
     es_document_index: str | None
     documents_to_percolate: _DocumentsToPercolate | None
@@ -756,7 +781,8 @@ def prepare_percolator_content(
                 None,
                 None,
             )
-        case "search.RECAPDocument":
+        # SCOTUS documents share the RECAP percolator index and mapping.
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
             percolator_index = RECAPPercolator._index._name
             es_document_index = None
             model = apps.get_model(app_label)
@@ -812,9 +838,9 @@ def set_skip_percolation_if_bankruptcy_data(
 ) -> None:
     """Set skip percolation flag if bankruptcy data is present.
 
-    :param docket_data: A dict containing the docket data fields.
-    :param d: The docket to be saved.
-    :return: None
+    Args:
+        docket_data: A dict containing the docket data fields.
+        d: The docket to be saved.
     """
     if bool(set(docket_data.keys()) & set(bankruptcy_data_fields)):
         d.skip_percolator_request = True
@@ -828,9 +854,12 @@ def _exceeds_attorney_limit(
     Stops counting early once the limit is exceeded for efficiency, since
     parties data can be very large.
 
-    :param parties_data: A list of dicts containing the parties data.
-    :param limit: The maximum number of attorneys allowed.
-    :return: True if the total number of attorneys exceeds the limit.
+    Args:
+        parties_data: A list of dicts containing the parties data.
+        limit: The maximum number of attorneys allowed.
+
+    Returns:
+        True if the total number of attorneys exceeds the limit.
     """
     count = 0
     for party in parties_data:
@@ -849,10 +878,13 @@ def set_skip_percolation_if_parties_data(
     limit, percolation is skipped during docket save(), since percolation
     will be scheduled after merging and indexing parties.
 
-    :param parties_data: A list of dicts containing the parties data.
-    :param d: The docket to be saved.
-    :return: True if the docket should be percolated after merging parties,
-    False otherwise.
+    Args:
+        parties_data: A list of dicts containing the parties data.
+        d: The docket to be saved.
+
+    Returns:
+        True if the docket should be percolated after merging parties,
+        False otherwise.
     """
     if not parties_data:
         return False
@@ -873,11 +905,13 @@ def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
 
     "X Alert(s) have hits: alert_name_1, alert_name_2 ..."
 
-    :param hits: A list of search alert hits, where each hit contains the
-    alert details.
-    :return: A string representing the email subject line.
-    """
+    Args:
+        hits: A list of search alert hits, where each hit contains the
+            alert details.
 
+    Returns:
+        A string representing the email subject line.
+    """
     alert_count = len(hits)
     alert_names_str = ", ".join(alert_hit[0].name for alert_hit in hits)
     if alert_count > 1:
@@ -892,11 +926,13 @@ def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
 def is_match_all_query(qs: str) -> bool:
     """Determine whether a given query string is a match-all query.
 
-    :param qs: The raw query string to evaluate.
-    :return: True if the query string has no parameters other than those in
-    COMMON_QUERY_PARAMS or if all remaining values are empty; False otherwise.
-    """
+    Args:
+        qs: The raw query string to evaluate.
 
+    Returns:
+        True if the query string has no parameters other than those in
+        COMMON_QUERY_PARAMS or if all remaining values are empty; False otherwise.
+    """
     parsed = parse_qs(qs, keep_blank_values=True)
     # Drop common query params
     for key in COMMON_QUERY_PARAMS:
@@ -934,21 +970,23 @@ def check_alert_limits(
     *,
     exclude_alert_pk: int | None = None,
 ) -> AlertLimitResult:
-    """Evaluate whether creating or editing an alert would exceed the user's
-    membership-based alert limits.
+    """Evaluate whether creating or editing an alert would exceed the user's membership-based alert limits.
 
     This holds the business logic shared by the alert creation form
     (``CreateAlertForm.clean_rate``) and the API serializer
     (``SearchAlertSerializer``). Each caller is responsible for turning the
     returned violation into an appropriate error message and exception type.
 
-    :param user: The alert owner.
-    :param rate: The alert rate (``Alert.REAL_TIME``, ``Alert.DAILY``, etc.).
-    :param alert_type: The resolved alert_type (e.g. RECAP, DOCKETS, OPINION).
-    :param exclude_alert_pk: When editing an existing alert, its pk, so it's
-    excluded from the quota count. None when creating a new alert.
-    :return: An ``AlertLimitResult`` with the violation found (or None when
-    within limits) and the free-tier quota for the rate.
+    Args:
+        user: The alert owner.
+        rate: The alert rate (``Alert.REAL_TIME``, ``Alert.DAILY``, etc.).
+        alert_type: The resolved alert_type (e.g. RECAP, DOCKETS, OPINION).
+        exclude_alert_pk: When editing an existing alert, its pk, so it's
+            excluded from the quota count. None when creating a new alert.
+
+    Returns:
+        An ``AlertLimitResult`` with the violation found (or None when
+        within limits) and the free-tier quota for the rate.
     """
     profile = user.profile  # type: ignore[attr-defined]
     quotas = RECAP_ALERT_QUOTAS[
@@ -1015,31 +1053,39 @@ def check_alert_limits(
 
 
 def get_alert_estimation_count(
-    query_data: QueryDict, day_count: int
+    query_data: QueryDict, day_count: int, include_scotus: bool = False
 ) -> tuple[int, int] | None:
-    """Estimate the number of alert hits a query would have produced over the
-    last ``day_count`` days.
+    """Estimate the number of alert hits a query would have produced over the last ``day_count`` days.
 
     This is the request-independent core of ``cl.api.views.get_result_count``,
     so it can be reused to estimate an alert's frequency from a stored alert
     query instead of an HTTP request.
 
-    :param query_data: A QueryDict holding the alert's search query parameters.
-    :param day_count: The number of days to average the estimation across.
-    :return: A two-tuple ``(total_hits, case_only_hits)`` where
-    ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
-    can't be validated by SearchForm.
-    :raises ElasticBadRequestError: If the query can't be built (e.g.
-    unbalanced parentheses/quotes, disallowed wildcards) or Elasticsearch
-    can't parse it.
-    :raises ElasticServerError: If the Elasticsearch request fails for any
-    other reason (e.g. a transport or connection error).
+    Args:
+        query_data: A QueryDict holding the alert's search query parameters.
+        day_count: The number of days to average the estimation across.
+        include_scotus: Whether RECAP estimates may count SCOTUS content.
+            Off by default; only the create-alert modal on the search
+            frontend turns it on, with scotus_frontend_search_enabled.
+
+    Returns:
+        A two-tuple ``(total_hits, case_only_hits)`` where
+        ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
+        can't be validated by SearchForm.
+
+    Raises:
+        ElasticBadRequestError: If the query can't be built (e.g.
+            unbalanced parentheses/quotes, disallowed wildcards) or Elasticsearch
+            can't parse it.
+        ElasticServerError: If the Elasticsearch request fails for any
+            other reason (e.g. a transport or connection error).
     """
     search_form = SearchForm(query_data)
     if not search_form.is_valid():
         return None
 
     cd = search_form.cleaned_data
+    cd["include_scotus"] = include_scotus
     total_case_only_query_results = 0
     try:
         match cd["type"]:

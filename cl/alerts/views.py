@@ -35,9 +35,7 @@ from cl.users.models import UserProfile
 
 @login_required
 def edit_alert_redirect(request, pk):
-    """Note that this method is still very useful because it gives people an
-    opportunity to login if they come to the site via one of our email alerts.
-    """
+    """Note that this method is still very useful because it gives people an opportunity to login if they come to the site via one of our email alerts."""
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=pk, user=request.user)
     return HttpResponseRedirect(f"/?{alert.query}&edit_alert={alert.pk}")
@@ -110,12 +108,14 @@ def htmx_disable_alert(request: HttpRequest, secret_key: str):
 @ratelimiter_unsafe_3_per_m
 @ratelimit_deny_list
 def disable_alert(request: HttpRequest, secret_key: str):
-    """Display a confirmation or success page whenever a user
-    chooses to disable their search alerts.
+    """Display a confirmation or success page whenever a user chooses to disable their search alerts.
 
-    :param request: The HttpRequest from the client
-    :param secret_key: The secret key for the search alert
-    :return: The HttpResponse to send to the client
+    Args:
+        request: The HttpRequest from the client
+        secret_key: The secret key for the search alert
+
+    Returns:
+        The HttpResponse to send to the client
     """
     alert = get_object_or_404(Alert, secret_key=secret_key)
 
@@ -170,11 +170,11 @@ def disable_alert(request: HttpRequest, secret_key: str):
 
 @require_http_methods(["GET"])
 def disable_alert_list(request: HttpRequest):
-    """Renders a list of search alerts associated with a user's email,
-    allowing them to disable alerts selectively.
+    """Renders a list of search alerts associated with a user's email, allowing them to disable alerts selectively.
 
-    :param request: The incoming HTTP request, containing the private
-    keys as query string parameters.
+    Args:
+        request: The incoming HTTP request, containing the private
+            keys as query string parameters.
     """
     private_keys = request.GET.getlist("keys")
     alerts = get_list_or_404(Alert, secret_key__in=private_keys)
@@ -304,7 +304,6 @@ def _toggle_docket_alert_legacy(
     TODO: Remove once new design is completely rolled out, together with
     the router in toggle_docket_alert and static-global/js/toggle_settings.js.
     """
-
     # This could be removed and replaced using the docket-alert API.
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
@@ -343,7 +342,7 @@ def _toggle_docket_alert_legacy(
 
 
 async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Allow users to create docket alerts based on case and court ID"""
+    """Allow users to create docket alerts based on case and court ID."""
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
     if not pacer_case_id or not court_id:
@@ -402,8 +401,9 @@ def set_docket_alert_state(
 ) -> None:
     """Flip the alert_type for a docket alert.
 
-    :param docket_alert: The docket alert to flip.
-    :param target_state: The new alert_type to set.
+    Args:
+        docket_alert: The docket alert to flip.
+        target_state: The new alert_type to set.
     """
     # Only flip the alert_type if it's not already the same
     if docket_alert.alert_type == target_state:
@@ -425,10 +425,13 @@ def toggle_docket_alert_confirmation(
 ) -> HttpResponse:
     """Show a confirmation or success page for toggling docket alerts.
 
-    :param request: The HttpRequest from the client
-    :param route_prefix: The route prefix, unsubscribe or subscribe
-    :param secret_key: The secret key for the docket alert
-    :return: The HttpResponse to send to the client
+    Args:
+        request: The HttpRequest from the client
+        route_prefix: The route prefix, unsubscribe or subscribe
+        secret_key: The secret key for the docket alert
+
+    Returns:
+        The HttpResponse to send to the client
     """
     target_state = DocketAlert.UNSUBSCRIPTION
     if route_prefix == "subscribe":
@@ -513,9 +516,12 @@ def one_click_docket_alert_unsubscribe(
 ) -> HttpResponse:
     """Unsubscribes a user from docket alerts for a specific docket.
 
-    :param request: The HttpRequest from the client
-    :param secret_key: The secret key for the docket alert
-    :return: The HttpResponse to send to the client
+    Args:
+        request: The HttpRequest from the client
+        secret_key: The secret key for the docket alert
+
+    Returns:
+        The HttpResponse to send to the client
     """
     try:
         docket_alert = DocketAlert.objects.get(secret_key=secret_key)

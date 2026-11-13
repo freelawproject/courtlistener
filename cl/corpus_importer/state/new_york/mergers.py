@@ -35,15 +35,19 @@ from cl.corpus_importer.state.common.party import (
     RoleMerger,
 )
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Ancestor,
+    Constant,
+    Fn,
     ManyStrategy,
     Merger,
     OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
-    ThroughParameters,
+    Scrape,
+    WithStrategy,
     overwrite,
 )
+from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAAttorney,
     NYCoACase,
@@ -101,10 +105,13 @@ def _storable_number(
 ) -> int | None:
     """A file's volume or part number, or `None` when it cannot be stored.
 
-    :param value: The number the scraper read.
-    :param field: Which number it is, for the log message.
-    :param document: The file it was read from, for the log message.
-    :return: The number, or `None` if it is out of range.
+    Args:
+        value: The number the scraper read.
+        field: Which number it is, for the log message.
+        document: The file it was read from, for the log message.
+
+    Returns:
+        The number, or `None` if it is out of range.
     """
     if value is None or 0 <= value <= SMALLINT_MAX:
         return value
@@ -119,12 +126,14 @@ def _storable_number(
 
 
 def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
-    """Merge strategy that keeps the path already stored for a document when
-    this scrape has no published one to put there.
+    """Merge strategy that keeps the path already stored for a document when this scrape has no published one to put there.
 
-    :param scrape: The path this scrape published to, if any.
-    :param db: The path already stored for the document.
-    :return: The path to store.
+    Args:
+        scrape: The path this scrape published to, if any.
+        db: The path already stored for the document.
+
+    Returns:
+        The path to store.
     """
     return (scrape.name or "") or (db.name or "")
 
@@ -132,9 +141,12 @@ def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
 def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
     """Merge strategy for scraped files.
 
-    :param scrape: What this scrape's download established, if it made one.
-    :param db: What is already stored for the document.
-    :return: The value to store.
+    Args:
+        scrape: What this scrape's download established, if it made one.
+        db: What is already stored for the document.
+
+    Returns:
+        The value to store.
     """
     return db if scrape is None or scrape == "" else scrape
 
@@ -146,8 +158,11 @@ def _stated(reading: CourtVocabulary | Unclassified) -> str:
     name itself stated, so a name that stated nothing readable is stored blank
     rather than under one of the reserved readings.
 
-    :param reading: What the scrape schema classified the field as.
-    :return: The value Court-PASS's naming convention uses, or the empty string.
+    Args:
+        reading: What the scrape schema classified the field as.
+
+    Returns:
+        The value Court-PASS's naming convention uses, or the empty string.
     """
     return "" if isinstance(reading, Unclassified) else reading.value
 
@@ -173,44 +188,43 @@ class NYCoADocumentMerger[ParamType](
     model: ClassVar[type[Model]] = NYCoADocument
     key: ClassVar[Iterable[str]] = ["file_name"]
 
-    file_name: str = Attribute(
-        lambda doc, params: doc.file_name, strategy=overwrite
+    file_name: str = WithStrategy(Scrape(NYCoAFile).file_name, overwrite)
+    content_type: str = WithStrategy(Scrape(NYCoAFile).content_type, overwrite)
+    doc_role: str = WithStrategy(
+        Fn(_stated)(Scrape(NYCoAFile).doc_role), overwrite
     )
-    content_type: str = Attribute(
-        lambda doc, params: doc.content_type, strategy=overwrite
+    doc_party: str = WithStrategy(Scrape(NYCoAFile).doc_party, overwrite)
+    doc_type: str = WithStrategy(
+        Fn(_stated)(Scrape(NYCoAFile).doc_type), overwrite
     )
-    doc_role: str = Attribute(
-        lambda doc, params: _stated(doc.doc_role), strategy=overwrite
+    volume: int | None = WithStrategy(
+        Fn(_storable_number)(
+            Scrape(NYCoAFile).volume, "volume", Scrape(NYCoAFile)
+        ),
+        overwrite,
     )
-    doc_party: str = Attribute(
-        lambda doc, params: doc.doc_party, strategy=overwrite
+    part: int | None = WithStrategy(
+        Fn(_storable_number)(
+            Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
+        ),
+        overwrite,
     )
-    doc_type: str = Attribute(
-        lambda doc, params: _stated(doc.doc_type), strategy=overwrite
+    filepath_local: str = WithStrategy(
+        Scrape(NYCoAFile).local_path, _keep_stored_file
     )
-    volume: int | None = Attribute(
-        lambda doc, params: _storable_number(doc.volume, "volume", doc),
-        strategy=overwrite,
+    sha256: str = WithStrategy(
+        Scrape(NYCoAFile).content_hash, _keep_downloaded
     )
-    part: int | None = Attribute(
-        lambda doc, params: _storable_number(doc.part, "part", doc),
-        strategy=overwrite,
-    )
-    filepath_local: str = Attribute(
-        lambda doc, params: doc.local_path, strategy=_keep_stored_file
-    )
-    sha256: str = Attribute(
-        lambda doc, params: doc.content_hash, strategy=_keep_downloaded
-    )
-    file_size: int | None = Attribute(
-        lambda doc, params: doc.file_size, strategy=_keep_downloaded
+    file_size: int | None = WithStrategy(
+        Scrape(NYCoAFile).file_size, _keep_downloaded
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], NYCoADocument | None]:
+    def merge_one(self) -> tuple[MergeResult, NYCoADocument | None]:
         """Settle which path to store for the file, then write the document.
 
-        :return: The merge result, carrying any file the scrape reported that
+        Returns:
+            The merge result, carrying any file the scrape reported that
             can never be published, and the merged document.
         """
         files = self._accept_file()
@@ -218,7 +232,7 @@ class NYCoADocumentMerger[ParamType](
         return result | MergeResult(files=files), document
 
     def _scrub_fileinfo(self) -> None:
-        """Remove info relevant to file"""
+        """Remove info relevant to file."""
         self.transformed["filepath_local"] = ""
         self.transformed["sha256"] = ""
         self.transformed["file_size"] = None
@@ -232,7 +246,8 @@ class NYCoADocumentMerger[ParamType](
         is deleted once the merge commits, since nothing will ever point at it;
         and a file the scrape cannot vouch for is not stored at all.
 
-        :return: `FileTally(missing=1)` for a file that will never be
+        Returns:
+            `FileTally(missing=1)` for a file that will never be
             published, and nothing otherwise. A file the scrape cannot vouch
             for is not missing where the document already has one, since the
             merge keeps that path and the loader publishes it if need be.
@@ -297,29 +312,31 @@ def _served_attachments(
 ) -> Sequence[NYCoAFile]:
     """The filing's files Court-PASS will actually hand over.
 
-    :param entry: The filing whose files to merge.
-    :param params: Unused; matches the transform signature.
-    :return: The files that get a document row.
+    Args:
+        entry: The filing whose files to merge.
+        params: Unused; matches the transform signature.
+
+    Returns:
+        The files that get a document row.
     """
     return [file for file in entry.attachments if file.available]
 
 
-def _entry_party_id(
-    entry: NYCoDocketEntry, params: RelatedParams[Any]
-) -> int | None:
-    """Resolve the filing's party to a party on this docket, matching on the
-    name the way `PartyMerger` does, with the filing's role breaking a tie.
+def _entry_party_id(entry: NYCoDocketEntry, docket: Docket) -> int | None:
+    """Resolve the filing's party to a party on this docket, matching on the name the way `PartyMerger` does, with the filing's role breaking a tie.
 
-    :param entry: The filing whose party to resolve.
-    :param params: The parameters of the merge, whose parent is the docket.
-    :return: The party's pk, or `None` when the docket lists no party of that
+    Args:
+        entry: The filing whose party to resolve.
+        docket: The docket the filing belongs to.
+
+    Returns:
+        The party's pk, or `None` when the docket lists no party of that
         name. A filer with no attorney of record is one the FILINGS table names
         and the ATTORNEY DETAILS section never does; `party_name` keeps the
         name whether or not this resolves.
     """
     if not entry.party:
         return None
-    docket = cast(Docket, params.parent)
     matched = list(
         docket.parties.filter(name=entry.party)
         .order_by("pk")
@@ -341,8 +358,7 @@ def _entry_party_id(
 
 
 def _keep_party_name(scrape: str | None, db: str | None) -> str:
-    """Merge strategy that keeps the party name an earlier scrape recorded when
-    this one read none, rather than blanking it."""
+    """Merge strategy that keeps the party name an earlier scrape recorded when this one read none, rather than blanking it."""
     return scrape or db or ""
 
 
@@ -353,47 +369,54 @@ class NYCoADocketEntryMerger[ParamType](
 
     Subclasses `Merger` rather than the shared `DocketEntryMerger`, whose
     cross-state entry type NYCoA does not store -- the Court's own filing type
-    vocabulary is normalized instead."""
+    vocabulary is normalized instead.
+    """
 
     model: ClassVar[type[Model]] = NYCoADocketEntry
     key: ClassVar[Iterable[str]] = ["docket_entry_id"]
 
     # Court-PASS only dates the filings its FILINGS table lists.
-    date_filed: date | None = Attribute(
-        lambda e, params: e.date_filed, strategy=overwrite
+    date_filed: date | None = WithStrategy(
+        Scrape(NYCoDocketEntry).date_filed, overwrite
     )
-    date_due: date | None = Attribute(
-        lambda e, params: e.date_due, strategy=overwrite
+    date_due: date | None = WithStrategy(
+        Scrape(NYCoDocketEntry).date_due, overwrite
     )
-    docket_entry_id: str = Attribute(
-        lambda e, params: e.docket_entry_id, strategy=overwrite
+    docket_entry_id: str = WithStrategy(
+        Scrape(NYCoDocketEntry).docket_entry_id, overwrite
     )
-    entry_index: int | None = Attribute(
-        lambda e, params: e.entry_index, strategy=overwrite
+    entry_index: int | None = WithStrategy(
+        Scrape(NYCoDocketEntry).entry_index, overwrite
     )
-    filing_type: int = Attribute(
-        lambda e, params: mirrored_code(FilingType, e.entry_filing_type),
-        strategy=overwrite,
+    filing_type: int = WithStrategy(
+        Fn(mirrored_code)(
+            FilingType, Scrape(NYCoDocketEntry).entry_filing_type
+        ),
+        overwrite,
     )
-    filing_type_raw: str = Attribute(
-        lambda e, params: e.raw_filing_type, strategy=overwrite
+    filing_type_raw: str = WithStrategy(
+        Scrape(NYCoDocketEntry).raw_filing_type, overwrite
     )
-    filing_role: int = Attribute(
-        lambda e, params: mirrored_code(FilingRole, e.entry_role),
-        strategy=overwrite,
+    filing_role: int = WithStrategy(
+        Fn(mirrored_code)(FilingRole, Scrape(NYCoDocketEntry).entry_role),
+        overwrite,
     )
-    filing_doctype: int = Attribute(
-        lambda e, params: mirrored_code(FilingDocType, e.entry_doctype),
-        strategy=overwrite,
+    filing_doctype: int = WithStrategy(
+        Fn(mirrored_code)(
+            FilingDocType, Scrape(NYCoDocketEntry).entry_doctype
+        ),
+        overwrite,
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    party_id: int | None = Attribute(_entry_party_id)
+    party_id: int | None = Fn(_entry_party_id)(
+        Scrape(NYCoDocketEntry), Ancestor(Docket)
+    )
     # The name Court-PASS printed, kept whether or not `party_id` resolved --
     # on a filing by a party with no attorney of record it is the only record
     # of who filed.
-    party_name: str = Attribute(
-        lambda e, params: e.party, strategy=_keep_party_name
+    party_name: str = WithStrategy(
+        Scrape(NYCoDocketEntry).party, _keep_party_name
     )
     # Court-PASS lists every file it has for a case, so a file that is gone
     # from the list -- or that it has stopped serving -- is gone from the
@@ -405,11 +428,11 @@ class NYCoADocketEntryMerger[ParamType](
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], NYCoADocketEntry | None]:
-        """Merge the filing, then drop any document it no longer serves a file
-        for.
+    def merge_one(self) -> tuple[MergeResult, NYCoADocketEntry | None]:
+        """Merge the filing, then drop any document it no longer serves a file for.
 
-        :return: The merge result and the merged filing, unchanged.
+        Returns:
+            The merge result and the merged filing, unchanged.
         """
         result, entry = super().merge_one()
         self._drop_unserved_documents(entry)
@@ -420,7 +443,8 @@ class NYCoADocketEntryMerger[ParamType](
 
         This exists to handle the special case of all documents being retracted.
 
-        :param entry: The merged filing, or `None` if the merge produced none.
+        Args:
+            entry: The merged filing, or `None` if the merge produced none.
         """
         if self.existing is None or entry is None:
             return
@@ -432,29 +456,28 @@ class NYCoADocketEntryMerger[ParamType](
 
 
 class ScrapedAttorney(NYCoAAttorney):
-    """One of a party's attorneys, with what the role merger needs beyond the
-    attorney.
+    """One of a party's attorneys, with what the role merger needs beyond the attorney.
 
-    :ivar primary: Whether this is the first attorney Court-PASS listed for the
-        party. Court-PASS never states an attorney's role, so the role follows
-        the convention the other states' mergers use -- the first attorney
-        listed is the party's lead and the rest are unknown -- which a child
-        merger cannot work out on its own because it cannot see its siblings.
+    Attributes:
+        primary: Whether this is the first attorney Court-PASS listed for the
+            party. Court-PASS never states an attorney's role, so the role follows
+            the convention the other states' mergers use -- the first attorney
+            listed is the party's lead and the rest are unknown -- which a child
+            merger cannot work out on its own because it cannot see its siblings.
     """
 
     primary: bool = False
 
 
-def _attorney_contact_raw(attorney: NYCoAAttorney, params: Any) -> str:
-    """Fold the firm and address Court-PASS prints for an attorney into the one
-    free-text contact field CourtListener keeps for them."""
+def _attorney_contact_raw(attorney: NYCoAAttorney) -> str:
+    """Fold the firm and address Court-PASS prints for an attorney into the one free-text contact field CourtListener keeps for them."""
     parts = [attorney.firm, attorney.address]
-    if (phone := attorney.phone.strip()) != _attorney_phone(attorney, params):
+    if (phone := attorney.phone.strip()) != _attorney_phone(attorney):
         parts.append(phone)
     return "\n".join(part for part in parts if part)
 
 
-def _attorney_phone(attorney: NYCoAAttorney, params: Any) -> str:
+def _attorney_phone(attorney: NYCoAAttorney) -> str:
     """The attorney's phone number, trimmed to fit `Attorney.phone`."""
     phone = attorney.phone.strip()
     if len(phone) <= PHONE_MAX_LENGTH:
@@ -470,13 +493,15 @@ class NYCoAAttorneyMerger(
 ):
     """Merger for an attorney on a Court-PASS docket."""
 
-    contact_raw: str = Attribute(_attorney_contact_raw, strategy=overwrite)
-    phone: str = Attribute(_attorney_phone, strategy=overwrite)
+    contact_raw: str = WithStrategy(
+        Fn(_attorney_contact_raw)(Scrape(ScrapedAttorney)), overwrite
+    )
+    phone: str = WithStrategy(
+        Fn(_attorney_phone)(Scrape(ScrapedAttorney)), overwrite
+    )
 
 
-def _attorney_role(
-    attorney: ScrapedAttorney, params: ThroughParameters[Any]
-) -> int:
+def _attorney_role(attorney: ScrapedAttorney) -> int:
     """The role to store for an attorney Court-PASS lists for a party.
 
     Court-PASS states which party an attorney represents but never in what
@@ -484,10 +509,12 @@ def _attorney_role(
     is stored as the party's lead and the rest as unknown -- the convention the
     other states' mergers follow. See `ScrapedAttorney`.
 
-    :param attorney: The attorney, marked with whether the Court listed it
-        first.
-    :param params: Unused; the role is read off the attorney alone.
-    :return: The `Role` code to store.
+    Args:
+        attorney: The attorney, marked with whether the Court listed it
+            first.
+
+    Returns:
+        The `Role` code to store.
     """
     return Role.ATTORNEY_LEAD if attorney.primary else Role.UNKNOWN
 
@@ -496,30 +523,34 @@ class NYCoARoleMerger(RoleMerger[ScrapedAttorney, RelatedParams[None]]):
     """Merger for the link between a Court-PASS attorney and the party.
 
     Overrides only `role`, which Court-PASS never states; see
-    `_attorney_role`."""
+    `_attorney_role`.
+    """
 
-    role: int = Attribute(_attorney_role)
+    role: int = Fn(_attorney_role)(Scrape(ScrapedAttorney))
 
 
-def _party_type_name(party: NYCoAParty, params: Any) -> str:
-    """Prefer the role Court-PASS printed. The cross-state `PartyType`
-    vocabulary has no value for several roles the Court of Appeals uses, amicus
-    curiae among them, so normalizing here would lose them."""
+def _party_type_name(party: NYCoAParty) -> str:
+    """Prefer the role Court-PASS printed.
+
+    The cross-state `PartyType` vocabulary has no value for several roles the
+    Court of Appeals uses, amicus curiae among them, so normalizing here would
+    lose them.
+    """
     return party.party_role_raw or party.party_type.value.title()
 
 
 class NYCoAPartyTypeMerger(PartyTypeMerger[NYCoAParty, RelatedParams[None]]):
     """Merger for a party's role on a Court-PASS docket."""
 
-    name: str = Attribute(_party_type_name)
+    name: str = Fn(_party_type_name)(Scrape(NYCoAParty))
 
 
 def _party_attorneys(party: NYCoAParty, params: Any) -> list[ScrapedAttorney]:
-    """The party's attorneys, each marked with whether the Court listed it
-    first.
+    """The party's attorneys, each marked with whether the Court listed it first.
 
     Which attorney that is decides the role stored for all of them, and only
-    the party sees them all at once. See `ScrapedAttorney`."""
+    the party sees them all at once. See `ScrapedAttorney`.
+    """
     return [
         # `dict` copies the scraped fields across without re-serializing them.
         ScrapedAttorney(**dict(attorney), primary=index == 0)
@@ -531,7 +562,8 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     """Merger for a party on a Court-PASS docket.
 
     Identity is `PartyMerger`'s -- the name, within the docket -- with the role
-    breaking a tie; see `resolve_query`."""
+    breaking a tie; see `resolve_query`.
+    """
 
     attorneys: list[Attorney] = AttorneyRelation(
         attorney=NYCoAAttorneyMerger,
@@ -543,7 +575,8 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     def query(self) -> QuerySet[Party]:
         """The docket's parties by date created.
 
-        :return: `PartyMerger`'s candidates, oldest first.
+        Returns:
+            `PartyMerger`'s candidates, oldest first.
         """
         return super().query().order_by("date_created")
 
@@ -555,18 +588,21 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
         to match parties when they have the same name (family cases), and log when
         we can't disambiguate.
 
-        :param qs: The candidates `PartyMerger.query` found. The framework caps
-            this at two rows; a third party sharing one name would need a later
-            scrape to settle, which is why the ambiguous case is refused rather
-            than guessed.
-        :return: Whether to continue, and the row to merge into.
+        Args:
+            qs: The candidates `PartyMerger.query` found. The framework caps
+                this at two rows; a third party sharing one name would need a later
+                scrape to settle, which is why the ambiguous case is refused rather
+                than guessed.
+
+        Returns:
+            Whether to continue, and the row to merge into.
         """
         candidates = list(qs)
         if len(candidates) < 2:
             return True, candidates[0] if candidates else None
 
         docket = cast(Docket, self.params.parent)
-        role = _party_type_name(self.scrape, None)
+        role = _party_type_name(self.scrape)
         for candidate in candidates:
             if candidate.party_types.filter(
                 docket=docket, name__iexact=role
@@ -586,13 +622,14 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
 class ScrapedIssue:
     """One of a case's issues, with what the merger needs beyond the issue.
 
-    :ivar issue: The issue as the scraper classified it.
-    :ivar category: The code stored for the issue's category.
-    :ivar subcategory: The code stored for the issue's subcategory.
-    :ivar alone_in_category: Whether this is the only issue the scrape states
-        under this category and subcategory. `NYCoAIssueMerger` identifies an
-        issue by that pair, so it needs to know when the pair is shared, and a
-        child merger cannot see its siblings.
+    Attributes:
+        issue: The issue as the scraper classified it.
+        category: The code stored for the issue's category.
+        subcategory: The code stored for the issue's subcategory.
+        alone_in_category: Whether this is the only issue the scrape states
+            under this category and subcategory. `NYCoAIssueMerger` identifies an
+            issue by that pair, so it needs to know when the pair is shared, and a
+            child merger cannot see its siblings.
     """
 
     issue: NYCoAIssue
@@ -617,18 +654,14 @@ class NYCoAIssueMerger[ParamType](
     model: ClassVar[type[Model]] = NYCoADocketIssue
     key: ClassVar[Iterable[str]] = ["category", "subcategory"]
 
-    category: int = Attribute(
-        lambda scraped, params: scraped.category, strategy=overwrite
+    category: int = WithStrategy(Scrape(ScrapedIssue).category, overwrite)
+    subcategory: int = WithStrategy(
+        Scrape(ScrapedIssue).subcategory, overwrite
     )
-    subcategory: int = Attribute(
-        lambda scraped, params: scraped.subcategory, strategy=overwrite
+    category_raw: str = WithStrategy(
+        Scrape(ScrapedIssue).issue.category_raw, overwrite
     )
-    category_raw: str = Attribute(
-        lambda scraped, params: scraped.issue.category_raw, strategy=overwrite
-    )
-    detail: str = Attribute(
-        lambda scraped, params: scraped.issue.detail, strategy=overwrite
-    )
+    detail: str = WithStrategy(Scrape(ScrapedIssue).issue.detail, overwrite)
 
     @override
     def query(self) -> QuerySet[NYCoADocketIssue]:
@@ -640,7 +673,8 @@ class NYCoAIssueMerger[ParamType](
         description is what the Court tells them apart by, so it is what the
         merger has to as well.
 
-        :return: The candidate rows, oldest first, so that `resolve_query` is
+        Returns:
+            The candidate rows, oldest first, so that `resolve_query` is
             deterministic.
         """
         candidates = self.manager.filter(
@@ -664,11 +698,14 @@ class NYCoAIssueMerger[ParamType](
         row; failing that the oldest does, and `ManyStrategy.REPLACE` on the
         relation prunes the rest.
 
-        :param qs: The candidates `query` found. The framework caps this at two
-            rows, which is enough here: the choice only has to come out the same
-            on every scrape, and a third row under one pair would have to be
-            pruned by a later scrape rather than this one.
-        :return: Whether to continue, and the row to merge into.
+        Args:
+            qs: The candidates `query` found. The framework caps this at two
+                rows, which is enough here: the choice only has to come out the same
+                on every scrape, and a third row under one pair would have to be
+                pruned by a later scrape rather than this one.
+
+        Returns:
+            Whether to continue, and the row to merge into.
         """
         candidates = list(qs)
         if not candidates:
@@ -684,13 +721,14 @@ class NYCoAIssueMerger[ParamType](
         )
 
 
-def _case_issues(case: NYCoACase, params: Any) -> Sequence[ScrapedIssue]:
+def _case_issues(case: NYCoACase) -> Sequence[ScrapedIssue]:
     """The case's issues, each paired with the codes it is stored under.
 
     The codes are classified here rather than in the child merger because
     whether another issue shares an issue's category pair decides how the
     merger identifies it, and only the case sees all of them at once. See
-    `ScrapedIssue`."""
+    `ScrapedIssue`.
+    """
     classified = [
         (
             issue,
@@ -720,33 +758,30 @@ class NYCoADocketMetadataMerger(
 
     The `OneToOneField` lives on this model rather than on `Docket`, so this is
     the reverse side of the relation: `OneToOneMerger` fills in `docket` from
-    the parent and matches on it, and this merger must not declare it."""
+    the parent and matches on it, and this merger must not declare it.
+    """
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
 
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
-        NYCoAIssueMerger, _case_issues, strategy=ManyStrategy.REPLACE
+        NYCoAIssueMerger,
+        cast(AttributeMerger, Fn(_case_issues)(Scrape(NYCoACase))),
+        strategy=ManyStrategy.REPLACE,
     )
-    decision_date: date | None = Attribute(
-        lambda case, params: case.decision_date, strategy=overwrite
+    decision_date: date | None = WithStrategy(
+        Scrape(NYCoACase).decision_date, overwrite
     )
-    official_citation: str = Attribute(
-        lambda case, params: case.official_citation, strategy=overwrite
+    official_citation: str = WithStrategy(
+        Scrape(NYCoACase).official_citation, overwrite
     )
-    lower_court_citation: str = Attribute(
-        lambda case, params: case.lower_court_citation, strategy=overwrite
+    lower_court_citation: str = WithStrategy(
+        Scrape(NYCoACase).lower_court_citation, overwrite
     )
 
 
-def _case_metadata(case: NYCoACase, params: None) -> NYCoACase | None:
-    """The NYCoA metadata is spread across the case's own fields rather than
-    nested under a key of its own, so the metadata merger takes the case."""
-    return case
-
-
-def _date_last_filing(case: NYCoACase, params: None) -> date | None:
+def _date_last_filing(case: NYCoACase) -> date | None:
     """The date the case's most recent dated filing was received.
 
     Court-PASS only dates the filings its FILINGS table lists, so on a docket
@@ -755,9 +790,11 @@ def _date_last_filing(case: NYCoACase, params: None) -> date | None:
     earliest filing the scrape dated -- so the field states the last date known
     for the case rather than nothing at all.
 
-    :param case: The scraped case.
-    :param params: Unused; the docket is the top-level merge.
-    :return: The latest filing date, the case's filing date when no filing
+    Args:
+        case: The scraped case.
+
+    Returns:
+        The latest filing date, the case's filing date when no filing
         carries one, and `None` when the scrape dates nothing.
     """
     filing_dates = sorted(e.date_filed for e in case.entries if e.date_filed)
@@ -765,33 +802,31 @@ def _date_last_filing(case: NYCoACase, params: None) -> date | None:
 
 
 class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
-    """Merger for a whole Court-PASS docket. This is the entry point: hand it a
-    scraped `NYCoACase` and it merges the docket, its parties and their
-    attorneys, its filings and their files, and the NYCoA-only metadata.
+    """Merger for a whole Court-PASS docket.
+
+    This is the entry point: hand it a scraped `NYCoACase` and it merges the
+    docket, its parties and their attorneys, its filings and their files, and
+    the NYCoA-only metadata.
 
     The merge is atomic, so a case either lands in full or not at all. That is
     what makes a failure recoverable -- a re-scrape merges the case again from
     scratch -- but it also means one unstorable value can cost the whole case,
     which is why `_storable_number` drops a misread volume rather than letting
-    it raise."""
+    it raise.
+    """
 
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
 
-    court_id: str = Attribute(
-        lambda case, params: NYCOA_COURT_ID, strategy=overwrite
+    court_id: str = WithStrategy(Constant(NYCOA_COURT_ID), overwrite)
+    docket_number_core: str = WithStrategy(
+        Fn(make_docket_number_core)(Scrape(NYCoACase).docket_number), overwrite
     )
-    docket_number_core: str = Attribute(
-        lambda case, params: make_docket_number_core(case.docket_number),
-        strategy=overwrite,
-    )
-    date_filed: date | None = Attribute(lambda case, params: case.date_filed)
-    date_argued: date | None = Attribute(
-        lambda case, params: case.argument_date
-    )
-    date_last_filing: date | None = Attribute(
-        _date_last_filing, strategy=overwrite
+    date_filed: date | None = Scrape(NYCoACase).date_filed
+    date_argued: date | None = Scrape(NYCoACase).argument_date
+    date_last_filing: date | None = WithStrategy(
+        Fn(_date_last_filing)(Scrape(NYCoACase)), overwrite
     )
 
     parties: list[Party] = PartyRelation(
@@ -800,15 +835,18 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
+    # The NYCoA metadata is spread across the case's own fields rather than
+    # nested under a key of its own, so the metadata merger takes the case.
     nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
-        NYCoADocketMetadataMerger, _case_metadata
+        NYCoADocketMetadataMerger, cast(AttributeMerger, Scrape(NYCoACase))
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult[Any], Docket | None]:
+    def merge_one(self) -> tuple[MergeResult, Docket | None]:
         """Merge the case, then delete the files of the documents it removed.
 
-        :return: The merge result and the merged docket, unchanged.
+        Returns:
+            The merge result and the merged docket, unchanged.
         """
         stored = self._stored_files()
         result, docket = super().merge_one()
@@ -816,10 +854,10 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
         return result, docket
 
     def _stored_files(self) -> dict[int, tuple[str, str]]:
-        """The files each of this docket's documents points at, before the
-        merge runs.
+        """The files each of this docket's documents points at, before the merge runs.
 
-        :return: Each document's file and thumbnail keyed by its primary key,
+        Returns:
+            Each document's file and thumbnail keyed by its primary key,
             or nothing for a docket being created.
         """
         if (docket := self.existing) is None:
@@ -833,15 +871,15 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
 
     @staticmethod
     def _delete_removed(stored: dict[int, tuple[str, str]]) -> None:
-        """Delete the files of the documents the merge removed, once it
-        commits.
+        """Delete the files of the documents the merge removed, once it commits.
 
         Published files are named by primary key, so no surviving document
         can share one. A file still in the private bucket can be: the scraper
         names files by content, so one file listed under two filings is one
         key. Any key another document still points at is left alone.
 
-        :param stored: What `_stored_files` found before the merge.
+        Args:
+            stored: What `_stored_files` found before the merge.
         """
         if not stored:
             return
@@ -873,7 +911,8 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     def query(self) -> QuerySet[Docket]:
         """The docket this case is, if CourtListener already has it.
 
-        :return: The candidate docket, of which the function returns at most
+        Returns:
+            The candidate docket, of which the function returns at most
             one.
         """
         return async_to_sync(find_docket_object_query)(
@@ -894,8 +933,11 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     def validate(scrape: NYCoACase) -> bool:
         """Whether this scrape can be merged at all.
 
-        :param scrape: The scraped case.
-        :return: Whether the merge may proceed.
+        Args:
+            scrape: The scraped case.
+
+        Returns:
+            Whether the merge may proceed.
         """
         if not is_nycoa_court(scrape.court_id):
             logger.error("Unknown court id: %s", scrape.court_id)

@@ -247,20 +247,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
       "column": 36,
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
@@ -361,22 +347,8 @@
     {
       "column": 13,
       "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
       "name": "bad-return",
       "concise_description": "Returned type `Unknown | None` is not assignable to declared return type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
       "severity": "error"
     },
     {
@@ -1290,20 +1262,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
@@ -1497,20 +1455,6 @@
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `citation_depth`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
       "severity": "error"
     },
     {
@@ -2284,97 +2228,6 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2389,31 +2242,10 @@
       "severity": "error"
     },
     {
-      "column": 14,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
       "severity": "error"
     },
     {
@@ -2424,69 +2256,6 @@
       "severity": "error"
     },
     {
-      "column": 45,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
       "column": 59,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2494,24 +2263,10 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
       "column": 25,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[DocketEntryType] | Unknown` is not assignable to parameter `docket_entries` with type `list[dict[str, Any]]`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
       "severity": "error"
     },
     {
@@ -3992,13 +3747,6 @@
       "severity": "error"
     },
     {
-      "column": 40,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 41,
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
@@ -4010,13 +3758,6 @@
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESSearchResult` is not assignable to parameter `search_results` with type `dict[Unknown, Unknown]` in function `cl.lib.search_utils.store_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {

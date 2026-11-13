@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Final, cast
+from typing import Any, Final
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,13 +12,14 @@ class FileTally:
     every `MergeResult` without any of them owning mutable state. `NO_FILES` is
     the shared empty one, so a merge that touched no file allocates nothing.
 
-    :ivar moved: Files now at their published key because this merge's
-        publish put them there.
-    :ivar missing: Files that were not there to move -- a path outside the
-        scrape's layout, or a key the bucket does not hold. Re-running
-        the load will not conjure these; the scrape has to be run again.
-    :ivar failed: Files the storage backend refused to copy for some other
-        reason. These are worth re-running the load over.
+    Attributes:
+        moved: Files now at their published key because this merge's
+            publish put them there.
+        missing: Files that were not there to move -- a path outside the
+            scrape's layout, or a key the bucket does not hold. Re-running
+            the load will not conjure these; the scrape has to be run again.
+        failed: Files the storage backend refused to copy for some other
+            reason. These are worth re-running the load over.
     """
 
     moved: int = 0
@@ -62,31 +63,28 @@ NO_FILES: Final = FileTally()
 
 
 @dataclass
-class MergeResult[T = int]:
+class MergeResult:
     """Stores data about the result of an attempted merge operation.
 
-    :ivar creates: Objects which needed to be created. Key is object name and
-        value is a list of PKs to created objects.
-    :ivar updates: Objects which needed to be updated.
-    :ivar failures: Objects for which the merge operation failed. Items will be
-        None if an object needed to be created but that operation failed.
-    :ivar files: What became of the files this merge had to publish. See
-        `FileTally`."""
+    Attributes:
+        creates: Objects which needed to be created. Key is object name and
+            value is a list of PKs to created objects.
+        updates: Objects which needed to be updated.
+        failures: Objects for which the merge operation failed. Items will be
+            None if an object needed to be created but that operation failed.
+        files: What became of the files this merge had to publish. See
+            `FileTally`.
+    """
 
-    creates: dict[str, set[T]] = field(default_factory=dict)
-    updates: dict[str, set[T]] = field(default_factory=dict)
-    failures: dict[str, list[T | None]] = field(default_factory=dict)
+    creates: dict[str, set[Any]] = field(default_factory=dict)
+    updates: dict[str, set[Any]] = field(default_factory=dict)
+    failures: dict[str, list[Any | None]] = field(default_factory=dict)
     files: FileTally = NO_FILES
 
     @staticmethod
-    def union[S, U](
-        a: MergeResult[S], b: MergeResult[U]
-    ) -> MergeResult[S | U]:
-        """
-        Creates a new MergeResult object storing the combined results of two
-        objects.
-        """
-        return MergeResult[S | U](
+    def union[S, U](a: MergeResult, b: MergeResult) -> MergeResult:
+        """Creates a new MergeResult object storing the combined results of two objects."""
+        return MergeResult(
             creates={
                 k: a.creates.get(k, set()) | b.creates.get(k, set())
                 for k in a.creates.keys() | b.creates.keys()
@@ -102,10 +100,8 @@ class MergeResult[T = int]:
             files=a.files | b.files,
         )
 
-    def __or__[U](self, other: MergeResult[U]) -> MergeResult[T | U]:
-        return MergeResult.union(
-            cast(MergeResult[T | U], self), cast(MergeResult[T | U], other)
-        )
+    def __or__(self, other: MergeResult) -> MergeResult:
+        return MergeResult.union(self, other)
 
     @property
     def success(self) -> bool:
@@ -120,35 +116,49 @@ class MergeResult[T = int]:
         return bool(self.creates)
 
     @staticmethod
-    def created[S](model: str, pk: S) -> MergeResult[S]:
+    def created(model: str, pk: Any) -> MergeResult:
         """Shorthand for the result of a successful create operation.
 
-        :param model: The model which was created.
-        :param pk: The primary key of created object.
-        :returns: The constructed MergeResult object."""
+        Args:
+            model: The model which was created.
+            pk: The primary key of created object.
+
+        Returns:
+            The constructed MergeResult object.
+        """
         return MergeResult(creates={model: {pk}})
 
     @staticmethod
-    def updated[S](model: str, pk: S) -> MergeResult[S]:
+    def updated(model: str, pk: Any) -> MergeResult:
         """Shorthand for the result of a successful update operation.
 
-        :param model: The model which was updated.
-        :param pk: The primary key of the updated object.
-        :return: The constructed MergeResult object."""
+        Args:
+            model: The model which was updated.
+            pk: The primary key of the updated object.
+
+        Returns:
+            The constructed MergeResult object.
+        """
         return MergeResult(updates={model: {pk}})
 
     @staticmethod
-    def failed[S](model: str, pk: S | None = None) -> MergeResult[S]:
+    def failed(model: str, pk: Any | None = None) -> MergeResult:
         """Shorthand for the result of a failed merge operation.
 
-        :param model: The model which failed.
-        :param pk: The (optional) primary key of the failed object.
-        :return: The constructed MergeResult object."""
+        Args:
+            model: The model which failed.
+            pk: The (optional) primary key of the failed object.
+
+        Returns:
+            The constructed MergeResult object.
+        """
         return MergeResult(failures={model: [pk]})
 
     @staticmethod
     def unnecessary() -> MergeResult:
         """Shorthand for the result of an unnecessary merge operation.
 
-        :return: The constructed MergeResult object."""
+        Returns:
+            The constructed MergeResult object.
+        """
         return MergeResult()

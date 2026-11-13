@@ -243,12 +243,7 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
 class DynamicAttorneyRoleSerializer(
     serializers.SerializerMethodField, AttorneyRoleSerializer
 ):
-    """
-    Serializes attorney role data by dynamically computing the field's value
-    using a serializer method. This combines the flexibility of the
-    SerializerMethodField class and allow us to use the schema defined in
-    AttorneyRoleSerializer.
-    """
+    """Serializes attorney role data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in AttorneyRoleSerializer."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -258,12 +253,7 @@ class DynamicAttorneyRoleSerializer(
 class DynamicPartyTypeSerializer(
     serializers.SerializerMethodField, PartyTypeSerializer
 ):
-    """
-    Serializes party type data by dynamically computing the field's value
-    using a serializer method. This combines the flexibility of the
-    SerializerMethodField class and allow us to use the schema defined in
-    PartyTypeSerializer.
-    """
+    """Serializes party type data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in PartyTypeSerializer."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -302,12 +292,7 @@ class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 class DynamicPartySerializer(
     serializers.SerializerMethodField, PartyRoleSerializer
 ):
-    """
-    Serializes party data by dynamically computing the field's value using a
-    serializer method. This combines the flexibility of the
-    SerializerMethodField class and allow us to use the schema defined in
-    PartyRoleSerializer.
-    """
+    """Serializes party data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in PartyRoleSerializer."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

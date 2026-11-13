@@ -64,9 +64,7 @@ class OpinionAlertsPercolatorTest(
     TestCase,
     SearchAlertsAssertions,
 ):
-    """
-    Opinion Alerts Percolator Tests
-    """
+    """Opinion Alerts Percolator Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -153,10 +151,7 @@ class OpinionAlertsPercolatorTest(
         self.percolator_call_count = 0
 
     def test_opinions_percolator_queries(self, mock_prefix) -> None:
-        """Test if a variety of Opinions and OpinionClusters can trigger
-        percolator queries
-        """
-
+        """Test if a variety of Opinions and OpinionClusters can trigger percolator queries."""
         created_queries_ids = []
 
         # Test Percolate an Opinion. It should match the query containing
@@ -209,10 +204,7 @@ class OpinionAlertsPercolatorTest(
     def test_index_and_delete_opinion_alerts_from_percolator(
         self, mock_prefix
     ) -> None:
-        """Test an Opinion alert is added/removed from the OpinionPercolator
-        index.
-        """
-
+        """Test an Opinion alert is added/removed from the OpinionPercolator index."""
         with self.captureOnCommitCallbacks(execute=True):
             opinion_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -264,7 +256,6 @@ class OpinionAlertsPercolatorTest(
 
     def test_percolate_document_for_different_rates(self, mock_prefix) -> None:
         """Confirm an Opinion is percolated upon ingestion."""
-
         opinion_cluster_indexing_time = self.mock_date
         with self.captureOnCommitCallbacks(execute=True):
             opinion_cluster_alert = AlertFactory(
@@ -567,10 +558,7 @@ class OpinionAlertsPercolatorTest(
     def test_percolate_opinion_upon_initial_extraction_citations_found(
         self, mock_prefix
     ) -> None:
-        """Test Opinion percolation to match queries that involve the
-        cites field.
-        """
-
+        """Test Opinion percolation to match queries that involve the cites field."""
         opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
             seconds=15
         )
@@ -639,10 +627,7 @@ class OpinionAlertsPercolatorTest(
     def test_percolate_opinion_upon_initial_extraction_no_citations_found(
         self, mock_prefix
     ) -> None:
-        """Test Opinion percolation for queries that don’t involve the cites
-        fields and where no citations are matched within the document content.
-        """
-
+        """Test Opinion percolation for queries that don’t involve the cites fields and where no citations are matched within the document content."""
         opinion_cluster_indexing_time = self.mock_date - datetime.timedelta(
             seconds=15
         )
@@ -701,7 +686,6 @@ class OpinionAlertsPercolatorTest(
 
     def test_opinion_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm Opinion Search alerts are properly highlighted."""
-
         with self.captureOnCommitCallbacks(execute=True):
             opinion_only_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -940,10 +924,7 @@ class OpinionAlertsPercolatorTest(
 
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=4, OPINION_HITS_PER_RESULT=3)
     def test_can_limit_scheduled_alert_hits(self, mock_prefix) -> None:
-        """Test that we can limit the number of hits included in a scheduled
-        alert email.
-        """
-
+        """Test that we can limit the number of hits included in a scheduled alert email."""
         # Create a daily opinion alert with a broad query that will match
         # all the opinions we create below
         with self.captureOnCommitCallbacks(execute=True):
@@ -1085,13 +1066,7 @@ class OpinionAlertsPercolatorTest(
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)
     def test_retrieve_all_the_matched_alerts_in_batches(self, mock_prefix):
-        """Confirm that we can retrieve all the matched alerts by the
-        percolator if the number of alerts matched exceeds the initial query
-        ELASTICSEARCH_PAGINATION_BATCH_SIZE.
-        Also assert that no RT alerts are scheduled to be sent according to its
-        rate.
-        """
-
+        """Confirm that we can retrieve all the matched alerts by the percolator if the number of alerts matched exceeds the initial query ELASTICSEARCH_PAGINATION_BATCH_SIZE. Also assert that no RT alerts are scheduled to be sent according to its rate."""
         alerts_created_user_1 = []
         for i in range(6):
             with self.captureOnCommitCallbacks(execute=True):

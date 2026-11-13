@@ -21,14 +21,19 @@ from juriscraper.state.docket import (
 )
 
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Ancestor,
+    Constant,
+    Fn,
     ManyStrategy,
     Merger,
     OneToManyRelation,
+    Params,
     RelatedParams,
+    Scrape,
+    WithStrategy,
     overwrite,
-    overwrite_if_present,
 )
+from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.search.models import CaseTransfer, Docket
 
 logger = logging.getLogger(__name__)
@@ -43,11 +48,15 @@ TRANSFER_REASON_MAP: dict[TransferReason, int] = {
 def inbound_transfers[TransferType: DocketTransfer](
     docket_data: ScrapeDocket[TransferType, Any, Any], params: Any
 ) -> list[TransferType]:
-    """Filter a docket's transfers down to the ones a `CaseTransfer` can be
-    created for. Skipped transfers are logged but do not fail the merge.
+    """Filter a docket's transfers down to the ones a `CaseTransfer` can be created for. Skipped transfers are logged but do not fail the merge.
 
-    :param docket_data: The scraped docket.
-    :return: The transfers to merge."""
+    Args:
+        docket_data: The scraped docket.
+        params: Unused.
+
+    Returns:
+        The transfers to merge.
+    """
     transfers = []
     for transfer in docket_data.transfers:
         if transfer.direction is not TransferDirection.INBOUND:
@@ -77,34 +86,12 @@ def inbound_transfers[TransferType: DocketTransfer](
     return transfers
 
 
-def _origin_docket_number(transfer: DocketTransfer, params: Any) -> str:
-    return transfer.docket_number
-
-
 def _destination_docket_id(
     transfer: DocketTransfer, params: RelatedParams[Any]
 ) -> int | None:
     if params.parent is not None:
         return params.parent.pk
     return None
-
-
-def _transfer_type(transfer: DocketTransfer, params: Any) -> int:
-    return TRANSFER_REASON_MAP[transfer.reason]
-
-
-def _destination_court_id(scrape: Any, params: RelatedParams[Any]) -> str:
-    return cast(str, cast(Docket, params.parent).court_id)
-
-
-def _destination_docket_number(scrape: Any, params: RelatedParams[Any]) -> str:
-    return cast(Docket, params.parent).docket_number or ""
-
-
-def _transfer_date(scrape: Any, params: RelatedParams[Any]) -> date | None:
-    # The standard docket format doesn't include transfer dates, so treat the
-    # destination docket's filing date as the date the transfer occurred.
-    return cast(Docket, params.parent).date_filed
 
 
 class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
@@ -115,7 +102,8 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     The destination fields come from the parent docket and the origin docket
     number and transfer type from the scraped transfer; subclasses must
     define the ``origin_court_id`` attribute to translate the transfer's
-    Juriscraper court ID to a CourtListener one."""
+    Juriscraper court ID to a CourtListener one.
+    """
 
     model: ClassVar[type[Model]] = CaseTransfer
     # Both ends are identified by court and docket number rather than by FK so
@@ -131,21 +119,26 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         "transfer_type",
     ]
 
-    destination_docket_id: int = Attribute(
-        _destination_docket_id,
-        strategy=overwrite_if_present,
+    destination_docket_id: int | None = Fn(_destination_docket_id)(
+        Scrape(DocketTransfer), Params(RelatedParams)
     )
-    origin_docket_number: str = Attribute(
-        _origin_docket_number, strategy=overwrite
+    origin_docket_number: str = WithStrategy(
+        Scrape(DocketTransfer).docket_number, overwrite
     )
-    transfer_type: int = Attribute(_transfer_type, strategy=overwrite)
-    destination_court_id: str = Attribute(
-        _destination_court_id, strategy=overwrite
+    transfer_type: int = WithStrategy(
+        Constant(TRANSFER_REASON_MAP)[Scrape(DocketTransfer).reason], overwrite
     )
-    destination_docket_number: str = Attribute(
-        _destination_docket_number, strategy=overwrite
+    destination_court_id: str = WithStrategy(
+        Ancestor(Docket).court_id, overwrite
     )
-    transfer_date: date | None = Attribute(_transfer_date, strategy=overwrite)
+    destination_docket_number: str = WithStrategy(
+        Fn(lambda v: v or "")(Ancestor(Docket).docket_number), overwrite
+    )
+    # The standard docket format doesn't include transfer dates, so treat the
+    # destination docket's filing date as the date the transfer occurred.
+    transfer_date: date | None = WithStrategy(
+        Ancestor(Docket).date_filed, overwrite
+    )
 
     @override
     def query(self) -> QuerySet[CaseTransfer]:
@@ -155,16 +148,15 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         can be filled in (see `update_existing`); otherwise match a transfer
         already attached to the parent docket.
 
-        :return: The queryset to find the transfer."""
+        Returns:
+            The queryset to find the transfer.
+        """
         # `super().query()` can't be used here. For a related merger
         # `self.manager` is the parent docket's reverse FK manager, so it would
         # constrain the lookup to `destination_docket = parent` and hide the
         # very partial transfers this method exists to find.
-        candidates = cast(
-            QuerySet[CaseTransfer],
-            CaseTransfer.objects.filter(
-                **{name: self.transformed[name] for name in self.key}
-            ),
+        candidates = CaseTransfer.objects.filter(
+            **{name: self.transformed[name] for name in self.key}
         )
         fillable = candidates.filter(destination_docket__isnull=True)
         if fillable.exists():
@@ -180,6 +172,6 @@ def CaseTransferRelation(
 ) -> list[CaseTransfer]:
     return OneToManyRelation(
         merger,
-        transform,
+        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
         strategy=strategy,
     )
