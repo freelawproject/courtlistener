@@ -434,25 +434,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         """The objects matching this merger's natural key."""
         return self.stored.filter(**self.natural_key(state).filters)
 
-    def pre_update(self, updated_fields: list[str]) -> list[str]:
-        """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
-
-        Args:
-            updated_fields: The fields that were updated.
-
-        Returns:
-            A list of additional attribute names that should be updated.
-        """
-        return []
-
-    def needs_update(self) -> bool:
-        """Whether to take the update path even when no attribute changed. Useful for re-triggering downstream processing (e.g. a re-download) driven by the merge result's updates.
-
-        Returns:
-            True to force the update path.
-        """
-        return False
-
     @override
     def lookup(
         self, state: MergerState.Lookup[Scrape, Params, M]
@@ -549,13 +530,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             if o2o_result.update or o2o_result.create:
                 updated.append(name)
             result |= o2o_result
-        if updated or self.needs_update():
-            result |= MergeResult.updated(
-                self.config.model.__name__, state.instance.pk
-            )
-            updated += self.pre_update(updated)
-            if updated:
-                updated += auto_now_fields(self.config.model)
 
         return state.save(state.instance, updated, result)
 
@@ -584,24 +558,29 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def save(
         self, state: MergerState.Save[Scrape, Params, M]
     ) -> MergerState.SaveOutput[Scrape, Params, M]:
+        result = state.result
         match state.operation:
             case MergerState.ModelCreate(fields):
                 instance = self.manager.create(**fields)
-                result = MergeResult.created(
+                result |= MergeResult.created(
                     instance.__class__.__name__, instance.pk
                 )
-            case MergerState.ModelUpdate(instance, fields):
+            case MergerState.ModelUpdate(instance, fields, force):
                 if fields:
-                    instance.save(update_fields=fields)
-                    result = MergeResult.updated(
+                    instance.save(
+                        update_fields=(
+                            *fields,
+                            *auto_now_fields(self.config.model),
+                        )
+                    )
+                if fields or force:
+                    result |= MergeResult.updated(
                         instance.__class__.__name__, instance.pk
                     )
-                else:
-                    result = MergeResult.unnecessary()
 
         if self.config.registry.related:
-            return state.children(instance, state.result | result)
-        return state.complete(instance, state.result | result)
+            return state.children(instance, result)
+        return state.complete(instance, result)
 
     @override
     def children(

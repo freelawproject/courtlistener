@@ -26,6 +26,8 @@ class ModelUpdate[M: Model]:
     """The model instance to save. Changes should already have been made and be awaiting save."""
     fields: Sequence[str]
     """The changed fields to save. Nothing outside of this set will be updated."""
+    force: bool
+    """Whether to force recording this update even if no fields are changed. A forced updated will not be saved to the DB, it will only be recorded."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -137,7 +139,7 @@ class Resolve[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
 
 
 type CreateOutput[Scrape, Params, M: Model] = (
-    "Save[Scrape, Params, M] | Failed[Scrape, Params, M]"
+    "Save[Scrape, Params, M, ModelCreate[M]] | Failed[Scrape, Params, M]"
 )
 
 
@@ -149,7 +151,7 @@ class Create[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
 
     def save(
         self, fields: Mapping[str, Any], result: MergeResult
-    ) -> Save[Scrape, Params, M]:
+    ) -> Save[Scrape, Params, M, ModelCreate[M]]:
         """Shorthand to transition to a save state."""
         return Save(
             self.scrape,
@@ -161,7 +163,7 @@ class Create[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
 
 
 type UpdateOutput[Scrape, Params, M: Model] = (
-    "Save[Scrape, Params, M] | Failed[Scrape, Params, M]"
+    "Save[Scrape, Params, M, ModelUpdate[M]] | Failed[Scrape, Params, M]"
 )
 
 
@@ -175,14 +177,18 @@ class Update[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
     """The object to update"""
 
     def save(
-        self, instance: M, fields: Sequence[str], result: MergeResult
-    ) -> Save[Scrape, Params, M]:
+        self,
+        instance: M,
+        fields: Sequence[str],
+        result: MergeResult,
+        force: bool = False,
+    ) -> Save[Scrape, Params, M, ModelUpdate[M]]:
         """Shorthand to transition to a save state."""
         return Save(
             self.scrape,
             self.params,
             self.relation_params,
-            ModelUpdate(instance, fields),
+            ModelUpdate(instance, fields, force),
             result,
         )
 
@@ -193,12 +199,14 @@ type SaveOutput[Scrape, Params, M: Model] = (
 
 
 @dataclass(slots=True, frozen=True)
-class Save[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
+class Save[Scrape, Params, M: Model, Operation = ModelOperation](
+    _Penultimate[Scrape, Params, M]
+):
     """Save the result of an operation to the database before continuing."""
 
     name = "save"
 
-    operation: ModelOperation[M]
+    operation: Operation
     """The operation to complete"""
     result: MergeResult
 

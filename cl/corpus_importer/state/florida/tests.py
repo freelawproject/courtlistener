@@ -1247,6 +1247,7 @@ class FloridaDocumentMergerTest(TestCase):
         ).merge()
 
         self.assertTrue(result.success)
+        self.assertIn("FloridaDocument", result.updates)
         self.assertIn(merged.pk, result.updates["FloridaDocument"])
 
     @merger_test(expected_query_count=29)

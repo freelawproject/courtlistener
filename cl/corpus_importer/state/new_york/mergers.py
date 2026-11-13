@@ -247,7 +247,23 @@ class NYCoADocumentMerger[ParamType](
     ]:
         """Settle which path to store for the file, then write the document."""
         self._accept_file(state.scrape, state.instance)
-        return super().update(state)
+
+        save_state = super().update(state)
+
+        if not isinstance(save_state, MergerState.Save):
+            return save_state
+
+        instance = save_state.operation.instance
+        updated_fields = list(save_state.operation.fields)
+
+        if "filepath_local" not in updated_fields:
+            return save_state
+
+        instance.page_count = None
+        instance.ocr_status = None
+        updated_fields += ["page_count", "ocr_status"]
+
+        return state.save(instance, updated_fields, save_state.result)
 
     def _scrub_fileinfo(self) -> None:
         """Remove info relevant to file."""
@@ -300,19 +316,6 @@ class NYCoADocumentMerger[ParamType](
             private_key,
         )
         self._scrub_fileinfo()
-
-    @override
-    def pre_update(self, updated_fields: list[str]) -> list[str]:
-        """Send a document whose file has moved back for extraction."""
-        updated = super().pre_update(updated_fields)
-        if not isinstance(self.state, MergerState.Update):
-            return updated
-        if "filepath_local" not in updated_fields + updated:
-            return updated
-        self.state.instance.page_count = None
-        self.state.instance.ocr_status = None
-        updated += ["page_count", "ocr_status"]
-        return updated
 
 
 def _served_attachments(
