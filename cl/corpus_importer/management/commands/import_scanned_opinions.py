@@ -38,6 +38,7 @@ from cl.corpus_importer.utils import (
     clean_body_content,
     get_court_id,
 )
+from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
@@ -972,11 +973,20 @@ def store_scan_xml(
     cluster save that stores its path, so the file is deleted if that save
     fails, and no orphan is left.
 
+    When the scan is imported again, the file overwrites the previous one.
+    Once the transaction commits, a previous file with another name, e.g.
+    one with a `_1` suffix from an older import, is deleted, and the
+    CloudFront cache of the files is invalidated, since they are public with
+    a long cache lifetime.
+
+    Caveat: an overwritten file isn't restored if the save fails.
+
     Args:
         cluster: A cluster with a pk.
         scan_case: The parsed scanned opinion.
         update_fields: The other cluster fields to save with the path.
     """
+    previous_name = cluster.filepath_xml_scan.name
     cluster.filepath_xml_scan.save(
         scan_case.file_name,
         ContentFile(scan_case.xml.encode()),
@@ -985,8 +995,25 @@ def store_scan_xml(
     try:
         cluster.save(update_fields=["filepath_xml_scan", *update_fields])
     except Exception:
-        cluster.filepath_xml_scan.delete(save=False)
+        # A new file is an orphan without the save, but an overwritten one
+        # is still the cluster's file
+        if cluster.filepath_xml_scan.name != previous_name:
+            cluster.filepath_xml_scan.delete(save=False)
         raise
+    if not previous_name:
+        return
+
+    name = cluster.filepath_xml_scan.name
+    storage = cluster.filepath_xml_scan.storage
+
+    def clean_up_previous_file() -> None:
+        """Delete a renamed previous file and invalidate the cached ones."""
+        if previous_name != name:
+            storage.delete(previous_name)
+        invalidate_cloudfront(sorted({f"/{previous_name}", f"/{name}"}))
+
+    # Until the commit, the cluster still points to the previous file
+    transaction.on_commit(clean_up_previous_file)
 
 
 def add_opinion_content(
@@ -1471,8 +1498,182 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
     return cluster
 
 
+def read_stored_scan_xml(cluster: OpinionCluster) -> str:
+    """Read the scan XML stored for a cluster.
+
+    Args:
+        cluster: A cluster imported from a scan.
+
+    Returns:
+        The stored XML, or an empty string if the file is missing.
+    """
+    if not cluster.filepath_xml_scan:
+        return ""
+    try:
+        with cluster.filepath_xml_scan.open("rb") as f:
+            return f.read().decode("utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+def get_overwrite_changes(
+    cluster: OpinionCluster, scan_case: ScanCase
+) -> tuple[list[tuple[Opinion, str]], str] | None:
+    """Get what changed in a scan imported before, to overwrite it.
+
+    The new XML's opinions are paired with the cluster's scanned opinions
+    by order, since it is the same scanned opinion of the portal. The head
+    matter is only compared when the cluster's came from a scan, since a
+    merged cluster can keep the head matter of another source, like
+    Harvard's.
+
+    Args:
+        cluster: The cluster the scan was imported into.
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The (opinion, new XML) pairs whose XML changed, and the new head
+        matter, or an empty string if it's unchanged or not the scan's. None
+        if the number of opinions changed, which needs a review.
+    """
+    scanned = list(
+        cluster.sub_opinions.filter(main_version__isnull=True)
+        .exclude(xml_scan="")
+        .order_by("ordering_key", "pk")
+    )
+    new_xmls = [str(op) for op in scan_case.opinions]
+    if len(scanned) != len(new_xmls):
+        return None
+    changed = [
+        (opinion, xml)
+        for opinion, xml in zip(scanned, new_xmls, strict=True)
+        if opinion.xml_scan != xml
+    ]
+    headmatter = scan_case.cluster_fields.get("headmatter", "")
+    if (
+        not cluster.headmatter.startswith("<headmatter>")
+        or cluster.headmatter == headmatter
+    ):
+        headmatter = ""
+    return changed, headmatter
+
+
+def replace_opinion_content(
+    opinion: Opinion, xml: str, scan_case: ScanCase
+) -> None:
+    """Store the corrected XML of a scanned opinion as its main version.
+
+    The previous contents are kept as older versions, so the corrections
+    can be followed.
+
+    Args:
+        opinion: The saved scanned opinion.
+        xml: Its new `<opinion>` XML.
+        scan_case: The parsed scanned opinion.
+    """
+    opinion.xml_scan = xml
+    opinion.save(update_fields=["xml_scan"])
+    opinion.contents.filter(is_main_version=True).update(is_main_version=False)
+    add_opinion_content(opinion, scan_case)
+
+
+def overwrite_scan(
+    cluster: OpinionCluster,
+    scan_case: ScanCase,
+    file_path: str,
+    dry_run: bool = False,
+) -> None:
+    """Overwrite a scan imported before with its new XML.
+
+    For a portal schema change or a correction upstream, like a missed
+    footnote: the opinions' XML and contents, the head matter when it came
+    from the scan, and the stored file are replaced, and the citations are
+    found again. Other fields aren't changed, so a change elsewhere in the
+    XML, like the syllabus, only rewrites the stored file. Nothing is
+    written when the XML didn't change.
+
+    Args:
+        cluster: The cluster the scan was imported into.
+        scan_case: The parsed scanned opinion.
+        file_path: The local path or the S3 key of the XML, used for
+            logging.
+        dry_run: Only log what would be overwritten.
+    """
+    citation = scan_case.citation.corrected_citation()
+    if (changes := get_overwrite_changes(cluster, scan_case)) is None:
+        logger.warning(
+            "Not overwriting %s (%s): cluster %s has %s scanned opinions "
+            "and the scan has %s. Skipping it for review: %s%s",
+            file_path,
+            citation,
+            cluster.pk,
+            cluster.sub_opinions.filter(main_version__isnull=True)
+            .exclude(xml_scan="")
+            .count(),
+            len(scan_case.opinions),
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return
+    changed, headmatter = changes
+    # Other parts of the XML, like the syllabus, only change the stored file
+    if (
+        not changed
+        and not headmatter
+        and (read_stored_scan_xml(cluster) == scan_case.xml)
+    ):
+        logger.info(
+            "Skipping %s (%s), unchanged since its import in cluster %s",
+            file_path,
+            citation,
+            cluster.pk,
+        )
+        return
+    count = len(changed)
+    summary = f"{count} opinion{'s' if count != 1 else ''}"
+    if headmatter:
+        summary += " and the head matter"
+    if not changed and not headmatter:
+        summary = "the stored XML"
+    if dry_run:
+        logger.info(
+            "Dry run: would overwrite %s of %s (%s) in cluster %s: %s%s",
+            summary,
+            file_path,
+            citation,
+            cluster.pk,
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return
+    logger.info(
+        "Overwriting %s of %s (%s) in cluster %s: %s%s",
+        summary,
+        file_path,
+        citation,
+        cluster.pk,
+        BASE_URL,
+        cluster.get_absolute_url(),
+    )
+    with transaction.atomic():
+        for opinion, xml in changed:
+            replace_opinion_content(opinion, xml, scan_case)
+        # The stored XML always changes, so date_modified is always saved
+        update_fields = ["date_modified"]
+        if headmatter:
+            cluster.headmatter = headmatter
+            update_fields.append("headmatter")
+        store_scan_xml(cluster, scan_case, update_fields)
+        if changed:
+            queue_citation_finding([opinion.pk for opinion, _ in changed])
+
+
 def import_scanned_opinion(
-    xml: str, file_path: str, court_id: str | None, dry_run: bool = False
+    xml: str,
+    file_path: str,
+    court_id: str | None,
+    dry_run: bool = False,
+    overwrite: bool = False,
 ) -> None:
     """Import a scanning project final XML into CourtListener.
 
@@ -1487,6 +1688,8 @@ def import_scanned_opinion(
         court_id: The CL court id, or None to look it up in the XML.
         dry_run: Only log whether the opinion would be skipped, merged or
             added, without writing to the database or uploading files.
+        overwrite: Overwrite opinions already imported whose XML changed,
+            instead of skipping them (see `overwrite_scan`).
     """
     logger.info("Processing %s", file_path)
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
@@ -1494,6 +1697,14 @@ def import_scanned_opinion(
     citation = scan_case.citation.corrected_citation()
 
     if cluster_id := find_imported_scan(scan_case):
+        if overwrite:
+            overwrite_scan(
+                OpinionCluster.objects.get(pk=cluster_id),
+                scan_case,
+                file_path,
+                dry_run,
+            )
+            return
         logger.info(
             "Skipping %s (%s), already imported in cluster %s",
             file_path,
@@ -1625,6 +1836,13 @@ class Command(VerboseCommand):
             help="Log what would be skipped, merged or added without "
             "changing anything.",
         )
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="Overwrite the opinions already imported whose XML changed, "
+            "e.g. after a schema change or a correction in the portal, "
+            "instead of skipping them.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Import every XML file found in the given path."""
@@ -1649,6 +1867,7 @@ class Command(VerboseCommand):
                     file_path,
                     options["court_id"],
                     options["dry_run"],
+                    options["overwrite"],
                 )
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
