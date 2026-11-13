@@ -7,8 +7,8 @@
 {% block content %}
   <div class="col-xs-12 col-sm-6 col-sm-offset-3">
     {% if invalid %}
-      <h2><i class="fa fa-exclamation-triangle red"></i>&nbsp;Invalid Confirmation Link</h2>
-      <p>The link you have used to confirm your account is invalid. Please try clicking the link again or you may request a <a href="{% url "email_confirmation_request" %}">new confirmation link</a>.
+      <h2><i class="fa fa-exclamation-triangle red"></i>&nbsp;Confirmation Link Not Found</h2>
+      <p>We couldn't find this confirmation link. It may have already been used, in which case your email address is probably confirmed and you can <a href="{% url "sign-in" %}">sign in</a>. Otherwise, the link may be incomplete or mistyped, and you can request a <a href="{% url "email_confirmation_request" %}">new confirmation link</a>.
       </p>
     {% elif expired %}
       <h2><i class="fa fa-exclamation-triangle red"></i>&nbsp;Expired Confirmation Link</h2>
