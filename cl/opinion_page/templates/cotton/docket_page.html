@@ -16,7 +16,7 @@
 
 <div class="flex flex-col gap-9">
   {% if perms.search|has_any_perm:"docket" %}
-  <div class="flex justify-end mb-2" x-data>
+  <div class="flex flex-wrap justify-end items-center gap-2 mb-2" x-data>
     <c-button variant="dark" size="sm" href="{% url 'admin:search_docket_change' docket.pk %}">
       {% svg "edit" class="w-3.5 h-3.5" aria_hidden="true" %}
       Edit Docket
@@ -24,6 +24,38 @@
         <span x-show="$store.viewCount.loaded" x-cloak class="text-greyscale-300">(<span x-text="$store.viewCount.value"></span> views)</span>
       {% endif %}
     </c-button>
+    {% if perms.search.change_docket %}
+      {# Swap target: the block response replaces this span's contents. #}
+      <span id="docket-block-{{ docket.pk }}" class="contents">
+        {% if docket.blocked %}
+          <c-badge variant="danger">Blocked</c-badge>
+        {% else %}
+          <c-toast
+            variant="warning"
+            title="Could not block this docket"
+            x-on:htmx:response-error="open"
+            x-on:htmx:send-error="open"
+          >
+            <c-slot name="trigger">
+              {# Stays enabled during the request: htmx moves focus to the badge that takes this id only while the button holds it. #}
+              <c-button
+                variant="dark"
+                size="sm"
+                id="docket-block-control-{{ docket.pk }}"
+                hx-post="{% url 'block_item' %}"
+                hx-vals='{"id": "{{ docket.pk }}", "type": "docket"}'
+                hx-swap="none"
+                hx-confirm="Are you sure you want to block this docket?"
+              >
+                Block This Docket
+              </c-button>
+            </c-slot>
+          </c-toast>
+        {% endif %}
+      </span>
+      {# Announces the block's outcome; the response swaps its contents. #}
+      <span id="docket-block-status-{{ docket.pk }}" role="status" class="sr-only"></span>
+    {% endif %}
   </div>
 {% endif %}
 
@@ -69,10 +101,6 @@
       </c-dialog>
     {% endif %}
   </div>
-
-  {% if perms.search.change_docket and docket.blocked %}
-    <span class="self-start px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
-  {% endif %}
 
   {# Action buttons — Note and Tags are placeholders. #}
   {# TODO: Wire up Add a Note and Tags button interactivity. #}

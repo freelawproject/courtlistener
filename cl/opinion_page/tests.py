@@ -46,7 +46,7 @@ from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
-from lxml.html import fromstring
+from lxml.html import fragments_fromstring, fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
 
@@ -3233,6 +3233,74 @@ class TestBlockSearchItemAjax(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    async def _block_docket_with_htmx(
+        self, user: User
+    ) -> "_MonkeyPatchedASGIResponse":
+        """Posts an htmx request to block the fixture docket as user."""
+        client = AsyncClient()
+        await client.aforce_login(user=user)
+        return await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"HX-Request": "true"},
+        )
+
+    async def test_htmx_request_blocks_docket(self) -> None:
+        """An htmx request from a user with change_docket blocks the docket."""
+        await self._block_docket_with_htmx(self.docket_only.user)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+    async def test_htmx_response_fills_the_docket_swap_targets(self) -> None:
+        """An htmx request is answered with out-of-band swaps for the badge and status nodes of the blocked docket."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        docket_pk = self.cluster.docket.pk
+        swaps = {
+            el.get("id"): el.get("hx-swap-oob")
+            for el in fragments_fromstring(response.content.decode())
+        }
+        self.assertEqual(
+            swaps,
+            {
+                f"docket-block-{docket_pk}": "innerHTML",
+                f"docket-block-status-{docket_pk}": "innerHTML",
+            },
+        )
+
+    async def test_htmx_response_badge_takes_the_button_id(self) -> None:
+        """The badge swapped in carries the Block button's id and is focusable from script, so htmx can move focus to it."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        docket_pk = self.cluster.docket.pk
+        target, _ = fragments_fromstring(response.content.decode())
+        self.assertEqual(
+            [
+                (el.get("id"), el.get("tabindex"))
+                for el in target.iterdescendants()
+            ],
+            [(f"docket-block-control-{docket_pk}", "-1")],
+        )
+
+    async def test_htmx_request_must_be_a_post(self) -> None:
+        """An htmx request with another method gets a 405."""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.get(
+            reverse("block_item"), headers={"HX-Request": "true"}
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    async def test_htmx_request_denied_without_permission(self) -> None:
+        """An htmx request from a user without change_docket gets a 403 and leaves the docket unblocked."""
+        response = await self._block_docket_with_htmx(self.viewer.user)
+
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        await self.cluster.docket.arefresh_from_db()
+        self.assertFalse(self.cluster.docket.blocked)
+
 
 class TestAdminButtonsVisibility(TestCase):
     """Test that admin buttons are shown or hidden based on user permissions across the opinion, docket, and RECAP document pages."""
@@ -4736,15 +4804,16 @@ class DocketPageV2StaffLinksTest(TestCase):
         return user
 
     async def _get_docket_page(
-        self, user: User | None = None
+        self, user: User | None = None, docket: Docket | None = None
     ) -> "_MonkeyPatchedASGIResponse":
-        """Loads the v2 docket page, logged in as user when given and anonymously otherwise, whatever the client's previous login."""
+        """Loads the v2 page of docket, the fixture docket by default, logged in as user when given and anonymously otherwise, whatever the client's previous login."""
+        docket = docket or self.docket
         if user is None:
             await self.async_client.alogout()
         else:
             await self.async_client.aforce_login(user)
         r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+            reverse("view_docket", args=[docket.pk, docket.slug])
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         return r
@@ -4818,6 +4887,74 @@ class DocketPageV2StaffLinksTest(TestCase):
             with self.subTest(recording=audio.pk):
                 href = reverse("admin:audio_audio_change", args=[audio.pk])
                 self.assertIn(audio.case_name, links[href])
+
+    @staticmethod
+    def _block_buttons(html: str) -> list[_Element]:
+        """Controls on the page that post to the block endpoint."""
+        return [
+            el
+            for el in fromstring(html).iter()
+            if el.get("hx-post") == reverse("block_item")
+        ]
+
+    async def test_change_docket_shows_the_block_button(self) -> None:
+        """change_docket shows one Block button that posts this docket to the block endpoint."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        r = await self._get_docket_page(user)
+        buttons = self._block_buttons(r.content.decode())
+        self.assertEqual(
+            [json.loads(button.get("hx-vals")) for button in buttons],
+            [{"id": str(self.docket.pk), "type": "docket"}],
+        )
+
+    async def test_failed_block_request_opens_the_error_toast(self) -> None:
+        """The Block button sits inside a toast that opens when its htmx request gets an error response or cannot be sent."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        r = await self._get_docket_page(user)
+        (button,) = self._block_buttons(r.content.decode())
+        toasts = [
+            el for el in button.iterancestors() if el.get("x-data") == "toast"
+        ]
+        self.assertEqual(
+            [
+                (
+                    toast.get("x-on:htmx:response-error"),
+                    toast.get("x-on:htmx:send-error"),
+                )
+                for toast in toasts
+            ],
+            [("open", "open")],
+        )
+
+    async def test_block_button_needs_change_docket(self) -> None:
+        """Users who cannot change dockets see no Block button, even with another docket permission."""
+        for label, user in (
+            ("anonymous", None),
+            ("no permissions", self.no_perms_user),
+            (
+                "view only",
+                await sync_to_async(self._user_with)("search.view_docket"),
+            ),
+        ):
+            with self.subTest(user=label):
+                r = await self._get_docket_page(user)
+                self.assertEqual(self._block_buttons(r.content.decode()), [])
+
+    async def test_blocked_docket_shows_the_badge_instead_of_the_button(
+        self,
+    ) -> None:
+        """A blocked docket shows change_docket users the Blocked badge in the button's place, and no Block button."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        blocked = await sync_to_async(DocketFactory)(
+            court=self.docket.court, source=Docket.RECAP, blocked=True
+        )
+        r = await self._get_docket_page(user, blocked)
+        html = r.content.decode()
+        self.assertEqual(self._block_buttons(html), [])
+        target = fromstring(html).get_element_by_id(
+            f"docket-block-{blocked.pk}"
+        )
+        self.assertEqual(" ".join(target.text_content().split()), "Blocked")
 
     async def test_users_without_permissions_see_no_admin_links(
         self,

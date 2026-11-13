@@ -1765,8 +1765,16 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 
 @ensure_csrf_cookie
 async def block_item(request: HttpRequest) -> HttpResponse:
-    """Block an item from search results using AJAX."""
-    if not is_ajax(request):
+    """Block an item from search results using AJAX or htmx.
+
+    htmx requests are answered with a partial that swaps the Blocked badge
+    and a status message into the v2 docket page; AJAX requests get plain
+    text.
+
+    TODO: Remove all ajax logic once v2 is rolled out globally
+    """
+    is_htmx = "HX-Request" in request.headers
+    if request.method != "POST" or not (is_htmx or is_ajax(request)):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
@@ -1819,4 +1827,10 @@ async def block_item(request: HttpRequest) -> HttpResponse:
     d.date_blocked = now()
     await d.asave()
 
+    if is_htmx:
+        return TemplateResponse(
+            request,
+            "v2_includes/docket_block_htmx/blocked.html",
+            {"docket": d},
+        )
     return HttpResponse("It worked")

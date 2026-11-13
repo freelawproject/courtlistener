@@ -12,6 +12,7 @@
         {'href': '#code-block', 'text': 'Code blocks'},
         {'href': '#two-column-list', 'text': 'Two column list'},
         {'href': '#eyebrow', 'text': 'Eyebrow'},
+        {'href': '#badge', 'text': 'Badge'},
         {'href': '#feature-card', 'text': 'Feature Card'},
         {'href': '#copy', 'text': 'Copy to clipboard'},
         {'href': '#description-list', 'text': 'Description list'},
@@ -201,6 +202,51 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-eyebrow&gt;CourtListener&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# BADGE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="badge">
+    <h2 class="mt-6 mb-3">Badge</h2>
+    <p>A short label that marks the state of the item it sits next to. When <code>variant</code> is omitted, no built-in styling is applied — the caller controls all classes.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 flex flex-wrap gap-2 items-center">
+      <c-badge variant="neutral">Neutral</c-badge>
+      <c-badge variant="info">Info</c-badge>
+      <c-badge variant="success">Success</c-badge>
+      <c-badge variant="warning">Warning</c-badge>
+      <c-badge variant="danger">Danger</c-badge>
+      <c-badge class="inline-block rounded-full px-3 py-1 text-xs font-medium bg-purple-100 text-purple-700">Custom</c-badge>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Color scheme: <code>neutral</code>, <code>info</code>, <code>success</code>, <code>warning</code> or <code>danger</code>. Without it the badge has no styling of its own.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes. The only styling when <code>variant</code> is omitted.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Badge's text.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-badge variant="neutral"&gt;Neutral&lt;/c-badge&gt;
+&lt;c-badge variant="info"&gt;Info&lt;/c-badge&gt;
+&lt;c-badge variant="success"&gt;Success&lt;/c-badge&gt;
+&lt;c-badge variant="warning"&gt;Warning&lt;/c-badge&gt;
+&lt;c-badge variant="danger"&gt;Danger&lt;/c-badge&gt;
+&lt;c-badge class="inline-block rounded-full px-3 py-1 text-xs font-medium bg-purple-100 text-purple-700"&gt;Custom&lt;/c-badge&gt;
       </c-code>
     </c-expansion-panel>
   </section>
