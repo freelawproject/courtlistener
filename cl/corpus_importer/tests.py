@@ -40,6 +40,7 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.corpus_importer.centralia import (
+    compare_structured_extraction,
     merge_structured_opinion_into_cl_opinion,
     should_ingest,
 )
@@ -6287,6 +6288,37 @@ class CentraliaShouldIngestTest(SimpleTestCase):
         ingestible, reason = should_ingest(opinion, self.make_payload())
         self.assertFalse(ingestible)
         self.assertIn("already extracted", reason)
+
+    def test_text_coverage_ignores_whitespace_and_counts_the_syllabus(
+        self,
+    ) -> None:
+        """Is coverage counted without whitespace and with the syllabus?
+
+        pdftotext pads `plain_text` with layout whitespace a structured read
+        drops, and the PDF it came from includes the syllabus.
+        """
+        syllabus_text = "Held: the statute applies to petitioner."
+        payload = self.make_payload(
+            opinions=[
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            headmatter={"text": "COURT OF APPEALS"},
+            sections={"syllabus": {"html": [syllabus_text]}},
+        )
+        payload["opinions"][0]["text"] = "Affirmed."
+        whole_pdf = f"COURT OF APPEALS {syllabus_text} Affirmed."
+        for label, plain_text in (
+            ("padded", "\n\n    ".join(whole_pdf.split(" ")) + " " * 500),
+            ("unpadded", whole_pdf),
+        ):
+            with self.subTest(label=label):
+                opinion = Opinion(plain_text=plain_text)
+
+                ingestible, reason = should_ingest(opinion, payload)
+
+                self.assertTrue(ingestible, msg=reason)
+                metrics = compare_structured_extraction(opinion, payload)
+                self.assertEqual(metrics["old_chars"], metrics["new_chars"])
 
     def test_ingests_a_clean_read(self) -> None:
         """Does a complete read of a real opinion pass the gate?"""
