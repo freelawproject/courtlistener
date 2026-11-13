@@ -5,9 +5,9 @@
 
 <c-vars label="" tabs="" active_tab="" class="" />
 
-{% if tabs.0.url %}
-  {% require_script "js/third_party/htmx" defer=True %}
-  {% with tabs_id=label|slugify|add:"-tabs" %}
+{% with tabs_id=label|slugify|add:"-tabs" %}
+  {% if tabs.0.url %}
+    {% require_script "js/third_party/htmx" defer=True %}
     <div
       id="{{ tabs_id }}"
       class="w-full {{ class }}"
@@ -43,39 +43,29 @@
         {{ slot }}
       </div>
     </div>
-  {% endwith %}
-{% else %}
-  <div x-data="tabsComponent" class="w-full {{ class }}">
-    {# DESKTOP tabs #}
+  {% else %}
     <div
-      role="tablist"
-      class="w-full gap-1 hidden md:flex"
-      x-data="focus"
-      x-on:keydown.left="focusPrevious"
-      x-on:keydown.right="focusNext"
-      x-on:keydown.home.prevent="focusFirst"
-      x-on:keydown.end.prevent="focusLast"
+      id="{{ tabs_id }}"
+      class="w-full {{ class }}"
+      x-data="tabsComponent"
+      data-active-tab="{{ active_tab }}"
     >
-      <template x-for="tab in tabs">
-        <div>
-          <button
-            x-on:click="setActiveTab"
-            x-bind:aria-selected="isActive"
-            x-bind:class="tabClass"
-            x-bind:data-tab-id="tab"
-            x-text="tab"
-            type="button"
-            role="tab"
-            class="px-5 py-3 text-sm font-normal rounded-t-2xl text-greyscale-600"
-          >
-          </button>
-        </div>
-      </template>
-    </div>
-
-    {# Active panel content #}
-    <div aria-label="Active {{ label }} panel" role="tabpanel" class="w-full bg-greyscale-100 text-greyscale-900 p-4 rounded-b-2xl md:rounded-tr-2xl rounded-tl-none">
+      <div
+        role="tablist"
+        aria-label="{{ label }}"
+        class="gap-1 hidden md:flex"
+        x-data="focus"
+        x-on:keydown.left="focusPrevious"
+        x-on:keydown.right="focusNext"
+        x-on:keydown.home.prevent="focusFirst"
+        x-on:keydown.end.prevent="focusLast"
+      >
+        {% for tab in tabs %}
+          <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
+        {% endfor %}
+      </div>
+      <c-tabs.select :tabs="tabs" :active_tab="active_tab" :tabs_id="tabs_id" :label="label" />
       {{ slot }}
     </div>
-  </div>
-{% endif %}
+  {% endif %}
+{% endwith %}
