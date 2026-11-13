@@ -160,6 +160,7 @@ from cl.search.models import (
     RECAPDocument,
     SCOTUSDocument,
     TexasDocketEntry,
+    TexasDocument,
 )
 from cl.search.state.texas.factories import (
     TexasDocketEntryFactory,
@@ -4214,6 +4215,66 @@ class DocketEntryFileDownload(TestCase):
         _, *rows = csv.reader(io.StringIO(response.content.decode()))
         self.assertEqual(
             [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_texas_docket_waffle"
+    )
+    @override_flag("texas_docket_page", active=True)
+    def test_csv_export_for_texas_docket(self) -> None:
+        """A Texas docket exports its entries oldest first, with the TAMES fields and the documents' formatted file path and OCR status."""
+        texas_docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            source=Docket.SCRAPER,
+        )
+        newer = TexasDocketEntryFactory(
+            docket=texas_docket,
+            sequence_number="2026-10-02.001",
+            entry_type="Motion disposed",
+            disposition="Granted",
+        )
+        older = TexasDocketEntryFactory(
+            docket=texas_docket, sequence_number="2026-10-01.001"
+        )
+        TexasDocumentFactory(docket_entry=newer)
+        document = TexasDocumentFactory(
+            docket_entry=older,
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+            filepath_local="recap/texas.pdf",
+            ocr_status=TexasDocument.OCR_COMPLETE,
+        )
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": texas_docket.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        header, *rows = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(header[0], "texasdocketentry_id")
+        self.assertEqual(
+            [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
+        first, second = rows
+        self.assertEqual(
+            first[header.index("texasdocument_url")], document.url
+        )
+        self.assertEqual(
+            first[header.index("texasdocument_filepath_local")],
+            "https://storage.courtlistener.com/recap/texas.pdf",
+        )
+        self.assertEqual(
+            first[header.index("texasdocument_ocr_status")], "OCR Complete"
+        )
+        self.assertEqual(
+            second[header.index("texasdocketentry_entry_type")],
+            "Motion disposed",
+        )
+        self.assertEqual(
+            second[header.index("texasdocketentry_disposition")], "Granted"
         )
 
 
