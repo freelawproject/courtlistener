@@ -19,14 +19,16 @@ class DocketEntryFilterForm(V1DocketEntryFilterForm):
             "min": 0,
             "class": widgets.NEW_STACK_WIDGET_CLASSES + " no-spinner",
         }
-        self.fields["entry_gte"].label = "Documents from"
-        self.fields["entry_gte"].widget = widgets.TextInput(
-            attrs={"placeholder": "From", **number_attrs}
-        )
-        self.fields["entry_lte"].label = "Documents to"
-        self.fields["entry_lte"].widget = widgets.TextInput(
-            attrs={"placeholder": "To", **number_attrs}
-        )
+        # The v1 form drops these fields for sources without entry numbers.
+        if "entry_gte" in self.fields:
+            self.fields["entry_gte"].label = "Documents from"
+            self.fields["entry_gte"].widget = widgets.TextInput(
+                attrs={"placeholder": "From", **number_attrs}
+            )
+            self.fields["entry_lte"].label = "Documents to"
+            self.fields["entry_lte"].widget = widgets.TextInput(
+                attrs={"placeholder": "To", **number_attrs}
+            )
         date_attrs = {"placeholder": "mm/dd/yyyy", "autocomplete": "off"}
         self.fields["filed_after"].widget = widgets.TextInput(
             attrs={**date_attrs, "data-flatpickr-after": ""}

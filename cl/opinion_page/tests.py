@@ -8,6 +8,7 @@ import re
 import shutil
 import threading
 from collections import Counter
+from dataclasses import replace
 from datetime import date
 from hashlib import md5
 from http import HTTPStatus
@@ -28,6 +29,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.db.models import Q
 from django.http import HttpResponse, QueryDict
 from django.middleware.csrf import CSRF_TOKEN_LENGTH
 from django.template import TemplateDoesNotExist, engines
@@ -72,6 +74,7 @@ from cl.lib.test_helpers import (
 )
 from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.docket_entry_sources import (
+    MetadataItem,
     _recap_document_detail_url,
     _scotus_document_detail_url,
     build_scotus_metadata,
@@ -86,14 +89,17 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_case_transfer_metadata,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
     build_originating_court_metadata,
+    build_trial_court_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
     es_get_related_clusters_with_cache,
     generate_docket_entries_csv_data,
+    is_source_hidden,
     make_docket_title,
 )
 from cl.opinion_page.views import (
@@ -119,8 +125,10 @@ from cl.recap.factories import (
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.constants import TAMES_COURT_IDS
 from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.factories import (
+    CaseTransferFactory,
     CitationWithParentsFactory,
     CourtFactory,
     DocketEntryFactory,
@@ -136,10 +144,12 @@ from cl.search.factories import (
     SCOTUSDocketEntryFactory,
     ScotusDocketMetadataFactory,
     SCOTUSDocumentFactory,
+    TrialCourtDataFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    CaseTransfer,
     Citation,
     ClusterRedirection,
     Docket,
@@ -149,6 +159,12 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
     SCOTUSDocument,
+    TexasDocketEntry,
+    TexasDocument,
+)
+from cl.search.state.texas.factories import (
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
@@ -2053,6 +2069,546 @@ class DocketSourceEmptyMessageTest(SimpleTestCase):
                 self.assertTrue(source.empty_message.strip())
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="test_is_source_hidden_waffle")
+class IsSourceHiddenTest(TestCase):
+    """Does is_source_hidden hide a source only while its own flag is off?"""
+
+    def setUp(self) -> None:
+        """Build an anonymous request to check each source's flag against."""
+        self.request = RequestFactory().get("/")
+        self.request.user = AnonymousUser()
+
+    def test_source_without_flag_is_never_hidden(self) -> None:
+        """Is a source with no launch_flag, like RECAP, always shown?"""
+        self.assertIsNone(docket_entry_sources.RECAP.launch_flag)
+        self.assertFalse(
+            async_to_sync(is_source_hidden)(
+                self.request, docket_entry_sources.RECAP
+            )
+        )
+
+    def test_source_with_flag_follows_the_flag(self) -> None:
+        """Is SCOTUS hidden while scotus_docket_page is off and shown once it's on?"""
+        for active in (False, True):
+            with (
+                self.subTest(flag_active=active),
+                override_flag("scotus_docket_page", active=active),
+            ):
+                self.assertEqual(
+                    async_to_sync(is_source_hidden)(
+                        self.request, docket_entry_sources.SCOTUS
+                    ),
+                    not active,
+                )
+
+
+class TexasDocketUrlTest(SimpleTestCase):
+    """Does Docket.texas_docket_url build the case page on TAMES for every TAMES court, and nothing for anything else?"""
+
+    def test_texas_docket_url(self) -> None:
+        """Is each court mapped to its TAMES court code, and is the URL left empty when it can't be built?"""
+        base = "https://search.txcourts.gov/Case.aspx"
+        cases = [
+            ("tex", "26-0999", f"{base}?cn=26-0999&coa=cossup"),
+            ("texcrimapp", "PD-0123-26", f"{base}?cn=PD-0123-26&coa=coscca"),
+            (
+                "txctapp3",
+                "03-24-00123-CV",
+                f"{base}?cn=03-24-00123-CV&coa=coa03",
+            ),
+            (
+                "txctapp15",
+                "15-25-00001-CV",
+                f"{base}?cn=15-25-00001-CV&coa=coa15",
+            ),
+            ("tex", "", ""),
+            ("scotus", "26-101", ""),
+        ]
+        for court_id, docket_number, expected in cases:
+            with self.subTest(court_id=court_id, docket_number=docket_number):
+                docket = Docket(court_id=court_id, docket_number=docket_number)
+                self.assertEqual(docket.texas_docket_url, expected)
+
+
+class TexasEntryDisplayTextTest(SimpleTestCase):
+    """Does the Texas source build each entry's text from its TAMES fields, one per line, escaped?"""
+
+    def test_display_text(self) -> None:
+        """Are the type, description, disposition and remarks each on their own line, with empty ones left out and scraped markup escaped?"""
+        cases = [
+            (
+                "every field",
+                TexasDocketEntry(
+                    entry_type="Brief filed",
+                    description="Brief on the merits",
+                    disposition="Granted",
+                    remarks="Oral argument set",
+                ),
+                "Brief filed<br>Brief on the merits<br>Disposition: Granted"
+                "<br>Remarks: Oral argument set",
+            ),
+            (
+                "only the type",
+                TexasDocketEntry(entry_type="Motion filed"),
+                "Motion filed",
+            ),
+            (
+                "scraped markup",
+                TexasDocketEntry(
+                    entry_type="<b>Notice</b>", disposition="<i>Denied</i>"
+                ),
+                "&lt;b&gt;Notice&lt;/b&gt;<br>Disposition: "
+                "&lt;i&gt;Denied&lt;/i&gt;",
+            ),
+        ]
+        for name, entry, expected in cases:
+            with self.subTest(case=name):
+                self.assertEqual(
+                    docket_entry_sources.TEXAS.entry_display_text(entry),
+                    expected,
+                )
+
+
+class TrialCourtMetadataTest(TestCase):
+    """Does the Texas source build a Trial Court Information section from a docket's TrialCourtData?"""
+
+    def test_every_field(self) -> None:
+        """Are all the trial court fields listed in order, with the judge linked to their page?"""
+        trial_court = TrialCourtDataFactory(
+            court=CourtFactory(short_name="Travis County District Court"),
+            docket_number_trial="D-1-GN-24-001234",
+            county="Travis",
+            reporter="Ann Smith",
+            date_filed=date(2024, 3, 1),
+            punishment="Five years",
+        )
+        items = build_trial_court_metadata(trial_court)
+        self.assertEqual(
+            [(item["label"], item["value"]) for item in items],
+            [
+                ("Court", "Travis County District Court"),
+                ("Docket Number", "D-1-GN-24-001234"),
+                ("County", "Travis"),
+                ("Judge", trial_court.judge.name_full),
+                ("Court Reporter", "Ann Smith"),
+                ("Date Filed", "March 1, 2024"),
+                ("Punishment", "Five years"),
+            ],
+        )
+        self.assertEqual(items[3]["url"], trial_court.judge.get_absolute_url())
+
+    def test_falls_back_to_scraped_names(self) -> None:
+        """Without a matched court or judge, are the names from the source shown, with no link for the judge?"""
+        trial_court = TrialCourtDataFactory(
+            court=None,
+            court_name="261st District Court",
+            judge=None,
+            judge_str="Jane Roe",
+        )
+        items = {
+            item["label"]: item
+            for item in build_trial_court_metadata(trial_court)
+        }
+        self.assertEqual(items["Court"]["value"], "261st District Court")
+        self.assertEqual(items["Judge"]["value"], "Jane Roe")
+        self.assertNotIn("url", items["Judge"])
+
+    def test_no_trial_court_data(self) -> None:
+        """Is there nothing to show for a docket without trial court data?"""
+        self.assertEqual(build_trial_court_metadata(None), [])
+
+    def test_sections_load_in_two_queries(self) -> None:
+        """Does the Texas source load the trial court and every case transfer, with their courts, judge and dockets, in two queries?"""
+        trial_court = TrialCourtDataFactory()
+        docket = trial_court.docket
+        for _ in range(3):
+            CaseTransferFactory(destination_docket=docket)
+        with CaptureQueriesContext(connection) as queries:
+            sections = docket_entry_sources.TEXAS.metadata_sections(docket)
+        self.assertEqual(len(queries), 2)
+        # The joined court and judge rows bring only the columns shown.
+        sql = queries[0]["sql"]
+        self.assertNotIn('"search_court"."notes"', sql)
+        self.assertNotIn('"people_db_person"."date_dob"', sql)
+        self.assertEqual(
+            [section["title"] for section in sections],
+            ["Trial Court Information", "Case Transfers"],
+        )
+        self.assertEqual(len(sections[0]["items"]), 7)
+        self.assertEqual(len(sections[1]["items"]), 3)
+
+
+class CaseTransferMetadataTest(TestCase):
+    """Does the case transfers section list every transfer of a docket from that docket's point of view?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create the docket whose transfers are listed, and a court of appeals docket on the other end."""
+        cls.docket = DocketFactory(docket_number="26-0999")
+        cls.coa = CourtFactory(short_name="Tex. App. - Houston [1st Dist.]")
+        cls.coa_docket = DocketFactory(
+            court=cls.coa, docket_number="01-24-00123-CV"
+        )
+
+    def items_for(self) -> list[MetadataItem]:
+        """Build the section the docket's page would show."""
+        return build_case_transfer_metadata(
+            self.docket,
+            CaseTransfer.objects.filter(
+                Q(origin_docket=self.docket)
+                | Q(destination_docket=self.docket)
+            ),
+        )
+
+    def test_appeal_from_a_docket_we_have_links_to_it(self) -> None:
+        """Does an appeal into the docket name the lower court and its date, and link its docket number to that docket's page?"""
+        CaseTransferFactory(
+            origin_court=self.coa,
+            origin_docket=self.coa_docket,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 1, 5),
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        [item] = self.items_for()
+        self.assertEqual(item["label"], "Appealed From")
+        self.assertEqual(
+            item["value"], "Tex. App. - Houston [1st Dist.], Jan. 5, 2026"
+        )
+        self.assertEqual(item["suffix_text"], "01-24-00123-CV")
+        self.assertEqual(
+            item["suffix_url"], self.coa_docket.get_absolute_url()
+        )
+
+    def test_transfer_without_the_other_docket_has_no_link(self) -> None:
+        """When the other court's docket isn't in CourtListener, is its docket number shown without a link?"""
+        CaseTransferFactory(
+            origin_court=self.coa,
+            origin_docket=None,
+            origin_docket_number="01-24-00999-CV",
+            destination_docket=self.docket,
+            transfer_type=CaseTransfer.WORKLOAD,
+        )
+        [item] = self.items_for()
+        self.assertEqual(item["label"], "Transferred From")
+        self.assertEqual(item["suffix_text"], "01-24-00999-CV")
+        self.assertNotIn("suffix_url", item)
+
+    def test_arrivals_come_before_departures_in_date_order(self) -> None:
+        """Are transfers into the docket listed first, then the ones out of it, each by date, with labels for their direction?"""
+        later_court = CourtFactory(short_name="Later Court")
+        CaseTransferFactory(
+            origin_docket=self.docket,
+            destination_court=later_court,
+            transfer_date=date(2026, 3, 1),
+            transfer_type=CaseTransfer.MERGE,
+        )
+        CaseTransferFactory(
+            origin_court=self.coa,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 2, 1),
+            transfer_type=CaseTransfer.JURISDICTION,
+        )
+        CaseTransferFactory(
+            origin_court=self.coa,
+            destination_docket=self.docket,
+            transfer_date=date(2026, 1, 1),
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        self.assertEqual(
+            [item["label"] for item in self.items_for()],
+            ["Appealed From", "Transferred From", "Merged Into"],
+        )
+
+    def test_no_transfers(self) -> None:
+        """Is the section empty for a docket that was never transferred?"""
+        self.assertEqual(self.items_for(), [])
+
+
+class TexasDocketEntrySourceTest(TestCase):
+    """Is every TAMES court served by the Texas source, and does that source load a page of entries in a fixed number of queries?"""
+
+    def test_every_tames_court_uses_the_texas_source(self) -> None:
+        """Do the Supreme Court, the Court of Criminal Appeals and the fifteen Courts of Appeals all map to TEXAS?"""
+        self.assertEqual(len(TAMES_COURT_IDS), 17)
+        for court_id in TAMES_COURT_IDS:
+            with self.subTest(court_id=court_id):
+                self.assertIs(
+                    docket_entry_sources.source_for_court_id(court_id),
+                    docket_entry_sources.TEXAS,
+                )
+
+    def test_only_sources_that_send_alerts_opt_in(self) -> None:
+        """Do RECAP and SCOTUS, whose mergers send docket alerts, opt in, while Texas keeps the default of no alerts menu?"""
+        cases = {
+            "RECAP": (docket_entry_sources.RECAP, True),
+            "SCOTUS": (docket_entry_sources.SCOTUS, True),
+            "TEXAS": (docket_entry_sources.TEXAS, False),
+        }
+        for name, (source, expected) in cases.items():
+            with self.subTest(source=name):
+                self.assertEqual(source.supports_docket_alerts, expected)
+
+    def test_entries_and_documents_load_in_two_queries(self) -> None:
+        """Do the docket page's entries and their documents take two queries, however many entries there are?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        for n in (1, 2, 3):
+            TexasDocumentFactory(
+                docket_entry=TexasDocketEntryFactory(
+                    docket=docket, sequence_number=f"2026-10-0{n}.001"
+                )
+            )
+        source = docket_entry_sources.TEXAS
+        with self.assertNumQueries(2):
+            documents = [
+                document
+                for entry in source.entries_queryset(docket)
+                for document in source.documents_for_entry(entry)
+            ]
+        self.assertEqual(len(documents), 3)
+
+    def test_entries_reuse_their_docket(self) -> None:
+        """Do the entries come with their docket already loaded, so reading entry.docket, as the RSS feed does for each item, takes no extra query?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        for n in (1, 2, 3):
+            TexasDocketEntryFactory(
+                docket=docket, sequence_number=f"2026-10-0{n}.001"
+            )
+        entries = list(
+            docket_entry_sources.TEXAS.entries_queryset(
+                docket
+            ).prefetch_related(None)
+        )
+        with self.assertNumQueries(0):
+            urls = {entry.docket.get_absolute_url() for entry in entries}
+        self.assertEqual(urls, {docket.get_absolute_url()})
+
+    def test_initial_document_buttons_link_to_tames(self) -> None:
+        """Does the initial-document button point at the first document of the earliest entry, on TAMES, in one query?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        later = TexasDocketEntryFactory(
+            docket=docket, sequence_number="2026-10-02.001"
+        )
+        earliest = TexasDocketEntryFactory(
+            docket=docket, sequence_number="2026-10-01.001"
+        )
+        TexasDocumentFactory(docket_entry=later, url="https://example.com/b")
+        TexasDocumentFactory(
+            docket_entry=earliest, url="https://example.com/a"
+        )
+        with self.assertNumQueries(1):
+            buttons = docket_entry_sources.TEXAS.initial_document_buttons(
+                [docket.pk]
+            )
+        self.assertEqual(
+            buttons,
+            {
+                docket.pk: docket_entry_sources.InitialDocumentButton(
+                    None, "https://example.com/a", "Initial Document"
+                )
+            },
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_docket_page_waffle")
+class TexasDocketPageTest(TestCase):
+    """Does a Texas docket stay hidden behind texas_docket_page, and once the flag is on, render its entries and TAMES links in both stacks?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a Texas Supreme Court docket with one entry and document, trial court data and an appeal from a court of appeals."""
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            docket_number="26-0999",
+        )
+        cls.document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=cls.docket,
+                sequence_number="2026-10-01.001",
+                entry_type="Petition for Review filed",
+                description="Petition for review",
+                disposition="Granted",
+                # Scraped text must never reach the page unescaped.
+                remarks="<script>alert(1)</script>",
+            ),
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+        )
+        TrialCourtDataFactory(
+            docket=cls.docket,
+            court=None,
+            court_name="261st District Court",
+            county="Travis",
+        )
+        cls.coa_docket = DocketFactory(
+            court=CourtFactory(short_name="Tex. App. - Austin"),
+            docket_number="03-25-00042-CV",
+        )
+        CaseTransferFactory(
+            origin_court=cls.coa_docket.court,
+            origin_docket=cls.coa_docket,
+            destination_court=cls.docket.court,
+            destination_docket=cls.docket,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        cls.url = reverse("view_docket", args=[cls.docket.pk, cls.docket.slug])
+
+    def test_case_transfers_section_in_both_stacks(self) -> None:
+        """Does each stack show the Case Transfers section, linking the lower court's docket number to its page?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Case Transfers", content)
+                self.assertIn("Tex. App. - Austin", content)
+                self.assertIn(self.coa_docket.get_absolute_url(), content)
+                self.assertIn("03-25-00042-CV", content)
+
+    def test_trial_court_section_in_both_stacks(self) -> None:
+        """Does each stack show the Trial Court Information section with the docket's trial court data?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Trial Court Information", content)
+                self.assertIn("261st District Court", content)
+                self.assertIn("Travis", content)
+
+    def test_entry_shows_type_disposition_and_escaped_remarks(self) -> None:
+        """Does each stack show the entry's type and disposition, and escape scraped remarks even where the legacy stack renders the text unescaped?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Petition for Review filed", content)
+                self.assertIn("Disposition: Granted", content)
+                self.assertIn(
+                    "Remarks: &lt;script&gt;alert(1)&lt;/script&gt;", content
+                )
+                self.assertNotIn("<script>alert(1)</script>", content)
+
+    def test_document_urls_return_404(self) -> None:
+        """Texas documents have no detail page: does a document or attachment URL on a Texas docket answer 404 rather than fail?"""
+        urls = [
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": "1",
+                    "slug": self.docket.slug,
+                },
+            ),
+            reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": "1",
+                    "att_num": 1,
+                    "slug": self.docket.slug,
+                },
+            ),
+        ]
+        with override_flag("texas_docket_page", active=True):
+            for url in urls:
+                with self.subTest(url=url):
+                    r = self.client.get(url)
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_document_description_is_escaped(self) -> None:
+        """Does each stack escape a scraped document description, even where the legacy stack renders descriptions unescaped?"""
+        TexasDocumentFactory(
+            docket_entry=self.document.docket_entry,
+            description="<img src=x onerror=alert(1)>",
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=2",
+        )
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("&lt;img src=x onerror=alert(1)&gt;", content)
+                self.assertNotIn("<img src=x onerror=alert(1)>", content)
+
+    def test_docket_returns_404_while_flag_is_off(self) -> None:
+        """Is the page a 404, like SCOTUS before its launch, while texas_docket_page is off?"""
+        with override_flag("texas_docket_page", active=False):
+            r = self.client.get(self.url)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_docket_renders_entries_and_tames_links(self) -> None:
+        """With the flag on, does each stack list the entry, link the docket and the document to TAMES, and leave out the PACER-only controls?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                r = self.client.get(self.url)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                content = r.content.decode()
+                self.assertIn("Petition for review", content)
+                self.assertIn("View on TAMES", content)
+                self.assertIn(
+                    "https://search.txcourts.gov/Case.aspx?cn=26-0999&amp;coa=cossup",
+                    content,
+                )
+                self.assertIn(
+                    "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+                    content,
+                )
+                self.assertNotIn('name="entry_gte"', content)
+                self.assertNotIn("Buy on PACER", content)
+
+    def test_alerts_menu_follows_supports_docket_alerts(self) -> None:
+        """Is the alerts menu hidden for Texas, whose alerts aren't sent yet, and shown again as soon as its source supports docket alerts, in both stacks?"""
+        with_alerts = replace(
+            docket_entry_sources.TEXAS, supports_docket_alerts=True
+        )
+        cases = (
+            ("texas", docket_entry_sources.TEXAS, False),
+            ("texas with alerts", with_alerts, True),
+        )
+        for name, source, shows_menu in cases:
+            for new_design in (False, True):
+                with (
+                    self.subTest(source=name, new_design=new_design),
+                    mock.patch.dict(
+                        docket_entry_sources.BY_COURT_ID, {"tex": source}
+                    ),
+                    override_flag("texas_docket_page", active=True),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    content = self.client.get(self.url).content.decode()
+                    self.assertEqual("Get Alerts" in content, shows_menu)
+                    self.assertEqual("Share Alert Link" in content, shows_menu)
+
+    def test_docket_feed_lists_entries_without_numbers(self) -> None:
+        """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""
+        TexasDocketEntry.objects.filter(
+            pk=self.document.docket_entry_id
+        ).update(date_filed=date(2026, 10, 1))
+        r = self.client.get(reverse("docket_feed", args=[self.docket.pk]))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn("Minute entry from 2026-10-01", content)
+        self.assertIn(
+            f"#minute-entry-{self.document.docket_entry_id}", content
+        )
+        # The entry's type and disposition aren't in its description field.
+        self.assertIn("Petition for Review filed", content)
+        self.assertIn("Disposition: Granted", content)
+        self.assertNotIn("<script>alert(1)</script>", content)
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
 @override_flag("scotus_docket_page", active=False)
 class ScotusDocketFlagDisabledTest(TestCase):
@@ -3811,6 +4367,66 @@ class DocketEntryFileDownload(TestCase):
             [row[0] for row in rows], [str(older.pk), str(newer.pk)]
         )
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_texas_docket_waffle"
+    )
+    @override_flag("texas_docket_page", active=True)
+    def test_csv_export_for_texas_docket(self) -> None:
+        """A Texas docket exports its entries oldest first, with the TAMES fields and the documents' formatted file path and OCR status."""
+        texas_docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            source=Docket.SCRAPER,
+        )
+        newer = TexasDocketEntryFactory(
+            docket=texas_docket,
+            sequence_number="2026-10-02.001",
+            entry_type="Motion disposed",
+            disposition="Granted",
+        )
+        older = TexasDocketEntryFactory(
+            docket=texas_docket, sequence_number="2026-10-01.001"
+        )
+        TexasDocumentFactory(docket_entry=newer)
+        document = TexasDocumentFactory(
+            docket_entry=older,
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+            filepath_local="recap/texas.pdf",
+            ocr_status=TexasDocument.OCR_COMPLETE,
+        )
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": texas_docket.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        header, *rows = csv.reader(io.StringIO(response.content.decode()))
+        self.assertEqual(header[0], "texasdocketentry_id")
+        self.assertEqual(
+            [row[0] for row in rows], [str(older.pk), str(newer.pk)]
+        )
+        first, second = rows
+        self.assertEqual(
+            first[header.index("texasdocument_url")], document.url
+        )
+        self.assertEqual(
+            first[header.index("texasdocument_filepath_local")],
+            "https://storage.courtlistener.com/recap/texas.pdf",
+        )
+        self.assertEqual(
+            first[header.index("texasdocument_ocr_status")], "OCR Complete"
+        )
+        self.assertEqual(
+            second[header.index("texasdocketentry_entry_type")],
+            "Motion disposed",
+        )
+        self.assertEqual(
+            second[header.index("texasdocketentry_disposition")], "Granted"
+        )
+
 
 class DocketFeedTest(TestCase):
     """Does the docket RSS feed render the right content for RECAP and SCOTUS?"""
@@ -4432,6 +5048,112 @@ class DocketEntryFilterFormHasFiltersTest(SimpleTestCase):
             with self.subTest(query=query):
                 form = DocketEntryFilterForm(QueryDict(query))
                 self.assertEqual(form.has_filters(), expected)
+
+
+class DocketEntryFilterFormEntryNumbersTest(SimpleTestCase):
+    """Do both filter forms drop the "Documents" range for sources whose entries have no entry number?"""
+
+    form_classes = {
+        "legacy": DocketEntryFilterForm,
+        "v2": forms_v2.DocketEntryFilterForm,
+    }
+
+    def test_range_fields_dropped_without_entry_numbers(self) -> None:
+        """Are entry_gte/entry_lte gone, and their params ignored, when has_entry_numbers is False?"""
+        data = QueryDict("entry_gte=5&entry_lte=10")
+        for stack, form_class in self.form_classes.items():
+            with self.subTest(stack=stack):
+                form = form_class(data, has_entry_numbers=False)
+                self.assertTrue(form.is_valid())
+                for name in ("entry_gte", "entry_lte"):
+                    self.assertNotIn(name, form.fields)
+                    self.assertNotIn(name, form.cleaned_data)
+                # Ignored params don't count as a filter either, so an
+                # empty docket still shows its "no entries yet" message.
+                self.assertFalse(form.has_filters())
+
+    def test_range_fields_kept_by_default(self) -> None:
+        """Do sources with entry numbers keep the "Documents" range?"""
+        for stack, form_class in self.form_classes.items():
+            with self.subTest(stack=stack):
+                form = form_class(QueryDict("entry_gte=5"))
+                self.assertTrue(form.is_valid())
+                self.assertEqual(form.cleaned_data["entry_gte"], 5)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_without_entry_numbers")
+class DocketWithoutEntryNumbersTest(TestCase):
+    """Does the docket page ignore and hide the "Documents" filter for a source whose entries have no entry number?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a docket with three numbered entries, so a filter on entry numbers would visibly drop some."""
+        cls.court = CourtFactory(id="nonumbers", jurisdiction="S")
+        cls.docket = DocketFactory(court=cls.court)
+        DocketEntry.objects.bulk_create(
+            [
+                DocketEntry(
+                    docket=cls.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 1, n),
+                )
+                for n in range(1, 4)
+            ]
+        )
+
+    def test_documents_filter_ignored_and_hidden(self) -> None:
+        """Does ?entry_gte=3 leave every entry on the page, with no "Documents" inputs, in both stacks?"""
+        # A copy of RECAP without entry numbers stands in for a source like
+        # Texas, whose entries have none.
+        source = replace(docket_entry_sources.RECAP, has_entry_numbers=False)
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        with mock.patch.dict(
+            docket_entry_sources.BY_COURT_ID, {self.court.pk: source}
+        ):
+            for new_design in (False, True):
+                with (
+                    self.subTest(new_design=new_design),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    r = self.client.get(url, {"entry_gte": "3"})
+                    self.assertEqual(r.status_code, HTTPStatus.OK)
+                    self.assertEqual(len(r.context["docket_entries"]), 3)
+                    content = r.content.decode()
+                    self.assertNotIn('name="entry_gte"', content)
+                    self.assertNotIn('name="entry_lte"', content)
+
+    def test_entry_number_column_unlabeled(self) -> None:
+        """Does each stack drop the "Document Number" label, which would head an always-empty column, only for a source without entry numbers?"""
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        for has_entry_numbers in (True, False):
+            source = replace(
+                docket_entry_sources.RECAP,
+                has_entry_numbers=has_entry_numbers,
+            )
+            for new_design in (False, True):
+                with (
+                    self.subTest(
+                        has_entry_numbers=has_entry_numbers,
+                        new_design=new_design,
+                    ),
+                    mock.patch.dict(
+                        docket_entry_sources.BY_COURT_ID,
+                        {self.court.pk: source},
+                    ),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    content = self.client.get(url).content.decode()
+                    # The v2 header's site search also has a "Document
+                    # Number" field, so look for the entry list's markup.
+                    labels = [
+                        '<p class="hidden-xs">Document Number</p>',
+                        'shrink-0">Document Number</div>',
+                        '<dt class="sr-only">Document Number</dt>',
+                    ]
+                    self.assertEqual(
+                        any(label in content for label in labels),
+                        has_entry_numbers,
+                    )
 
 
 class BuildDocketTabsTest(SimpleTestCase):

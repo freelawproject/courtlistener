@@ -1,6 +1,6 @@
 """Per-source configuration for fetching and rendering docket entries.
 
-The source instances (``RECAP``, ``SCOTUS``), the ``BY_COURT_ID`` map and
+The source instances (``RECAP``, ``SCOTUS``, ``TEXAS``), the ``BY_COURT_ID`` map and
 ``source_for_court_id`` are meant to be read through the module, as
 ``docket_entry_sources.RECAP``, so they stay visually distinct from the
 unrelated docket *data* sources in ``cl.search.docket_sources``
@@ -11,13 +11,24 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
-from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
+from django.db.models import (
+    Exists,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+)
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.utils.html import conditional_escape, format_html, format_html_join
+from django.utils.safestring import SafeString, mark_safe
 
 from cl.custom_filters.templatetags.extras import http_url
-from cl.search.constants import SCOTUS_COURT_IDS
+from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
 from cl.search.models import (
+    CaseTransfer,
     Court,
     Docket,
     DocketEntry,
@@ -27,11 +38,14 @@ from cl.search.models import (
     SCOTUSDocketEntry,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocketEntry,
+    TexasDocument,
+    TrialCourtData,
 )
 
 # The entry and document models a DocketEntrySource can serve.
-type SourceDocketEntry = DocketEntry | SCOTUSDocketEntry
-type SourceDocument = RECAPDocument | SCOTUSDocument
+type SourceDocketEntry = DocketEntry | SCOTUSDocketEntry | TexasDocketEntry
+type SourceDocument = RECAPDocument | SCOTUSDocument | TexasDocument
 
 
 class MetadataItem(TypedDict):
@@ -168,6 +182,16 @@ def _no_metadata_sections(docket: Docket) -> list[MetadataSection]:
     return []
 
 
+def _entry_description(entry: Any) -> str:
+    """Return the entry's own description: by default that's all the docket page shows for an entry."""
+    return entry.description
+
+
+def _document_description(document: Any) -> str:
+    """Return the document's own description, as the docket page has always shown it."""
+    return document.description
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -182,7 +206,8 @@ class DocketEntrySource:
     markup. Both template stacks hold one file per component: under
     cotton/, the docket_source_button/, docket_source_attribution/ and
     document_source_link/ folders; under includes/, those three plus
-    docket_empty_cta/ and docket_source_li/. A source named "xyz" needs
+    docket_empty_cta/, docket_source_li/, document_download_button/ and
+    document_unavailable_message/. A source named "xyz" needs
     xyz.html in every folder of both stacks. A missing one fails at render
     time with an error that doesn't name it, so DocketSourceComponentTest
     checks that every component resolves. Sources that render the same
@@ -225,6 +250,33 @@ class DocketEntrySource:
     document under its entry. A source returns False for documents that
     only exist to index their entry, like SCOTUS placeholders.
 
+    ``launch_flag`` names the flag that hides this source's dockets until
+    launch, or None when they are public. While the flag is off for a
+    request, every docket and document page of the source returns a 404;
+    see ``is_source_hidden`` in cl.opinion_page.utils.
+
+    ``has_entry_numbers`` says whether the source's entries carry an
+    ``entry_number``. When False, the docket page drops its "Documents"
+    range filter, since there is nothing to filter on.
+
+    ``supports_docket_alerts`` says whether subscribers of the source's
+    dockets get docket alerts. When False, both stacks hide the docket's
+    alerts menu, so nobody subscribes to alerts that would never be sent.
+    It defaults to False so a new source only shows the menu once its
+    mergers send alerts and it opts in.
+
+    ``entry_display_text`` returns the text the docket page shows for an
+    entry, which the view puts on ``entry.display_text``. The legacy stack
+    renders it unescaped, as it always did for RECAP descriptions, so a
+    source that builds it from scraped fields MUST escape them, e.g. with
+    ``format_html``, as ``_texas_entry_display_text`` does.
+
+    ``document_display_description`` does the same for each document's
+    description, which ``attach_display_fields`` puts on
+    ``document.display_description``. The legacy stack renders it unescaped
+    too, so a source whose descriptions come from a scraper MUST escape
+    them.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -234,7 +286,8 @@ class DocketEntrySource:
     main_docs_prefetch: Callable[[], Prefetch]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
-    # Single-document lookup, for the document detail page.
+    # Single-document lookup, for the document detail page, which reads
+    # pk, attachment_number and description from the queryset's rows.
     documents_for_docket_and_number: Callable[
         [int, str], QuerySet[SourceDocument]
     ]
@@ -267,6 +320,11 @@ class DocketEntrySource:
     metadata_sections: Callable[[Docket], list[MetadataSection]] = (
         _no_metadata_sections
     )
+    launch_flag: str | None = None
+    has_entry_numbers: bool = True
+    supports_docket_alerts: bool = False
+    entry_display_text: Callable[[Any], str] = _entry_description
+    document_display_description: Callable[[Any], str] = _document_description
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -276,6 +334,9 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
     document.detail_url = source.document_detail_url(document)
     document.external_url = source.document_external_url(document)
     document.has_actions = source.document_has_actions(document)
+    document.display_description = source.document_display_description(
+        document
+    )
 
 
 # RECAP
@@ -347,9 +408,9 @@ def _recap_document_has_actions(document: RECAPDocument) -> bool:
     """Return whether one RECAP document gets action buttons.
 
     Numberless minute entries are not individually addressable on PACER, so
-    there is nothing to download, buy or pray for. Legacy hides the whole
-    action area for them; see the `{# Hide this if an unnumbered minute
-    entry #}` guard in includes/de_list.html.
+    there is nothing to download, buy or pray for. Both stacks hide the
+    whole action area for them through ``has_actions``, in
+    includes/de_list.html and cotton/docket_entry_rows.html.
     """
     return bool(document.document_number)
 
@@ -487,6 +548,7 @@ RECAP: DocketEntrySource = DocketEntrySource(
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
     initial_document_buttons=_recap_initial_document_buttons,
+    supports_docket_alerts=True,
 )
 
 
@@ -676,12 +738,264 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
         document="scotusdocument",
     ),
     admin_document_label="SCOTUS Document",
+    launch_flag="scotus_docket_page",
+    supports_docket_alerts=True,
+)
+
+
+# Texas
+def _texas_entries(docket: Docket) -> QuerySet[TexasDocketEntry]:
+    """Return this docket's TexasDocketEntry queryset, with its documents prefetched for the docket page's entry list."""
+    # Going through the docket's reverse manager, like RECAP and SCOTUS do,
+    # gives every entry this docket instance, so callers that read
+    # entry.docket (like the RSS feed) don't query it once per entry.
+    # pyrefly can't see the reverse accessor of an FK without related_name.
+    # pyrefly: ignore[missing-attribute]
+    return docket.texasdocketentry_set.all().prefetch_related(
+        Prefetch(
+            "texasdocument_set",
+            queryset=TexasDocument.objects.defer("plain_text"),
+        )
+    )
+
+
+def _texas_documents_for_entry(
+    de: TexasDocketEntry,
+) -> QuerySet[TexasDocument]:
+    """Return the TexasDocuments attached to this docket entry."""
+    return de.texasdocument_set.all()
+
+
+def _texas_entry_display_text(entry: TexasDocketEntry) -> SafeString:
+    """Return what the docket page shows for one Texas entry, one line each: its type, its description, and its disposition and remarks when TAMES lists them.
+
+    TAMES keeps an entry's text in entry_type, and only appellate briefs have
+    a description. Every part comes from the court, so format_html escapes
+    it before the lines are joined.
+    """
+    lines = [entry.entry_type, entry.description]
+    if entry.disposition:
+        lines.append(format_html("Disposition: {}", entry.disposition))
+    if entry.remarks:
+        lines.append(format_html("Remarks: {}", entry.remarks))
+    return format_html_join(
+        mark_safe("<br>"), "{}", ((line,) for line in lines if line)
+    )
+
+
+def _texas_document_display_description(document: TexasDocument) -> str:
+    """Return the document's description escaped, since it comes from TAMES and the legacy stack renders it unescaped."""
+    return conditional_escape(document.description)
+
+
+def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Build the metadata sections specific to a Texas docket."""
+    # Imported here rather than at module scope because cl.opinion_page.utils
+    # imports from this module.
+    from cl.opinion_page.utils import (
+        build_case_transfer_metadata,
+        build_trial_court_metadata,
+    )
+
+    trial_court = (
+        TrialCourtData.objects.filter(docket=docket)
+        .select_related("court", "judge")
+        .only(
+            "court_name",
+            "docket_number_trial",
+            "docket_number_raw_trial",
+            "county",
+            "judge_str",
+            "reporter",
+            "date_filed",
+            "punishment",
+            "court__short_name",
+            # Person.name_full and get_absolute_url read these.
+            "judge__name_first",
+            "judge__name_middle",
+            "judge__name_last",
+            "judge__name_suffix",
+            "judge__slug",
+        )
+        .first()
+    )
+    transfers = (
+        CaseTransfer.objects.filter(
+            Q(origin_docket=docket) | Q(destination_docket=docket)
+        )
+        .select_related(
+            "origin_court",
+            "destination_court",
+            "origin_docket",
+            "destination_docket",
+        )
+        .only(
+            "transfer_type",
+            "transfer_date",
+            "origin_docket_number",
+            "destination_docket_number",
+            "origin_court__short_name",
+            "destination_court__short_name",
+            "origin_docket__slug",
+            "destination_docket__slug",
+        )
+    )
+    return [
+        {
+            "items": build_trial_court_metadata(trial_court),
+            "title": "Trial Court Information",
+        },
+        {
+            "items": build_case_transfer_metadata(docket, transfers),
+            "title": "Case Transfers",
+        },
+    ]
+
+
+def _texas_main_docs_prefetch() -> Prefetch:
+    """Prefetch each entry's first document into `main_docs`.
+
+    Used for the docket RSS feed's description and enclosure. A Texas entry
+    has no designated main document, so its first stored one stands in.
+    """
+    return Prefetch(
+        "texasdocument_set",
+        queryset=TexasDocument.objects.defer("plain_text").order_by(
+            "date_created", "pk"
+        )[:1],
+        to_attr="main_docs",
+    )
+
+
+def _texas_documents_for_docket_and_number(
+    docket_id: int, doc_num: str
+) -> QuerySet[TexasDocument]:
+    """Return no documents: Texas documents have no document number, so they have no detail page to look up.
+
+    The detail page reads attachment_number from the rows, which
+    TexasDocument doesn't have, so the empty queryset still provides it and
+    the page answers 404 instead of failing.
+    """
+    return TexasDocument.objects.none().annotate(
+        attachment_number=Value(None, output_field=IntegerField())
+    )
+
+
+async def _get_texas_document_for_render(pk: int) -> TexasDocument:
+    """Fetch a single TexasDocument with the docket/court relation already loaded.
+
+    Texas documents have no detail page yet, so the docket page never calls
+    this; the source still needs it to fill the DocketEntrySource contract.
+    """
+    return await TexasDocument.objects.select_related(
+        "docket_entry__docket__court"
+    ).aget(pk=pk)
+
+
+def _texas_document_is_attachment(document: TexasDocument) -> bool:
+    """Return True always: a Texas entry has no "main document", every document is an attachment."""
+    return True
+
+
+def _texas_document_label(document: TexasDocument) -> str:
+    """Return the label identifying one Texas document within its entry.
+
+    TAMES numbers neither documents nor attachments, so every document gets
+    the same label and its description tells them apart.
+    """
+    return "Document"
+
+
+def _texas_document_detail_url(document: TexasDocument) -> str | None:
+    """Return None: Texas documents have no CourtListener page, since the page URLs need a document number."""
+    return None
+
+
+def _texas_document_external_url(document: TexasDocument) -> str | None:
+    """Return the TAMES URL for one Texas document, or None.
+
+    The URL comes from the court rather than from us, so it is filtered
+    through http_url before being handed to a template.
+    """
+    return http_url(document.url) or None
+
+
+def _texas_docket_url(docket: Docket) -> str | None:
+    """Return the docket's case page on TAMES, or None when it can't be built."""
+    return docket.texas_docket_url or None
+
+
+def _texas_initial_document_buttons(
+    docket_ids: Iterable[int],
+) -> dict[int, InitialDocumentButton]:
+    """Return the initial-document button of each Texas docket.
+
+    The initial document is the first document of the docket's earliest
+    entry that has documents. Texas documents have no CourtListener page
+    yet, so the button links to the document on TAMES.
+    """
+    # distinct() on the docket keeps the first row of each docket in the
+    # order_by below: its earliest entry, then its first document. pk
+    # breaks ties, so the same document wins on every search.
+    initial_documents = (
+        TexasDocument.objects.filter(docket_entry__docket_id__in=docket_ids)
+        .select_related("docket_entry")
+        .order_by(
+            "docket_entry__docket_id",
+            "docket_entry__sequence_number",
+            "date_created",
+            "pk",
+        )
+        .distinct("docket_entry__docket_id")
+        .only("pk", "url", "docket_entry__docket_id")
+    )
+    buttons: dict[int, InitialDocumentButton] = {}
+    for initial_document in initial_documents:
+        if external_url := _texas_document_external_url(initial_document):
+            buttons[initial_document.docket_entry.docket_id] = (
+                InitialDocumentButton(None, external_url, "Initial Document")
+            )
+    return buttons
+
+
+TEXAS: DocketEntrySource = DocketEntrySource(
+    entries_queryset=_texas_entries,
+    documents_for_entry=_texas_documents_for_entry,
+    main_docs_prefetch=_texas_main_docs_prefetch,
+    order_by_asc=("sequence_number",),
+    order_by_desc=("-sequence_number",),
+    document_is_attachment=_texas_document_is_attachment,
+    document_label=_texas_document_label,
+    document_detail_url=_texas_document_detail_url,
+    document_external_url=_texas_document_external_url,
+    documents_for_docket_and_number=_texas_documents_for_docket_and_number,
+    get_document_for_render=_get_texas_document_for_render,
+    docket_url=_texas_docket_url,
+    initial_document_buttons=_texas_initial_document_buttons,
+    has_pay_and_pray=False,
+    component="texas",
+    empty_message="There are no entries for this docket yet.",
+    admin_url_names=AdminNames(
+        entry="admin:search_texasdocketentry_change",
+        document="admin:search_texasdocument_change",
+    ),
+    admin_perm_names=AdminNames(
+        entry="texasdocketentry",
+        document="texasdocument",
+    ),
+    admin_document_label="Texas Document",
+    launch_flag="texas_docket_page",
+    has_entry_numbers=False,
+    entry_display_text=_texas_entry_display_text,
+    document_display_description=_texas_document_display_description,
+    metadata_sections=_texas_metadata_sections,
 )
 
 # Courts whose dockets use a source other than RECAP. source_for_court_id
 # falls back to RECAP for any court not listed here.
 BY_COURT_ID: dict[str, DocketEntrySource] = {
-    court_id: SCOTUS for court_id in SCOTUS_COURT_IDS
+    **{court_id: SCOTUS for court_id in SCOTUS_COURT_IDS},
+    **{court_id: TEXAS for court_id in TAMES_COURT_IDS},
 }
 
 

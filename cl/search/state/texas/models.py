@@ -1,6 +1,7 @@
 """Models unique to Texas dockets."""
 
 import logging
+from collections.abc import Callable
 from typing import IO
 
 import pghistory
@@ -68,10 +69,23 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ordering = ["-sequence_number"]
         # verbose_name_plural = "Texas Docket Entries"
 
+    csv_columns = [
+        "id",
+        "date_filed",
+        "sequence_number",
+        "entry_type",
+        "description",
+        "disposition",
+        "remarks",
+        "appellate_brief",
+    ]
+
 
 @pghistory.track()
 @document_model
-class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
+class TexasDocument(
+    AbstractDateTimeModel, AbstractStateDocument, CSVExportMixin
+):
     """Represents an attachment to a Texas docket entry.
 
     Attributes:
@@ -90,6 +104,39 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
+
+    csv_columns = [
+        "id",
+        "description",
+        "url",
+        "sha1",
+        "page_count",
+        "file_size",
+        "filepath_local",
+        "filepath_ia",
+        "ocr_status",
+    ]
+
+    def _get_readable_ocr_status(self, field: str) -> str:
+        """Return the OCR status label for the CSV export."""
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, field: str) -> str:
+        """Return the file's full storage URL for the CSV export, or an empty string when there's no file."""
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Return the CSV export's formatter for each column that needs one.
+
+        Formats the file path and OCR status the same way the RECAP and
+        SCOTUS exports do.
+        """
+        return {
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
     @classmethod
     def tmp_prefix(cls) -> str:

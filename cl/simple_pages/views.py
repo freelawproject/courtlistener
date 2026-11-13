@@ -249,6 +249,9 @@ async def components(request: HttpRequest) -> HttpResponse:
             # view_docket attaches documents plus their resolved display
             # fields; the demo goes through the same source config so the
             # library shows what the real page shows.
+            self.display_text = docket_entry_sources.RECAP.entry_display_text(
+                self
+            )
             self.documents = documents
             for document in documents:
                 attach_display_fields(docket_entry_sources.RECAP, document)

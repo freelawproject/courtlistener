@@ -117,14 +117,32 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.Select(),
     )
 
+    ENTRY_NUMBER_FIELDS = ("entry_gte", "entry_lte")
+
     def __init__(
         self,
         *args: Any,
         request: HttpRequest | None = None,
+        has_entry_numbers: bool = True,
         **kwargs: Any,
     ) -> None:
+        """Build the form for one docket's entries.
+
+        Args:
+            *args: Passed through to forms.Form, usually the bound data.
+            request: The request being served, if any.
+            has_entry_numbers: Whether the docket's entries carry an
+                entry number (DocketEntrySource.has_entry_numbers). When
+                False, the "Documents" range fields are dropped, so their
+                GET params are ignored instead of filtering on a field the
+                entries don't have.
+            **kwargs: Passed through to forms.Form.
+        """
         self.request = request
         super().__init__(*args, **kwargs)
+        if not has_entry_numbers:
+            for name in self.ENTRY_NUMBER_FIELDS:
+                del self.fields[name]
 
     def has_filters(self) -> bool:
         """Whether the bound data carries any filter or search param.

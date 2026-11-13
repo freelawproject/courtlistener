@@ -78,7 +78,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources, forms_v2
+from cl.opinion_page import forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -103,6 +103,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    is_source_hidden,
     separate_syllabus,
 )
 from cl.people_db.models import (
@@ -370,13 +371,19 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    if await sync_to_async(flag_is_active)(request, "use_new_design"):
-        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
-    else:
-        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
+    form_class = (
+        forms_v2.DocketEntryFilterForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else DocketEntryFilterForm
+    )
+    form = form_class(
+        request.GET,
+        request=request,
+        has_entry_numbers=source.has_entry_numbers,
+    )
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -415,6 +422,7 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
+            entry.display_text = source.entry_display_text(entry)
             entry.documents = [
                 document
                 for document in source.documents_for_entry(entry)
@@ -713,11 +721,8 @@ async def recap_document_context(
     """Returns an HttpResponse for a RECAPDocument or SCOTUSDocument, depending on the docket's court. This can be either an HttpResponseRedirect or a TemplateResponse."""
     docket = await aget_object_or_404(Docket, pk=docket_id)
     source = docket.get_entry_source()
-    is_scotus = source is docket_entry_sources.SCOTUS
 
-    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
-        request, "scotus_docket_page"
-    ):
+    if await is_source_hidden(request, source):
         raise Http404("Docket not found.")
 
     # Tuples of (pk, attachment_number, description)

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import nh3
 import pghistory
@@ -945,6 +945,18 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "https://www.supremecourt.gov/search.aspx"
             f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
         )
+
+    @property
+    def texas_docket_url(self) -> str:
+        """Return the docket's case page on TAMES, the Texas courts' site, or "" when the docket isn't from a TAMES court or has no docket number."""
+        # Imported here because cl.search.constants imports this module.
+        from cl.search.constants import TAMES_COURT_CODES
+
+        court_code = TAMES_COURT_CODES.get(self.court_id)
+        if not court_code or not self.docket_number:
+            return ""
+        query = urlencode({"cn": self.docket_number, "coa": court_code})
+        return f"https://search.txcourts.gov/Case.aspx?{query}"
 
     def get_entry_source(self) -> "DocketEntrySource":
         """Return the DocketEntrySource config for this docket's court - RECAP/PACER by default, with per-court overrides."""

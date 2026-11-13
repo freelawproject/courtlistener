@@ -45,7 +45,7 @@
       <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
     {% endif %}
 
-    {% if docket_source_url and user.is_authenticated %}
+    {% if docket_source_url and docket_source.supports_docket_alerts and user.is_authenticated %}
       {# Quota dialog, rendered closed. A refused toggle fires docket-alert-quota-reached, which opens it, and fills the alert count out of band. #}
       <c-dialog
         x-on:docket-alert-quota-reached.window="open"
@@ -85,7 +85,7 @@
       {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
       Tags
     </c-button>
-    {% if docket_source_url %}
+    {% if docket_source_url and docket_source.supports_docket_alerts %}
     <c-menu-button
       button_variant="outline"
       widget_aria_label="Docket alerts menu"
