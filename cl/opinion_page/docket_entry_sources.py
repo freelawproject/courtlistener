@@ -237,6 +237,12 @@ class DocketEntrySource:
     ``entry_number``. When False, the docket page drops its "Documents"
     range filter, since there is nothing to filter on.
 
+    ``supports_docket_alerts`` says whether subscribers of the source's
+    dockets get docket alerts. When False, both stacks hide the docket's
+    alerts menu, so nobody subscribes to alerts that would never be sent.
+    It defaults to False so a new source only shows the menu once its
+    mergers send alerts and it opts in.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -281,6 +287,7 @@ class DocketEntrySource:
     )
     launch_flag: str | None = None
     has_entry_numbers: bool = True
+    supports_docket_alerts: bool = False
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -501,6 +508,7 @@ RECAP: DocketEntrySource = DocketEntrySource(
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
     initial_document_buttons=_recap_initial_document_buttons,
+    supports_docket_alerts=True,
 )
 
 
@@ -691,6 +699,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     ),
     admin_document_label="SCOTUS Document",
     launch_flag="scotus_docket_page",
+    supports_docket_alerts=True,
 )
 
 

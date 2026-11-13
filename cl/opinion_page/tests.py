@@ -2134,6 +2134,17 @@ class TexasDocketEntrySourceTest(TestCase):
                     docket_entry_sources.TEXAS,
                 )
 
+    def test_only_sources_that_send_alerts_opt_in(self) -> None:
+        """Do RECAP and SCOTUS, whose mergers send docket alerts, opt in, while Texas keeps the default of no alerts menu?"""
+        cases = {
+            "RECAP": (docket_entry_sources.RECAP, True),
+            "SCOTUS": (docket_entry_sources.SCOTUS, True),
+            "TEXAS": (docket_entry_sources.TEXAS, False),
+        }
+        for name, (source, expected) in cases.items():
+            with self.subTest(source=name):
+                self.assertEqual(source.supports_docket_alerts, expected)
+
     def test_entries_and_documents_load_in_two_queries(self) -> None:
         """Do the docket page's entries and their documents take two queries, however many entries there are?"""
         docket = DocketFactory(court=CourtFactory(id="tex"))
@@ -2228,6 +2239,29 @@ class TexasDocketPageTest(TestCase):
                 )
                 self.assertNotIn('name="entry_gte"', content)
                 self.assertNotIn("Buy on PACER", content)
+
+    def test_alerts_menu_follows_supports_docket_alerts(self) -> None:
+        """Is the alerts menu hidden for Texas, whose alerts aren't sent yet, and shown again as soon as its source supports docket alerts, in both stacks?"""
+        with_alerts = replace(
+            docket_entry_sources.TEXAS, supports_docket_alerts=True
+        )
+        cases = (
+            ("texas", docket_entry_sources.TEXAS, False),
+            ("texas with alerts", with_alerts, True),
+        )
+        for name, source, shows_menu in cases:
+            for new_design in (False, True):
+                with (
+                    self.subTest(source=name, new_design=new_design),
+                    mock.patch.dict(
+                        docket_entry_sources.BY_COURT_ID, {"tex": source}
+                    ),
+                    override_flag("texas_docket_page", active=True),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    content = self.client.get(self.url).content.decode()
+                    self.assertEqual("Get Alerts" in content, shows_menu)
+                    self.assertEqual("Share Alert Link" in content, shows_menu)
 
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
         """Does the docket feed list Texas entries, which have no entry number, linking each to its row on the docket page?"""
