@@ -117,6 +117,46 @@ class ClusterSources:
         "S": "scanning project",
     }
 
+    # Cluster source characters that contribute content ranking ABOVE Lawbox
+    # in cl.citations.utils.CITATION_SOURCE_FIELDS: Columbia archive (Z) ->
+    # html_columbia, the scanning project (S) -> xml_scan, Harvard CAP (U) ->
+    # xml_harvard, and the 2020 anonymous database (Q) -> html_anon_2020.
+    # Court websites (C), public.resource.org (R) and direct court input (D)
+    # populate Opinion.html, which ranks *below* html_lawbox.
+    _SOURCES_PREFERRED_OVER_LAWBOX = frozenset("ZSUQ")
+
+    @classmethod
+    def lawbox_is_best_source(cls, source: str) -> bool:
+        """Whether ``source`` is a combination in which Lawbox is the best text
+        source for citation annotation.
+
+        Of the values in :attr:`NAMES`, only ``L``, ``LC`` and ``LR`` qualify:
+        court websites (``C``) and public.resource.org (``R``) populate
+        ``Opinion.html``, which ranks *below* ``html_lawbox``, while Columbia
+        (``Z``), the scanning project (``S``), Harvard CAP (``U``) and the 2020
+        anonymous database (``Q``) populate fields that outrank it.
+
+        :param source: An ``OpinionCluster.source`` value.
+        :return: True if the combination includes Lawbox and none of the
+            corpora that outrank it.
+        """
+        parts = frozenset(source)
+        return cls.LAWBOX in parts and not (
+            parts & cls._SOURCES_PREFERRED_OVER_LAWBOX
+        )
+
+    @classmethod
+    def lawbox_citation_sources(cls) -> frozenset[str]:
+        """Every known source combination for which Lawbox is the best text
+        source.
+
+        :return: The subset of :attr:`NAMES` codes for which
+            :meth:`lawbox_is_best_source` is True.
+        """
+        return frozenset(
+            code for code, _ in cls.NAMES if cls.lawbox_is_best_source(code)
+        )
+
     @classmethod
     def _canonical_combine(cls, chars: frozenset[str]) -> str:
         """Sort characters by CANONICAL_ORDER for a deterministic result.
