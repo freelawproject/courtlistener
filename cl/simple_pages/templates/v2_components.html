@@ -27,6 +27,7 @@
         {'href': '#callout', 'text': 'Callout'},
         {'href': '#button', 'text': 'Button'},
         {'href': '#form-input', 'text': 'Form input'},
+        {'href': '#icon', 'text': 'Icon'},
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#banner', 'text': 'Banner'},
@@ -1333,6 +1334,66 @@ Sample code here.
       <c-code>
 &lt;c-form.input :form="form" field_name="entry_gte" form_prefix="desktop" :hide_label="True" only /&gt;
 &lt;c-form.input :form="form" field_name="entry_gte" only /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# ICON #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="icon">
+    <h2 class="mt-6 mb-3">Icon</h2>
+    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text colour. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has a label. A one-off icon that needs none of this can keep using the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag. The component only takes the props below and drops any other attribute, such as an <code>id</code> or an Alpine binding, so use the tag when the <code>&lt;svg&gt;</code> needs one.</p>
+
+    <h4 class="mt-3">Demo</h4>
+
+    <h5 class="mt-3">Sizes</h5>
+    <div class="my-4 flex flex-row flex-wrap items-end gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" />sm (16px, default)</span>
+      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="md" label="Zoom"/>md (20px)</span>
+      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="lg" />lg (24px)</span>
+      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="custom" class="size-3" />custom</span>
+    </div>
+
+    <h5 class="mt-3">Variants</h5>
+    <div class="my-4 flex flex-row flex-wrap items-center gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <span class="flex items-center gap-2"><c-icon name="bell" />Filled</span>
+      <span class="flex items-center gap-2"><c-icon name="bell" outline />Outline</span>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>name</code></c-slot>
+        <c-slot name="description">File name in <code>cl/assets/static-global/svg/</code>, without <code>.svg</code>. The plain name is the filled icon, or the only version for icons without variants.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">One of <code>sm</code> (16px), <code>md</code> (20px) or <code>lg</code> (24px). Defaults to <code>sm</code>, and unknown values fall back to it. For any other size, such as a responsive one, use <code>custom</code> and set the size in <code>class</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>outline</code></c-slot>
+        <c-slot name="description">Renders the <code>&lt;name&gt;_outline</code> file instead of the filled one. Pass it bare (<code>outline</code>) or bound (<code>:outline="is_current"</code>). Any non-empty string counts as set, including <code>"false"</code>. Only for icons that have an <code>_outline</code> file.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="description">Accessible name, for an icon that carries meaning on its own. Without it the icon is decorative and gets <code>aria-hidden="true"</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Extra classes added after the size class. With <code>size="custom"</code>, this is where the size goes.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-icon name="magnifier" /&gt;
+&lt;c-icon name="magnifier" size="md" class="text-greyscale-400" /&gt;
+&lt;c-icon name="chevron" size="custom" class="size-3" /&gt;
+&lt;c-icon name="bell" outline /&gt;
+&lt;c-icon name="bell" :outline="is_outline" /&gt;
+&lt;c-icon name="circle_question_mark" label="Help" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
