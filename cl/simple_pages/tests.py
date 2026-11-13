@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from http import HTTPStatus
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
@@ -13,12 +13,16 @@ from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.custom_filters.templatetags.svg_tags import svg
 from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse
 
 
 class ChangePasswordWellKnownTests(SimpleTestCase):
@@ -847,3 +851,118 @@ class DialogComponentTest(SimpleTestCase):
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
+
+
+class ToastComponentTest(SimpleTestCase):
+    """The c-toast component renders its optional parts only when given."""
+
+    def render(self, source: str) -> str:
+        """Compiles a Cotton snippet and renders it."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render({"request": RequestFactory().get("/")})
+
+    def test_title_alone_renders_only_the_close_icon(self) -> None:
+        """Without a variant, icon or description, the only svg is the close button's."""
+        html = self.render('<c-toast title="Link copied" />')
+        self.assertIn('role="status"', html)
+        self.assertIn("Link copied", html)
+        self.assertEqual(html.count("<svg"), 1)
+
+    @staticmethod
+    def icon(name: str) -> str:
+        """The markup the toast renders for a named icon."""
+        return svg(name, **{"class": "size-5", "aria_hidden": "true"})
+
+    def test_variant_adds_its_icon_and_description_its_text(self) -> None:
+        """Each variant adds its own icon; the description renders when given."""
+        variant_icons = {
+            "info": "info",
+            "success": "circle_check",
+            "warning": "triangle_exclamation",
+        }
+        for variant, icon in variant_icons.items():
+            with self.subTest(variant=variant):
+                html = self.render(
+                    f'<c-toast variant="{variant}" title="Docket blocked"'
+                    ' description="No longer indexed" />'
+                )
+                self.assertIn("No longer indexed", html)
+                self.assertEqual(html.count("<svg"), 2)
+                self.assertIn(self.icon(icon), html)
+
+    def test_unknown_variant_renders_no_icon(self) -> None:
+        """A variant outside the presets renders neither an icon nor its slot."""
+        html = self.render('<c-toast variant="error" title="Oops" />')
+        self.assertEqual(html.count("<svg"), 1)
+        self.assertNotIn('<span class="shrink-0', html)
+
+    def test_icon_prop_replaces_the_variant_icon(self) -> None:
+        """A named icon renders instead of the variant's, as the only icon."""
+        html = self.render(
+            '<c-toast variant="success" title="Alert created" icon="bell" />'
+        )
+        self.assertIn(self.icon("bell"), html)
+        self.assertNotIn(self.icon("circle_check"), html)
+
+    def test_trigger_slot_renders_inside_the_root(self) -> None:
+        """A trigger slot renders; a toast opened by an event has none."""
+        with_trigger = self.render(
+            '<c-toast title="Saved"><c-slot name="trigger">'
+            '<button x-on:click="open">Show</button></c-slot></c-toast>'
+        )
+        self.assertIn('x-on:click="open"', with_trigger)
+        self.assertNotIn(
+            'x-on:click="open"', self.render('<c-toast title="Saved" />')
+        )
+
+    def test_action_container_renders_only_with_content(self) -> None:
+        """A trigger slot written on its own lines leaves no empty action box."""
+        with_trigger = self.render(
+            '<c-toast title="Saved">\n'
+            '  <c-slot name="trigger"><button x-on:click="open">Show</button></c-slot>\n'
+            "</c-toast>"
+        )
+        self.assertNotIn("shrink-0 items-center gap-2", with_trigger)
+        with_action = self.render(
+            '<c-toast title="Saved"><button>Undo</button></c-toast>'
+        )
+        self.assertIn("shrink-0 items-center gap-2", with_action)
+
+    def test_undeclared_attributes_land_on_the_root(self) -> None:
+        """A listener passed to the component opens the toast from an event."""
+        html = self.render(
+            '<c-toast title="Saved" x-on:docket-blocked.window="open" />'
+        )
+        self.assertIn('x-on:docket-blocked.window="open"', html)
+
+
+class ComponentsToastDemoTest(TestCase):
+    """The components view answers the server-rendered toast demo's htmx request."""
+
+    def get(self, toast: str, **headers: str) -> "_MonkeyPatchedWSGIResponse":
+        """Requests the components page the way a demo button does."""
+        return self.client.get(
+            reverse("components"),
+            {"toast": toast},
+            headers={"HX-Request": "true", "X-CL-Design": "v2", **headers},
+        )
+
+    def test_server_renders_the_toast_partial(self) -> None:
+        """The server-rendered demo swaps a toast in and opens it after settle."""
+        r = self.get("server")
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_includes/components/toast_demo.html")
+        self.assertEqual(
+            r["HX-Trigger-After-Settle"], "toast-demo-server-ready"
+        )
+        self.assertContains(r, 'id="toast-demo-server"')
+        self.assertContains(r, 'hx-swap-oob="true"')
+
+    def test_other_requests_get_the_page(self) -> None:
+        """Another name, or a request that is not htmx, renders the library."""
+        for toast, headers in (("nope", {}), ("server", {"HX-Request": ""})):
+            with self.subTest(toast=toast, headers=headers):
+                r = self.get(toast, **headers)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, "v2_components.html")

@@ -10,6 +10,7 @@ from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils import timezone
 
 from cl.disclosures.models import (
     Agreement,
@@ -175,6 +176,21 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 async def components(request: HttpRequest) -> HttpResponse:
+    if (
+        request.headers.get("HX-Request")
+        and request.GET.get("toast") == "server"
+    ):
+        # The library's server-rendered toast demo: a toast rendered with
+        # request-time content, swapped out of band into the page's
+        # placeholder and opened by HX-Trigger-After-Settle, once Alpine has
+        # bound the swapped markup.
+        return TemplateResponse(
+            request,
+            "includes/components/toast_demo.html",
+            {"rendered_at": timezone.localtime().strftime("%H:%M:%S")},
+            headers={"HX-Trigger-After-Settle": "toast-demo-server-ready"},
+        )
+
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
         PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT
