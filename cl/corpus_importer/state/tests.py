@@ -32,8 +32,9 @@ from cl.corpus_importer.state.loader import (
     WaitOutcome,
 )
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Constant,
     Merger,
+    Scrape,
 )
 from cl.corpus_importer.state.preflight import (
     STANDARD_CHECKS,
@@ -241,12 +242,10 @@ class LoaderTestCase(TestCase):
         class TestMerger(Merger[LoaderScrape, None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = Attribute(default=test_court)
-            source: int = Attribute(default=DocketSources.SCRAPER)
-            docket_number: str = Attribute(
-                lambda scrape, params: scrape.docket_number
-            )
-            case_name: str = Attribute(lambda scrape, params: scrape.case_name)
+            court: Court = Constant(test_court)
+            source: int = Constant(DocketSources.SCRAPER)
+            docket_number: str = Scrape(LoaderScrape).docket_number
+            case_name: str = Scrape(LoaderScrape).case_name
 
             def query(self) -> QuerySet[Docket]:
                 return Docket.objects.filter(

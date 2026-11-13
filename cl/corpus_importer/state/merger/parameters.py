@@ -6,7 +6,7 @@ from django.db.models import Model
 
 
 @dataclass
-class RelatedParams[ParamType]:
+class RelatedParams[Params]:
     """Wrapper for passing parameters to a related object.
 
     Attributes:
@@ -18,13 +18,13 @@ class RelatedParams[ParamType]:
             must not declare it.
     """
 
-    params: ParamType
+    params: Params
     parent: Model | None = field(kw_only=True)
     parent_name: str | None = field(kw_only=True, default=None)
 
 
 @dataclass
-class ThroughParameters[ParamType](RelatedParams[ParamType]):
+class ThroughParameters[Params](RelatedParams[Params]):
     """Wrapper for passing parameters to a `through` model.
 
     Attributes:
@@ -37,4 +37,4 @@ class ThroughParameters[ParamType](RelatedParams[ParamType]):
     source_name: str = field(kw_only=True)
     target: Model = field(kw_only=True)
     target_name: str = field(kw_only=True)
-    params: ParamType
+    params: Params

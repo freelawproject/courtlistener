@@ -5,6 +5,7 @@ from importlib import import_module
 from urllib.parse import urlencode
 
 from celery import Task
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -49,14 +50,23 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
+from cl.search.es_docket_sources import (
+    SCOTUS_ES_SOURCE,
+    SOURCE_BY_MODEL,
+    ESDocketSource,
+    percolator_enabled,
+    source_for_court,
+)
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
     DocketEntry,
     RECAPDocument,
     SCOTUSDocketEntry,
+    SCOTUSDocument,
 )
 from cl.search.types import (
+    ESDictDocument,
     ESDocumentNameType,
     SaveESDocumentReturn,
     SearchAlertHitType,
@@ -408,7 +418,7 @@ def send_alert_and_webhook(
     # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
     if (
         source is not SCOTUS_ALERT_SOURCE
-        or settings.SCOTUS_DOCKET_ALERT_WEBHOOKS_ENABLED
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
     ):
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
@@ -645,6 +655,14 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
     )
+    # SCOTUS search alert webhooks stay off with SCOTUS docket alert
+    # webhooks: their payloads would have id null and no uid until the
+    # SCOTUS search API (#8153).
+    send_webhooks = (
+        get_docket_source(app_label_model, document_content)
+        is not SCOTUS_ES_SOURCE
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+    )
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
@@ -675,15 +693,21 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         alert_user = alert_triggered.user
         # The (document_type, document_id) pairs to record in the alert_hits
         # Redis sets if this hit ends up being delivered or scheduled.
-        alert_set_writes: list[tuple[str, int]] = []
+        alert_set_writes: list[tuple[str, int | str]] = []
         # Set highlight if available in response.
         match app_label_model:
-            case "search.RECAPDocument":
-                # Filter out RECAPDocuments already seen by this alert.
+            case "search.RECAPDocument" | "search.SCOTUSDocument":
+                # SCOTUS pks can collide with RECAPDocument pks, so those
+                # documents are tracked by their namespaced uid instead.
+                document_hit_id = (
+                    document_content_copy.get("uid")
+                    or document_content_copy["id"]
+                )
+                # Filter out documents already seen by this alert.
                 if not include_recap_document_hit(
                     alert_triggered_id, recap_document_hits, docket_hits
                 ) or has_document_alert_hit_been_triggered(
-                    r, alert_triggered_id, "r", document_content_copy["id"]
+                    r, alert_triggered_id, "r", document_hit_id
                 ):
                     continue
                 transform_percolator_child_document(
@@ -692,7 +716,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id = document_content_copy["docket_id"]
                 child_document = True
                 alert_set_writes = [
-                    ("r", document_content_copy["id"]),
+                    ("r", document_hit_id),
                     # Mark case-only alert as triggered.
                     ("co", object_id),
                 ]
@@ -755,7 +779,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         ]
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
-        webhook_sent = send_webhook_alert_hits(alert_user, hits)
+        webhook_sent = send_webhooks and send_webhook_alert_hits(
+            alert_user, hits
+        )
         schedule_alert = not (
             alert_triggered.rate == Alert.REAL_TIME
             and not alert_user.profile.is_eligible_for_rt_search_alerts  # pyrefly:ignore[missing-attribute]
@@ -798,6 +824,46 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create)
 
 
+def get_docket_source(
+    app_label: str, document_content: ESDictDocument
+) -> ESDocketSource | None:
+    """Return the docket source (RECAP, SCOTUS) of a percolated document.
+
+    :param app_label: The percolated document's app label.
+    :param document_content: The percolated document's ES content.
+    :return: The document's ESDocketSource, or None if it isn't docket
+    content (e.g. an Opinion).
+    """
+    match app_label:
+        case "search.Docket":
+            return source_for_court(document_content.get("court_id", ""))
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
+            return SOURCE_BY_MODEL[apps.get_model(app_label)]
+        case _:
+            return None
+
+
+def search_alerts_percolation_enabled(response: SaveESDocumentReturn) -> bool:
+    """Check whether a document's search alerts percolation is enabled.
+
+    Each source has its own PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting;
+    opinions use PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED.
+
+    Args:
+        response: The indexed document to percolate.
+
+    Returns:
+        True if the document should be percolated.
+    """
+    if source := get_docket_source(
+        response.app_label, response.document_content
+    ):
+        return percolator_enabled(source)
+    if response.app_label == "search.Opinion":
+        return settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+    return True
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -835,16 +901,10 @@ def send_or_schedule_search_alerts(
         self.request.chain = None
         return None
 
-    if (
-        not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
-        and response.app_label in ["search.RECAPDocument", "search.Docket"]
-    ) or (
-        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        and response.app_label in ["search.Opinion"]
-    ):
-        # Disable percolation for RECAP Or Opinions search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        # is set to True. Useful to prevent conflicts in tests.
+    if not search_alerts_percolation_enabled(response):
+        # Disable percolation for RECAP, SCOTUS or Opinions search alerts
+        # until their PERCOLATOR_*_SEARCH_ALERTS_ENABLED setting is True.
+        # Useful to prevent conflicts in tests.
         self.request.chain = None
         return None
 
@@ -857,13 +917,13 @@ def send_or_schedule_search_alerts(
         percolator_index, es_document_index, documents_to_percolate = (
             prepare_percolator_content(app_label, document_id)
         )
-    except RECAPDocument.DoesNotExist as exc:
+    except (RECAPDocument.DoesNotExist, SCOTUSDocument.DoesNotExist) as exc:
         if (
             self.request.retries
             >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
         ):
             logger.warning(
-                "RECAPDocument %s missing during alert trigger.", document_id
+                "%s %s missing during alert trigger.", app_label, document_id
             )
             self.request.chain = None
             return None

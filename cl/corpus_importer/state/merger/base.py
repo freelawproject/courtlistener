@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import (
+    Callable,
     Iterable,
     MutableMapping,
     Sequence,
@@ -55,30 +56,29 @@ def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
     )
 
 
-class MergerSpecRegistry[ScrapeType, ParamType]:
+class MergerSpecRegistry[Scrape, Params]:
     def __init__(
         self,
         *,
-        related: dict[
-            str, RelatedMerger[ScrapeType, ParamType, Any, Any, Model]
-        ]
+        related: dict[str, RelatedMerger[Scrape, Params, Any, Any, Model]]
         | None = None,
-        attr: dict[str, AttributeMerger[ScrapeType, ParamType, Any]]
-        | None = None,
-        one_to_one: dict[
-            str, OneToOneMerger[ScrapeType, ParamType, Any, Model]
-        ]
+        attr: dict[str, AttributeMerger[Scrape, Params, Any]] | None = None,
+        one_to_one: dict[str, OneToOneMerger[Scrape, Params, Any, Model]]
         | None = None,
     ):
         self.related: dict[
-            str, RelatedMerger[ScrapeType, ParamType, Any, Any, Model]
+            str, RelatedMerger[Scrape, Params, Any, Any, Model]
         ] = related or {}
-        self.attr: dict[str, AttributeMerger[ScrapeType, ParamType, Any]] = (
-            attr or {}
-        )
+        self.attr: dict[str, AttributeMerger[Scrape, Params, Any]] = attr or {}
         self.one_to_one: dict[
-            str, OneToOneMerger[ScrapeType, ParamType, Any, Model]
+            str, OneToOneMerger[Scrape, Params, Any, Model]
         ] = one_to_one or {}
+        self._transformers: dict[str, Callable[[Scrape, Params], Any]] = (
+            # pyrefly:ignore[bad-assignment]
+            {k: v.transform for k, v in self.attr.items()}
+            | {k: v.transform for k, v in self.one_to_one.items()}
+            | {k: v.transform for k, v in self.related.items()}
+        )
 
     def __copy__(self) -> Self:
         return self.__class__(
@@ -93,7 +93,7 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         )
 
     def validate(
-        self, merger: type[Merger[ScrapeType, ParamType, Any]]
+        self, merger: type[Merger[Scrape, Params, Any]]
     ) -> list[Exception]:
         """Run validation for every attached spec against the given merger.
 
@@ -126,16 +126,21 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         self.attr.update(other.attr)
         self.one_to_one.update(other.one_to_one)
 
-    def register(self, spec: MergerSpecification[ScrapeType, ParamType, Any]):
+    def register(self, spec: MergerSpecification[Scrape, Params, Any]):
         match spec:
             case AttributeMerger():
-                self.attr[spec.name] = spec
+                self.attr[spec._name] = spec
             case OneToOneMerger():
-                self.one_to_one[spec.name] = spec
+                self.one_to_one[spec._name] = spec
             case RelatedMerger():
-                self.related[spec.name] = spec
+                self.related[spec._name] = spec
             case _:
-                logger.error(f"Unknown merger spec type: {spec}")
+                logger.error(f"Unknown merger spec type: {spec!r}")
+                return
+        self._transformers[spec._name] = spec.transform
+
+    def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
+        return {k: v(scrape, params) for k, v in self._transformers.items()}
 
 
 class MergerMeta(type):
@@ -170,7 +175,7 @@ class MergerMeta(type):
         }
 
 
-class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
+class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
     """Base class for a merger which takes in `D` and merges it into `model`.
 
     Subclasses should generally not be instantiated; methods and attributes
@@ -210,9 +215,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         super().__init_subclass__()
 
         if abstract:
-            logger.info(
-                "Skipping validation of abstract merger: %s", cls.__name__
-            )
             return
 
         cls.errors += cls.__registry__.validate(cls)
@@ -256,11 +258,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     @classmethod
     def init_many(
         cls,
-        scrapes: Sequence[ScrapeType],
+        scrapes: Sequence[Scrape],
         *,
-        params: ParamType | Sequence[ParamType],
+        params: Params | Sequence[Params],
         manager: Manager[M] | None = None,
-    ) -> tuple[MergeResult[Any], list[Self]]:
+    ) -> tuple[MergeResult, list[Self]]:
         result = MergeResult.unnecessary()
         if isinstance(params, Sequence):
             if len(params) != len(scrapes):
@@ -330,7 +332,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         return result, mergers
 
     @staticmethod
-    def validate(scrape: ScrapeType) -> bool:
+    def validate(scrape: Scrape) -> bool:
         """Validate the input data before attempting a merge operation.
 
         Args:
@@ -344,9 +346,9 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
     def __init__(
         self,
-        scrape: ScrapeType,
+        scrape: Scrape,
         *,
-        params: ParamType,
+        params: Params,
         existing: M | None = None,
         manager: Manager[M] | None = None,
         lookup: bool = True,
@@ -370,26 +372,13 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             )
             result = MergeResult.failed(self.model.__name__)
 
-        self.scrape: ScrapeType = scrape
-        self.params: ParamType = params
-        self.result: MergeResult[Any] | None = result
+        self.scrape: Scrape = scrape
+        self.params: Params = params
+        self.result: MergeResult | None = result
         self.out: M | None = None
 
         self.transformed: dict[str, Any] = (
-            {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.attr.items()
-            }
-            | {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.related.items()
-            }
-            | {
-                name: spec.transform(scrape, params)
-                for name, spec in self.__registry__.one_to_one.items()
-            }
-            if valid
-            else {}
+            self.__registry__.transform(scrape, params) if valid else {}
         )
 
         # Relations the merger fills in itself rather than leaving to a spec: a
@@ -490,7 +479,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             return True, results[0]
         return False, None
 
-    def merge(self) -> MergeResult[Any]:
+    def merge(self) -> MergeResult:
         """Merge scraped data into the DB."""
         if self.result is not None:
             return self.result
@@ -520,7 +509,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         self.after()
         return result
 
-    def update_existing(self) -> MergeResult[Any]:
+    def update_existing(self) -> MergeResult:
         """Merge attributes and 1-1 relations into `self.existing` in-place."""
         obj = cast(
             M,
@@ -577,7 +566,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
         return result
 
-    def create_new(self) -> tuple[M, MergeResult[Any]]:
+    def create_new(self) -> tuple[M, MergeResult]:
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.__registry__.one_to_one.items():
@@ -600,7 +589,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         result |= MergeResult.created(self.model.__name__, db_obj.pk)
         return db_obj, result
 
-    def merge_one(self) -> tuple[MergeResult[Any], M | None]:
+    def merge_one(self) -> tuple[MergeResult, M | None]:
         """Merge the object's own attributes and then all of its related/child mergers, returning the combined result.
 
         When `atomic` is set, the caller runs this inside a single

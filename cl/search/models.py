@@ -287,6 +287,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     # real SCOTUS docket from one created only to hold a scraped Opinion.
     # Declared here only so the type checker knows the attribute exists.
     _index_in_es: bool
+    # Not a model field either - set transiently by mergers (RECAP and
+    # SCOTUS) so the ES signal processor doesn't percolate a save that will be
+    # percolated later, e.g. after the docket's parties are indexed.
+    skip_percolator_request: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
@@ -4013,6 +4017,12 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
     namespace.
     """
 
+    # Not a model field - merge_scotus_docket sets this transiently so the
+    # metadata change isn't percolated when the docket is percolated after
+    # its parties are merged instead. Declared here only so the type checker
+    # knows the attribute exists.
+    skip_percolator_request: bool
+
     docket = models.OneToOneField(
         "search.Docket",
         help_text="The docket this SCOTUS metadata applies to.",
@@ -4325,6 +4335,12 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
         attachment_number: The attachment number on the docket page in SCOTUS.
         url: The download URL that SCOTUS provided for this document.
     """
+
+    # Not a model field - merge_scotus_document sets this transiently on a
+    # new document whose PDF will be downloaded, so the ES signal processor
+    # doesn't percolate it before its text is extracted. Declared here only
+    # so the type checker knows the attribute exists.
+    skip_percolator_request: bool
 
     docket_entry = models.ForeignKey(
         SCOTUSDocketEntry,
