@@ -4608,24 +4608,6 @@ class RECAPSearchAPIV4Test(
             v4_recap_meta_keys,
         )
 
-    async def test_capital_case_not_in_api_results(self) -> None:
-        """capital_case isn't exposed in V4 RECAP results yet: not on the docket, its nested documents, or RECAP document results.
-
-        The SCOTUS search API (#8153) adds it.
-        """
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk}",
-        }
-        r = await self._test_api_results_count(search_params, 1, "type r")
-        docket_result = r.data["results"][0]
-        self.assertNotIn("capital_case", docket_result)
-        self.assertNotIn("capital_case", docket_result["recap_documents"][0])
-
-        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
-        r = await self._test_api_results_count(search_params, 1, "type rd")
-        self.assertNotIn("capital_case", r.data["results"][0])
-
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
         # Confirm expected values for empty fields.

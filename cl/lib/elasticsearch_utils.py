@@ -7,7 +7,7 @@ import re
 import time
 import traceback
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
@@ -16,6 +16,7 @@ from typing import Any, Literal, Never, cast
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.paginator import Page
+from django.db import models
 from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
 from django.db.models.functions import Substr
@@ -85,6 +86,7 @@ from cl.search.constants import (
     opinion_boosts_es,
     recap_boosts_es,
 )
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
@@ -665,6 +667,18 @@ def build_sort_results(
         "cluster_id desc": {"cluster_id": {"order": "desc"}},
         "id asc": {"id": {"order": "asc"}},
         "id desc": {"id": {"order": "desc"}},
+        # RECAP documents have an id and SCOTUS ones a uid. A missing uid
+        # sorts as "" because a null sort value doesn't survive the cursor.
+        # A missing id sorts last in desc and first in asc, so documents
+        # without one keep their place when the cursor goes back a page.
+        "id asc,uid asc": {
+            "id": {"order": "asc", "missing": "_first"},
+            "uid": {"order": "asc", "missing": ""},
+        },
+        "id desc,uid desc": {
+            "id": {"order": "desc", "missing": "_last"},
+            "uid": {"order": "desc", "missing": ""},
+        },
         "dob desc,name_reverse asc": {
             "dob": {"order": "desc"},
             "name_reverse": {"order": "asc"},
@@ -1375,7 +1389,12 @@ def get_match_all_query(
 
 
 def includes_scotus(cd: CleanData) -> bool:
-    """Whether a RECAP search should include SCOTUS content. False unless the caller sets cd["include_scotus"], which only the search frontend does, behind the scotus_docket_page flag. Temporary: remove once SCOTUS launches."""
+    """Whether a RECAP search should include SCOTUS content.
+
+    True only when the caller sets cd["include_scotus"]. The search frontend
+    sets it behind the scotus_docket_page flag and the v4 Search API behind
+    scotus_search_api. Temporary: remove once SCOTUS launches.
+    """
     return bool(cd.get("include_scotus"))
 
 
@@ -2120,6 +2139,30 @@ def merge_semantic_relevant_chunks(
             child_doc["_source"]["text"] = text
 
 
+def get_plain_text_previews(
+    model: type[models.Model], pks: Iterable[int | str]
+) -> QuerySet:
+    """Return the id and the start of plain_text of the given document rows.
+
+    plain_text_short holds the first NO_MATCH_HL_SIZE characters of
+    plain_text, cut in the database so the full text isn't loaded.
+
+    Args:
+        model: A document model with a plain_text field.
+        pks: The primary keys to fetch.
+
+    Returns:
+        A values() queryset of {"id", "plain_text_short"} dicts.
+    """
+    return (
+        model.objects.filter(pk__in=pks)
+        .annotate(
+            plain_text_short=Substr("plain_text", 1, settings.NO_MATCH_HL_SIZE)
+        )
+        .values("id", "plain_text_short")
+    )
+
+
 def merge_unavailable_fields_on_parent_document(
     results: Page | dict | Response,
     search_type: str,
@@ -2169,36 +2212,38 @@ def merge_unavailable_fields_on_parent_document(
             # highlighting is disabled.
 
             if search_type == SEARCH_TYPES.RECAP:
-                rd_ids = {
-                    doc["_source"]["id"]
+                docs = [
+                    doc["_source"]
                     for entry in results
                     for doc in entry["child_docs"]
-                }
+                ]
             else:
-                rd_ids = {entry["id"] for entry in results}
+                docs = list(results)
 
-            recap_docs = (
-                RECAPDocument.objects.filter(pk__in=rd_ids)
-                .annotate(
-                    plain_text_short=Substr(
-                        "plain_text", 1, settings.NO_MATCH_HL_SIZE
-                    )
-                )
-                .values("id", "plain_text_short")
-            )
-            recap_docs_dict = {
-                doc["id"]: doc["plain_text_short"] for doc in recap_docs
+            # The ES id field holds RECAP pks only; other sources' documents
+            # are matched by their uid (e.g. "scotus_123").
+            rd_pks = {doc["id"] for doc in docs if doc["id"] is not None}
+            uids = {doc["uid"] for doc in docs if doc["id"] is None}
+            plain_texts: dict[int | str, str] = {
+                doc["id"]: doc["plain_text_short"]
+                for doc in get_plain_text_previews(RECAPDocument, rd_pks)
             }
-            for result in results:
-                if search_type == SEARCH_TYPES.RECAP:
-                    for rd in result["child_docs"]:
-                        rd["_source"]["plain_text"] = recap_docs_dict.get(
-                            rd["_source"]["id"], ""
-                        )
-                else:
-                    result["plain_text"] = recap_docs_dict.get(
-                        result["id"], ""
-                    )
+            for source in ALL_ES_SOURCES:
+                if not source.uid_namespace:
+                    continue
+                prefix = f"{source.uid_namespace}_"
+                pks = [
+                    uid.removeprefix(prefix)
+                    for uid in uids
+                    if uid.startswith(prefix)
+                ]
+                for doc in get_plain_text_previews(source.document_model, pks):
+                    plain_texts[f"{prefix}{doc['id']}"] = doc[
+                        "plain_text_short"
+                    ]
+            for doc in docs:
+                key = doc["id"] if doc["id"] is not None else doc["uid"]
+                doc["plain_text"] = plain_texts.get(key, "")
 
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
             request_type == "frontend"

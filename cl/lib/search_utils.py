@@ -279,11 +279,21 @@ def scotus_frontend_search_enabled(request: HttpRequest) -> bool:
     """Whether the search frontend (search page, RSS search feed and the create-alert estimate) may include SCOTUS content for this request.
 
     Staff see SCOTUS before launch, everyone after. It uses the same flag
-    as the SCOTUS docket pages, since results link to them. The search
-    APIs don't use it: they keep SCOTUS hidden until their own launch.
+    as the SCOTUS docket pages, since results link to them. The v4 Search
+    API uses scotus_search_api_enabled instead.
     Temporary: remove once SCOTUS launches.
     """
     return bool(flag_is_active(request, "scotus_docket_page"))
+
+
+def scotus_search_api_enabled(request: HttpRequest) -> bool:
+    """Whether the v4 Search API may include SCOTUS content for this request.
+
+    It has its own flag, scotus_search_api, so the API can launch apart from
+    the search frontend. v3 never shows SCOTUS. Temporary: remove once the
+    SCOTUS Search API launches.
+    """
+    return bool(flag_is_active(request, "scotus_search_api"))
 
 
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
