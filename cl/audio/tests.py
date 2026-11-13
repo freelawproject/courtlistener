@@ -933,3 +933,32 @@ class ViewAudioFileNoteTest(TestCase):
         note_form = r.context["note_form"]
         self.assertIsNone(note_form.instance.pk)
         self.assertTrue(note_form.initial["name"])
+
+
+class ViewAudioFileMissingMp3Test(TestCase):
+    """Regression coverage for #7223: a processed Audio with no mp3 renders its page without the player instead of raising a ValueError."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.audio = AudioWithParentsFactory(processing_complete=True)
+
+    async def test_page_renders_without_mp3(self) -> None:
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[self.audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotContains(r, 'id="jquery_jplayer_1"')
+        self.assertNotContains(r, "og:audio:url")
+        self.assertContains(r, self.audio.download_url)
+
+    async def test_unprocessed_page_renders_without_mp3(self) -> None:
+        audio = await sync_to_async(AudioWithParentsFactory)()
+
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "has not yet completed processing")
+        self.assertNotContains(r, "og:audio:url")

@@ -7211,10 +7211,11 @@ class SCOTUSESIndexingSignalTest(
             with self.subTest(field=field):
                 de = SCOTUSDocketEntry.objects.get(pk=entry.pk)
                 setattr(de, field, new_value)
+                # Queued with .si(): it's chained with the percolation tasks.
                 with mock.patch(
-                    "cl.lib.es_signal_processor.update_es_document.delay",
+                    "cl.lib.es_signal_processor.update_es_document.si",
                     side_effect=lambda *args, **kwargs: self.count_task_calls(
-                        update_es_document, False, *args, **kwargs
+                        update_es_document, True, *args, **kwargs
                     ),
                 ):
                     de.save()
@@ -7341,8 +7342,12 @@ class SCOTUSESIndexingSignalTest(
         self.assertFalse(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).SCOTUS))
         self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
 
-    def test_scotus_dockets_are_not_sent_to_the_percolator(self) -> None:
-        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES save or update returns nothing to percolate, unlike a RECAP Docket's."""
+    def test_scotus_dockets_are_sent_to_the_percolator(self) -> None:
+        """Check SCOTUS Docket saves and updates are percolated.
+
+        A SCOTUS Docket's ES save and update are percolated, like a RECAP
+        Docket's.
+        """
         # Not indexed yet: es_save_document only percolates a first write.
         with override_settings(ELASTICSEARCH_DISABLED=True):
             scotus_docket = ScotusDocketMetadataFactory(
@@ -7353,7 +7358,7 @@ class SCOTUSESIndexingSignalTest(
             )
 
         for docket, percolates in [
-            (scotus_docket, False),
+            (scotus_docket, True),
             (recap_docket, True),
         ]:
             with self.subTest(source=docket.source):
