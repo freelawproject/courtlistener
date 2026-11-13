@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import (
     Callable,
-    Iterable,
     Mapping,
     Sequence,
 )
@@ -196,17 +195,65 @@ class MergerConfig[M: Model]:
     :ivar registry: The specs declared on the merger. Filled in when the
         merger class is created, so it should not be passed.
     :ivar fields: The model fields loaded of an object read to be merged
-        into; every other field is deferred. Filled in when the merger class
-        is created, so it should not be passed.
+        into; every other field is deferred.
     """
 
     model: Final[type[M]]
-    key: Final[Iterable[str]] = ()
-    reads: Final[Iterable[str]] = ()
+    key: Final[tuple[str, ...]] = ()
+    reads: Final[tuple[str, ...]] = ()
     registry: MergerSpecRegistry[Any, Any] = field(
         default_factory=MergerSpecRegistry
     )
-    fields: tuple[str, ...] = ()
+    fields: tuple[str, ...] = field(init=False, default=())
+
+    def __post_init__(self):
+        if self.model is Model:
+            return
+        self.fields = tuple(
+            {
+                *self.registry.attr,
+                *self.key,
+                *self.reads,
+                *(
+                    f.attname
+                    for f in self.model._meta.concrete_fields
+                    if f.is_relation
+                ),
+            }
+        )
+
+    def loading[QModel: Model](
+        self, objects: QuerySet[QModel]
+    ) -> QuerySet[QModel]:
+        """Have a query load only the fields this merger and the mergers of its relations use.
+
+        Args:
+            objects: A query for objects of this merger's model.
+
+        Returns:
+            The narrowed query.
+        """
+        return objects.only(*self.fields).prefetch_related(
+            *self.registry.prefetch
+        )
+
+    @classmethod
+    def inherit(
+        cls, parent: type[Merger], registry: MergerSpecRegistry
+    ) -> MergerConfig:
+        return MergerConfig(
+            parent.config.model,
+            parent.config.key,
+            reads=tuple(
+                {
+                    read
+                    for base in parent.__mro__
+                    if issubclass(base, Merger)
+                    for read in base.config.reads
+                }
+            ),
+            registry=registry,
+        )
 
 
 class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
@@ -216,7 +263,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     the spec's name, unless the input failed validation.
     """
 
-    config: ClassVar[MergerConfig[Model]]
+    config: ClassVar[MergerConfig[Model]] = MergerConfig(Model)
     """Configurable information determining merger behavior."""
 
     def __init_subclass__(cls, abstract: bool = False) -> None:
@@ -242,32 +289,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
         errors = registry.validate(cls)
 
-        model = cls.config.model
-        reads = tuple(
-            dict.fromkeys(
-                chain.from_iterable(
-                    config.reads
-                    for base in cls.__mro__
-                    if (config := vars(base).get("config")) is not None
-                )
-            )
-        )
-        # Django reads a row's foreign keys to tie it to the objects it is
-        # related to, so deferring one costs a query per row.
-        foreign_keys = [
-            f.attname for f in model._meta.concrete_fields if f.is_relation
-        ]
-        cls.config = MergerConfig(
-            model,
-            cls.config.key,
-            reads,
-            registry,
-            tuple(
-                dict.fromkeys(
-                    chain(registry.attr, cls.config.key, reads, foreign_keys)
-                )
-            ),
-        )
+        cls.config = MergerConfig.inherit(cls, registry)
 
         if errors:
             raise TypeError(
@@ -397,25 +419,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 [str(value) for value in attributes.values()]
                 + [str(obj.pk) for obj in relations.values()]
             ),
-        )
-
-    @classmethod
-    def loading(cls, objects: QuerySet[M]) -> QuerySet[M]:
-        """Have a query load what merging its objects takes and no more: the fields this merger uses, and everything the mergers of its relations look for.
-
-        The related objects come without their other fields too, and so does
-        anything queried through the relation they were loaded into. Deleting
-        through such a relation hands the deletion signals objects with
-        fields missing; delete through the model's manager instead.
-
-        Args:
-            objects: A query for objects of this merger's model.
-
-        Returns:
-            The narrowed query.
-        """
-        return objects.only(*cls.config.fields).prefetch_related(
-            *cls.config.registry.prefetch
         )
 
     @property

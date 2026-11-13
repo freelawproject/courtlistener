@@ -133,7 +133,9 @@ class KeyLookup[M: Model](SiblingLookup[M]):
             operator.or_, [Q(**key.filters) for key, _ in self._unfetched]
         )
         self._unfetched = []
-        self._rows.extend(self._merger.loading(manager.filter(matching)))
+        self._rows.extend(
+            self._merger.config.loading(manager.filter(matching))
+        )
         self._index(key)
 
 
@@ -163,7 +165,7 @@ class RelationLookup[M: Model](SiblingLookup[M]):
             return
         self._related = None
         if related._result_cache is None:
-            related = self._merger.loading(related)
+            related = self._merger.config.loading(related)
         self._rows.extend(related)
 
     @override

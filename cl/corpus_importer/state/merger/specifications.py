@@ -566,7 +566,7 @@ class RelatedMerger[
         return [
             Prefetch(
                 self._name,
-                self.merger.loading(
+                self.merger.config.loading(
                     cast(
                         QuerySet[RM],
                         self.merger.config.model._default_manager.all(),
