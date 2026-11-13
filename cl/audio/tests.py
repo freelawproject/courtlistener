@@ -77,7 +77,6 @@ class PodcastTest(ESIndexTestCase, TestCase):
 
     async def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
-
         # Test jurisdiction_podcast for a court.
         response = await self.async_client.get(
             reverse(
@@ -151,7 +150,6 @@ class PodcastTest(ESIndexTestCase, TestCase):
         Search podcasts are a subclass of the Jurisdiction podcasts, so a
         simple test is all that's needed here.
         """
-
         params = {
             "q": f"court_id:{self.audio.docket.court.pk}",
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -218,8 +216,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertTrue(pubdate_not_present)
 
     def test_search_podcast_has_individualized_metadata(self) -> None:
-        """Does the search podcast include query-specific title and
-        description?"""
+        """Does the search podcast include query-specific title and description?"""
         params = {
             "q": "magnitsky",
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -250,10 +247,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertIn("magnitsky", subtitle)
 
     def test_podcast_excludes_audios_without_processed_mp3(self) -> None:
-        """Audios indexed before `process_audio_file` finishes (or whose
-        `local_path` ends up None at index time) must not appear in the feed —
-        otherwise the enclosure URL renders as `.../None`.
-        """
+        """Audios indexed before `process_audio_file` finishes (or whose `local_path` ends up None at index time) must not appear in the feed — otherwise the enclosure URL renders as `.../None`."""
         with (
             mock.patch(
                 "cl.lib.es_signal_processor.allow_es_audio_indexing",
@@ -300,7 +294,6 @@ class PodcastTest(ESIndexTestCase, TestCase):
 
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empty podcast?"""
-
         # Bad syntax error.
         params = {
             "q": "Leave /:",
@@ -900,10 +893,7 @@ class ReenqueueDaemonTest(TestCase):
 
 
 class ViewAudioFileNoteTest(TestCase):
-    """Regression coverage for view_audio_file's `name` callable
-    (#7725): the suggested note name needs the parent Docket, fetched
-    only when actually needed -- i.e. when the Audio has no Note yet.
-    """
+    """Regression coverage for view_audio_file's `name` callable (#7725): the suggested note name needs the parent Docket, fetched only when actually needed -- i.e. when the Audio has no Note yet."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -943,3 +933,32 @@ class ViewAudioFileNoteTest(TestCase):
         note_form = r.context["note_form"]
         self.assertIsNone(note_form.instance.pk)
         self.assertTrue(note_form.initial["name"])
+
+
+class ViewAudioFileMissingMp3Test(TestCase):
+    """Regression coverage for #7223: a processed Audio with no mp3 renders its page without the player instead of raising a ValueError."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.audio = AudioWithParentsFactory(processing_complete=True)
+
+    async def test_page_renders_without_mp3(self) -> None:
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[self.audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotContains(r, 'id="jquery_jplayer_1"')
+        self.assertNotContains(r, "og:audio:url")
+        self.assertContains(r, self.audio.download_url)
+
+    async def test_unprocessed_page_renders_without_mp3(self) -> None:
+        audio = await sync_to_async(AudioWithParentsFactory)()
+
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "has not yet completed processing")
+        self.assertNotContains(r, "og:audio:url")

@@ -110,10 +110,7 @@ class Command(VerboseCommand, CommandUtils):
 
     @staticmethod
     def update_any_missing_pacer_case_ids(options):
-        """The network requests were making things far too slow and had to be
-        disabled during the first pass. With this method, we update any items
-        that are missing their pacer case ID value.
-        """
+        """The network requests were making things far too slow and had to be disabled during the first pass. With this method, we update any items that are missing their pacer case ID value."""
         ds = Docket.objects.filter(idb_data__isnull=False, pacer_case_id=None)
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)

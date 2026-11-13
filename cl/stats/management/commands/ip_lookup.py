@@ -86,10 +86,11 @@ class Command(BaseCommand):
     ) -> None:
         """Print the result for an IP address lookup.
 
-        :param ip: The IP address that was looked up.
-        :param user_pk: The user PK from Redis. May be a numeric string, an
-            int, or a non-numeric string like "AnonymousUser".
-        :param date_str: The date the IP was found.
+        Args:
+            ip: The IP address that was looked up.
+            user_pk: The user PK from Redis. May be a numeric string, an
+                int, or a non-numeric string like "AnonymousUser".
+            date_str: The date the IP was found.
         """
         if not str(user_pk).isdigit():
             self.stdout.write(f"\n{ip}\n  User: {user_pk}\n  Date: {date_str}")

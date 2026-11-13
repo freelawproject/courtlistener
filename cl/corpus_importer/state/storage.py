@@ -40,12 +40,15 @@ def copy_file(
     Overwrites whatever is already at `published_key`, which is how a file the
     court has corrected replaces the copy published before it.
 
-    :param source_bucket: The bucket the file is in now.
-    :param source_key: The key the file is under now.
-    :param published_key: The key to publish it under.
-    :param content_type: The MIME type to serve the file as. Left to S3's
-        default when empty.
-    :return: Whether the file is now published, and if not, why not. Anything
+    Args:
+        source_bucket: The bucket the file is in now.
+        source_key: The key the file is under now.
+        published_key: The key to publish it under.
+        content_type: The MIME type to serve the file as. Left to S3's
+            default when empty.
+
+    Returns:
+        Whether the file is now published, and if not, why not. Anything
         other than `PublishOutcome.PUBLISHED` is logged, and the caller must
         not store `published_key` for a document whose file is not there.
     """
@@ -82,12 +85,11 @@ def copy_file(
 
 
 def delete_file(bucket: str, key: str) -> None:
-    """Delete a file nothing points at any more, logging rather than raising
-    when the bucket refuses, since the document it belonged to is already
-    settled either way.
+    """Delete a file nothing points at any more, logging rather than raising when the bucket refuses, since the document it belonged to is already settled either way.
 
-    :param bucket: The bucket to delete from.
-    :param key: The key to delete.
+    Args:
+        bucket: The bucket to delete from.
+        key: The key to delete.
     """
     try:
         AWSMediaStorage().connection.meta.client.delete_object(

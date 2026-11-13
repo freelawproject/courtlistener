@@ -45,11 +45,14 @@ from cl.visualizations.models import SCOTUSMap
 
 
 def delete_from_ia(url: str) -> Response:
-    """Delete an item from Internet Archive by URL
+    """Delete an item from Internet Archive by URL.
 
-    :param url: The URL of the item, for example,
-    https://archive.org/download/gov.uscourts.nyed.299029/gov.uscourts.nyed.299029.30.0.pdf
-    :return: The requests.Response of the request to IA.
+    Args:
+        url: The URL of the item, for example,
+            https://archive.org/download/gov.uscourts.nyed.299029/gov.uscourts.nyed.299029.30.0.pdf
+
+    Returns:
+        The requests.Response of the request to IA.
     """
     # Get the path and drop the /download/ part of it to just get the bucket
     # and the path
@@ -81,8 +84,8 @@ def delete_document_citations(rd: RECAPDocument) -> None:
     relation. Documents that had no citations to begin with are left
     alone, ES included.
 
-    :param rd: The RECAPDocument whose citations should be removed.
-    :return: None
+    Args:
+        rd: The RECAPDocument whose citations should be removed.
     """
     # Both kinds of citation come from the same scrubbed text, so drop them
     # together or not at all.
@@ -111,9 +114,12 @@ def delete_document_citations(rd: RECAPDocument) -> None:
 def seal_documents(queryset: QuerySet) -> list[str]:
     """Delete a queryset of RECAPDocuments and mark them as sealed.
 
-    :param queryset: A queryset of RECAPDocuments you wish to seal.
-    :return: a list of URLs that did not succeed or an empty list if everything
-    worked well.
+    Args:
+        queryset: A queryset of RECAPDocuments you wish to seal.
+
+    Returns:
+        a list of URLs that did not succeed or an empty list if everything
+        worked well.
     """
     ia_failures = []
     deleted_filepaths = []
@@ -180,10 +186,10 @@ def delete_cluster_files(cluster: OpinionCluster, delete_docket: bool) -> None:
     orphaned. Must be called before the rows are deleted: it reads
     `local_path` etc. off live objects.
 
-    :param cluster: The OpinionCluster about to be deleted.
-    :param delete_docket: Whether the cluster's docket will be deleted too,
-        and so whether its file should be cleaned up as well.
-    :return: None
+    Args:
+        cluster: The OpinionCluster about to be deleted.
+        delete_docket: Whether the cluster's docket will be deleted too,
+            and so whether its file should be cleaned up as well.
     """
     deleted_filepaths = []
 
@@ -235,8 +241,11 @@ def _note_blockers_for_cluster(cluster: OpinionCluster) -> QuerySet[Note]:
     Checks both the cluster and its docket -- a Note can be attached to
     either.
 
-    :param cluster: The OpinionCluster being considered for sealing.
-    :return: A queryset of Notes attached to the cluster or its docket.
+    Args:
+        cluster: The OpinionCluster being considered for sealing.
+
+    Returns:
+        A queryset of Notes attached to the cluster or its docket.
     """
     return get_notes_for(cluster).union(get_notes_for(cluster.docket))
 
@@ -316,11 +325,13 @@ DOCKET_BLOCKER_KEYS = [
 
 
 def check_blocking_relations(cluster: OpinionCluster) -> dict[str, bool]:
-    """Check each blocker relation for the given cluster to determine
-    if dependent objects exist that block deletion
+    """Check each blocker relation for the given cluster to determine if dependent objects exist that block deletion.
 
-    :param cluster: OpinionCluster instance to check blockers for
-    :return: Dictionary mapping relation keys to boolean indicating presence of blockers
+    Args:
+        cluster: OpinionCluster instance to check blockers for
+
+    Returns:
+        Dictionary mapping relation keys to boolean indicating presence of blockers
     """
     blockers_found = {}
     for key, get_relation in SEAL_BLOCKERS_MAP.items():
@@ -337,11 +348,13 @@ def check_blocking_relations(cluster: OpinionCluster) -> dict[str, bool]:
 
 
 def get_blocking_relations(cluster: OpinionCluster) -> dict[str, Any]:
-    """Retrieve the actual blocking related objects for a cluster, annotating
-    each with an admin change-url for UI display
+    """Retrieve the actual blocking related objects for a cluster, annotating each with an admin change-url for UI display.
 
-    :param cluster: OpinionCluster instance
-    :return: Dictionary mapping relation keys to querysets or lists of blocker objects
+    Args:
+        cluster: OpinionCluster instance
+
+    Returns:
+        Dictionary mapping relation keys to querysets or lists of blocker objects
     """
     blockers = {}
     for key, get_relation in SEAL_BLOCKERS_MAP.items():
@@ -359,10 +372,13 @@ def get_blocking_relations(cluster: OpinionCluster) -> dict[str, Any]:
 
 
 def get_deletion_blockers(cluster: OpinionCluster) -> tuple[bool, bool]:
-    """Check whether anything blocks deleting a cluster or its docket
+    """Check whether anything blocks deleting a cluster or its docket.
 
-    :param cluster: OpinionCluster to check
-    :return: Two-tuple of whether the cluster is blocked from being
+    Args:
+        cluster: OpinionCluster to check
+
+    Returns:
+        Two-tuple of whether the cluster is blocked from being
         deleted, and whether its docket is
     """
     blockers = check_blocking_relations(cluster)
@@ -373,15 +389,15 @@ def get_deletion_blockers(cluster: OpinionCluster) -> tuple[bool, bool]:
 
 
 def seal_cluster(cluster: OpinionCluster, delete_docket: bool) -> None:
-    """Delete a cluster and record the redirection that makes its URLs 410
+    """Delete a cluster and record the redirection that makes its URLs 410.
 
     Callers MUST check `get_deletion_blockers` first: this does no blocker
     checking of its own and will happily delete a cluster that something
     else still points at.
 
-    :param cluster: OpinionCluster to seal
-    :param delete_docket: Whether to delete the cluster's docket too
-    :return: None
+    Args:
+        cluster: OpinionCluster to seal
+        delete_docket: Whether to delete the cluster's docket too
     """
     docket = cluster.docket
     cluster_pk = cluster.pk

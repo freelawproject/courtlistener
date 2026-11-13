@@ -7,9 +7,9 @@ from factory.declarations import PostGenerationContext
 
 
 class RelatedFactoryVariableList(RelatedFactoryList):
-    """This factory allows you to specify how many related objects do you
-    want to create, but also allows you to define the data for each related
-    object. For example:
+    """This factory allows you to specify how many related objects do you want to create, but also allows you to define the data for each related object.
+
+    For example:
 
     Define how many objects do you want:
 

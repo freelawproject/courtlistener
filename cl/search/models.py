@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
@@ -279,9 +280,13 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     exclude=["view_count"],
 )
 class Docket(AbstractDateTimeModel, DocketSources):
-    """A class to sit above OpinionClusters, Audio files, and Docket Entries,
-    and link them together.
-    """
+    """A class to sit above OpinionClusters, Audio files, and Docket Entries, and link them together."""
+
+    # Not a model field - merge_scotus_docket sets this transiently, right
+    # before a Docket's first save, so the ES signal processor can tell a
+    # real SCOTUS docket from one created only to hold a scraped Opinion.
+    # Declared here only so the type checker knows the attribute exists.
+    _index_in_es: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
@@ -817,9 +822,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     @property
     def authorities(self):
-        """Returns a queryset that can be used for querying and caching
-        authorities.
-        """
+        """Returns a queryset that can be used for querying and caching authorities."""
         return OpinionsCitedByRECAPDocument.objects.filter(
             citing_document__docket_entry__docket_id=self.pk
         )
@@ -833,8 +836,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     @property
     def authorities_with_data(self):
-        """Returns a queryset of this document's authorities for
-        eventual injection into a view template.
+        """Returns a queryset of this document's authorities for eventual injection into a view template.
 
         The returned queryset is sorted by the depth field.
         """
@@ -941,19 +943,13 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     def get_entry_source(self) -> "DocketEntrySource":
-        """Return the DocketEntrySource config for this docket's court -
-        RECAP/PACER by default, with per-court overrides.
-        """
+        """Return the DocketEntrySource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
         from cl.opinion_page import docket_entry_sources
 
-        return docket_entry_sources.BY_COURT_ID.get(
-            self.court_id, docket_entry_sources.RECAP
-        )
+        return docket_entry_sources.source_for_court_id(self.court_id)
 
     def get_alert_source(self) -> "DocketAlertSource":
-        """Return the DocketAlertSource config for this docket's court -
-        RECAP/PACER by default, with per-court overrides.
-        """
+        """Return the DocketAlertSource config for this docket's court - RECAP/PACER by default, with per-court overrides."""
         from cl.alerts.docket_alert_sources import (
             _ALERT_SOURCES_BY_COURT_ID,
             RECAP_ALERT_SOURCE,
@@ -1017,8 +1013,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
         Start with the XML, then do them in the order they were received since
         that should correspond to the history of the docket itself.
 
-        :param do_original_xml: Whether to do the original XML file as received
-        from Internet Archive.
+        Args:
+            do_original_xml: Whether to do the original XML file as received
+                from Internet Archive.
         """
         if self.source not in self.RECAP_SOURCES():
             return
@@ -1042,7 +1039,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class DocketTags(Docket.tags.through):
-    """A model class to track docket tags m2m relation"""
+    """A model class to track docket tags m2m relation."""
 
     class Meta:
         proxy = True
@@ -1052,7 +1049,7 @@ class DocketTags(Docket.tags.through):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class DocketPanel(Docket.panel.through):
-    """A model class to track docket panel m2m relation"""
+    """A model class to track docket panel m2m relation."""
 
     class Meta:
         proxy = True
@@ -1198,10 +1195,10 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return columns
 
     def get_column_function(self):
-        """Get dict of attrs: function to apply on field value if it needs
-        to be pre-processed before being add to csv
+        """Get dict of attrs: function to apply on field value if it needs to be pre-processed before being add to csv.
 
-        returns: dict -- > {attr1: function}"""
+        returns: dict -- > {attr1: function}
+        """
         return {}
 
 
@@ -1209,7 +1206,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class DocketEntryTags(DocketEntry.tags.through):
-    """A model class to track docket entry tags m2m relation"""
+    """A model class to track docket entry tags m2m relation."""
 
     class Meta:
         proxy = True
@@ -1358,8 +1355,7 @@ class RECAPDocument(
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store PACER documents under the RECAP bucket layout, which the
-        original RECAP server also used, so paths stay compatible."""
+        """Store PACER documents under the RECAP bucket layout, which the original RECAP server also used, so paths stay compatible."""
         root = "recap-thumbnails" if thumbs else "recap"
         bucket = get_bucket_name(
             self.docket_entry.docket.court_id,
@@ -1413,14 +1409,13 @@ class RECAPDocument(
             )
 
     def is_acms_document(self) -> bool:
-        """
-        Checks if the document is from ACMS based on the presence of hyphens
-        in the pacer_doc_id.
+        """Checks if the document is from ACMS based on the presence of hyphens in the pacer_doc_id.
 
         ACMS documents are currently the only ones using hyphens in their
         doc_id.
 
-        :return: True if the doc_id contains more than one hyphen, False
+        Returns:
+            True if the doc_id contains more than one hyphen, False
             otherwise.
         """
         return self.pacer_doc_id.count("-") > 1
@@ -1474,8 +1469,9 @@ class RECAPDocument(
 
     @property
     def needs_extraction(self):
-        """Does the item need extraction and does it have all the right
-        fields? Items needing OCR still need extraction.
+        """Does the item need extraction and does it have all the right fields?
+
+        Items needing OCR still need extraction.
         """
         return all(
             [
@@ -1490,8 +1486,7 @@ class RECAPDocument(
 
     @property
     def authorities_with_data(self):
-        """Returns a queryset of this document's authorities for
-        eventual injection into a view template.
+        """Returns a queryset of this document's authorities for eventual injection into a view template.
 
         The returned queryset is sorted by the depth field.
         """
@@ -1579,8 +1574,8 @@ class RECAPDocument(
         )
 
     def clean(self):
-        """
-        Validate that:
+        """Validate the following attachment number rules.
+
         - Attachments must have an attachment_number.
         - Main PACER documents must not have an attachment_number.
         """
@@ -1634,11 +1629,10 @@ class RECAPDocument(
         return ""
 
     def get_column_function(self):
-        """Get dict of attrs: function to apply on field value if it needs
-        to be pre-processed before being add to csv
-        If not functions returns empty dict
+        """Get dict of attrs: function to apply on field value if it needs to be pre-processed before being add to csv If not functions returns empty dict.
 
-        returns: dict -- > {attr1: function}"""
+        returns: dict -- > {attr1: function}
+        """
         return {
             "document_type": self._get_readable_document_type,
             "ocr_status": self._get_readable_ocr_status,
@@ -1650,7 +1644,7 @@ class RECAPDocument(
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class RECAPDocumentTags(RECAPDocument.tags.through):
-    """A model class to track recap document tags m2m relation"""
+    """A model class to track recap document tags m2m relation."""
 
     class Meta:
         proxy = True
@@ -1819,7 +1813,7 @@ class Claim(AbstractDateTimeModel):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class ClaimTags(Claim.tags.through):
-    """A model class to track claim tags m2m relation"""
+    """A model class to track claim tags m2m relation."""
 
     class Meta:
         proxy = True
@@ -1885,8 +1879,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         verbose_name_plural = "Claim History Entries"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store claim documents under the claim bucket layout, keyed on the
-        claim's docket rather than the document's own docket entry."""
+        """Store claim documents under the claim bucket layout, keyed on the claim's docket rather than the document's own docket entry."""
         root = "claim-thumbnails" if thumbs else "claim"
         bucket = get_bucket_name(
             self.claim.docket.court_id, self.pacer_case_id
@@ -1955,8 +1948,7 @@ class StateCourtsQuerySet(models.QuerySet["Court"]):
 
 @pghistory.track()
 class Court(models.Model):
-    """A class to represent some information about each court, can be extended
-    as needed.
+    """A class to represent some information about each court, can be extended as needed.
 
     Note that a Courthouse object should be created alongside each new Court.
     Even if this is not enforced by the data model, there is some logic tied
@@ -2198,7 +2190,7 @@ class Court(models.Model):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class CourtAppealsTo(Court.appeals_to.through):
-    """A model class to track court appeals_to m2m relation"""
+    """A model class to track court appeals_to m2m relation."""
 
     class Meta:
         proxy = True
@@ -2624,7 +2616,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
 
     async def acaption(self):
-        """Make a proper caption
+        """Make a proper caption.
 
         This selects the best case name, then combines it with the best one or
         two citations we have in our system. Finally, if it's not a SCOTUS
@@ -2672,7 +2664,7 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def caption(self):
-        """Make a proper caption
+        """Make a proper caption.
 
         This selects the best case name, then combines it with the best one or
         two citations we have in our system. Finally, if it's not a SCOTUS
@@ -2716,11 +2708,13 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def display_citation(self):
-        """Find favorite citation to display
+        """Find favorite citation to display.
 
         Identify the proper or favorite citation(s) to display on the front end
         but don't wrap it together with a title
-        :return: The citation if applicable
+
+        Returns:
+            The citation if applicable
         """
         citation_list = [citation for citation in self.citations.all()]
         citations = sorted(citation_list, key=sort_cites)
@@ -2740,20 +2734,19 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def citation_string(self):
-        """Make a citation string, joined by commas"""
+        """Make a citation string, joined by commas."""
         citations = sorted(self.citations.all(), key=sort_cites)
         return ", ".join(str(c) for c in citations)
 
     async def acitation_string(self):
-        """Make a citation string, joined by commas"""
+        """Make a citation string, joined by commas."""
         result = [citation async for citation in self.citations.all()]
         citations = sorted(result, key=sort_cites)
         return ", ".join(str(c) for c in citations)
 
     @property
     def authorities(self) -> QuerySet["OpinionCluster"]:
-        """Returns a queryset that can be used for querying and caching
-        authorities.
+        """Returns a queryset that can be used for querying and caching authorities.
 
         Citation relationships connect individual opinions, but an authority
         is displayed at the cluster level. Traverse and aggregate those
@@ -2772,9 +2765,7 @@ class OpinionCluster(AbstractDateTimeModel):
         )
 
     async def aauthorities(self) -> QuerySet["OpinionCluster"]:
-        """Returns a queryset that can be used for querying and caching
-        authorities.
-        """
+        """Returns a queryset that can be used for querying and caching authorities."""
         return self.authorities
 
     @property
@@ -2849,11 +2840,7 @@ class OpinionCluster(AbstractDateTimeModel):
         )
 
     async def aauthorities_with_data(self) -> list["OpinionCluster"]:
-        """Returns a list of this cluster's authorities with an extra field
-        appended related to citation depth, for eventual injection into a
-        view template.
-        The returned list is sorted by that citation depth field.
-        """
+        """Returns a list of this cluster's authorities with an extra field appended related to citation depth, for eventual injection into a view template. The returned list is sorted by that citation depth field."""
         return [authority async for authority in self.authorities_with_data]
 
     def top_visualizations(self):
@@ -2893,8 +2880,8 @@ class OpinionCluster(AbstractDateTimeModel):
         opinions (e.g. Lead Opinion, Concurrence, Dissent), so this returns
         a queryset that may contain many opinions.
 
-        :return: A queryset of the cluster's main-version sub-opinions.
-        :rtype: QuerySet[Opinion]
+        Returns:
+            QuerySet[Opinion]: A queryset of the cluster's main-version sub-opinions.
         """
         return self.sub_opinions.filter(main_version__isnull=True)
 
@@ -2933,7 +2920,7 @@ class OpinionCluster(AbstractDateTimeModel):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class OpinionClusterPanel(OpinionCluster.panel.through):
-    """A model class to track opinion cluster panel m2m relation"""
+    """A model class to track opinion cluster panel m2m relation."""
 
     class Meta:
         proxy = True
@@ -2945,8 +2932,7 @@ class OpinionClusterPanel(OpinionCluster.panel.through):
 class OpinionClusterNonParticipatingJudges(
     OpinionCluster.non_participating_judges.through
 ):
-    """A model class to track opinion cluster non_participating_judges m2m
-    relation"""
+    """A model class to track opinion cluster non_participating_judges m2m relation."""
 
     class Meta:
         proxy = True
@@ -3022,7 +3008,7 @@ class BaseCitation(models.Model):
 
 @pghistory.track()
 class Citation(BaseCitation, AbstractDateTimeModel):
-    """A citation to an OpinionCluster"""
+    """A citation to an OpinionCluster."""
 
     cluster = models.ForeignKey(
         OpinionCluster,
@@ -3064,8 +3050,11 @@ def sort_cites(c):
 
     That'd give you the list of the Citation items sorted by their priority.
 
-    :param c: A Citation object to score.
-    :return: A score for the Citation passed in.
+    Args:
+        c: A Citation object to score.
+
+    Returns:
+        A score for the Citation passed in.
     """
     if c.type == Citation.NEUTRAL:
         return 0
@@ -3361,9 +3350,7 @@ class Opinion(AbstractDateTimeModel):
 
     @property
     def clean_text(self) -> str:
-        """
-        Returns the cleaned opinion text by using the annotated `best_text`
-        if it exists; otherwise, it falls back to computing the value in Python.
+        """Returns the cleaned opinion text by using the annotated `best_text` if it exists; otherwise, it falls back to computing the value in Python.
 
         The retrieved text is then cleaned using the `nh3.clean`. This cleaning
         process removes all HTML tags while preserving the content.
@@ -3413,7 +3400,7 @@ class Opinion(AbstractDateTimeModel):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class OpinionJoinedBy(Opinion.joined_by.through):
-    """A model class to track opinion joined_by m2m relation"""
+    """A model class to track opinion joined_by m2m relation."""
 
     class Meta:
         proxy = True
@@ -3625,9 +3612,7 @@ def build_authority_opinions_query(
 def build_authorities_query(
     base_queryset: QuerySet[OpinionsCitedByRECAPDocument],
 ) -> QuerySet[OpinionsCitedByRECAPDocument]:
-    """
-    Optimizes the authorities query by applying select_related, prefetch_related,
-    and selecting only the relevant fields to display the list of citations
+    """Optimizes the authorities query by applying select_related, prefetch_related, and selecting only the relevant fields to display the list of citations.
 
     Args:
         base_queryset (QuerySet[OpinionsCitedByRECAPDocument]): The queryset to optimize
@@ -3771,9 +3756,12 @@ class Tag(AbstractDateTimeModel):
 
         By using get_or_create calls, we make it atomic, fixing the problem.
 
-        :param thing: Either a Docket, DocketEntry, or RECAPDocument that you
-        wish to tag.
-        :return: A tuple with the tag and whether a new item was created
+        Args:
+            thing: Either a Docket, DocketEntry, or RECAPDocument that you
+                wish to tag.
+
+        Returns:
+            A tuple with the tag and whether a new item was created
         """
         match thing:
             case Docket():
@@ -3930,7 +3918,7 @@ class SearchQuery(models.Model):
 
 
 class ClusterRedirection(models.Model):
-    """Model to prevent dead /opinion/ links"""
+    """Model to prevent dead /opinion/ links."""
 
     VERSION = 1
     DUPLICATE = 2
@@ -3976,14 +3964,15 @@ class ClusterRedirection(models.Model):
         cluster_to_delete: OpinionCluster,
         reason: int,
     ):
-        """Create a ClusterRedirection entry from two OpinionCluster objects
+        """Create a ClusterRedirection entry from two OpinionCluster objects.
 
         Accounts for redirections pointing to the cluster to delete
         Deletion of the `cluster_to_delete` is left to the caller
 
-        :param cluster_to_keep: the redirection will point to this cluster
-        :param cluster_to_delete: this id will go into deleted_cluster_id
-        :param reason: one of ClusterRedirection.REDIRECTION_REASON
+        Args:
+            cluster_to_keep: the redirection will point to this cluster
+            cluster_to_delete: this id will go into deleted_cluster_id
+            reason: one of ClusterRedirection.REDIRECTION_REASON
         """
         if reason not in [i[0] for i in cls.REDIRECTION_REASON]:
             raise ValueError("Invalid value for `ClusterRedirection.reason`")
@@ -4048,6 +4037,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(fields=["capital_case"])
 
     def __str__(self) -> str:
         return f"SCOTUS metadata for docket {self.docket_id}"
@@ -4057,8 +4047,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name_plural = "SCOTUS Docket Metadata"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store the questions-presented PDF alongside the docket's documents
-        in the RECAP layout, using the docket's filing date and a `qp` marker:
+        """Store the questions-presented PDF alongside the docket's documents in the RECAP layout, using the docket's filing date and a `qp` marker.
 
             recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.qp.pdf
 
@@ -4079,9 +4068,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
 @pghistory.track()
 @document_model
 class CaseTransfer(AbstractDateTimeModel):
-    """
-    Represents any transfer of a docket between two courts whether that be
-    an appeal, workload balancing, or docket merging.
+    """Represents any transfer of a docket between two courts whether that be an appeal, workload balancing, or docket merging.
 
     The `x_court` and `x_docket_number` fields must always be set and at least
     one of `origin_docket` or `destination_docket` must be set to ensure
@@ -4101,14 +4088,15 @@ class CaseTransfer(AbstractDateTimeModel):
     3. Otherwise, create a new entry with only origin or destination docket\
        field set depending on which you have.
 
-    :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket_number: The ID of the docket this transfer originates from.
-    :ivar origin_docket: The docket object this transfer originates from.
-    :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket_number: The ID of the case docket in the destination court.
-    :ivar destination_docket: The docket object in the destination court.
-    :ivar transfer_date: The date this transfer occurred.
-    :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
+    Attributes:
+        origin_court: The court this transfer originates from.
+        origin_docket_number: The ID of the docket this transfer originates from.
+        origin_docket: The docket object this transfer originates from.
+        destination_court: The court the docket is being transferred to.
+        destination_docket_number: The ID of the case docket in the destination court.
+        destination_docket: The docket object in the destination court.
+        transfer_date: The date this transfer occurred.
+        transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
 
     APPEAL = 0
@@ -4167,8 +4155,11 @@ class CaseTransfer(AbstractDateTimeModel):
     ) -> tuple[int, int]:
         """Fill null docket FKs for one side (origin or destination).
 
-        :param side: Either "origin" or "destination".
-        :return: Tuple of (updated_count, total_count).
+        Args:
+            side: Either "origin" or "destination".
+
+        Returns:
+            Tuple of (updated_count, total_count).
         """
         from cl.recap.mergers import find_docket_object
 
@@ -4256,17 +4247,17 @@ class CaseTransfer(AbstractDateTimeModel):
 @pghistory.track()
 @document_model
 class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
-    """
-    Represents a docket entry in a SCOTUS docket.
+    """Represents a docket entry in a SCOTUS docket.
 
-    :ivar docket: The Docket this entry is associated with.
-    :ivar entry_number: Entry number on the SCOTUS Docket page.
-    :ivar description: For appellate brief events, a short description of
-    the brief.
-    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
-    :ivar sequence_number: CL-generated field to keep entries in the same
-    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
-    and the index in the SCOTUS table.
+    Attributes:
+        docket: The Docket this entry is associated with.
+        entry_number: Entry number on the SCOTUS Docket page.
+        description: For appellate brief events, a short description of
+            the brief.
+        date_filed: The date that SCOTUS indicates this entry was filed.
+        sequence_number: CL-generated field to keep entries in the same
+            order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+            and the index in the SCOTUS table.
     """
 
     docket = models.ForeignKey(
@@ -4286,22 +4277,41 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "entry_number",
+            "description",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         ordering = ["-sequence_number"]
 
+    csv_columns = [
+        "id",
+        "entry_number",
+        "date_filed",
+        "sequence_number",
+        "description",
+    ]
+
 
 @pghistory.track()
 @document_model
-class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
-    """
-    Represents an attachment to a SCOTUS docket entry.
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
+    """Represents an attachment to a SCOTUS docket entry.
 
-    :ivar docket_entry: The Docket this document is associated with.
-    :ivar description: The description of this file in SCOTUS.
-    :ivar document_number: The document number on the docket page in SCOTUS.
-    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
-    :ivar url: The download URL that SCOTUS provided for this document.
+    An entry without attachments gets one empty placeholder document (no
+    url), so its metadata can be indexed in ES, which indexes entries
+    through their documents. See is_placeholder.
+
+    Attributes:
+        docket_entry: The Docket this document is associated with.
+        description: The description of this file in SCOTUS.
+        document_number: The document number on the docket page in SCOTUS.
+        attachment_number: The attachment number on the docket page in SCOTUS.
+        url: The download URL that SCOTUS provided for this document.
     """
 
     docket_entry = models.ForeignKey(
@@ -4319,6 +4329,17 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         null=True,
     )
     url = models.URLField(max_length=1000)
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "description",
+            "document_number",
+            "attachment_number",
+            "plain_text",
+            "page_count",
+            "filepath_local",
+        ]
+    )
 
     class Meta:
         indexes = [
@@ -4332,12 +4353,46 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         )
         ordering = ("document_number", "attachment_number")
 
+    csv_columns = [
+        "id",
+        "description",
+        "document_number",
+        "attachment_number",
+        "url",
+        "is_available",
+        "sha1",
+        "page_count",
+        "file_size",
+        "filepath_local",
+        "filepath_ia",
+        "ocr_status",
+    ]
+
+    def _get_readable_ocr_status(self, field: str) -> str:
+        """Return the OCR status label for the CSV export."""
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, field: str) -> str:
+        """Return the file's full storage URL for the CSV export, or an empty string when there's no file."""
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs to be pre-processed before being add to csv.
+
+        returns: dict -- > {attr1: function}
+        """
+        return {
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
+
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Store SCOTUS documents in the RECAP layout, with the CourtListener
-        docket id in place of the PACER case id since SCOTUS isn't in PACER:
+        """Store SCOTUS documents in the RECAP layout, with the CourtListener docket id in place of the PACER case id since SCOTUS isn't in PACER.
 
             recap/gov.uscourts.scotus.<docket_id>/gov.uscourts.scotus.<docket_id>.<date_filed>.<document_number>.<attachment_number>.pdf
 
@@ -4385,13 +4440,19 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         return bool(self.filepath_local)
 
     @property
+    def is_placeholder(self) -> bool:
+        """Whether this is the empty document of an entry without attachments. Placeholders have no file to download and no page of their own; to find them in a query, filter on url=""."""
+        return not self.url
+
+    @property
     def has_valid_pdf(self) -> bool:
         return self.is_available
 
     @property
     def needs_extraction(self):
-        """Does the item need extraction and does it have all the right
-        fields? Items needing OCR still need extraction.
+        """Does the item need extraction and does it have all the right fields?
+
+        Items needing OCR still need extraction.
         """
         return (
             self.ocr_status is None or self.ocr_status == self.OCR_NEEDED
@@ -4408,38 +4469,33 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
 @pghistory.track()
 @document_model
 class TrialCourtData(AbstractDateTimeModel):
-    """
-    Trial court information for cases which have moved at least twice since
-    originating in a trial court. This is useful because
-    `originating_court_information` only captures info from the court directly
-    below in the appellate chain, and `CaseTransfer` similarly only goes one
-    step at a time. This model lets us store data from the very first time a
-    case appeared.
+    """Trial court information for cases which have moved at least twice since originating in a trial court. This is useful because `originating_court_information` only captures info from the court directly below in the appellate chain, and `CaseTransfer` similarly only goes one step at a time. This model lets us store data from the very first time a case appeared.
 
-    :ivar docket: The docket in the higher court that this information is
-        associated with.
-    :ivar docket_number_trial: The docket number of the trial court case with
-        (potentially) some cleanup applied. May be blank if not available for a
-        given state.
-    :ivar docket_number_raw_trial: The raw trial court docket number value as
-        found on the source, with no cleaning or transformations applied. May
-        be blank.
-    :ivar judge_str: The name of the judge who presided over the case. May be
-        blank if this information is not available.
-    :ivar judge: The entry in people_db.Person for the judge who presided over
-        this case if available.
-    :ivar reporter: The court reporter listed for this case. May be blank if
-        this information is not available.
-    :ivar date_filed: The date this case was originally filed. May be blank if
-        this information is not available.
-    :ivar court_name: The name of the court this case was filed in as it
-        appears in the source. May be blank if this information is not
-        available.
-    :ivar court: A foreign key to the Court object corresponding to the court
-        this case was heard in. May be blank if the court is not in the
-        database or is unavailable in the source.
-    :ivar punishment: The punishment assigned in criminal cases if available.
-    :ivar county: The county the trial court is located in if available.
+    Attributes:
+        docket: The docket in the higher court that this information is
+            associated with.
+        docket_number_trial: The docket number of the trial court case with
+            (potentially) some cleanup applied. May be blank if not available for a
+            given state.
+        docket_number_raw_trial: The raw trial court docket number value as
+            found on the source, with no cleaning or transformations applied. May
+            be blank.
+        judge_str: The name of the judge who presided over the case. May be
+            blank if this information is not available.
+        judge: The entry in people_db.Person for the judge who presided over
+            this case if available.
+        reporter: The court reporter listed for this case. May be blank if
+            this information is not available.
+        date_filed: The date this case was originally filed. May be blank if
+            this information is not available.
+        court_name: The name of the court this case was filed in as it
+            appears in the source. May be blank if this information is not
+            available.
+        court: A foreign key to the Court object corresponding to the court
+            this case was heard in. May be blank if the court is not in the
+            database or is unavailable in the source.
+        punishment: The punishment assigned in criminal cases if available.
+        county: The county the trial court is located in if available.
     """
 
     docket = models.OneToOneField(

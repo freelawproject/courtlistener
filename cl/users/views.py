@@ -62,7 +62,8 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.es_docket_sources import es_uid
+from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -188,10 +189,7 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Show the logged-in user's notes, grouped by the kind of object
-    each is attached to (docket, opinion, oral argument, or RECAP
-    document).
-    """
+    """Show the logged-in user's notes, grouped by the kind of object each is attached to (docket, opinion, oral argument, or RECAP document)."""
     notes = request.user.notes.prefetch_related("content_object").order_by(
         "pk"
     )
@@ -208,29 +206,41 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         # Carried alongside the form so the template can build a link/
         # icon for the noted object.
         note_forms[bucket].append((NoteForm(instance=note), target))
+    search_url = reverse("show_results")
     docket_search_url = (
-        "/?type=r&q=xxx AND docket_id:("
+        f"{search_url}?type=r&q=xxx AND docket_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=xxx AND id:("
+        f"{search_url}?type=oa&q=xxx AND id:("
         + " OR ".join(
             str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
         + ")"
     )
-    recap_search_url = (
-        "/?type=r&q=xxx AND id:("
-        + " OR ".join(
-            str(target.pk)
-            for _, target in note_forms["Documents"]
-            if isinstance(target, RECAPDocument)
-        )
-        + ")"
-    )
+    # The ES id field holds RECAP pks only; other sources' documents are
+    # matched by their uid (e.g. "scotus_123").
+    ids: list[str] = []
+    uids: list[str] = []
+    for _, d in note_forms["Documents"]:
+        if uid := es_uid(type(d), d.pk):
+            uids.append(uid)
+        else:
+            ids.append(str(d.pk))
+    id_query = f"id:({' OR '.join(ids)})"
+    uid_query = f"uid:({' OR '.join(uids)})"
+    # ES rejects an empty "id:()" or "uid:()", so each is only added when
+    # it has values.
+    if ids and uids:
+        document_query = f"({id_query} OR {uid_query})"
+    elif uids:
+        document_query = uid_query
+    else:
+        document_query = id_query
+    recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
     opinion_search_url = (
-        "/?q=xxx AND cluster_id:("
+        f"{search_url}?q=xxx AND cluster_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
@@ -530,7 +540,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 @check_honeypot(field_name="skip_me_if_alive")
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
-    """allow only an anonymous user to register"""
+    """Allow only an anonymous user to register."""
     redirect_to = get_redirect_or_abort(request, "next")
     # Every successful-looking outcome below, including a refused duplicate,
     # must produce this exact redirect. Anything that differs between the
@@ -656,8 +666,7 @@ def register(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def register_success(request: HttpRequest) -> HttpResponse:
-    """Tell the user they have been registered and allow them to continue where
-    they left off."""
+    """Tell the user they have been registered and allow them to continue where they left off."""
     redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
     if email:
@@ -765,7 +774,7 @@ def confirm_email(request, activation_key):
 )
 @check_honeypot(field_name="skip_me_if_alive")
 def request_email_confirmation(request: HttpRequest) -> HttpResponse:
-    """Send an email confirmation email"""
+    """Send an email confirmation email."""
     if request.method == "POST":
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
@@ -856,7 +865,7 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Render the webhooks page"""
+    """Render the webhooks page."""
     return TemplateResponse(
         request,
         "profile/webhooks.html",
@@ -874,8 +883,7 @@ def view_webhook_logs(
     request: AuthenticatedHttpRequest,
     route_prefix: str,
 ) -> HttpResponse:
-    """Render the webhooks logs page"""
-
+    """Render the webhooks logs page."""
     page_title = "Webhook Logs"
     sub_page = "logs"
     debug = False
@@ -904,8 +912,7 @@ def view_webhook_logs(
 def view_webhook_logs_detail(
     request: AuthenticatedHttpRequest, pk: int
 ) -> HttpResponse:
-    """Render the webhook event detail page"""
-
+    """Render the webhook event detail page."""
     webhook_event = get_object_or_404(
         WebhookEvent, webhook__user=request.user, pk=pk
     )
@@ -936,8 +943,7 @@ def view_webhook_logs_detail(
 def toggle_recap_email_auto_subscription(
     request: AuthenticatedHttpRequest,
 ) -> HttpResponse:
-    """Toggle the user's setting to auto-subscribe to recap.email cases"""
-
+    """Toggle the user's setting to auto-subscribe to recap.email cases."""
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
 
@@ -969,9 +975,7 @@ def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
 @method_decorator(ratelimiter_unsafe_10_per_m, name="post")
 @method_decorator(ratelimiter_unsafe_2000_per_h, name="post")
 class RateLimitedPasswordResetView(PasswordResetView):
-    """
-    Custom Password reset view with rate limiting
-    """
+    """Custom Password reset view with rate limiting."""
 
     template_name = "register/password_reset_form.html"
     email_template_name = "register/password_reset_email.html"
@@ -979,9 +983,7 @@ class RateLimitedPasswordResetView(PasswordResetView):
 
 
 class SafeRedirectLoginView(auth_views.LoginView):
-    """
-    Custom LoginView that validates and sanitizes the redirect URL after a
-    successful login.
+    """Custom LoginView that validates and sanitizes the redirect URL after a successful login.
 
     This view inherits from Django's built-in LoginView but adds an extra layer
     of security by ensuring the redirect URL submitted by the login form is safe
@@ -989,9 +991,7 @@ class SafeRedirectLoginView(auth_views.LoginView):
     """
 
     def get_redirect_url(self):
-        """
-        Return the user-originating redirect URL if it's safe. otherwise falls
-        back to the default.
+        """Return the user-originating redirect URL if it's safe. otherwise falls back to the default.
 
         This method ensures users cannot be redirected to malicious URLs after
         logging in, even if they attempt to provide one.

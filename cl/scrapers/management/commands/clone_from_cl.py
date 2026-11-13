@@ -1,6 +1,4 @@
-"""
-This tool allows you to partially clone data from courtlistener.com to your
-local environment, you only need to pass the type and object id and run it.
+"""This tool allows you to partially clone data from courtlistener.com to your local environment, you only need to pass the type and object id and run it.
 
 manage.py clone_from_cl --type search.OpinionCluster --id 9355884
 manage.py clone_from_cl --type search.Docket --id 5377675
@@ -113,11 +111,14 @@ class CloneException(Exception):
 def clean_api_data(
     data: dict, fields_to_remove: list[str] | None = None
 ) -> dict:
-    """Remove fields that shouldn't be saved to the db
+    """Remove fields that shouldn't be saved to the db.
 
-    :param data: The dictionary data obtained from the CourtListener API.
-    :param fields_to_remove: A list of specific keys to remove in addition to the defaults.
-    :return: The cleaned dictionary ready for database insertion/update.
+    Args:
+        data: The dictionary data obtained from the CourtListener API.
+        fields_to_remove: A list of specific keys to remove in addition to the defaults.
+
+    Returns:
+        The cleaned dictionary ready for database insertion/update.
     """
     default_fields_to_remove = ["resource_uri", "absolute_url"]
     removals = default_fields_to_remove + (fields_to_remove or [])
@@ -127,21 +128,27 @@ def clean_api_data(
 
 
 def get_id_from_url(api_url: str) -> str:
-    """Get the PK from an API url
+    """Get the PK from an API url.
 
-    :param api_url: api url with a pk
-    :return: pk from url
+    Args:
+        api_url: api url with a pk
+
+    Returns:
+        pk from url
     """
     return api_url.split("/")[-2]
 
 
 def get_json_data(api_url: str, session: Session, timeout: int = 120) -> dict:
-    """Get the JSON data from endpoint
+    """Get the JSON data from endpoint.
 
-    :param api_url: api url to send get request
-    :param session: a Requests session
-    :param timeout: timeout for get request
-    :return: list of opinion cluster objects
+    Args:
+        api_url: api url to send get request
+        session: a Requests session
+        timeout: timeout for get request
+
+    Returns:
+        list of opinion cluster objects
     """
     data = session.get(api_url, timeout=timeout)
 
@@ -161,19 +168,20 @@ def clone_opinion_cluster(
     download_opinion_files: bool = False,
     no_update: bool = False,
 ):
-    """Download opinion cluster data from courtlistener.com and add it to
-    local environment
+    """Download opinion cluster data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param cluster_ids: a list of opinion cluster ids
-    :param download_cluster_files: True if it should download cluster files
-    :param add_docket_entries: flag to clone docket entries and recap docs
-    :param person_positions: True if we should clone person positions
-    :param download_opinion_files: True if we should download local_path file from opinion
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of opinion cluster objects
+    Args:
+        session: a Requests session
+        cluster_ids: a list of opinion cluster ids
+        download_cluster_files: True if it should download cluster files
+        add_docket_entries: flag to clone docket entries and recap docs
+        person_positions: True if we should clone person positions
+        download_opinion_files: True if we should download local_path file from opinion
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of opinion cluster objects
     """
-
     opinion_clusters = []
 
     for cluster_id in cluster_ids:
@@ -317,17 +325,16 @@ def clone_opinion(
     download_local_file: bool = False,
     no_update: bool = False,
 ):
-    """Download opinion data from courtlistener.com and add it to local
-    environment
-    :param session: a Requests session
-    :param opinion_id: opinion id to clone
-    :param opinion_cluster_id: cluster id related to opinions
-    :param person_positions: True if we should clone person positions
-    :param download_local_file: True if we should download local_path file
-    :param no_update: If True, skip updating object if it already exists
-    :return:
-    """
+    """Download opinion data from courtlistener.com and add it to local environment.
 
+    Args:
+        session: a Requests session
+        opinion_id: opinion id to clone
+        opinion_cluster_id: cluster id related to opinions
+        person_positions: True if we should clone person positions
+        download_local_file: True if we should download local_path file
+        no_update: If True, skip updating object if it already exists
+    """
     opinion_path = reverse(
         "opinion-detail",
         kwargs={"version": "v4", "pk": opinion_id},
@@ -419,22 +426,23 @@ def clone_docket(
     download_local_file: bool = False,
     no_update: bool = False,
 ):
-    """Download docket data from courtlistener.com and add it to local
-    environment
+    """Download docket data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param docket_ids: a list of docket ids
-    :param add_docket_entries: flag to clone docket entries and recap docs
-    :param add_audio_files: flag to clone related audio files
-        when cloning a docket
-    :param add_clusters: flag to clone related opinion clusters when
-        cloning a docket
-    :param person_positions: True is we should clone person positions
-    :param download_local_file: True if we should download local_path file from opinion when add_clusters is True
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of docket objects
+    Args:
+        session: a Requests session
+        docket_ids: a list of docket ids
+        add_docket_entries: flag to clone docket entries and recap docs
+        add_audio_files: flag to clone related audio files
+            when cloning a docket
+        add_clusters: flag to clone related opinion clusters when
+            cloning a docket
+        person_positions: True is we should clone person positions
+        download_local_file: True if we should download local_path file from opinion when add_clusters is True
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of docket objects
     """
-
     dockets = []
 
     for docket_id in docket_ids:
@@ -532,15 +540,13 @@ def clone_docket(
 def clone_audio_files(
     session: Session, audio_files: list[str], no_update: bool = False
 ):
-    """Clone audio_audio rows related to the docket
-    Also, clone the actual `local_mp3_path` files to the dev storage.
-    This is useful for testing the audio.transcribe command
+    """Clone audio_audio rows related to the docket Also, clone the actual `local_mp3_path` files to the dev storage. This is useful for testing the audio.transcribe command.
 
-    :param session: session with authorization header
-    :param audio_files: api urls for the audio files
-    :param no_update: If True, skip updating object if it already exists
+    Args:
+        session: session with authorization header
+        audio_files: api urls for the audio files
+        no_update: If True, skip updating object if it already exists
     """
-
     for audio_id in audio_files:
         print(f"Cloning Audio id: {audio_id}")
 
@@ -625,15 +631,16 @@ def clone_audio_files(
 def clone_docket_entries(
     session: Session, docket_id: int, no_update: bool = False
 ) -> list:
-    """Download docket entries data from courtlistener.com and add it to local
-    environment
+    """Download docket entries data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param docket_id: docket id to clone docket entries
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of docket objects
+    Args:
+        session: a Requests session
+        docket_id: docket id to clone docket entries
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of docket objects
     """
-
     params = {"docket__id": docket_id}
 
     docket_entries_data = []
@@ -713,14 +720,16 @@ def clone_recap_documents(
     recap_documents_data: list,
     no_update: bool = False,
 ) -> list:
-    """Download recap documents data from courtlistener.com and add it to local
-    environment
+    """Download recap documents data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param docket_entry_id: docket entry id to assign to recap document
-    :param recap_documents_data: list with recap documents data to create
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of recap documents objects
+    Args:
+        session: a Requests session
+        docket_entry_id: docket entry id to assign to recap document
+        recap_documents_data: list with recap documents data to create
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of recap documents objects
     """
     created_recap_documents = []
     for recap_document_data in recap_documents_data:
@@ -769,11 +778,11 @@ def clone_recap_documents(
 
 
 def clone_tag(session: Session, tag_ids: list) -> list:
-    """Clone tags from docket entries or recap documents
+    """Clone tags from docket entries or recap documents.
 
-    :param session: a Requests session
-    :param tag_ids: list of tag ids to clone
-    :return:
+    Args:
+        session: a Requests session
+        tag_ids: list of tag ids to clone
     """
     created_tags = []
     for tag_id in tag_ids:
@@ -821,13 +830,16 @@ def clone_position(
     person_id: int,
     no_update: bool = False,
 ):
-    """Download position data from courtlistener.com and add it to local environment
+    """Download position data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param position_ids: a list of position ids
-    :param person_id: id of the person the positions belong to
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of position objects
+    Args:
+        session: a Requests session
+        position_ids: a list of position ids
+        person_id: id of the person the positions belong to
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of position objects
     """
     positions = []
 
@@ -902,16 +914,17 @@ def clone_person(
     positions: bool = False,
     no_update: bool = False,
 ):
-    """Download person data from courtlistener.com and add it to local
-    environment
+    """Download person data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param people_ids: a list of person ids
-    :param positions: True if we should clone person positions
-    :param no_update: If True, skip updating a Person object if it already exists, unless positions cloning is enabled
-    :return: list of person objects
+    Args:
+        session: a Requests session
+        people_ids: a list of person ids
+        positions: True if we should clone person positions
+        no_update: If True, skip updating a Person object if it already exists, unless positions cloning is enabled
+
+    Returns:
+        list of person objects
     """
-
     people = []
 
     for person_id in people_ids:
@@ -989,15 +1002,16 @@ def clone_person(
 
 
 def clone_court(session: Session, court_ids: list, no_update: bool = False):
-    """Download court data from courtlistener.com and add it to local
-    environment
+    """Download court data from courtlistener.com and add it to local environment.
 
-    :param session: a Requests session
-    :param court_ids: list of court ids
-    :param no_update: If True, skip updating object if it already exists
-    :return: list of Court objects
+    Args:
+        session: a Requests session
+        court_ids: list of court ids
+        no_update: If True, skip updating object if it already exists
+
+    Returns:
+        list of Court objects
     """
-
     courts = []
 
     for court_id in court_ids:

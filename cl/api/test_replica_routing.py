@@ -88,8 +88,7 @@ class ReplicaRoutingMiddlewareTest(TestCase):
         self.factory = RequestFactory()
 
     def _get_middleware(self, response_fn=None):
-        """Create middleware with a get_response that captures the
-        ContextVar value during the request."""
+        """Create middleware with a get_response that captures the ContextVar value during the request."""
         captured = {}
 
         def get_response(request: HttpRequest) -> HttpResponse:

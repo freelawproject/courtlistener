@@ -8,8 +8,7 @@ register = template.Library()
 
 @register.simple_tag()
 def svg(name, **kwargs):
-    """
-    Include an SVG file directly in the template.
+    """Include an SVG file directly in the template.
 
     Usage:
     ```

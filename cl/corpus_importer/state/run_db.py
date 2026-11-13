@@ -55,11 +55,16 @@ def downloaded_run_database(key: str) -> Iterator[Path]:
     and the download goes to the system temporary directory, which therefore
     needs the room.
 
-    :param key: The database's path within `AWS_STORAGE_BUCKET_NAME`, for
-        instance `nycourts_gov/2026-08-08.db`.
-    :yield: Path to the downloaded database.
-    :raises RunDatabaseUnavailable: If `key` names no file, or the download
-        fails for any reason.
+    Args:
+        key: The database's path within `AWS_STORAGE_BUCKET_NAME`, for
+            instance `nycourts_gov/2026-08-08.db`.
+
+    Yields:
+        Path to the downloaded database.
+
+    Raises:
+        RunDatabaseUnavailable: If `key` names no file, or the download
+            fails for any reason.
     """
     name = key.rsplit("/", 1)[-1]
     if name in ("", ".", ".."):

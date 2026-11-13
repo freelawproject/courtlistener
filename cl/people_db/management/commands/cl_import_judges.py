@@ -99,7 +99,7 @@ class Command(VerboseCommand):
         df = pd.read_csv(infile)
         df = df.replace(r"^\s+$", np.nan, regex=True)
         for x in textfields:
-            df[x] = df[x].replace(np.nan, "", regex=True)
+            df[x] = df[x].fillna("")
         # Assign the result back rather than using inplace=True: df[col] is a
         # temporary Series, so an inplace call on it is chained assignment,
         # which pandas 3's copy-on-write silently turns into a no-op.
@@ -131,7 +131,7 @@ class Command(VerboseCommand):
         ]
 
         for x in textfields:
-            df[x] = df[x].replace(np.nan, "", regex=True)
+            df[x] = df[x].fillna("")
         for i, row in df.iterrows():
             if i < self.options["offset"]:
                 continue

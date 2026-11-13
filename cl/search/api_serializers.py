@@ -64,9 +64,12 @@ inverted_o_type_index_map = {
 def get_value_from_es_obj(obj: dict | ESDictDocument | Hit, field: str) -> Any:
     """Retrieve a value field from an ES object or dict.
 
-    :param obj: The object or dict to access.
-    :param field: The field name to retrieve.
-    :return: The value of the field, or None if not present.
+    Args:
+        obj: The object or dict to access.
+        field: The field name to retrieve.
+
+    Returns:
+        The value of the field, or None if not present.
     """
     if isinstance(obj, dict):
         return obj.get(field, None)
@@ -380,7 +383,7 @@ class V3PersonESResultSerializer(DocumentSerializer):
 
 
 class ExtendedPersonESSerializer(V3PersonESResultSerializer):
-    """Extends the Person serializer with all the field we get from the db"""
+    """Extends the Person serializer with all the field we get from the db."""
 
     snippet = serializers.SerializerMethodField(read_only=True)
     appointer = serializers.ListField(read_only=True)
@@ -495,14 +498,14 @@ class BaseMetaDataSerializer(serializers.Serializer):
 
 class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
     """The metadata serializer V4 Search API for main documents.
+
     Includes the score field.
     """
 
     score = serializers.SerializerMethodField(source="*", read_only=True)
 
     def get_score(self, obj):
-        """
-        Returns the appropriate score serialization for a given result object.
+        """Returns the appropriate score serialization for a given result object.
 
         If the `semantic` keyword is included in the query string with a truthy value,
         this method uses `SemanticSearchScoreSerializer`, which includes both semantic
@@ -521,9 +524,7 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
 
 
 class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
-    """The metadata serializer for the RECAP search type includes the
-    additional more_docs field.
-    """
+    """The metadata serializer for the RECAP search type includes the additional more_docs field."""
 
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining", default=False
@@ -531,9 +532,7 @@ class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
 
 
 class RECAPWebhookMetaDataSerializer(BaseMetaDataSerializer):
-    """The metadata serializer for the RECAP search Webhook that includes the
-    additional more_docs field without the score field.
-    """
+    """The metadata serializer for the RECAP search Webhook that includes the additional more_docs field without the score field."""
 
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining", default=False
@@ -588,6 +587,10 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_case_id",
             "plain_text",
             "docket_id",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 
@@ -630,6 +633,8 @@ class BaseDocketESResultSerializer(DocumentSerializer):
             "court_exact",
             "timestamp",
             "date_created",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
         )
 
 
@@ -849,6 +854,9 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "cites",
             "pacer_doc_id",
             "trustee_str",
+            "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 
