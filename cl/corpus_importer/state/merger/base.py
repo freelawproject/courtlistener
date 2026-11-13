@@ -556,11 +556,8 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             updated += self.pre_update(updated)
             if updated:
                 updated += auto_now_fields(self.config.model)
-            state.instance.save(update_fields=updated)
 
-        if self.config.registry.related:
-            return state.children(state.instance, result)
-        return state.complete(state.instance, result)
+        return state.save(state.instance, updated, result)
 
     @override
     def create(
@@ -578,14 +575,33 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             model_name = spec.merger.config.model.__name__
             if model_name in result.creates:
                 o2o_params[attname] = next(iter(result.creates[model_name]))
-        db_obj = self.manager.create(
-            **(self._attributes(state.relation_params) | o2o_params),
+
+        return state.save(
+            self._attributes(state.relation_params) | o2o_params, result
         )
-        result |= MergeResult.created(self.config.model.__name__, db_obj.pk)
+
+    @override
+    def save(
+        self, state: MergerState.Save[Scrape, Params, M]
+    ) -> MergerState.SaveOutput[Scrape, Params, M]:
+        match state.operation:
+            case MergerState.ModelCreate(fields):
+                instance = self.manager.create(**fields)
+                result = MergeResult.created(
+                    instance.__class__.__name__, instance.pk
+                )
+            case MergerState.ModelUpdate(instance, fields):
+                if fields:
+                    instance.save(update_fields=fields)
+                    result = MergeResult.updated(
+                        instance.__class__.__name__, instance.pk
+                    )
+                else:
+                    result = MergeResult.unnecessary()
 
         if self.config.registry.related:
-            return state.children(db_obj, result)
-        return state.complete(db_obj, result)
+            return state.children(instance, state.result | result)
+        return state.complete(instance, state.result | result)
 
     @override
     def children(
