@@ -2223,8 +2223,13 @@ class TrialCourtMetadataTest(TestCase):
         docket = trial_court.docket
         for _ in range(3):
             CaseTransferFactory(destination_docket=docket)
-        with self.assertNumQueries(2):
+        with CaptureQueriesContext(connection) as queries:
             sections = docket_entry_sources.TEXAS.metadata_sections(docket)
+        self.assertEqual(len(queries), 2)
+        # The joined court and judge rows bring only the columns shown.
+        sql = queries[0]["sql"]
+        self.assertNotIn('"search_court"."notes"', sql)
+        self.assertNotIn('"people_db_person"."date_dob"', sql)
         self.assertEqual(
             [section["title"] for section in sections],
             ["Trial Court Information", "Case Transfers"],

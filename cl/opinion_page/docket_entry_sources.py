@@ -800,6 +800,23 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     trial_court = (
         TrialCourtData.objects.filter(docket=docket)
         .select_related("court", "judge")
+        .only(
+            "court_name",
+            "docket_number_trial",
+            "docket_number_raw_trial",
+            "county",
+            "judge_str",
+            "reporter",
+            "date_filed",
+            "punishment",
+            "court__short_name",
+            # Person.name_full and get_absolute_url read these.
+            "judge__name_first",
+            "judge__name_middle",
+            "judge__name_last",
+            "judge__name_suffix",
+            "judge__slug",
+        )
         .first()
     )
     transfers = (
