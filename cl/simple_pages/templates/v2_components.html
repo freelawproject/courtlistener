@@ -1355,7 +1355,7 @@ Sample code here.
 
     <h5 class="mt-3">Variants</h5>
     <div class="my-4 flex flex-row flex-wrap items-center gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-2"><c-icon name="bell" />Filled</span>
+      <span class="flex items-center gap-2"><c-icon name="bell" class="text-greyscale-400" />Filled</span>
       <span class="flex items-center gap-2"><c-icon name="bell" outline />Outline</span>
     </div>
 
@@ -1407,7 +1407,7 @@ Sample code here.
       <c-slot name="button_content">Open Menu</c-slot>
       <c-slot name="menu_content">
         <c-menu-button.item href="#" icon="bell_outline">Alerts</c-menu-button.item>
-        <c-menu-button.item href="#" icon="bookmark">Notes</c-menu-button.item>
+        <c-menu-button.item href="#" icon="bookmark_outline">Notes</c-menu-button.item>
         <c-menu-button.divider />
         <c-menu-button.item href="#" icon="avatar_outline">Account</c-menu-button.item>
       </c-slot>
@@ -1472,7 +1472,7 @@ Sample code here.
   &lt;c-slot name="button_content"&gt;Open Menu&lt;/c-slot&gt;
   &lt;c-slot name="menu_content"&gt;
     &lt;c-menu-button.item href="#" icon="bell_outline"&gt;Alerts&lt;/c-menu-button.item&gt;
-    &lt;c-menu-button.item href="#" icon="bookmark"&gt;Notes&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.item href="#" icon="bookmark_outline"&gt;Notes&lt;/c-menu-button.item&gt;
     &lt;c-menu-button.divider /&gt;
     &lt;c-menu-button.item href="#" icon="avatar_outline"&gt;Account&lt;/c-menu-button.item&gt;
   &lt;/c-slot&gt;
@@ -1815,7 +1815,7 @@ Sample code here.
 
     <h4 class="mt-3">Demo</h4>
     <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" /></span>
+      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" icon_class="w-4 h-4 text-greyscale-400" /></span>
       <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="True" icon_class="w-4 h-4 text-greyscale-500" /></span>
     </div>
 

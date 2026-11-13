@@ -702,8 +702,8 @@ def build_docket_tabs(
     """Build the tab navigation items for the docket page.
 
     Each item is a dict with 'label', 'url', 'key' and 'icon'. 'icon' names a
-    file in cl/assets/static-global/svg/ for the {% svg %} tag; the mobile
-    dropdown ignores it.
+    file in cl/assets/static-global/svg/ for the <c-icon> component; the
+    mobile dropdown ignores it.
     """
     tabs = [
         {
