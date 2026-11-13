@@ -357,9 +357,9 @@ async def components(request: HttpRequest) -> HttpResponse:
     demo_disabled_filter_form.fields["entry_gte"].disabled = True
 
     demo_panel_tabs: list[TabItem] = [
-        {"key": "first", "label": "First tab", "icon": ""},
-        {"key": "second", "label": "Second tab", "icon": ""},
-        {"key": "third", "label": "Third tab", "icon": ""},
+        {"key": "first", "label": "First tab"},
+        {"key": "second", "label": "Second tab"},
+        {"key": "third", "label": "Third tab"},
     ]
 
     return TemplateResponse(

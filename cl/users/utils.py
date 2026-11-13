@@ -460,20 +460,22 @@ class TabItem(TypedDict):
 
     The component picks its mode from the entries: when they have a `url`,
     each tab is a link to its own page; when none do, each tab is a button
-    that shows the c-tabs.panel whose `name` matches its `key`. A list where
-    only some entries have a `url` is not supported.
+    that shows the c-tabs.panel with the same `key`. A list where only some
+    entries have a `url` is not supported.
 
     :key: Identifies the tab. It's compared with the component's `active_tab`
         and used to build its ids, so it must be unique within the list.
     :label: Text shown on the tab and in the mobile dropdown.
-    :icon: Name of an SVG in cl/assets/static-global/svg/ for the {% svg %} tag.
+    :icon: Name of an SVG in cl/assets/static-global/svg/ for the {% svg %}
+        tag. Only shown in link mode.
     :url: Page the tab links to. Only in link mode.
-    :count: Number shown in a chip next to the label. Only shown on desktop.
+    :count: Number shown after the label: in a chip on panel-mode tabs and in
+        brackets in the mobile dropdown.
     """
 
     key: str
     label: str
-    icon: str
+    icon: NotRequired[str]
     url: NotRequired[str]
     count: NotRequired[int]
 
