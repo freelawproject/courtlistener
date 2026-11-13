@@ -2121,6 +2121,45 @@ class TexasDocketUrlTest(SimpleTestCase):
                 self.assertEqual(docket.texas_docket_url, expected)
 
 
+class TexasEntryDisplayTextTest(SimpleTestCase):
+    """Does the Texas source build each entry's text from its TAMES fields, one per line, escaped?"""
+
+    def test_display_text(self) -> None:
+        """Are the type, description, disposition and remarks each on their own line, with empty ones left out and scraped markup escaped?"""
+        cases = [
+            (
+                "every field",
+                TexasDocketEntry(
+                    entry_type="Brief filed",
+                    description="Brief on the merits",
+                    disposition="Granted",
+                    remarks="Oral argument set",
+                ),
+                "Brief filed<br>Brief on the merits<br>Disposition: Granted"
+                "<br>Remarks: Oral argument set",
+            ),
+            (
+                "only the type",
+                TexasDocketEntry(entry_type="Motion filed"),
+                "Motion filed",
+            ),
+            (
+                "scraped markup",
+                TexasDocketEntry(
+                    entry_type="<b>Notice</b>", disposition="<i>Denied</i>"
+                ),
+                "&lt;b&gt;Notice&lt;/b&gt;<br>Disposition: "
+                "&lt;i&gt;Denied&lt;/i&gt;",
+            ),
+        ]
+        for name, entry, expected in cases:
+            with self.subTest(case=name):
+                self.assertEqual(
+                    docket_entry_sources.TEXAS.entry_display_text(entry),
+                    expected,
+                )
+
+
 class TexasDocketEntrySourceTest(TestCase):
     """Is every TAMES court served by the Texas source, and does that source load a page of entries in a fixed number of queries?"""
 
@@ -2204,11 +2243,31 @@ class TexasDocketPageTest(TestCase):
             docket_entry=TexasDocketEntryFactory(
                 docket=cls.docket,
                 sequence_number="2026-10-01.001",
+                entry_type="Petition for Review filed",
                 description="Petition for review",
+                disposition="Granted",
+                # Scraped text must never reach the page unescaped.
+                remarks="<script>alert(1)</script>",
             ),
             url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
         )
         cls.url = reverse("view_docket", args=[cls.docket.pk, cls.docket.slug])
+
+    def test_entry_shows_type_disposition_and_escaped_remarks(self) -> None:
+        """Does each stack show the entry's type and disposition, and escape scraped remarks even where the legacy stack renders the text unescaped?"""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Petition for Review filed", content)
+                self.assertIn("Disposition: Granted", content)
+                self.assertIn(
+                    "Remarks: &lt;script&gt;alert(1)&lt;/script&gt;", content
+                )
+                self.assertNotIn("<script>alert(1)</script>", content)
 
     def test_docket_returns_404_while_flag_is_off(self) -> None:
         """Is the page a 404, like SCOTUS before its launch, while texas_docket_page is off?"""

@@ -422,6 +422,7 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
+            entry.display_text = source.entry_display_text(entry)
             entry.documents = [
                 document
                 for document in source.documents_for_entry(entry)

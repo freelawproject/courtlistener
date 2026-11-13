@@ -14,6 +14,8 @@ from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from django.urls import reverse
 from django.utils.formats import date_format
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import SafeString, mark_safe
 
 from cl.custom_filters.templatetags.extras import http_url
 from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
@@ -170,6 +172,11 @@ def _no_metadata_sections(docket: Docket) -> list[MetadataSection]:
     return []
 
 
+def _entry_description(entry: Any) -> str:
+    """Return the entry's own description: by default that's all the docket page shows for an entry."""
+    return entry.description
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -243,6 +250,12 @@ class DocketEntrySource:
     It defaults to False so a new source only shows the menu once its
     mergers send alerts and it opts in.
 
+    ``entry_display_text`` returns the text the docket page shows for an
+    entry, which the view puts on ``entry.display_text``. The legacy stack
+    renders it unescaped, as it always did for RECAP descriptions, so a
+    source that builds it from scraped fields MUST escape them, e.g. with
+    ``format_html``, as ``_texas_entry_display_text`` does.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
@@ -288,6 +301,7 @@ class DocketEntrySource:
     launch_flag: str | None = None
     has_entry_numbers: bool = True
     supports_docket_alerts: bool = False
+    entry_display_text: Callable[[Any], str] = _entry_description
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -721,6 +735,23 @@ def _texas_documents_for_entry(
     return de.texasdocument_set.all()
 
 
+def _texas_entry_display_text(entry: TexasDocketEntry) -> SafeString:
+    """Return what the docket page shows for one Texas entry, one line each: its type, its description, and its disposition and remarks when TAMES lists them.
+
+    TAMES keeps an entry's text in entry_type, and only appellate briefs have
+    a description. Every part comes from the court, so format_html escapes
+    it before the lines are joined.
+    """
+    lines = [entry.entry_type, entry.description]
+    if entry.disposition:
+        lines.append(format_html("Disposition: {}", entry.disposition))
+    if entry.remarks:
+        lines.append(format_html("Remarks: {}", entry.remarks))
+    return format_html_join(
+        mark_safe("<br>"), "{}", ((line,) for line in lines if line)
+    )
+
+
 def _texas_main_docs_prefetch() -> Prefetch:
     """Prefetch each entry's first document into `main_docs`.
 
@@ -848,6 +879,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     admin_document_label="Texas Document",
     launch_flag="texas_docket_page",
     has_entry_numbers=False,
+    entry_display_text=_texas_entry_display_text,
 )
 
 # Courts whose dockets use a source other than RECAP. source_for_court_id
