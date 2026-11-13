@@ -78,6 +78,10 @@ class DocketFeed(Feed):
         return mark_safe(f"{preface} in {docket_title}")
 
     def item_description(self, item: SourceDocketEntry) -> str:
+        """Return the entry's text as the docket page shows it, falling back to its main document's description."""
+        # Sources like Texas keep an entry's text outside its description
+        # field, so ask the source, as the docket page does.
+        text = item.docket.get_entry_source().entry_display_text(item)
         try:
             # main_docs comes from the source's main_docs_prefetch()
             # to_attr, which pyrefly can't see.
@@ -85,8 +89,8 @@ class DocketFeed(Feed):
             main_doc = item.main_docs[0]
         except IndexError:
             # No doc associated with entry
-            return item.description
-        return item.description or main_doc.description
+            return text
+        return text or main_doc.description
 
     def item_link(self, item: SourceDocketEntry) -> str:
         if entry_number := _entry_number_of(item):

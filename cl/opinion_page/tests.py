@@ -2587,7 +2587,7 @@ class TexasDocketPageTest(TestCase):
                     self.assertEqual("Share Alert Link" in content, shows_menu)
 
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
-        """Does the docket feed list Texas entries, which have no entry number, linking each to its row on the docket page?"""
+        """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""
         TexasDocketEntry.objects.filter(
             pk=self.document.docket_entry_id
         ).update(date_filed=date(2026, 10, 1))
@@ -2598,6 +2598,10 @@ class TexasDocketPageTest(TestCase):
         self.assertIn(
             f"#minute-entry-{self.document.docket_entry_id}", content
         )
+        # The entry's type and disposition aren't in its description field.
+        self.assertIn("Petition for Review filed", content)
+        self.assertIn("Disposition: Granted", content)
+        self.assertNotIn("<script>alert(1)</script>", content)
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
