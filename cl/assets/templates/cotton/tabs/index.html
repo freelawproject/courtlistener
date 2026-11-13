@@ -1,7 +1,5 @@
 {% load component_tags %}
 {% require_script "js/alpine/components/tabs.js" %}
-{% require_script "js/alpine/composables/focus.js" %}
-{% require_script "js/alpine/plugins/focus" defer=True %}
 
 <c-vars label="" tabs="" active_tab="" class="" />
 
@@ -44,6 +42,8 @@
       </div>
     </div>
   {% else %}
+    {% require_script "js/alpine/composables/focus.js" %}
+    {% require_script "js/alpine/plugins/focus" defer=True %}
     {# Falls back to the first tab when the caller omits active_tab. Panels can't see this fallback, so they stay hidden until Alpine shows the first one; pass active_tab from resolve_active_tab to render the right panel from the start. #}
     {% firstof active_tab tabs.0.key as current_tab %}
     <div

@@ -48,12 +48,10 @@ document.addEventListener('alpine:init', () => {
       for (const option of select.options) option.selected = option.defaultSelected;
     },
     handleSendError() {
-      this.isBusy = false;
       this.errorMessage = "Couldn't load this tab. Please check your connection and try again.";
       this.restoreSelectedTab();
     },
     handleResponseError(event) {
-      this.isBusy = false;
       const { xhr, pathInfo } = event.detail;
 
       if (xhr.status >= 500) {
