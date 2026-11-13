@@ -625,7 +625,8 @@ class TestSvgTag(SimpleTestCase):
     def test_every_icon_name_in_use_has_a_file(self) -> None:
         """A renamed or deleted icon file must not leave a template or view
         pointing at a name that no longer exists, since the svg tag renders
-        nothing for it in production."""
+        nothing for it in production.
+        """
         source_root = settings.INSTALL_ROOT / "cl"
         used: dict[str, set[str]] = {}
 
