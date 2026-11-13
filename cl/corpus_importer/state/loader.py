@@ -26,7 +26,7 @@ import logging
 import sqlite3
 import time
 from abc import ABC
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -35,12 +35,13 @@ from pathlib import Path
 from typing import Any, ClassVar, Final, assert_never, cast
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.ledger import LoadLedger, RetryRows
-from cl.corpus_importer.state.merger import Merger
+from cl.corpus_importer.state.merger import Merger, MergerState
 from cl.corpus_importer.state.preflight import (
     STANDARD_CHECKS,
     CheckResult,
@@ -547,26 +548,91 @@ class JKentScrapeLoader[
                 yield prepared
 
     @classmethod
-    def merge_one(cls, scrape: ScrapeType) -> MergeResult:
+    def merge_one(cls, scrape: ScrapeType) -> tuple[MergeResult, FileTally]:
         """Merge a single scrape, then publish its files.
 
         Runs in celery worker.
+
+        Args:
+            scrape: The scrape to merge.
+
+        Returns:
+            The result of the merge and the publish together, and what
+            became of the scrape's files.
         """
         merger = cls.merger(scrape, params=cls.params(scrape))
-        result = merger.merge()
-        if isinstance(merger.out, Docket):
-            result |= cls.publish_files(merger.out)
-        return result
+        with transaction.atomic():
+            result = merger.merge()
+        files = cls.reconcile_files(scrape, merger)
+        if isinstance(
+            state := merger.state, MergerState.Complete
+        ) and isinstance(state.output, Docket):
+            published, tally = cls.publish_files(state.output)
+            result |= published
+            files |= tally
+        return result, files
 
     @classmethod
-    def merge_payload(cls, payload: str) -> tuple[str, MergeResult]:
+    def reconcile_files(
+        cls, scrape: ScrapeType, merger: ScrapeMerger
+    ) -> FileTally:
+        """Bring storage in line with a merge that has just committed, before its files are published. Override for a merger that tracks files.
+
+        :param scrape: The scrape that was merged.
+        :param merger: The merger, in the state the merge left it in.
+        :return: What became of the scrape's files other than being published.
+        """
+        return NO_FILES
+
+    @classmethod
+    def delete_removed_files(
+        cls, stored: Mapping[int, tuple[str, str]]
+    ) -> None:
+        """Delete the files of the documents a merge removed.
+
+        Published files are named by primary key, so no surviving document
+        can share one. A file still in the private bucket can be: the scraper
+        names files by content, so one file listed under two filings is one
+        key. Any key another document still points at is left alone.
+
+        :param stored: Each document's file and thumbnail before the merge,
+            keyed by the document's primary key.
+        """
+        if not stored or (model := cls.document_model) is None:
+            return
+        kept = set(
+            model._default_manager.filter(pk__in=stored).values_list(
+                "pk", flat=True
+            )
+        )
+        removed = [stored[pk] for pk in stored.keys() - kept]
+        paths = {path for path, _ in removed if path}
+        referenced = set(
+            model._default_manager.filter(
+                filepath_local__in=paths
+            ).values_list("filepath_local", flat=True)
+        )
+        private = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+        public = settings.AWS_STORAGE_BUCKET_NAME
+        for path, thumbnail in removed:
+            if path and path not in referenced:
+                delete_file(
+                    private if path.startswith(cls.private_prefix) else public,
+                    path,
+                )
+            if thumbnail:
+                delete_file(public, thumbnail)
+
+    @classmethod
+    def merge_payload(cls, payload: str) -> tuple[str, MergeResult, FileTally]:
         """Merge one dispatched row, given the payload celery carried.
 
         Args:
             payload: The scrape, as the load dumped it at dispatch.
 
         Returns:
-            The scrape's label and the result of merging it.
+            The scrape's label, the result of merging it, and what
+            became of its files.
 
         Raises:
             pydantic.ValidationError: If the payload no longer fits
@@ -576,10 +642,10 @@ class JKentScrapeLoader[
                 will reconcile them.
         """
         scrape = cls.scrape_model.model_validate_json(payload)
-        return cls.label(scrape), cls.merge_one(scrape)
+        return cls.label(scrape), *cls.merge_one(scrape)
 
     @classmethod
-    def publish_files(cls, docket: Docket) -> MergeResult:
+    def publish_files(cls, docket: Docket) -> tuple[MergeResult, FileTally]:
         """Move each of a docket's files from private to public.
 
         A file goes where the document says it belongs, which for a state
@@ -596,7 +662,7 @@ class JKentScrapeLoader[
             file there was a move to make.
         """
         if not cls.private_prefix or (model := cls.document_model) is None:
-            return MergeResult()
+            return MergeResult(), NO_FILES
         documents: QuerySet[AbstractStateDocument] = (
             model._default_manager.filter(**{DOCKET_PATH: docket})
             .exclude(filepath_local="")
@@ -651,8 +717,8 @@ class JKentScrapeLoader[
             if key not in referenced:
                 delete_file(bucket, key)
         if not moved:
-            return MergeResult(files=tally)
-        return MergeResult(updates={model.__name__: moved}, files=tally)
+            return MergeResult(), tally
+        return MergeResult(updates={model.__name__: moved}), tally
 
     @classmethod
     def published_only(

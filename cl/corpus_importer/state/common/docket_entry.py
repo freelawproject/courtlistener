@@ -8,7 +8,7 @@ target model are per-state).
 
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
@@ -18,12 +18,12 @@ from cl.corpus_importer.state.merger import (
     Fn,
     ManyStrategy,
     Merger,
+    MergerConfig,
+    MergerState,
     OneToManyRelation,
     Params,
     RelatedParams,
     Scrape,
-    WithStrategy,
-    overwrite,
 )
 from cl.search.state.shared import (
     AbstractStateDocument,
@@ -43,29 +43,34 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = WithStrategy(Scrape(ScrapeDocument).url, overwrite)
+    """Merges a scraped document's URL, and clears what was stored for the old one when it changes."""
+
+    config: ClassVar[MergerConfig[AbstractStateDocument]] = MergerConfig(
+        model=AbstractStateDocument,
+        reads=("filepath_local", "processing_error"),
+    )
+
+    url: str = Scrape(ScrapeDocument).url
 
     @override
     def needs_update(self) -> bool:
         """Force the update path for a document with no stored file and no recorded processing error -- its download failed transiently, and reporting an update gets the download re-dispatched on re-ingest."""
+        if not isinstance(state := self.state, MergerState.Update):
+            return False
+        document = cast(AbstractStateDocument, state.instance)
         return (
-            self.existing is not None
-            and not cast(AbstractStateDocument, self.existing).filepath_local
-            and cast(AbstractStateDocument, self.existing).processing_error
-            is None
+            not document.filepath_local and document.processing_error is None
         )
 
     @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         updated = super().pre_update(updated_fields)
-        # This hook only runs on the update path, so `existing` is set; the
-        # guard narrows the type for mypy.
-        if (
-            existing := cast(AbstractStateDocument | None, self.existing)
-        ) is None:
+        # This hook only runs on the update path; the guard narrows the type.
+        if not isinstance(self.state, MergerState.Update):
             return updated
         if "url" not in updated_fields:
             return updated
+        existing = cast(AbstractStateDocument, self.state.instance)
         if existing.processing_error == ProcessingError.BAD_URL:
             existing.processing_error = None
             updated.append("processing_error")
@@ -96,13 +101,8 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = WithStrategy(
-        Scrape(ScrapeDocketEntry).date_filed, overwrite
-    )
-    entry_type: int = WithStrategy(
-        Fn(getattr)(
-            DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
-        ),
-        overwrite,
+    date_filed: date = Scrape(ScrapeDocketEntry).date_filed
+    entry_type: int = Fn(getattr)(
+        DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
     )
     documents: list[Any] = AttachmentRelation()

@@ -2,7 +2,7 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Generator, Iterator
 from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
@@ -14,8 +14,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import DatabaseError, connection
-from django.db.models import Model, QuerySet
+from django.db import DatabaseError
 from django.test import override_settings
 from pydantic import BaseModel
 
@@ -34,6 +33,8 @@ from cl.corpus_importer.state.loader import (
 from cl.corpus_importer.state.merger import (
     Constant,
     Merger,
+    MergerConfig,
+    MergerState,
     Scrape,
 )
 from cl.corpus_importer.state.preflight import (
@@ -73,67 +74,6 @@ from cl.search.models import (
     Docket,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
-
-
-def merger_test[**P, R](
-    *, expected_query_count: int | range | None = None
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    def decorator(f: Callable[P, R]) -> Callable[P, R]:
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            counts = {"merger": 0, "test": 0}
-            merger_sql: list[str] = []
-            merge_depth = 0
-
-            original_merge = Merger.merge
-
-            def counting_merge(merger_self: Any) -> Any:
-                nonlocal merge_depth
-                merge_depth += 1
-                try:
-                    return original_merge(merger_self)
-                finally:
-                    merge_depth -= 1
-
-            def count_query(
-                execute: Any, sql: Any, params: Any, many: Any, context: Any
-            ) -> Any:
-                # Skip savepoint bookkeeping from transaction.atomic(); it only
-                # appears because tests already run inside a transaction.
-                if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
-                    if merge_depth:  # pyrefly:ignore[redundant-condition] See https://github.com/meta/pyrefly/issues/5563
-                        counts["merger"] += 1
-                        merger_sql.append(sql)
-                    else:
-                        counts["test"] += 1
-                return execute(sql, params, many, context)
-
-            Merger.merge = counting_merge  # type: ignore[method-assign, assignment]
-
-            with connection.execute_wrapper(count_query):
-                output = f(*args, **kwargs)
-
-            if expected_query_count is not None:
-                if isinstance(args[0], TestCase):
-                    # It's okay if the query count is below the expect amount, but we still assert it isn't to force
-                    # the expectation to be updated whenever performance is improved.
-                    if isinstance(expected_query_count, int):
-                        args[0].assertEqual(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be equal to expectation.",
-                        )
-                    elif isinstance(expected_query_count, range):
-                        args[0].assertIn(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be in expected range.",
-                        )
-
-            return output
-
-        return wrapper
-
-    return decorator
 
 
 def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
@@ -240,16 +180,21 @@ class LoaderTestCase(TestCase):
         test_court = self.court
 
         class TestMerger(Merger[LoaderScrape, None, Docket]):
-            model: ClassVar[type[Model]] = Docket
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
             court: Court = Constant(test_court)
             source: int = Constant(DocketSources.SCRAPER)
             docket_number: str = Scrape(LoaderScrape).docket_number
             case_name: str = Scrape(LoaderScrape).case_name
 
-            def query(self) -> QuerySet[Docket]:
-                return Docket.objects.filter(
-                    court=test_court, docket_number=self.scrape.docket_number
+            def lookup(
+                self, state: MergerState.Lookup[LoaderScrape, None, Docket]
+            ) -> MergerState.LookupOutput[LoaderScrape, None, Docket]:
+                return state.resolve(
+                    Docket.objects.filter(
+                        court=test_court,
+                        docket_number=state.scrape.docket_number,
+                    )
                 )
 
         loader: type[JKentScrapeLoader[Any, Any]] = type(
@@ -534,11 +479,11 @@ class JKentScrapeLoaderTest(LoaderTestCase):
                 self.assertIn("LoaderScrape", logs.output[0])
 
     def test_merger_declining_a_scrape_is_a_failure(self) -> None:
-        """A merger refuses a scrape in its own `validate`, which it reports as a failure. Does the row come back from the queue counted as one, with the rest of the run left to merge?"""
+        """A merger refuses a scrape in its own `validator`, which it reports as a failure. Does the row come back from the queue counted as one, with the rest of the run left to merge?"""
 
         class RejectingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             @staticmethod
-            def validate(scrape: LoaderScrape) -> bool:
+            def validator(scrape: LoaderScrape) -> bool:
                 return scrape.docket_number != "A-1"
 
         _run_database(
@@ -570,7 +515,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
         class RaisingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             def merge(self) -> Any:
-                if self.scrape.docket_number == "A-1":
+                if self.state.scrape.docket_number == "A-1":
                     raise ValueError("boom")
                 return super().merge()
 
@@ -738,7 +683,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
 
-        ledger.merged(1, MergeResult(files=FileTally(moved=2, missing=1)))
+        ledger.merged(1, MergeResult(), FileTally(moved=2, missing=1))
 
         self.assertEqual(
             set(self.redis.keys(f"{self.key}:*")),
@@ -776,7 +721,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             )
         ):
             ledger.dispatched(row, f"A-{row}")
-            ledger.merged(row, MergeResult(files=files))
+            ledger.merged(row, MergeResult(), files)
 
         self.assertEqual(
             ledger.totals().files, FileTally(moved=4, missing=1, failed=2)
@@ -789,7 +734,8 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
         ledger.rejected(
             1,
-            MergeResult(failures={"Docket": [None]}, files=FileTally(moved=1)),
+            MergeResult(failures={"Docket": [None]}),
+            FileTally(moved=1),
         )
 
         self.assertEqual(ledger.totals().files, FileTally(moved=1))
@@ -1598,7 +1544,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
 
         class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
             def merge(self) -> Any:
-                if self.scrape.docket_number in failing:
+                if self.state.scrape.docket_number in failing:
                     raise DatabaseError("the database is having none of it")
                 return super().merge()
 
