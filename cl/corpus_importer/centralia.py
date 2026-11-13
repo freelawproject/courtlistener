@@ -10,6 +10,7 @@ from juriscraper.lib.string_utils import titlecase
 
 from cl.citations.tasks import HYPERSCAN_TOKENIZER
 from cl.citations.utils import make_get_citations_kwargs
+from cl.scrapers.utils import link_judges
 from cl.search.models import Opinion
 
 logger = logging.getLogger(__name__)
@@ -315,8 +316,12 @@ def _apply_writing(
 ) -> None:
     """Copy one writing of a structured read onto an opinion, unsaved.
 
-    Sets the opinion's HTML, ordering key, type, per curiam flag and, unless
-    it is per curiam, its author string when the read names an author.
+    Sets the opinion's HTML, ordering key, type, per curiam flag and author
+    string. A per curiam writing has no author, so its author string is
+    cleared. Otherwise the read's author replaces the author string, which
+    is kept when the read names no one. The linked `author` is cleared
+    whenever it may no longer match the author string, so callers must run
+    link_judges afterward to link it again.
 
     :param opinion: The opinion to update. It may be new.
     :param writing: One of the `opinions` of Doctor's structured payload.
@@ -331,9 +336,15 @@ def _apply_writing(
     opinion.per_curiam = (
         normalize_centralia_opinion_type(centralia_type) == "per-curiam"
     )
-    if not opinion.per_curiam:
-        if author_name := writing.get("author_name"):
-            opinion.author_str = titlecase(author_name)
+    if opinion.per_curiam:
+        author_str = ""
+    elif author_name := writing.get("author_name"):
+        author_str = titlecase(author_name)
+    else:
+        author_str = opinion.author_str
+    if opinion.per_curiam or author_str != opinion.author_str:
+        opinion.author = None
+    opinion.author_str = author_str
 
 
 def merge_structured_opinion_into_cl_opinion(
@@ -346,6 +357,10 @@ def merge_structured_opinion_into_cl_opinion(
     syllabus and headmatter in `OpinionCluster.syllabus` and `.headmatter`.
     A cluster field is only replaced when the read found that section, so
     existing content is never blanked.
+
+    Each opinion's `author` is then linked to the judges database from its
+    author string with link_judges, which may also add the judges named in
+    the cluster's `judges` to its panel.
 
     When the read found several writings, such as a majority and a dissent,
     each writing after the first becomes a new opinion in the cluster, with
@@ -416,6 +431,7 @@ def merge_structured_opinion_into_cl_opinion(
         cluster_fields.append("headmatter")
 
     with transaction.atomic():
+        link_judges(cluster, [opinion, *siblings])
         opinion.save(
             update_fields=[
                 "date_modified",
@@ -424,6 +440,7 @@ def merge_structured_opinion_into_cl_opinion(
                 "type",
                 "per_curiam",
                 "author_str",
+                "author",
             ]
         )
         # Saved one at a time, unlike bulk_create, so the signals that
