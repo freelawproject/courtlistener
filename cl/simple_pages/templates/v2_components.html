@@ -665,14 +665,14 @@ Sample code here.
     </p>
 
     <h4 class="mt-3">Demo</h4>
-    <c-tabs class="my-4" label="My tabs">
-      <c-tabs.panel name="First tab">
+    <c-tabs class="my-4" label="My tabs" :tabs="demo_panel_tabs" :active_tab="demo_panel_active_tab">
+      <c-tabs.panel key="first" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
         First tab panel content
       </c-tabs.panel>
-      <c-tabs.panel name="Second tab">
+      <c-tabs.panel key="second" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
         Second tab panel content
       </c-tabs.panel>
-      <c-tabs.panel name="Third tab">
+      <c-tabs.panel key="third" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
         Third tab panel content
       </c-tabs.panel>
     </c-tabs>
