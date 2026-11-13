@@ -32,16 +32,7 @@
             <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
           {% endfor %}
         </ul>
-        <select
-          id="{{ tabs_id }}-select"
-          aria-label="{{ label }}"
-          x-on:change="navigateToTab"
-          class="w-full md:hidden"
-        >
-          {% for tab in tabs %}
-            <option value="{{ tab.key }}"{% if tab.key == active_tab %} selected{% endif %}>{{ tab.label }}{% if tab.count %} ({{ tab.count }}){% endif %}</option>
-          {% endfor %}
-        </select>
+        <c-tabs.select :tabs="tabs" :active_tab="active_tab" :tabs_id="tabs_id" :label="label" />
       </nav>
       <div role="status">
         <template x-if="errorMessage">

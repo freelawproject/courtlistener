@@ -1,0 +1,12 @@
+<c-vars tabs tabs_id="" label="" active_tab="" />
+
+<select
+  id="{{ tabs_id }}-select"
+  aria-label="{{ label }}"
+  x-on:change="navigateToTab"
+  class="w-full md:hidden"
+>
+  {% for tab in tabs %}
+    <option value="{{ tab.key }}"{% if tab.key == active_tab %} selected{% endif %}>{{ tab.label }}{% if tab.count %} ({{ tab.count }}){% endif %}</option>
+  {% endfor %}
+</select>
