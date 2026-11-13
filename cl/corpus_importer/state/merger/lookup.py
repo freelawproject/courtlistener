@@ -24,8 +24,7 @@ class NaturalKey:
     :ivar filters: The query filters matching the objects with this key.
     :ivar attnames: The model attributes holding the key's values.
     :ivar values: The key's values, as text so that scraped and stored values
-        compare equal. Two keys with the same `attnames` identify the same
-        object when their `values` are equal.
+        compare equal.
     """
 
     filters: Mapping[str, Any]
@@ -93,8 +92,7 @@ class SiblingLookup[M: Model](ABC):
         """File the rows read since the last call under their natural keys.
 
         Args:
-            key: Any key of the group, for the attributes its keys are made
-                of.
+            key: Any key of the group.
         """
         for obj in self._rows[self._indexed :]:
             self._found.setdefault(key.values_of(obj), []).append(obj)
@@ -149,8 +147,7 @@ class RelationLookup[M: Model](SiblingLookup[M]):
 
         Args:
             merger: The class of the mergers in the group.
-            related: The objects to match against. Nothing is queried for
-                when they have already been loaded.
+            related: The objects to match against.
         """
         super().__init__(merger)
         self._related: QuerySet[M] | None = related

@@ -84,8 +84,7 @@ class MergerSpecification[Scrape, Params, Output](ABC):
             field: The field to validate this specification for.
 
         Returns:
-            A list of errors encountered during validation. These will be surfaced after the merger is fully
-            constructed and will prevent the `merge` method from being called.
+            A list of errors encountered during validation.
         """
         return []
 
@@ -106,17 +105,15 @@ class AttributeMerger[Scrape, Params, Transform](
     """An expression computing one model attribute at merge time.
 
     Instances are not built directly: start from `Scrape`, `Params`,
-    `Ancestor`, `Constant` or `Fn` and chain attribute access, indexing and
-    calls onto the result. Each step returns another expression rather than a
-    value; nothing is evaluated until `transform` is called.
+    `Ancestor`, `Constant` or `Fn` and proxy attribute access, indexing and
+    calls. Nothing is evaluated until `transform` is called.
 
-    Because attribute access is itself part of the expression language, a name
-    that isn't defined on the class is never an `AttributeError` here; it
-    becomes a deferred lookup that fails only when the merge runs.
+    Because attribute access is proxied, a name that isn't defined on the class
+    becomes a deferred lookup that fails when the merge runs.
 
     Attributes:
         strategy: How the computed value is reconciled with the value already
-            in the DB. Set it with `WithStrategy`.
+            in the DB.
     """
 
     __slots__ = (
@@ -199,10 +196,7 @@ class AttributeMerger[Scrape, Params, Transform](
 
 
 class _AncestorProxy[M: Model](AttributeMerger):
-    """Expression evaluating to the nearest ancestor of a given model type.
-
-    Build it with `Ancestor`.
-    """
+    """Expression evaluating to the nearest ancestor of a given model type."""
 
     def __init__(self, model: type[M]):
         """Create an expression looking up an ancestor.
@@ -219,7 +213,7 @@ def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
 
     Args:
         model: The model class of the parent to find.
-        scrape: Unused; present so this can serve as a transform.
+        scrape: Unused.
         params: The params of the merger being run.
 
     Returns:
@@ -237,10 +231,7 @@ def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
 
 
 class _ConstantProxy(AttributeMerger):
-    """Expression evaluating to a fixed value.
-
-    Build it with `Constant` or `Fn`.
-    """
+    """Expression evaluating to a fixed value."""
 
     __slots__ = ("_value",)
 
@@ -257,10 +248,7 @@ class _ConstantProxy(AttributeMerger):
 
 
 class _ScrapeProxy(AttributeMerger):
-    """Expression evaluating to the scrape itself.
-
-    Build it with `Scrape`.
-    """
+    """Expression evaluating to the scrape itself."""
 
     def __init__(self):
         """Create an expression evaluating to the scrape."""
@@ -269,10 +257,7 @@ class _ScrapeProxy(AttributeMerger):
 
 
 class _ParamsProxy(AttributeMerger):
-    """Expression evaluating to the merger's params.
-
-    Build it with `Params`.
-    """
+    """Expression evaluating to the merger's params."""
 
     def __init__(self):
         """Create an expression evaluating to the params."""
@@ -281,11 +266,7 @@ class _ParamsProxy(AttributeMerger):
 
 
 class _AttrProxy(AttributeMerger):
-    """Expression reading an attribute of another expression's value.
-
-    Chained attribute accesses collapse into a single dotted lookup. Built by
-    attribute access on an expression.
-    """
+    """Expression reading an attribute of another expression's value."""
 
     __slots__ = ("_key", "_previous")
 
@@ -317,10 +298,7 @@ class _AttrProxy(AttributeMerger):
 
 
 class _ItemProxy(AttributeMerger):
-    """Expression indexing another expression's value.
-
-    Built by subscripting an expression.
-    """
+    """Expression indexing another expression's value."""
 
     def __init__(self, previous: AttributeMerger, key: AttributeMerger | Any):
         """Create an expression indexing a value.
@@ -360,10 +338,7 @@ class _ItemProxy(AttributeMerger):
 
 
 class _CallProxy(AttributeMerger):
-    """Expression calling another expression's value.
-
-    Built by calling an expression.
-    """
+    """Expression calling another expression's value."""
 
     def __init__(
         self,
@@ -421,8 +396,7 @@ def Fn[F: Callable](f: F) -> F:
     """Wrap a callable so it can be invoked at merge time.
 
     Calling the result inside a merger definition builds an expression which
-    invokes `f` when the merge runs, e.g.
-    `Fn(parse_date)(Scrape(dict)["filed"])`.
+    invokes `f` when the merge runs, e.g. `Fn(parse_date)(Scrape(dict)["filed"])`.
 
     Args:
         f: The callable to invoke at merge time.
@@ -442,8 +416,7 @@ def Scrape[T](_: type[T]) -> T:
     For example, `Scrape(dict)["docket_number"]`.
 
     Args:
-        _: The type of the scrape. It only informs the type checker; it is
-            never instantiated or checked at runtime.
+        _: The type of the scrape. Never instantiated or checked at runtime.
 
     Returns:
         An expression typed as `T` so chained accesses type-check. It is not
@@ -460,8 +433,7 @@ def Params[T](_: type[T]) -> T:
     For example, `Params(DocketParams).court_id`.
 
     Args:
-        _: The type of the params. It only informs the type checker; it is
-            never instantiated or checked at runtime.
+        _: The type of the params. Never instantiated or checked at runtime.
 
     Returns:
         An expression typed as `T` so chained accesses type-check. It is not
@@ -495,8 +467,6 @@ def Ancestor[M: Model](model: type[M]) -> M:
 def Constant[T](value: T) -> T:
     """Build an expression that always evaluates to the same value.
 
-    Use it for attributes that don't depend on the scrape or params.
-
     Args:
         value: The value to evaluate to. The same object is shared by every
             merge, so it should not be mutable state.
@@ -517,8 +487,7 @@ def WithStrategy[T](specification: T, strategy: Strategy) -> T:
 
     Args:
         specification: The attribute expression to change.
-        strategy: The strategy to use in place of the default
-            `overwrite_if_present`.
+        strategy: The strategy to use.
 
     Returns:
         The same `specification` object that was passed in.
@@ -641,7 +610,7 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
         self.parent_name: str | None = None
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
-        """Validate the field and, along the way, learn which side of the relation it is. A reverse relation is a `OneToOneRel` rather than a `OneToOneField`, and carries the name of the child's own field."""
+        """Validate the field and, along the way, learn which side of the relation it is."""
         errors = super().validate(field)
         if not field.one_to_one:
             errors.append(

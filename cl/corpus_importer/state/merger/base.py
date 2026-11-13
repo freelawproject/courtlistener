@@ -74,11 +74,7 @@ type AnyRelatedMerger[Scrape, Params] = (
 
 @dataclass(kw_only=True)
 class MergerSpecRegistry[Scrape, Params]:
-    """The specifications declared on a merger, grouped by kind.
-
-    Every spec must be registered before `related`, `merge_order` or
-    `validate` is used: the first two are computed once and kept.
-    """
+    """The specifications declared on a merger."""
 
     attr: dict[str, AttributeMerger[Scrape, Params, Any]] = field(
         default_factory=dict
@@ -103,7 +99,7 @@ class MergerSpecRegistry[Scrape, Params]:
 
     @cached_property
     def merge_order(self) -> list[AnyRelatedMerger[Scrape, Params]]:
-        """The related specs in an order that satisfies every spec's `after`. Specs with no dependency between them may come in any order.
+        """The related specs in an order that satisfies every spec's `after`.
 
         :raises graphlib.CycleError: If the `after` declarations are circular.
         """
@@ -195,12 +191,8 @@ class MergerConfig[M: Model]:
     :ivar model: The model the merger applies to.
     :ivar key: A natural key to use for looking up objects in the DB; used in
         the default `lookup` implementation.
-    :ivar reads: The model fields read off the object being merged into that
-        no spec is declared for, such as those a `pre_update` hook or the
-        model's `save` looks at. A field that is neither declared nor listed
-        here is not loaded with the object, so reading it costs a query. A
-        merger also loads the fields the mergers it subclasses list here,
-        abstract ones included.
+    :ivar reads: Additionaly model fields to load. Useful for situations like
+        preventing extra queries from custom `save` methods that inspect fields.
     :ivar registry: The specs declared on the merger. Filled in when the
         merger class is created, so it should not be passed.
     :ivar fields: The model fields loaded of an object read to be merged
@@ -352,12 +344,10 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         Args:
             scrape: The scraped data to transform.
             params: Parameters passed to the merger.
-            existing: Whether to look the object up, create it, or merge into
-                a known one.
+            existing: Whether to look the object up, create it, or merge into a known one.
             manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
             siblings: The lookup shared with the mergers created alongside
                 this one, all of which must be created before any is merged.
-                Defaults to one of this merger's own.
 
         Attributes:
             manager: The manager to use for lookups and creation of objects.
