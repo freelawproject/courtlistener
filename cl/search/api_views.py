@@ -24,6 +24,7 @@ from cl.api.utils import (
     NoFilterCacheListMixin,
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
+from cl.lib.search_utils import scotus_search_api_enabled
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
@@ -555,6 +556,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         cleaned_data["request_date"] = (
             paginator.initialize_context_from_request(request, search_type)
         )
+        cleaned_data["include_scotus"] = scotus_search_api_enabled(request)
         highlighting_fields = {}
         main_query, child_docs_query = do_es_api_query(
             search_query,

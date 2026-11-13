@@ -279,9 +279,9 @@ cardinality_query_unique_ids = {
     SEARCH_TYPES.PARENTHETICAL: "id",
 }
 
-# SCOTUS documents have no id (it's RECAP-only), so the search page's
-# document counts also count their uid. The search APIs don't show SCOTUS
-# yet, so they count id only.
+# SCOTUS documents have no id, so document counts also count their uid,
+# and the v4 API cursor uses it to break ties. Each pair needs matching
+# keys in build_sort_results' order_by_map.
 cardinality_query_extra_unique_ids = {
     SEARCH_TYPES.RECAP_DOCUMENT: "uid",
 }

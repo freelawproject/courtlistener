@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.dsl import Q
 from lxml import etree, html
+from rest_framework.response import Response
 from rest_framework.serializers import CharField
 from waffle.testutils import override_flag
 
@@ -73,6 +74,7 @@ from cl.search.api_serializers import (
     PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
+    RECAPESWebhookResultSerializer,
 )
 from cl.search.api_utils import CursorESList
 from cl.search.api_views import (
@@ -4608,24 +4610,6 @@ class RECAPSearchAPIV4Test(
             v4_recap_meta_keys,
         )
 
-    async def test_capital_case_not_in_api_results(self) -> None:
-        """capital_case isn't exposed in V4 RECAP results yet: not on the docket, its nested documents, or RECAP document results.
-
-        The SCOTUS search API (#8153) adds it.
-        """
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk}",
-        }
-        r = await self._test_api_results_count(search_params, 1, "type r")
-        docket_result = r.data["results"][0]
-        self.assertNotIn("capital_case", docket_result)
-        self.assertNotIn("capital_case", docket_result["recap_documents"][0])
-
-        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
-        r = await self._test_api_results_count(search_params, 1, "type rd")
-        self.assertNotIn("capital_case", r.data["results"][0])
-
     async def test_results_api_empty_fields(self) -> None:
         """Confirm empty fields values in V4 RECAP Search API results."""
         # Confirm expected values for empty fields.
@@ -7868,6 +7852,207 @@ class SCOTUSRECAPSearchTest(
         content = r.content.decode()
         self.assertIn(self.recap_docket_path, content)
         self.assertIn(self.scotus_docket_path, content)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="SCOTUSSearchAPITest")
+@override_flag("scotus_search_api", active=True)
+class SCOTUSSearchAPITest(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
+    """The v4 Search API shows SCOTUS content behind scotus_search_api.
+
+    SCOTUS documents have a uid instead of an id, so the API identifies,
+    counts and paginates them by it.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Index a SCOTUS and a RECAP docket with five "Tied" documents each.
+
+        Same description everywhere, so every document ties on score.
+        """
+        cls.rebuild_index("search.Docket")
+        with cls.captureOnCommitCallbacks(execute=True):
+            scotus_entry = SCOTUSDocketEntryFactory(
+                docket__court=CourtFactory(id="scotus", jurisdiction="F")
+            )
+            ScotusDocketMetadataFactory(
+                docket=scotus_entry.docket, capital_case=True
+            )
+            recap_entry = DocketEntryFactory(
+                docket__court=CourtFactory(id="ca1", jurisdiction="F"),
+                docket__source=Docket.RECAP,
+            )
+            cls.scotus_documents = [
+                SCOTUSDocumentFactory(
+                    docket_entry=scotus_entry,
+                    attachment_number=n,
+                    description="Tied",
+                    plain_text=f"SCOTUS text {n}",
+                )
+                for n in range(1, 6)
+            ]
+            cls.recap_documents = [
+                RECAPDocumentFactory(
+                    docket_entry=recap_entry,
+                    document_type=RECAPDocument.ATTACHMENT,
+                    attachment_number=n,
+                    description="Tied",
+                )
+                for n in range(1, 6)
+            ]
+
+    def _search(self, version: str, **params: str) -> Response:
+        """GET the Search API with the given params."""
+        return self.client.get(
+            reverse("search-list", kwargs={"version": version}), params
+        )
+
+    def _walk_rd_cursor(self, court: str) -> tuple[list[str], list[str]]:
+        """Return the document URLs of every type=rd page, in both directions.
+
+        The first list goes forward through "next" and the second goes back
+        through "previous" from the last page.
+        """
+        r = self._search(
+            "v4", type=SEARCH_TYPES.RECAP_DOCUMENT, q="Tied", court=court
+        )
+        forward = [result["absolute_url"] for result in r.data["results"]]
+        while r.data["next"]:
+            r = self.client.get(r.data["next"])
+            forward += [result["absolute_url"] for result in r.data["results"]]
+        backward = [result["absolute_url"] for result in r.data["results"]]
+        while r.data["previous"]:
+            r = self.client.get(r.data["previous"])
+            backward += [
+                result["absolute_url"] for result in r.data["results"]
+            ]
+        return forward, backward
+
+    # With the micro-cache on, a result cached with the flag can't be served
+    # to a request without it.
+    @override_settings(ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True)
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_scotus_test:",
+    )
+    def test_v4_shows_scotus_only_behind_its_flag(
+        self, mock_cache_key: mock.MagicMock
+    ) -> None:
+        """Every RECAP search type shows SCOTUS only with scotus_search_api."""
+        redis_cache = get_redis_interface("CACHE")
+        if keys := redis_cache.keys(
+            ":1:search_results_cache_api_scotus_test:*"
+        ):
+            redis_cache.delete(*keys)
+        for search_type, active in product(
+            (
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+                SEARCH_TYPES.RECAP_DOCUMENT,
+            ),
+            (True, False),
+        ):
+            with (
+                self.subTest(type=search_type, flag_active=active),
+                override_flag("scotus_search_api", active=active),
+            ):
+                r = self._search("v4", type=search_type, court="scotus")
+                self.assertEqual(bool(r.data["results"]), active)
+
+    def test_v3_never_shows_scotus(self) -> None:
+        """v3 is deprecated, so it doesn't get SCOTUS even with the flag."""
+        r = self._search("v3", type=SEARCH_TYPES.RECAP, court="scotus")
+        self.assertEqual(r.data["results"], [])
+
+    def test_api_v4_identifies_scotus_documents_by_uid(self) -> None:
+        """v4 type=rd results identify SCOTUS documents by uid instead of id.
+
+        They also carry their capital_case and a snippet from their text.
+        """
+        r = self._search(
+            "v4", type=SEARCH_TYPES.RECAP_DOCUMENT, q="Tied", court="scotus"
+        )
+
+        expected = {
+            f"scotus_{sd.pk}": (f"scotus_{sd.docket_entry_id}", sd.plain_text)
+            for sd in self.scotus_documents
+        }
+        results = r.data["results"]
+        self.assertEqual(
+            {d["uid"]: (d["docket_entry_uid"], d["snippet"]) for d in results},
+            expected,
+        )
+        self.assertEqual({d["id"] for d in results}, {None})
+        self.assertEqual({d["capital_case"] for d in results}, {True})
+
+    def test_api_v4_type_r_snippets_of_scotus_documents(self) -> None:
+        """v4 type=r results give each nested SCOTUS document its own snippet."""
+        r = self._search(
+            "v4", type=SEARCH_TYPES.RECAP, q="Tied", court="scotus"
+        )
+
+        texts = {
+            f"scotus_{sd.pk}": sd.plain_text for sd in self.scotus_documents
+        }
+        nested = [
+            d for case in r.data["results"] for d in case["recap_documents"]
+        ]
+        self.assertTrue(nested)
+        for doc in nested:
+            with self.subTest(uid=doc["uid"]):
+                self.assertEqual(doc["snippet"], texts[doc["uid"]])
+
+    @override_settings(SEARCH_API_PAGE_SIZE=2)
+    def test_rd_api_cursor_reaches_every_document(self) -> None:
+        """The type=rd cursor returns every document once, forward and back."""
+        recap_urls = [rd.get_absolute_url() for rd in self.recap_documents]
+        scotus_urls = [sd.get_absolute_url() for sd in self.scotus_documents]
+        cases = [
+            ("ca1", recap_urls),
+            ("scotus", scotus_urls),
+            ("ca1 scotus", recap_urls + scotus_urls),
+        ]
+        for court, expected in cases:
+            with self.subTest(court=court):
+                forward, backward = self._walk_rd_cursor(court)
+
+                self.assertCountEqual(forward, expected)
+                self.assertCountEqual(backward, expected)
+
+    @override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=1)
+    def test_document_counts_include_scotus(self) -> None:
+        """The API document counts include SCOTUS documents.
+
+        ELASTICSEARCH_MAX_RESULT_COUNT=1 makes the type=rd count use its
+        approximate count.
+        """
+        api_r = self._search(
+            "v4", type=SEARCH_TYPES.RECAP, q="Tied", court="scotus"
+        )
+        api_rd = self._search(
+            "v4", type=SEARCH_TYPES.RECAP_DOCUMENT, q="Tied", court="scotus"
+        )
+
+        self.assertEqual(api_r.data["document_count"], 5)
+        self.assertEqual(api_rd.data["count"], 5)
+
+
+class RECAPWebhookSerializerTest(SimpleTestCase):
+    """Check the fields of the RECAP search webhook payload."""
+
+    def test_webhook_payload_leaves_scotus_fields_out(self) -> None:
+        """RECAP search webhooks don't get the SCOTUS fields the v4 API shows.
+
+        Not until SCOTUS gets its own webhook version.
+        """
+        serializer = RECAPESWebhookResultSerializer()
+        fields = {
+            *serializer.fields,
+            *serializer.fields["recap_documents"].child.fields,
+        }
+
+        self.assertTrue(
+            fields.isdisjoint({"capital_case", "uid", "docket_entry_uid"})
+        )
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
