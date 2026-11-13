@@ -17,20 +17,14 @@ from django.db.models import Model, QuerySet
 from cl.corpus_importer.state.utils import MergeResult
 
 
-class State[Enter: State | None, Exit: State]:
-    """A stage of a merge, typed by the states it can be entered from and exited to."""
+class State:
+    """A stage of a merge."""
 
     def failed[Scrape, Params, M: Model](
         self, reason: str, result: MergeResult
     ) -> Failed[Scrape, Params, M]:
         """Shorthand to transition to a failure state."""
         return Failed(cast(NonTerminal, self), reason, result)
-
-    def complete[Scrape, Params, M: Model](
-        self, output: M, result: MergeResult
-    ) -> Complete[Scrape, Params, M]:
-        """Shorthand to transition to a success state."""
-        return Complete(cast(NonTerminal, self), output, result)
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,13 +38,28 @@ class DerivedData[Scrape, Params]:
     relation_params: Mapping[str, Model]
     """Extra model parameters for foreign object relationships"""
 
-    def create[M: Model](
+
+class _QueryState[Scrape, Params, M: Model](
+    State, DerivedData[Scrape, Params]
+):
+    def resolve(
+        self, candidates: QuerySet[M] | Sequence[M]
+    ) -> Resolve[Scrape, Params, M]:
+        """Shorthand to transition to a resolve state."""
+        return Resolve(
+            self.scrape,
+            self.params,
+            self.relation_params,
+            candidates,
+        )
+
+    def create(
         self,
     ) -> Create[Scrape, Params, M]:
         """Shorthand to transition to a create state."""
         return Create(self.scrape, self.params, self.relation_params)
 
-    def update[M: Model](
+    def update(
         self,
         instance: M,
     ) -> Update[Scrape, Params, M]:
@@ -62,18 +71,51 @@ class DerivedData[Scrape, Params]:
             instance,
         )
 
-    def resolve[M: Model](
-        self, candidates: QuerySet[M] | Sequence[M]
-    ) -> Resolve[Scrape, Params, M]:
-        """Shorthand to transition to a resolve state."""
-        return Resolve(
-            self.scrape,
-            self.params,
-            self.relation_params,
-            candidates,
-        )
 
-    def children[M: Model](
+@dataclass(slots=True, frozen=True)
+class _Penultimate[Scrape, Params, M: Model](
+    State, DerivedData[Scrape, Params]
+):
+    def complete(
+        self, output: M, result: MergeResult
+    ) -> Complete[Scrape, Params, M]:
+        """Shorthand to transition to a success state."""
+        return Complete(cast(NonTerminal, self), output, result)
+
+
+type LookupOutput[Scrape, Params, M: Model] = (
+    "Resolve[Scrape, Params, M] | Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Lookup[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
+    """Looking for an existing object to merge into."""
+
+
+type ResolveOutput[Scrape, Params, M: Model] = (
+    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Resolve[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
+    """Choosing which of the lookup's candidates to merge into."""
+
+    candidates: QuerySet[M] | Sequence[M]
+    """Objects to choose between"""
+
+
+type CreateOutput[Scrape, Params, M: Model] = (
+    "Children[Scrape, Params, M] | Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Create[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
+    """Creating a new object, since none exists to merge into."""
+
+    def children(
         self, parent: M, result: MergeResult
     ) -> Children[Scrape, Params, M]:
         """Shorthand to transition to a child state."""
@@ -86,100 +128,38 @@ class DerivedData[Scrape, Params]:
         )
 
 
-type LookupInput[Scrape, Params, M: Model] = None
-type LookupOutput[Scrape, Params, M: Model] = (
-    "Resolve[Scrape, Params, M] | Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Lookup[Scrape, Params, M: Model](
-    State[
-        LookupInput[Scrape, Params, M],
-        LookupOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Looking for an existing object to merge into."""
-
-
-type ResolveInput[Scrape, Params, M: Model] = Lookup[Scrape, Params, M]
-type ResolveOutput[Scrape, Params, M: Model] = (
-    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Resolve[Scrape, Params, M: Model](
-    State[
-        ResolveInput[Scrape, Params, M],
-        ResolveOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Choosing which of the lookup's candidates to merge into."""
-
-    candidates: QuerySet[M] | Sequence[M]
-    """Objects to choose between"""
-
-
-type CreateInput[Scrape, Params, M: Model] = (
-    Resolve[Scrape, Params, M] | Lookup[Scrape, Params, M]
-)
-type CreateOutput[Scrape, Params, M: Model] = (
-    "Children[Scrape, Params, M] | Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Create[Scrape, Params, M: Model](
-    State[
-        CreateInput[Scrape, Params, M],
-        CreateOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Creating a new object, since none exists to merge into."""
-
-
-type UpdateInput[Scrape, Params, M: Model] = (
-    Resolve[Scrape, Params, M] | Lookup[Scrape, Params, M]
-)
 type UpdateOutput[Scrape, Params, M: Model] = (
     "Children[Scrape, Params, M] | Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
 )
 
 
 @dataclass(slots=True, frozen=True)
-class Update[Scrape, Params, M: Model](
-    State[
-        UpdateInput[Scrape, Params, M],
-        UpdateOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
+class Update[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
     """Merging into an existing object."""
 
     instance: M
     """The object to update"""
 
+    def children(
+        self, parent: M, result: MergeResult
+    ) -> Children[Scrape, Params, M]:
+        """Shorthand to transition to a child state."""
+        return Children(
+            self.scrape,
+            self.params,
+            self.relation_params,
+            parent,
+            result,
+        )
 
-type ChildrenInput[Scrape, Params, M: Model] = (
-    Create[Scrape, Params, M] | Update[Scrape, Params, M]
-)
+
 type ChildrenOutput[Scrape, Params, M: Model] = (
     "Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
 )
 
 
 @dataclass(slots=True, frozen=True)
-class Children[Scrape, Params, M: Model](
-    State[
-        ChildrenInput[Scrape, Params, M],
-        ChildrenOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
+class Children[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
     """Merging the related objects of a created or updated object."""
 
     parent: M
@@ -197,17 +177,11 @@ type NonTerminal[Scrape, Params, M: Model] = (
 )
 
 
-type CompleteInput[Scrape, Params, M: Model] = NonTerminal[Scrape, Params, M]
 type CompleteOutput[Scrape, Params, M: Model] = "Complete[Scrape, Params, M]"
 
 
 @dataclass(slots=True, frozen=True)
-class Complete[Scrape, Params, M: Model](
-    State[
-        CompleteInput[Scrape, Params, M],
-        CompleteOutput[Scrape, Params, M],
-    ]
-):
+class Complete[Scrape, Params, M: Model](State):
     """The merge finished successfully."""
 
     state: NonTerminal[Scrape, Params, M]
@@ -218,17 +192,11 @@ class Complete[Scrape, Params, M: Model](
     """The result of the entire merge operation"""
 
 
-type FailedInput[Scrape, Params, M: Model] = "AnyState[Scrape, Params, M]"
 type FailedOutput[Scrape, Params, M: Model] = "Failed[Scrape, Params, M]"
 
 
 @dataclass(slots=True, frozen=True)
-class Failed[Scrape, Params, M: Model](
-    State[
-        FailedInput[Scrape, Params, M],
-        FailedOutput[Scrape, Params, M],
-    ]
-):
+class Failed[Scrape, Params, M: Model](State):
     """The merge could not finish."""
 
     state: NonTerminal[Scrape, Params, M] | None
