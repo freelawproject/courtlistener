@@ -569,11 +569,11 @@ def update_es_document(
     main_model = apps.get_model(main_app_label)
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
-        return
+        return None
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:
-        return
+        return None
 
     related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
@@ -585,7 +585,7 @@ def update_es_document(
             related_instance_id, related_instance_model
         )
         if not related_instance:
-            return
+            return None
 
     # Get the fields to update and their values from DB.
     fields_values_to_update = document_fields_to_update(
@@ -597,7 +597,7 @@ def update_es_document(
     )
     if not fields_values_to_update:
         # Abort, avoid updating not indexed fields, like "source" in Docket.
-        return
+        return None
 
     embeddings = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":

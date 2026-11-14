@@ -798,12 +798,12 @@ def update_docket_info_iquery(
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
     except IQuerySaveError as exc:
         if self.request.retries == self.max_retries:
             logger.warning("%s", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 

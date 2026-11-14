@@ -215,7 +215,7 @@ def get_existing_docket(
     """
     # Avoid lookups by blank docket number
     if not docket_number.strip():
-        return
+        return None
 
     # delete semicolons only for the lookup, for back compatibility
     # with juriscraper string formatting
@@ -543,7 +543,7 @@ def update_or_create_originating_court_information(
         lower_court_judge: will go into OCI.assigned_to_str
     """
     if not (lower_court_judge or lower_court_number):
-        return
+        return None
 
     if existing_oci := docket.originating_court_information:
         update = False
@@ -561,7 +561,7 @@ def update_or_create_originating_court_information(
             existing_oci.save()
 
         # If the docket already had a OriginatingCourtInformation, just return
-        return
+        return None
 
     return OriginatingCourtInformation(
         docket_number=lower_court_number or "",

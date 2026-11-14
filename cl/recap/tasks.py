@@ -2105,7 +2105,7 @@ def fetch_pacer_doc_by_rd_base(
         msg = "PDF already marked as 'is_available'. Doing nothing."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
         self.request.chain = None
-        return
+        return None
 
     if not pacer_doc_id:
         msg = (
@@ -2119,14 +2119,14 @@ def fetch_pacer_doc_by_rd_base(
             fq, msg, PROCESSING_STATUS.INVALID_CONTENT
         )
         self.request.chain = None
-        return
+        return None
 
     session_data = async_to_sync(get_pacer_cookie_from_cache)(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
@@ -2152,7 +2152,7 @@ def fetch_pacer_doc_by_rd_base(
         msg = "Failed to get PDF from network."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
     except PacerLoginException as exc:
         msg = f"PacerLoginException while getting document for rd: {rd.pk}."
         if self.request.retries == self.max_retries:
@@ -2183,7 +2183,7 @@ def fetch_pacer_doc_by_rd_base(
     if success is False:
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     subdocket_pqs_to_replicate = []
@@ -3081,12 +3081,12 @@ async def save_pacer_doc_from_pq(
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-        return
+        return None
 
     if pq.status == PROCESSING_STATUS.FAILED or not pq.filepath_local:
         await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
         await mark_fq_status(fq, pq.error_message, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     pdf_bytes = await read_file_bytes(pq.filepath_local)
 
@@ -3108,7 +3108,7 @@ async def save_pacer_doc_from_pq(
 
     if success is False:
         await mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     msg = "Successfully completed fetch and save."
     await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)

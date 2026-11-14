@@ -375,7 +375,7 @@ def get_same_url_opinions(
     """
     standard_url = opinion_group["download_url"].replace("https", "http")
     if standard_url in seen_urls:
-        return
+        return None
 
     seen_urls.add(standard_url)
     download_url_query = get_query_from_url(

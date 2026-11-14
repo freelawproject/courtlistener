@@ -3005,7 +3005,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             logger.error("%s Aborting.", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3118,7 +3118,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
