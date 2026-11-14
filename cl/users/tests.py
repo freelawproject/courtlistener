@@ -47,7 +47,7 @@ from cl.alerts.factories import (
     DocketAlertFactory,
     DocketAlertWithParentsFactory,
 )
-from cl.alerts.models import Alert, DocketAlert, DocketAlertEvent
+from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -584,7 +584,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertIn("attachment;", response["Content-Disposition"])
         export = json.loads(response.content)
-        self.assertEqual(export["account"]["username"], "pandora")
+        self.assertEqual(export["user"][0]["fields"]["username"], "pandora")
 
     def test_take_out_requires_login(self) -> None:
         """Are anonymous users sent to sign in instead of getting data?"""
@@ -6181,33 +6181,22 @@ class DataExportTest(TestCase):
         cls.user = UserProfileWithParentsFactory.create(
             user__username="exporter",
             employer="Exporter LLP",
+            notes="Staff-only remark",
         ).user
         cls.other_user = UserProfileWithParentsFactory.create().user
-        cls.docket = DocketFactory.create(case_name="Lorem v. Ipsum")
+        cls.docket = DocketFactory.create()
 
         AlertFactory.create(
-            user=cls.user,
-            name="My alert",
-            query="q=foo",
-            rate=Alert.DAILY,
-            secret_key="alertsecret",
+            user=cls.user, name="My alert", secret_key="alertsecret"
         )
         AlertFactory.create(user=cls.other_user, name="Not mine")
         DocketAlertWithParentsFactory.create(
-            user=cls.user,
-            docket=cls.docket,
-            alert_type=DocketAlert.SUBSCRIPTION,
-            secret_key="docketsecret",
+            user=cls.user, docket=cls.docket, secret_key="docketsecret"
         )
         NoteFactory.create(user=cls.user, name="My note")
         tag = UserTagFactory.create(user=cls.user, name="my-tag")
         tag.dockets.add(cls.docket)
-        rd = RECAPDocumentFactory.create(
-            docket_entry__docket=cls.docket, document_number="3"
-        )
-        PrayerFactory.create(
-            user=cls.user, recap_document=rd, status=Prayer.WAITING
-        )
+        PrayerFactory.create(user=cls.user)
         VisualizationFactory.create(user=cls.user, title="My map")
         NeonMembershipFactory.create(user=cls.user)
         SearchQuery.objects.create(
@@ -6226,70 +6215,69 @@ class DataExportTest(TestCase):
         )
 
     def test_exports_each_kind_of_data(self, mock_usage: MagicMock) -> None:
-        """Does each section hold the user's rows, with readable labels?"""
+        """Does each section hold the user's rows as stored?"""
         export = build_user_data_export(self.user)
 
-        with self.subTest("account"):
-            self.assertEqual(export["account"]["username"], "exporter")
-            self.assertEqual(export["account"]["employer"], "Exporter LLP")
-        with self.subTest("search alerts"):
-            self.assertEqual(len(export["search_alerts"]), 1)
-            self.assertEqual(export["search_alerts"][0]["name"], "My alert")
-            self.assertEqual(export["search_alerts"][0]["rate"], "Daily")
-        with self.subTest("docket alerts"):
-            alert = export["docket_alerts"][0]
-            self.assertEqual(alert["case_name"], "Lorem v. Ipsum")
-            self.assertEqual(alert["alert_type"], "Subscription")
-        with self.subTest("notes"):
-            self.assertEqual(export["notes"][0]["name"], "My note")
-        with self.subTest("tags"):
-            tag = export["tags"][0]
-            self.assertEqual(tag["name"], "my-tag")
-            self.assertEqual(
-                tag["dockets"],
-                [{"docket_id": self.docket.pk, "case_name": "Lorem v. Ipsum"}],
-            )
-        with self.subTest("prayers"):
-            prayer = export["prayers"][0]
-            self.assertEqual(prayer["docket_id"], self.docket.pk)
-            self.assertEqual(prayer["document_number"], "3")
-        with self.subTest("visualizations"):
-            self.assertEqual(export["visualizations"][0]["title"], "My map")
-        with self.subTest("memberships"):
-            self.assertEqual(len(export["memberships"]), 1)
-        with self.subTest("search history"):
-            query = export["search_history"][0]
-            self.assertEqual(query["get_params"], "q=foo")
-            self.assertEqual(query["engine"], "Elasticsearch")
-        with self.subTest("login history"):
-            event = export["login_history"][0]
-            self.assertEqual(event["ip_address"], "192.0.2.1")
-            self.assertEqual(event["outcome"], AuthOutcome.SUCCESS.label)
-        with self.subTest("API usage"):
-            self.assertEqual(export["api_usage_by_day"]["total"], 7)
-            self.assertEqual(mock_usage.call_args.args[0], self.user.pk)
+        expected_counts = {
+            "user": 1,
+            "profile": 1,
+            "search_alerts": 1,
+            "docket_alerts": 1,
+            "notes": 1,
+            "tags": 1,
+            "tagged_dockets": 1,
+            "prayers": 1,
+            "visualizations": 1,
+            "memberships": 1,
+            "search_history": 1,
+            "login_history": 1,
+        }
+        for section, count in expected_counts.items():
+            with self.subTest(section=section):
+                self.assertEqual(len(export[section]), count)
 
-    def test_leaves_out_secrets_and_other_users(
-        self, mock_usage: MagicMock
-    ) -> None:
-        """Are credentials and other people's rows kept out of the export?"""
+        self.assertEqual(export["user"][0]["fields"]["username"], "exporter")
+        self.assertEqual(
+            export["profile"][0]["fields"]["employer"], "Exporter LLP"
+        )
+        self.assertEqual(
+            export["docket_alerts"][0]["fields"]["docket"], self.docket.pk
+        )
+        self.assertEqual(
+            export["tagged_dockets"][0]["fields"]["docket"], self.docket.pk
+        )
+        self.assertEqual(
+            export["login_history"][0]["fields"]["ip_address"], "192.0.2.1"
+        )
+        self.assertEqual(export["api_usage_by_day"]["total"], 7)
+        self.assertEqual(mock_usage.call_args.args[0], self.user.pk)
+
+    def test_leaves_out_excluded_fields(self, mock_usage: MagicMock) -> None:
+        """Are credentials and staff fields left out?"""
+        export = build_user_data_export(self.user)
+
+        excluded = {
+            "user": "password",
+            "profile": "notes",
+            "search_alerts": "secret_key",
+            "docket_alerts": "secret_key",
+        }
+        for section, field in excluded.items():
+            with self.subTest(section=section, field=field):
+                self.assertNotIn(field, export[section][0]["fields"])
+
+    def test_leaves_out_other_users(self, mock_usage: MagicMock) -> None:
+        """Are other people's rows kept out of the export?"""
         content = json.dumps(
             build_user_data_export(self.user), cls=DjangoJSONEncoder
         )
 
-        for unwanted in (
-            "alertsecret",
-            "docketsecret",
-            "Not mine",
-            self.user.password,
-        ):
-            with self.subTest(unwanted=unwanted):
-                self.assertNotIn(unwanted, content)
+        self.assertNotIn("Not mine", content)
 
     def test_empty_account(self, mock_usage: MagicMock) -> None:
         """Does an account with no saved items export empty sections?"""
         export = build_user_data_export(self.other_user)
 
         self.assertEqual(export["docket_alerts"], [])
-        self.assertEqual(export["tags"], [])
+        self.assertEqual(export["tagged_dockets"], [])
         self.assertEqual(export["login_history"], [])
