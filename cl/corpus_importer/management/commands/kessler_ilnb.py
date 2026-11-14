@@ -17,7 +17,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import DocketEntry, RECAPDocument
 
@@ -35,7 +35,7 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     for i, row in enumerate(reader):
@@ -45,15 +45,12 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = async_to_sync(log_into_pacer)(
+            session_data = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
-        session_data = SessionData(
-            pacer_session.cookies, pacer_session.proxy_address
-        )
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
@@ -89,7 +86,7 @@ def get_final_docs(options):
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     for i, de in enumerate(des):
@@ -99,7 +96,7 @@ def get_final_docs(options):
         if i >= options["limit"] > 0:
             break
         if i % 1000 == 0:
-            pacer_session = async_to_sync(log_into_pacer)(
+            session_data = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             logger.info(f"Sent {i} tasks to celery so far.")
@@ -117,9 +114,7 @@ def get_final_docs(options):
             chain(
                 get_pacer_doc_by_rd.s(
                     rd_pk,
-                    SessionData(
-                        pacer_session.cookies, pacer_session.proxy_address
-                    ),
+                    session_data,
                     tag=TAG_FINALS,
                 ).set(queue=q),
                 extract_pdf_document.si(rd_pk).set(queue=q),

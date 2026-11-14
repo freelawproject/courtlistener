@@ -7,7 +7,7 @@ from django.conf import settings
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.search.models import Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -40,9 +40,7 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                session_data=SessionData(
-                    session.cookies, session.proxy_address
-                ),
+                session_data=session,
                 docket_pk=d.pk,
                 tag_names=[JACKSON_TAG],
                 **{

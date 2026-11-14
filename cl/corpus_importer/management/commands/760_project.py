@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -30,10 +30,9 @@ def get_dockets(options):
     q = options["queue"]
     task = options["task"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
