@@ -69,7 +69,7 @@ from cl.search.types import (
 
 type DocumentModelMapping = Mapping[
     Literal["save", "delete", "m2m", "reverse", "reverse-delete"],
-    Mapping[type[Model], dict]
+    Mapping[type[Model], dict],
 ]
 
 
