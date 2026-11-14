@@ -1,4 +1,4 @@
-FROM python:3.13 AS build-base
+FROM python:3.15 AS build-base
 
 # Install apt dependencies
 # caching: https://docs.docker.com/build/cache/optimize/#use-cache-mounts
