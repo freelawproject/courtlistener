@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import (
-    Callable,
     Mapping,
     Sequence,
 )
@@ -44,6 +43,7 @@ from .specifications import (
     MergerSpecification,
     OneToManyMerger,
     OneToOneMerger,
+    Transformer,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class MergerSpecRegistry[Scrape, Params]:
     many_to_many: dict[
         str, ManyToManyMerger[Scrape, Params, Model, Any, Any]
     ] = field(default_factory=dict)
-    _transformers: dict[str, Callable[[Scrape, Params], Any]] = field(
+    _transformers: dict[str, Transformer[Scrape, Params, Any, Any]] = field(
         default_factory=dict
     )
 
@@ -180,9 +180,14 @@ class MergerSpecRegistry[Scrape, Params]:
                 return
         self._transformers[spec._name] = spec.transform
 
-    def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> dict[str, Any]:
         """Get every specification's transformed value, by field name."""
-        return {k: v(scrape, params) for k, v in self._transformers.items()}
+        return {
+            k: v(scrape, params, database)
+            for k, v in self._transformers.items()
+        }
 
 
 @dataclass(slots=True)
@@ -243,6 +248,10 @@ class MergerConfig[M: Model]:
     def inherit(
         cls, parent: type[Merger], registry: MergerSpecRegistry
     ) -> MergerConfig:
+        """Build a config for a subclass of ``parent`` using ``registry``.
+
+        The subclass reads every field read by any of its mergers in the MRO.
+        """
         return MergerConfig(
             parent.config.model,
             parent.config.key,
@@ -383,7 +392,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             not isinstance(self.state, MergerState.Failed)
             or self.state.state is not None
         ):
-            vars(self).update(self.config.registry.transform(scrape, params))
+            vars(self).update(
+                self.config.registry.transform(scrape, params, None)
+            )
 
         if manager is None:
             manager = cast(Manager[M], self.config.model._default_manager)
