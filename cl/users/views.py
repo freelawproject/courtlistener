@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import OrderedDict
 from datetime import timedelta
@@ -12,6 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_email
 from django.db import IntegrityError, models, transaction
 from django.db.models import F
@@ -26,7 +28,7 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import now
+from django.utils.timezone import localdate, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -57,6 +59,7 @@ from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
+    ratelimiter_unsafe_3_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
@@ -64,8 +67,8 @@ from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.es_docket_sources import es_uid
 from cl.search.models import SEARCH_TYPES
-from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
+from cl.users.data_export import build_user_data_export
 from cl.users.forms import (
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
@@ -489,43 +492,28 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
+@ratelimiter_unsafe_3_per_m
+@never_cache
 @login_required
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        user = request.user
-        confirmed = "Yes" if user.profile.email_confirmed else "No"
-        description = (
-            "A user has requested an export of their data in accordance "
-            "with the GDPR/CCPA. Their account details are:<br><br>"
-            f"Logged In As: {user.username} ({user.email})<br>"
-            f"Email Confirmed: {confirmed}"
-        )
-        create_zoho_desk_ticket.delay(
-            subject="User data export request",
-            name=user.get_full_name() or user.username,
-            email=user.email,
-            description=description,
-            request_type="Data Export Request",
-            assignee_id=settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
-                "data_export", ""
-            ),
+    """Show the data export page, and download the export on POST.
+
+    The export is built in memory during the request, which is fine for the
+    small amount of data a typical account holds.
+    """
+    if request.method != "POST":
+        return TemplateResponse(
+            request, "profile/take_out.html", {"private": True}
         )
 
-        return HttpResponseRedirect(reverse("take_out_done"))
-
-    return TemplateResponse(
-        request,
-        "profile/take_out.html",
-        {"private": True},
+    export = build_user_data_export(request.user)
+    response = HttpResponse(
+        json.dumps(export, cls=DjangoJSONEncoder, indent=2),
+        content_type="application/json",
     )
-
-
-async def take_out_done(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "profile/take_out_done.html",
-        {"private": True},
-    )
+    filename = f"courtlistener-data-{localdate().isoformat()}.json"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 @ratelimiter_unsafe_10_per_m
