@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def get_or_create_parenthetical_groups(
     cluster: OpinionCluster,
-) -> QuerySet[ParentheticalGroup, ParentheticalGroup]:
+) -> QuerySet[ParentheticalGroup]:
     """Given a cluster, return its existing ParentheticalGroup's from the database or compute and store new ones if they do not yet exist or need to be updated.
 
     Args:

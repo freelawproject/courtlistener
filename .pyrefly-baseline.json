@@ -2067,6 +2067,13 @@
       "severity": "error"
     },
     {
+      "column": 28,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-assignment",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "severity": "error"
+    },
+    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
