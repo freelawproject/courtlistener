@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import logging
 import operator
 import typing
@@ -52,8 +53,8 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-type Transformer[Scrape, Params, Transformed] = Callable[
-    [Scrape, Params], Transformed
+type Transformer[Scrape, Params, Database: Model, Transformed] = Callable[
+    [Scrape, Params, Database | None], Transformed
 ]
 
 
@@ -105,8 +106,10 @@ class MergerSpecification[Scrape, Params, Output](ABC):
         self._name = name
 
     @abstractmethod
-    def transform(self, scrape: Scrape, params: Params) -> Output:
-        """Get the field's value from the scrape and params."""
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Output:
+        """Get the field's value from the scrape, params, and existing DB model if any."""
         ...
 
 
@@ -127,17 +130,16 @@ class AttributeMerger[Scrape, Params, Transform](
             in the DB.
     """
 
-    __slots__ = (
-        "strategy",
-        "_transform",
-    )
+    __slots__ = ("strategy", "_transform", "_uses_scrape", "_db_fields")
 
-    _transform: Transformer[Any, Any, Any]
+    _transform: Transformer[Any, Any, Any, Any]
 
     def __init__(self):
         """Create an expression."""
         super().__init__()
         self.strategy: Strategy = overwrite
+        self._uses_scrape: bool = False
+        self._db_fields: tuple[str, ...] = ()
 
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.
@@ -193,17 +195,20 @@ class AttributeMerger[Scrape, Params, Transform](
 
     @override
     @final
-    def transform(self, scrape: Scrape, params: Params) -> Transform:
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Transform:
         """Evaluate this expression.
 
         Args:
             scrape: The scrape being merged.
             params: The params passed to the merger.
+            database: The existing model instance from the database, if any.
 
         Returns:
             The value of the expression for this scrape and params.
         """
-        return self._transform(scrape, params)
+        return self._transform(scrape, params, database)
 
 
 class _AncestorProxy[M: Model](AttributeMerger):
@@ -219,13 +224,16 @@ class _AncestorProxy[M: Model](AttributeMerger):
         self._transform = functools.partial(_ancestor, model)
 
 
-def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
+def _ancestor[M: Model](
+    model: type[M], scrape: Any, params: Any, database: M | None
+) -> M:
     """Find the nearest parent of a given type among nested `RelatedParams`.
 
     Args:
         model: The model class of the parent to find.
         scrape: Unused.
         params: The params of the merger being run.
+        database: The existing model instance from the database, if any.
 
     Returns:
         The nearest parent that is an instance of `model`.
@@ -254,7 +262,7 @@ class _ConstantProxy(AttributeMerger):
                 merge, so it should not be mutated.
         """
         super().__init__()
-        self._transform = lambda s, p: value
+        self._transform = lambda s, p, m: value
         self._value = value
 
 
@@ -264,7 +272,8 @@ class _ScrapeProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the scrape."""
         super().__init__()
-        self._transform = lambda s, p: s
+        self._uses_scrape = True
+        self._transform = lambda s, p, m: s
 
 
 class _ParamsProxy(AttributeMerger):
@@ -273,7 +282,7 @@ class _ParamsProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the params."""
         super().__init__()
-        self._transform = lambda s, p: p
+        self._transform = lambda s, p, m: p
 
 
 class _AttrProxy(AttributeMerger):
@@ -289,6 +298,8 @@ class _AttrProxy(AttributeMerger):
             key: The name of the attribute to read.
         """
         super().__init__()
+        self._uses_scrape = previous._uses_scrape
+        self._db_fields = previous._db_fields
         if isinstance(previous, _AttrProxy):
             key = f"{previous._key}.{key}"
             previous = previous._previous
@@ -297,15 +308,15 @@ class _AttrProxy(AttributeMerger):
         getter = operator.attrgetter(key)
         match previous:
             case _ScrapeProxy():
-                self._transform = lambda s, p: getter(s)
+                self._transform = lambda s, p, m: getter(s)
             case _ParamsProxy():
-                self._transform = lambda s, p: getter(p)
+                self._transform = lambda s, p, m: getter(p)
             case _ConstantProxy():
                 v = previous._value
-                self._transform = lambda s, p: getter(v)
+                self._transform = lambda s, p, m: getter(v)
             case _:
                 g = previous._transform
-                self._transform = lambda s, p: getter(g(s, p))
+                self._transform = lambda s, p, m: getter(g(s, p, m))
 
 
 class _ItemProxy(AttributeMerger):
@@ -320,32 +331,34 @@ class _ItemProxy(AttributeMerger):
                 merge time; anything else is used as-is.
         """
         super().__init__()
+        self._uses_scrape = previous._uses_scrape
+        self._db_fields = previous._db_fields
         if isinstance(key, AttributeMerger):
             f = key._transform
             match previous:
                 case _ScrapeProxy():
-                    self._transform = lambda s, p: s[f(s, p)]
+                    self._transform = lambda s, p, m: s[f(s, p)]
                 case _ParamsProxy():
-                    self._transform = lambda s, p: p[f(s, p)]
+                    self._transform = lambda s, p, m: p[f(s, p, m)]
                 case _ConstantProxy():
                     v = previous._value
-                    self._transform = lambda s, p: v[f(s, p)]
+                    self._transform = lambda s, p, m: v[f(s, p, m)]
                 case _:
                     g = previous._transform
-                    self._transform = lambda s, p: g(s, p)[f(s, p)]
+                    self._transform = lambda s, p, m: g(s, p, m)[f(s, p, m)]
         else:
             getter = operator.itemgetter(key)
             match previous:
                 case _ScrapeProxy():
-                    self._transform = lambda s, p: getter(s)
+                    self._transform = lambda s, p, m: getter(s)
                 case _ParamsProxy():
-                    self._transform = lambda s, p: getter(p)
+                    self._transform = lambda s, p, m: getter(p)
                 case _ConstantProxy():
                     v = previous._value
-                    self._transform = lambda s, p: getter(v)
+                    self._transform = lambda s, p, m: getter(v)
                 case _:
                     g = previous._transform
-                    self._transform = lambda s, p: getter(g(s, p))
+                    self._transform = lambda s, p, m: getter(g(s, p, m))
 
 
 class _CallProxy(AttributeMerger):
@@ -372,7 +385,7 @@ class _CallProxy(AttributeMerger):
         # Three cheers for unintuitive behavior! (late binding)
         def _make_transform(
             v: AttributeMerger | Any,
-        ) -> Transformer[Any, Any, Any]:
+        ) -> Transformer[Any, Any, Any, Any]:
             """Wrap an argument so expressions and plain values evaluate alike.
 
             Args:
@@ -383,23 +396,38 @@ class _CallProxy(AttributeMerger):
             """
             if isinstance(v, AttributeMerger):
                 return v._transform
-            return lambda s, p: v
+            return lambda s, p, m: v
 
         arg_fns = tuple(_make_transform(arg) for arg in args)
         kwarg_fns = {k: _make_transform(kwarg) for k, kwarg in kwargs.items()}
 
+        self._uses_srcape = previous._uses_scrape or any(
+            a._uses_scrape
+            for a in itertools.chain(args, kwargs.values())
+            if isinstance(a, AttributeMerger)
+        )
+        self._db_fields = tuple(
+            set(previous._db_fields)
+            | set(
+                f
+                for a in itertools.chain(args, kwargs.values())
+                if isinstance(a, AttributeMerger)
+                for f in a._db_fields
+            )
+        )
+
         match previous:
             case _ConstantProxy():
                 f = previous._value
-                self._transform = lambda s, p: f(
-                    *(a(s, p) for a in arg_fns),
-                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                self._transform = lambda s, p, m: f(
+                    *(a(s, p, m) for a in arg_fns),
+                    **{k: v(s, p, m) for k, v in kwarg_fns.items()},
                 )
             case _:
                 f = previous._transform
-                self._transform = lambda s, p: f(s, p)(
-                    *(a(s, p) for a in arg_fns),
-                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                self._transform = lambda s, p, m: f(s, p, m)(
+                    *(a(s, p, m) for a in arg_fns),
+                    **{k: v(s, p, m) for k, v in kwarg_fns.items()},
                 )
 
 
@@ -597,8 +625,10 @@ class RelatedMerger[
         ...
 
     @override
-    def transform(self, scrape: Scrape, params: Params) -> Transform:
-        return self.attribute.transform(scrape, params)
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Transform:
+        return self.attribute.transform(scrape, params, database)
 
 
 class OneToOneMerger[Scrape, Params, Child, RM: Model](
@@ -643,7 +673,7 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
         self, parent: RM | None, scrape: Scrape, params: Params
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
-        merger_input = self.transform(scrape, params)
+        merger_input = self.transform(scrape, params, None)
         if merger_input is None:
             return MergeResult.unnecessary()
 
@@ -734,7 +764,7 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         self, parent: RM | None, scrape: Scrape, params: Params
     ) -> tuple[Sequence[Child], MergeResult, RelatedManager[Any]]:
         related_manager: RelatedManager[Any] = getattr(parent, self._name)
-        transformed = self.transform(scrape, params)
+        transformed = self.transform(scrape, params, None)
         if isinstance(transformed, (str, bytes)):
             return (
                 [],
