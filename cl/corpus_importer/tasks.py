@@ -2475,10 +2475,9 @@ async def download_pacer_pdf_by_rd(
             )
         else:
             report = FreeOpinionReport(pacer_court_id, s)
-            # Juriscraper annotates this argument as int, but PACER IDs are strings.
             r, r_msg = await report.download_pdf(
                 pacer_case_id,
-                cast(Any, pacer_doc_id),
+                pacer_doc_id,
                 magic_number,
                 # Without a magic number, Juriscraper sends this as multipart
                 # form data, and httpx only accepts str/bytes values there.
@@ -2520,10 +2519,9 @@ async def download_pdf_by_magic_number(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     ) as s:
         report = FreeOpinionReport(court_id, s)
-        # Juriscraper annotates this argument as int, but PACER IDs are strings.
         return await report.download_pdf(
             pacer_case_id,
-            cast(Any, pacer_doc_id),
+            pacer_doc_id,
             magic_number,
             appellate,
             de_seq_num,
