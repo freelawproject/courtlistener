@@ -125,7 +125,7 @@ def _storable_number(
     return None
 
 
-def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
+def _keep_stored_file(scrape: str, db: FieldFile) -> str:
     """Merge strategy that keeps the path already stored for a document when this scrape has no published one to put there.
 
     Args:
@@ -135,7 +135,7 @@ def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
     Returns:
         The path to store.
     """
-    return (scrape.name or "") or (db.name or "")
+    return scrape or (db.name or "")
 
 
 def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
