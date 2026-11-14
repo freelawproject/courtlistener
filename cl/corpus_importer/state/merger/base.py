@@ -495,13 +495,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def update(
         self, state: MergerState.Update[Scrape, Params, M]
     ) -> MergerState.UpdateOutput[Scrape, Params, M]:
-        obj = cast(
-            M, self.config.model(**self._attributes(state.relation_params))
-        )
-
         updated: list[str] = []
         for name, spec in self.config.registry.attr.items():
-            obj_v = getattr(obj, name)
+            obj_v = getattr(self, name)
             db_v = getattr(state.instance, name)
             merged = spec.strategy(obj_v, db_v)
             if merged != db_v:
