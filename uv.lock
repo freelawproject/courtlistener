@@ -552,7 +552,7 @@ requires-dist = [
     { name = "kombu", specifier = ">=5.6.2" },
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "markdown2", specifier = ">=2.5.4" },
-    { name = "nameparser", specifier = ">=1.1.3" },
+    { name = "nameparser", specifier = ">=3.0.1" },
     { name = "natsort", specifier = ">=8.4.0" },
     { name = "ndg-httpsclient", specifier = ">=0.5.1" },
     { name = "networkx", specifier = ">=3.7" },
@@ -2232,11 +2232,11 @@ wheels = [
 
 [[package]]
 name = "nameparser"
-version = "1.1.3"
+version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ee/f6/418a49f9e7a6d98f938e712b1356eaff2247bc1ce679a851ac0d02022330/nameparser-1.1.3.tar.gz", hash = "sha256:aa2400ad71ccf8070675b40311a257c934659f91854b154e1ba6c264761c049d", size = 36504, upload-time = "2023-09-21T00:12:05.522Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/bd/2a7678b274c17fa334f0fe4ae1045cf7d80a1525851d1dd4023889f65782/nameparser-3.0.1.tar.gz", hash = "sha256:556a41d4884b954ea96fc266f81bd4822af3132704ee57238e977c29995ddb23", size = 1602896, upload-time = "2026-11-08T21:42:34.48Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/41/dd01b1f0ccffe618efe2d66ecde6964b0fada9d0f4891542675a9e722498/nameparser-1.1.3-py2.py3-none-any.whl", hash = "sha256:08ccda98681d59751c82052d52f185bc52f99d43e87d46b85c015a9096ecfa66", size = 24669, upload-time = "2023-09-21T00:12:04.174Z" },
+    { url = "https://files.pythonhosted.org/packages/80/ef/0fd9bac6e4c143be0bab7f75cbe03b65acc7b9287cd97a80f34c9e1d2cf5/nameparser-3.0.1-py3-none-any.whl", hash = "sha256:1a50284b285a3581c079037305af188a4f32cb76a5bc9eb0d73da3d26822db12", size = 603988, upload-time = "2026-11-08T21:42:32.566Z" },
 ]
 
 [[package]]
