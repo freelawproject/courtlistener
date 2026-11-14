@@ -581,7 +581,7 @@ async def lookup_judge_by_full_name_and_set_attr(
             born before the event date and died after it.
     """
     if not full_name:
-        return None
+        return
     judge = await lookup_judge_by_full_name(
         full_name, court_id, event_date, require_living_judge
     )

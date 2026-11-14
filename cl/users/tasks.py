@@ -68,7 +68,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
             settings.DEFAULT_FROM_EMAIL,
             ["donate@free.law"],
         )
-        return None
+        return
 
     profile = user.profile  # type: ignore
     if len(neon_accounts) == 1:
@@ -77,7 +77,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
         # merges.
         profile.neon_account_id = neon_accounts[0]["Account ID"]
         profile.save(update_fields=["neon_account_id"])
-        return None
+        return
 
     if len(neon_accounts) == 0:
         # No account found, create one

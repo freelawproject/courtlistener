@@ -1982,7 +1982,7 @@ class OpinionBaseDocument(Document):
 
     def prepare_dateFiled(self, instance):
         if instance.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.date_filed, str):
             datetime_object = datetime.strptime(
@@ -1994,7 +1994,7 @@ class OpinionBaseDocument(Document):
 
     def prepare_dateArgued(self, instance):
         if instance.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_argued, str):
             datetime_object = datetime.strptime(
@@ -2006,7 +2006,7 @@ class OpinionBaseDocument(Document):
 
     def prepare_dateReargued(self, instance):
         if instance.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargued, str):
             datetime_object = datetime.strptime(
@@ -2018,7 +2018,7 @@ class OpinionBaseDocument(Document):
 
     def prepare_dateReargumentDenied(self, instance):
         if instance.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargument_denied, str):
             datetime_object = datetime.strptime(
@@ -2209,7 +2209,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_dateFiled(self, instance):
         if instance.cluster.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.cluster.date_filed, str):
             datetime_object = datetime.strptime(
@@ -2221,7 +2221,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_dateArgued(self, instance):
         if instance.cluster.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_argued, str):
             datetime_object = datetime.strptime(
@@ -2233,7 +2233,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_dateReargued(self, instance):
         if instance.cluster.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargued, str):
             datetime_object = datetime.strptime(
@@ -2245,7 +2245,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_dateReargumentDenied(self, instance):
         if instance.cluster.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargument_denied, str):
             datetime_object = datetime.strptime(

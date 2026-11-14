@@ -3623,7 +3623,7 @@ async def mock_method_set_rd_sealed_status(
 ) -> None:
     if rd.document_type == RECAPDocument.PACER_DOCUMENT:
         await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
-        return
+        return None
     return await set_rd_sealed_status(rd, magic_number, potentially_sealed)
 
 

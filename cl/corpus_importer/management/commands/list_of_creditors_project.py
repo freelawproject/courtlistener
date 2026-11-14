@@ -53,7 +53,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
             "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
             "env vars to continue..."
         )
-        return None
+        return
 
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")

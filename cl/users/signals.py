@@ -71,12 +71,12 @@ def store_bounce_or_complaint_obj(
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
             assert_never(obj_type)
-            return None
+            return
 
     if random.random() >= storing_rate or not email_recipient:
         # Ignore events that exceed the random sampling rate or have no
         # email recipient.
-        return None
+        return
 
     try:
         storage = S3PrivateUUIDStorage()
@@ -93,7 +93,7 @@ def store_bounce_or_complaint_obj(
             obj_type.value,
             email_recipient,
         )
-        return None
+        return
 
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")

@@ -34,7 +34,7 @@ def load_fixture(apps, schema_editor):
 
 def unload_fixture(apps, schema_editor):
     """Noop"""
-    return None
+    return
 
 
 class Migration(migrations.Migration):

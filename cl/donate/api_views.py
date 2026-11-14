@@ -346,7 +346,7 @@ class MembershipWebhookViewSet(
             # issues.
             #
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-            return None
+            return
 
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
@@ -379,7 +379,7 @@ class MembershipWebhookViewSet(
                     email["from_email"],
                     [user.email],
                 )
-                return None
+                return
 
             if not user.profile.email_confirmed:
                 if user.profile.stub_account:
