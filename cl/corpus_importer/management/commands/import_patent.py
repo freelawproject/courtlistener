@@ -6,6 +6,7 @@ from celery import chain
 from django.conf import settings
 
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
     make_fjc_idb_lookup_params,
@@ -83,12 +84,14 @@ def get_dockets(options: dict) -> None:
                     court_id=item.district_id,
                     session_data=session_data,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                        "doc_num_end": "",  # No end doc num
-                    },
+                    **DocketReportQueryParams(
+                        {
+                            "show_parties_and_counsel": True,
+                            "show_terminated_parties": True,
+                            "show_list_of_member_cases": False,
+                            "doc_num_end": "",  # No end doc num
+                        }
+                    ),
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -101,11 +104,13 @@ def get_dockets(options: dict) -> None:
                     session_data=session_data,
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                    },
+                    **DocketReportQueryParams(
+                        {
+                            "show_parties_and_counsel": True,
+                            "show_terminated_parties": True,
+                            "show_list_of_member_cases": False,
+                        }
+                    ),
                 ).set(queue=q),
             ).apply_async()
 

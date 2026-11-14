@@ -16,7 +16,16 @@ from pathlib import Path
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs, cast
+from typing import (
+    IO,
+    Any,
+    Literal,
+    NotRequired,
+    TypedDict,
+    TypeIs,
+    Unpack,
+    cast,
+)
 from urllib.parse import urljoin
 from uuid import UUID
 
@@ -1878,6 +1887,26 @@ def probe_or_scrape_iquery_pages(
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
+class DocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see DocketReport.query()
+    """
+
+    date_range_type: NotRequired[Literal["Filed", "Entered"]]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    doc_num_start: NotRequired[str | int | None]
+    doc_num_end: NotRequired[str | int | None]
+    show_parties_and_counsel: NotRequired[bool]
+    show_terminated_parties: NotRequired[bool]
+    show_list_of_member_cases: NotRequired[bool]
+    include_pdf_headers: NotRequired[bool]
+    show_multiple_docs: NotRequired[bool]
+    output_format: NotRequired[Literal["html", "pdf"]]
+    order_by: NotRequired[Literal["date", "-date", "document_number"]]
+
+
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
@@ -1894,7 +1923,7 @@ def get_docket_by_pacer_case_id(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
     try:
@@ -1919,7 +1948,7 @@ async def get_docket_by_pacer_case_id_base(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
@@ -2012,6 +2041,24 @@ async def get_docket_by_pacer_case_id_base(
     }
 
 
+class AppellateDocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see AppellateDocketReport.query()
+    """
+
+    show_docket_entries: NotRequired[bool]
+    show_orig_docket: NotRequired[bool]
+    show_prior_cases: NotRequired[bool]
+    show_associated_cases: NotRequired[bool]
+    show_panel_info: NotRequired[bool]
+    show_party_atty_info: NotRequired[bool]
+    show_caption: NotRequired[bool]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    output_format: NotRequired[Literal["html", "xml"]]
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException,),
@@ -2026,7 +2073,7 @@ def get_appellate_docket_by_docket_number(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_appellate_docket_by_docket_number_base."""
     try:
@@ -2049,7 +2096,7 @@ async def get_appellate_docket_by_docket_number_base(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 

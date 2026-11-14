@@ -8,6 +8,8 @@ from django.conf import settings
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import (
+    AppellateDocketReportQueryParams,
+    DocketReportQueryParams,
     get_appellate_docket_by_docket_number,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -55,15 +57,17 @@ def get_dockets(options):
                     court_id=row["fjc_court_id"],
                     session_data=session_data,
                     tag_names=[TAG],
-                    **{
-                        "show_docket_entries": True,
-                        "show_orig_docket": True,
-                        "show_prior_cases": True,
-                        "show_associated_cases": True,
-                        "show_panel_info": True,
-                        "show_party_atty_info": True,
-                        "show_caption": True,
-                    },
+                    **AppellateDocketReportQueryParams(
+                        {
+                            "show_docket_entries": True,
+                            "show_orig_docket": True,
+                            "show_prior_cases": True,
+                            "show_associated_cases": True,
+                            "show_panel_info": True,
+                            "show_party_atty_info": True,
+                            "show_caption": True,
+                        }
+                    ),
                 ).set(queue=q),
             ).apply_async()
         elif task == "district":
@@ -79,11 +83,13 @@ def get_dockets(options):
                     court_id=row["fjc_court_id"],
                     session_data=session_data,
                     tag_names=[TAG],
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": True,
-                    },
+                    **DocketReportQueryParams(
+                        {
+                            "show_parties_and_counsel": True,
+                            "show_terminated_parties": True,
+                            "show_list_of_member_cases": True,
+                        }
+                    ),
                 ).set(queue=q),
             ).apply_async()
 
