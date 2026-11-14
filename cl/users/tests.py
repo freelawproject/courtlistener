@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
@@ -46,7 +47,7 @@ from cl.alerts.factories import (
     DocketAlertFactory,
     DocketAlertWithParentsFactory,
 )
-from cl.alerts.models import DocketAlert, DocketAlertEvent
+from cl.alerts.models import Alert, DocketAlert, DocketAlertEvent
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -105,6 +106,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
+from cl.sso.models import AuthEvent, AuthMethod, AuthOutcome
 from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -119,6 +121,7 @@ from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
 from cl.users import signals as user_signals
 from cl.users.admin import UserAdmin, UserProfileInline
+from cl.users.data_export import build_user_data_export
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -565,28 +568,30 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
-    @patch("cl.users.views.create_zoho_desk_ticket")
-    async def test_take_out_creates_zoho_desk_ticket(
-        self, mock_task: MagicMock
-    ) -> None:
-        """Does requesting a data export create a Zoho Desk ticket?"""
-        user = await sync_to_async(User.objects.get)(username="pandora")
+    @patch(
+        "cl.users.data_export.get_user_api_usage",
+        return_value={"total": 0},
+    )
+    def test_take_out_downloads_export(self, mock_usage: MagicMock) -> None:
+        """Does posting to the export page download the user's data?"""
         self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
+            self.client.login(username="pandora", password="password")
         )
-        response = await self.async_client.post(
-            reverse("take_out"),
-            follow=True,
-        )
-        self.assertRedirects(response, reverse("take_out_done"))
-        mock_task.delay.assert_called_once()
-        call_kwargs = mock_task.delay.call_args.kwargs
-        self.assertEqual(call_kwargs["email"], user.email)
-        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
-        self.assertIn(user.username, call_kwargs["description"])
-        self.assertIn("Email Confirmed:", call_kwargs["description"])
+
+        response = self.client.post(reverse("take_out"))
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        export = json.loads(response.content)
+        self.assertEqual(export["account"]["username"], "pandora")
+
+    def test_take_out_requires_login(self) -> None:
+        """Are anonymous users sent to sign in instead of getting data?"""
+        response = self.client.post(reverse("take_out"))
+
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), response["Location"])
 
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
@@ -6162,3 +6167,129 @@ class MembershipHeaderLinkTest(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(self.url)
         self.assertContains(response, "Join FLP")
+
+
+@patch(
+    "cl.users.data_export.get_user_api_usage",
+    return_value={"2026-01-02": 7, "total": 7},
+)
+class DataExportTest(TestCase):
+    """Tests for build_user_data_export."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="exporter",
+            employer="Exporter LLP",
+        ).user
+        cls.other_user = UserProfileWithParentsFactory.create().user
+        cls.docket = DocketFactory.create(case_name="Lorem v. Ipsum")
+
+        AlertFactory.create(
+            user=cls.user,
+            name="My alert",
+            query="q=foo",
+            rate=Alert.DAILY,
+            secret_key="alertsecret",
+        )
+        AlertFactory.create(user=cls.other_user, name="Not mine")
+        DocketAlertWithParentsFactory.create(
+            user=cls.user,
+            docket=cls.docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+            secret_key="docketsecret",
+        )
+        NoteFactory.create(user=cls.user, name="My note")
+        tag = UserTagFactory.create(user=cls.user, name="my-tag")
+        tag.dockets.add(cls.docket)
+        rd = RECAPDocumentFactory.create(
+            docket_entry__docket=cls.docket, document_number="3"
+        )
+        PrayerFactory.create(
+            user=cls.user, recap_document=rd, status=Prayer.WAITING
+        )
+        VisualizationFactory.create(user=cls.user, title="My map")
+        NeonMembershipFactory.create(user=cls.user)
+        SearchQuery.objects.create(
+            user=cls.user,
+            get_params="q=foo",
+            query_time_ms=5,
+            hit_cache=False,
+            source=SearchQuery.WEBSITE,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+        AuthEvent.objects.create(
+            user=cls.user,
+            method=AuthMethod.PASSWORD,
+            outcome=AuthOutcome.SUCCESS,
+            ip_address="192.0.2.1",
+        )
+
+    def test_exports_each_kind_of_data(self, mock_usage: MagicMock) -> None:
+        """Does each section hold the user's rows, with readable labels?"""
+        export = build_user_data_export(self.user)
+
+        with self.subTest("account"):
+            self.assertEqual(export["account"]["username"], "exporter")
+            self.assertEqual(export["account"]["employer"], "Exporter LLP")
+        with self.subTest("search alerts"):
+            self.assertEqual(len(export["search_alerts"]), 1)
+            self.assertEqual(export["search_alerts"][0]["name"], "My alert")
+            self.assertEqual(export["search_alerts"][0]["rate"], "Daily")
+        with self.subTest("docket alerts"):
+            alert = export["docket_alerts"][0]
+            self.assertEqual(alert["case_name"], "Lorem v. Ipsum")
+            self.assertEqual(alert["alert_type"], "Subscription")
+        with self.subTest("notes"):
+            self.assertEqual(export["notes"][0]["name"], "My note")
+        with self.subTest("tags"):
+            tag = export["tags"][0]
+            self.assertEqual(tag["name"], "my-tag")
+            self.assertEqual(
+                tag["dockets"],
+                [{"docket_id": self.docket.pk, "case_name": "Lorem v. Ipsum"}],
+            )
+        with self.subTest("prayers"):
+            prayer = export["prayers"][0]
+            self.assertEqual(prayer["docket_id"], self.docket.pk)
+            self.assertEqual(prayer["document_number"], "3")
+        with self.subTest("visualizations"):
+            self.assertEqual(export["visualizations"][0]["title"], "My map")
+        with self.subTest("memberships"):
+            self.assertEqual(len(export["memberships"]), 1)
+        with self.subTest("search history"):
+            query = export["search_history"][0]
+            self.assertEqual(query["get_params"], "q=foo")
+            self.assertEqual(query["engine"], "Elasticsearch")
+        with self.subTest("login history"):
+            event = export["login_history"][0]
+            self.assertEqual(event["ip_address"], "192.0.2.1")
+            self.assertEqual(event["outcome"], AuthOutcome.SUCCESS.label)
+        with self.subTest("API usage"):
+            self.assertEqual(export["api_usage_by_day"]["total"], 7)
+            self.assertEqual(mock_usage.call_args.args[0], self.user.pk)
+
+    def test_leaves_out_secrets_and_other_users(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Are credentials and other people's rows kept out of the export?"""
+        content = json.dumps(
+            build_user_data_export(self.user), cls=DjangoJSONEncoder
+        )
+
+        for unwanted in (
+            "alertsecret",
+            "docketsecret",
+            "Not mine",
+            self.user.password,
+        ):
+            with self.subTest(unwanted=unwanted):
+                self.assertNotIn(unwanted, content)
+
+    def test_empty_account(self, mock_usage: MagicMock) -> None:
+        """Does an account with no saved items export empty sections?"""
+        export = build_user_data_export(self.other_user)
+
+        self.assertEqual(export["docket_alerts"], [])
+        self.assertEqual(export["tags"], [])
+        self.assertEqual(export["login_history"], [])
