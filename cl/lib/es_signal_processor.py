@@ -867,7 +867,7 @@ class ESSignalProcessor:
             # If the save includes 'view_count' in the update fields, abort
             # the operation.This indicates that a user view is incrementing
             # the 'view_count' for dockets and opinions.
-            return None
+            return
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
@@ -998,14 +998,14 @@ class ESSignalProcessor:
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
+                        return
                 case Opinion() if self.es_document is OpinionClusterDocument:  # type: ignore
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
+                        return
                 case _:
                     try:
                         affected_fields = fields_map[instance.type]

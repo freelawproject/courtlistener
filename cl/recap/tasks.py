@@ -1846,7 +1846,7 @@ def process_recap_appellate_case_query_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1859,7 +1859,7 @@ def process_recap_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1872,7 +1872,7 @@ def process_recap_appellate_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task
@@ -2034,7 +2034,7 @@ def update_docket_from_hidden_api(data):
             or None if looking up the item failed.
     """
     if data is None:
-        return None
+        return
 
     d = Docket.objects.get(pk=data["pass_through"])
 
@@ -2265,7 +2265,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
         fq = PacerFetchQueue.objects.get(pk=fq_pk)
         msg = "Successfully completed fetch and save."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-    return None
+    return
 
 
 @app.task(
@@ -3964,7 +3964,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         else:
             raise self.retry(exc=exc)
 
@@ -3980,7 +3980,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
@@ -3995,7 +3995,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         case _:
             docket_parser = TexasCourtOfAppealsScraper(
                 court_id=email_data["court_id"]
@@ -4053,7 +4053,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     try:
         result = merge_texas_docket(docket_data, download_attachments=True)
@@ -4065,7 +4065,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     else:
         changed_documents = list(
             result.creates.get("TexasDocument", set())
@@ -4083,7 +4083,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
 
-    return None
+    return
 
 
 def fetch_and_archive_scotus_docket_followup(
@@ -4170,7 +4170,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         else:
             raise self.retry(exc=exc)
 
@@ -4197,7 +4197,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     if email_type == SCOTUSEmailType.CONFIRMATION.value:
         if data == SCOTUSConfirmationResult.Success.value:
@@ -4208,7 +4208,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
 
         async_to_sync(mark_pq_status)(
             epq,
@@ -4217,7 +4217,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     try:
         d, _, doc_pks = merge_scotus_docket(data)
     except Exception as e:
@@ -4237,7 +4237,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
         status = PROCESSING_STATUS.SUCCESSFUL
         async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
-    return None
+    return
 
 
 @app.task(

@@ -92,7 +92,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(
                     tasks_to_schedule,
                     court_id,
                 )
-                return None
+                return
 
             task_to_schedule_count = 0
             while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
@@ -160,13 +160,13 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         # doesn't have skip_iquery_sweep set, abort it. This is a Docket
         # created by an upload or another RECAP source different from the
         # iquery probe daemon.
-        return None
+        return
 
     if getattr(instance, "skip_iquery_sweep", False):
         # This is an instance added by the probe_or_scrape_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
-        return None
+        return
 
     # Only call update_latest_case_id_and_schedule_iquery_sweep if:
     # - The docket belongs to a RECAP district or bankruptcy court,

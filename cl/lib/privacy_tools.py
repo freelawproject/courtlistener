@@ -27,7 +27,7 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
     def set_blocked(opinion: Opinion) -> None:
         opinion.cluster.blocked = True
         opinion.cluster.date_blocked = now()
-        return None
+        return
 
     # Block if there is sensitive content in the document
     if extension in ["html", "wpd"]:
@@ -36,7 +36,7 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
         opinion.plain_text, found_ppi = anonymize(content)
     if found_ppi:
         set_blocked(opinion)
-        return None
+        return
 
     oc = opinion.cluster
     court = opinion.cluster.docket.court
@@ -46,13 +46,13 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
     thirty_years_ago = now().date() - timedelta(days=30 * 365)
     from_last_thirty_years = oc.date_filed > thirty_years_ago
     if not from_last_thirty_years:
-        return None
+        return
     #
     # Block based on rules and terms
     #
     if oc.precedential_status == "Unpublished":
         set_blocked(opinion)
-        return None
+        return
 
     lower_state_court = court in Court.objects.filter(
         jurisdiction__in=[Court.STATE_TRIAL, Court.STATE_APPELLATE]
@@ -66,14 +66,14 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
         ]
     ):
         set_blocked(opinion)
-        return None
+        return
 
     federal_district_court = court in Court.objects.filter(
         jurisdiction=Court.FEDERAL_DISTRICT
     )
     if federal_district_court and "asylum" in lower_content:
         set_blocked(opinion)
-        return None
+        return
 
     not_appellate_court = court in Court.objects.exclude(
         jurisdiction__in=[
@@ -90,7 +90,7 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
         ]
     ):
         set_blocked(opinion)
-        return None
+        return
 
     # fmt: off
     private_court = court in Court.objects.filter(
@@ -109,7 +109,7 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
     # fmt: on
     if private_court:
         set_blocked(opinion)
-        return None
+        return
 
 
 def anonymize(s: str) -> tuple[str, bool]:
