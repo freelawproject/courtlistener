@@ -1,8 +1,8 @@
-import json
 import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib import messages
@@ -13,7 +13,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
-from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_email
 from django.db import IntegrityError, models, transaction
 from django.db.models import F
@@ -21,6 +20,7 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseRedirect,
+    JsonResponse,
     QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect
@@ -28,7 +28,7 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import localdate, now
+from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -59,7 +59,6 @@ from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
     ratelimiter_all_2_per_m,
-    ratelimiter_unsafe_3_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
@@ -68,7 +67,10 @@ from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.es_docket_sources import es_uid
 from cl.search.models import SEARCH_TYPES
 from cl.stats.metrics import accounts_deleted_total
-from cl.users.data_export import build_user_data_export
+from cl.users.data_export import (
+    build_user_data_export,
+    claim_daily_export,
+)
 from cl.users.forms import (
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
@@ -492,26 +494,42 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
-@ratelimiter_unsafe_3_per_m
+@sensitive_post_parameters("password")
 @never_cache
 @login_required
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Show the data export page, and download the export on POST.
 
-    The export is built in memory during the request, which is fine for the
-    small amount of data a typical account holds.
+    The user must confirm their password, and gets one export per day. The
+    export is built in memory during the request, which is fine for the small
+    amount of data a typical account holds.
     """
-    if request.method != "POST":
+    is_post = request.method == "POST"
+    form = PasswordConfirmForm(request, request.POST if is_post else None)
+    if not is_post or not form.is_valid():
         return TemplateResponse(
-            request, "profile/take_out.html", {"private": True}
+            request, "profile/take_out.html", {"form": form, "private": True}
         )
 
-    export = build_user_data_export(request.user)
-    response = HttpResponse(
-        json.dumps(export, cls=DjangoJSONEncoder, indent=2),
-        content_type="application/json",
+    if not claim_daily_export(request.user):
+        form.add_error(
+            None,
+            "You can download your data once a day. Please try again "
+            "tomorrow.",
+        )
+        return TemplateResponse(
+            request,
+            "profile/take_out.html",
+            {"form": form, "private": True},
+            status=HTTPStatus.TOO_MANY_REQUESTS,
+        )
+
+    response = JsonResponse(
+        build_user_data_export(request.user), json_dumps_params={"indent": 2}
     )
-    filename = f"courtlistener-data-{localdate().isoformat()}.json"
+    filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 

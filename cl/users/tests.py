@@ -7,7 +7,7 @@ from http import HTTPStatus
 from itertools import product
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -106,7 +106,6 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
-from cl.sso.models import AuthEvent, AuthMethod, AuthOutcome
 from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -567,31 +566,6 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             response,
             reverse("delete_profile_done"),
         )
-
-    @patch(
-        "cl.users.data_export.get_user_api_usage",
-        return_value={"total": 0},
-    )
-    def test_take_out_downloads_export(self, mock_usage: MagicMock) -> None:
-        """Does posting to the export page download the user's data?"""
-        self.assertTrue(
-            self.client.login(username="pandora", password="password")
-        )
-
-        response = self.client.post(reverse("take_out"))
-
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(response["Content-Type"], "application/json")
-        self.assertIn("attachment;", response["Content-Disposition"])
-        export = json.loads(response.content)
-        self.assertEqual(export["user"][0]["fields"]["username"], "pandora")
-
-    def test_take_out_requires_login(self) -> None:
-        """Are anonymous users sent to sign in instead of getting data?"""
-        response = self.client.post(reverse("take_out"))
-
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertIn(reverse("sign-in"), response["Location"])
 
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
@@ -6169,9 +6143,8 @@ class MembershipHeaderLinkTest(TestCase):
         self.assertContains(response, "Join FLP")
 
 
-@patch(
-    "cl.users.data_export.get_user_api_usage",
-    return_value={"2026-01-02": 7, "total": 7},
+@patch.object(
+    UserProfile, "total_api_usage", new_callable=PropertyMock, return_value=7
 )
 class DataExportTest(TestCase):
     """Tests for build_user_data_export."""
@@ -6207,20 +6180,12 @@ class DataExportTest(TestCase):
             source=SearchQuery.WEBSITE,
             engine=SearchQuery.ELASTICSEARCH,
         )
-        AuthEvent.objects.create(
-            user=cls.user,
-            method=AuthMethod.PASSWORD,
-            outcome=AuthOutcome.SUCCESS,
-            ip_address="192.0.2.1",
-        )
 
     def test_exports_each_kind_of_data(self, mock_usage: MagicMock) -> None:
         """Does each section hold the user's rows as stored?"""
         export = build_user_data_export(self.user)
 
         expected_counts = {
-            "user": 1,
-            "profile": 1,
             "search_alerts": 1,
             "docket_alerts": 1,
             "notes": 1,
@@ -6228,17 +6193,18 @@ class DataExportTest(TestCase):
             "tagged_dockets": 1,
             "prayers": 1,
             "visualizations": 1,
-            "memberships": 1,
             "search_history": 1,
-            "login_history": 1,
         }
         for section, count in expected_counts.items():
             with self.subTest(section=section):
                 self.assertEqual(len(export[section]), count)
 
-        self.assertEqual(export["user"][0]["fields"]["username"], "exporter")
+        self.assertEqual(export["user"]["fields"]["username"], "exporter")
         self.assertEqual(
-            export["profile"][0]["fields"]["employer"], "Exporter LLP"
+            export["profile"]["fields"]["employer"], "Exporter LLP"
+        )
+        self.assertEqual(
+            export["membership"]["model"], "donate.neonmembership"
         )
         self.assertEqual(
             export["docket_alerts"][0]["fields"]["docket"], self.docket.pk
@@ -6246,25 +6212,24 @@ class DataExportTest(TestCase):
         self.assertEqual(
             export["tagged_dockets"][0]["fields"]["docket"], self.docket.pk
         )
-        self.assertEqual(
-            export["login_history"][0]["fields"]["ip_address"], "192.0.2.1"
-        )
-        self.assertEqual(export["api_usage_by_day"]["total"], 7)
-        self.assertEqual(mock_usage.call_args.args[0], self.user.pk)
+        self.assertEqual(export["total_api_requests"], 7)
 
     def test_leaves_out_excluded_fields(self, mock_usage: MagicMock) -> None:
-        """Are credentials and staff fields left out?"""
+        """Are credentials, staff fields and links to the user left out?"""
         export = build_user_data_export(self.user)
 
-        excluded = {
-            "user": "password",
-            "profile": "notes",
-            "search_alerts": "secret_key",
-            "docket_alerts": "secret_key",
-        }
-        for section, field in excluded.items():
-            with self.subTest(section=section, field=field):
-                self.assertNotIn(field, export[section][0]["fields"])
+        excluded = [
+            (export["user"], "password"),
+            (export["user"], "is_staff"),
+            (export["profile"], "notes"),
+            (export["profile"], "user"),
+            (export["search_alerts"][0], "secret_key"),
+            (export["search_alerts"][0], "user"),
+            (export["docket_alerts"][0], "secret_key"),
+        ]
+        for row, field in excluded:
+            with self.subTest(model=row["model"], field=field):
+                self.assertNotIn(field, row["fields"])
 
     def test_leaves_out_other_users(self, mock_usage: MagicMock) -> None:
         """Are other people's rows kept out of the export?"""
@@ -6278,6 +6243,81 @@ class DataExportTest(TestCase):
         """Does an account with no saved items export empty sections?"""
         export = build_user_data_export(self.other_user)
 
+        self.assertIsNone(export["membership"])
         self.assertEqual(export["docket_alerts"], [])
         self.assertEqual(export["tagged_dockets"], [])
-        self.assertEqual(export["login_history"], [])
+        self.assertEqual(export["search_history"], [])
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Process-local, so parallel workers can't reset or share the
+            # daily export counter mid-test.
+            "LOCATION": "take-out-view-test",
+        },
+    },
+)
+@patch.object(
+    UserProfile, "total_api_usage", new_callable=PropertyMock, return_value=0
+)
+class TakeOutViewTest(TestCase):
+    """Tests for the take_out view."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="taker",
+            user__password=make_password("a-good-password"),
+        ).user
+
+    def setUp(self) -> None:
+        django_cache.clear()
+        self.client.force_login(self.user)
+
+    def download(self, password: str = "a-good-password") -> HttpResponse:
+        """POST the export form with the given password."""
+        return self.client.post(reverse("take_out"), {"password": password})
+
+    def test_downloads_export(self, mock_usage: MagicMock) -> None:
+        """Does the right password download the user's data?"""
+        response = self.download()
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        export = json.loads(response.content)
+        self.assertEqual(export["user"]["fields"]["username"], "taker")
+
+    def test_wrong_password_shows_error(self, mock_usage: MagicMock) -> None:
+        """Does a wrong password show the form again, without using up the day?"""
+        response = self.download(password="wrong")
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your password was invalid.")
+        self.assertNotIn("Content-Disposition", response)
+        self.assertEqual(self.download().status_code, HTTPStatus.OK)
+
+    def test_one_export_per_day(self, mock_usage: MagicMock) -> None:
+        """Is a second export within a day refused with a helpful message?"""
+        self.assertEqual(self.download().status_code, HTTPStatus.OK)
+
+        with time_machine.travel(now() + timedelta(hours=23), tick=False):
+            response = self.download()
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertContains(
+            response,
+            "You can download your data once a day.",
+            status_code=HTTPStatus.TOO_MANY_REQUESTS,
+        )
+        self.assertNotIn("Content-Disposition", response)
+
+    def test_requires_login(self, mock_usage: MagicMock) -> None:
+        """Are anonymous users sent to sign in instead of getting data?"""
+        self.client.logout()
+
+        response = self.download()
+
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), response["Location"])
