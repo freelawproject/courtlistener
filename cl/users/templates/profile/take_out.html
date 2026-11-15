@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Create a Data Export Request – CourtListener.com{% endblock %}
+{% block title %}Export Your Data – CourtListener.com{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -8,21 +8,37 @@
     <div class="col-sm-3">&nbsp;</div>
     <div class="col-sm-6">
       <h1><i class="fa fa-download gray"></i>&nbsp;Request Your Data</h1>
-      <p>We believe that our users have a general right to access their data and to export it from CourtListener.
+      <p>We believe that our users have a right to access their data and to export it from CourtListener.
       </p>
-      <p>To create an export request, please press the button below, and we will generate a file with your data and email it to the address that is associated with your account.
+      <p>Confirm your password below to download a file with the data we hold about your account, including your account details, alerts, notes, tags, prayers, visualizations, recent search history, API usage, and more. You can only download your data once a day.
       </p>
-      <p>Typically, export files will include things like your notes, alerts, and visualizations.
+      <p>The file is in JSON format, which other programs can read. If you have questions about your data, please <a href="{% url "contact" %}">get in touch</a>.
       </p>
-      <p>Generating exports typically takes 2&dash;5 days. If you delete your account during this time, we will not be able to generate your export.</p>
 
-      <div class="v-offset-above-2">
-        <form action="" method="post" class="float-right">{% csrf_token %}
-            <button type="submit" class="btn btn-primary btn-lg">Request a Data Export</button>
-        </form>
+      <form action="" method="post" class="v-offset-above-2">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-warning">
+            {% for error in form.non_field_errors %}{{ error|escape }}{% endfor %}
+          </div>
+        {% endif %}
+        <div class="form-group">
+          {{ form.password.label_tag }}
+          {{ form.password }}
+          {% if form.password.errors %}
+            <p class="help-block">
+              {% for error in form.password.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg">Download My Data</button>
+      </form>
+      <p class="v-offset-above-2">
         <a href="{% url "view_settings" %}"><i class="fa fa-arrow-circle-o-left gray"></i>&nbsp;Cancel and go
           back&hellip;</a>
-      </div>
+      </p>
     </div>
     <div class="col-sm-3">&nbsp;</div>
 {% endblock %}
