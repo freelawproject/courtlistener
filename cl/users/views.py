@@ -276,9 +276,10 @@ def build_membership_details(
     """Build the Level / Status / Payment / Term rows of the Membership page.
 
     Values are display-ready. Payment is only listed for inactive memberships,
-    where it usually explains why. An inactive membership can still have a
-    term end date in the future (e.g., a declined renewal payment), so the
-    term row says "ended" only once the date has passed.
+    where it usually explains why. An active membership's term always "ends".
+    An inactive one can still have an end date in the future (e.g., a declined
+    renewal payment), so its term row says "ended" only once the date has
+    passed.
     """
     is_active = membership.is_active
     details: list[MembershipDetail] = [
@@ -293,7 +294,9 @@ def build_membership_details(
             }
         )
     if termination_date := membership.termination_date:
-        term_ended = localdate(termination_date) < localdate()
+        term_ended = not is_active and (
+            localdate(termination_date) < localdate()
+        )
         details.append(
             {
                 "label": "Term ended" if term_ended else "Term ends",
