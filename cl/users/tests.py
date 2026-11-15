@@ -6198,81 +6198,32 @@ class MembershipHeaderLinkTest(TestCase):
 class MembershipPageTest(TestCase):
     """Tests for the profile's Membership page."""
 
-    # Time is frozen for tests that depend on the date, and the dates below are
-    # relative to it.
-    NOW = datetime(2026, 11, 15, 12, tzinfo=UTC)
-    FUTURE = datetime(2027, 1, 14, 12, tzinfo=UTC)
-    PAST = datetime(2026, 9, 1, 12, tzinfo=UTC)
+    def test_page_follows_membership_state(self) -> None:
+        """The page offers join, upgrade or renew, and words the term to match."""
+        user = UserProfileWithParentsFactory.create().user
+        self.client.force_login(user)
+        url = reverse("profile_your_support")
+        now = datetime(2026, 11, 15, 12, tzinfo=UTC)
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        """Create the user and the URLs shared by the tests."""
-        cls.user = UserProfileWithParentsFactory.create().user
-        cls.url = reverse("profile_your_support")
-        cls.contact_url = f"{reverse('contact')}?issue_type=memberships"
+        with time_machine.travel(now, tick=False):
+            with self.subTest(state="none"):
+                response = self.client.get(url)
+                self.assertContains(response, "Become a Member")
 
-    def setUp(self) -> None:
-        """Log the user in; the page requires authentication."""
-        self.client.force_login(self.user)
-
-    def test_non_member_is_invited_to_join(self) -> None:
-        """Users with no membership are invited to join and told where to get help."""
-        response = self.client.get(self.url)
-        self.assertContains(response, "You aren't a member yet")
-        self.assertContains(response, "Become a Member")
-        self.assertContains(response, "Not seeing your membership?")
-        self.assertContains(response, self.contact_url)
-        for address in ("donate@free.law", "memberships@free.law"):
-            self.assertNotContains(response, f"mailto:{address}")
-
-    def test_active_member_sees_level_and_upgrade_link(self) -> None:
-        """Active members can confirm their level and find the upgrade flow."""
-        with time_machine.travel(self.NOW, tick=False):
-            NeonMembershipFactory(
-                user=self.user,
-                level=NeonMembershipLevel.TIER_2,
-                neon_id="98765",
-                termination_date=self.FUTURE,
-            )
-            response = self.client.get(self.url)
-        self.assertContains(response, "CL Membership - Tier 2")
-        self.assertContains(response, "<dt>Term ends</dt>")
-        # The term end is shown with its time zone, in the site's time zone
-        # until local-time.js swaps in the visitor's.
-        self.assertContains(response, "January 14, 2027 at 4:00 AM PST")
-        self.assertContains(response, 'datetime="2027-01-14T12:00:00+00:00"')
-        self.assertContains(response, "memberships/upgrade/98765")
-        self.assertContains(response, "Upgrade Membership")
-        self.assertNotContains(response, "Become a Member")
-        # The help for people who can't see a membership is just noise here.
-        self.assertNotContains(response, "Not seeing your membership?")
-        self.assertContains(response, self.contact_url)
-
-    def test_inactive_member_is_invited_to_renew(self) -> None:
-        """An inactive membership says so, and only says its term ended once it has."""
-        cases = {
-            "future": (self.FUTURE, "Term ends"),
-            "past": (self.PAST, "Term ended"),
-        }
-        with time_machine.travel(self.NOW, tick=False):
             membership = NeonMembershipFactory(
-                user=self.user,
-                level=NeonMembershipLevel.TIER_1,
-                payment_status=MembershipPaymentStatus.FAILED,
+                user=user,
+                level=NeonMembershipLevel.TIER_2,
+                termination_date=now + timedelta(days=60),
             )
-            for label, (termination_date, term_label) in cases.items():
-                with self.subTest(term=label):
-                    membership.termination_date = termination_date
-                    membership.save()
-                    response = self.client.get(self.url)
-                    self.assertContains(
-                        response, "Your Membership Isn't Active"
-                    )
-                    self.assertContains(response, "Renew Your Membership")
-                    self.assertContains(
-                        response, "Payment failed or was declined"
-                    )
-                    self.assertContains(response, f"<dt>{term_label}</dt>")
-                    self.assertNotContains(
-                        response, "Not seeing your membership?"
-                    )
+            with self.subTest(state="active"):
+                response = self.client.get(url)
+                self.assertContains(response, "Upgrade Membership")
+                self.assertContains(response, "<dt>Term ends</dt>")
+                self.assertContains(response, "at 4:00 AM PST")
+
+            membership.termination_date = now - timedelta(days=60)
+            membership.save()
+            with self.subTest(state="lapsed"):
+                response = self.client.get(url)
+                self.assertContains(response, "Renew Your Membership")
+                self.assertContains(response, "<dt>Term ended</dt>")

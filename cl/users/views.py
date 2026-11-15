@@ -277,7 +277,7 @@ def build_membership_details(
     """Build the Level / Term / Payment / Status rows of the Membership page.
 
     Values are display-ready. The term end is a ``<time>`` element showing the
-    time in the site's time zone, which ``local-time.js`` rewrites in the
+    time in the site's time zone, which ``base.js`` rewrites in the
     visitor's own time zone. Status comes last, preceded by Payment for
     inactive memberships, where it usually explains why. An active
     membership's term always "ends". An inactive one can still have an end
@@ -296,7 +296,7 @@ def build_membership_details(
             {
                 "label": "Term ended" if term_ended else "Term ends",
                 "value": format_html(
-                    '<time class="local-time" datetime="{}">{}</time>',
+                    '<time data-local-time datetime="{}">{}</time>',
                     termination_date.isoformat(),
                     date_format(
                         localtime(termination_date), r"F j, Y \a\t g:i A T"
