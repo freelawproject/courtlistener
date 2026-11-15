@@ -36,6 +36,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
 from lxml.html import fromstring
+from redis import ConnectionError as RedisConnectionError
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
@@ -6177,6 +6178,7 @@ class DataExportTest(TestCase):
             get_params="q=foo",
             query_time_ms=5,
             hit_cache=False,
+            failed=False,
             source=SearchQuery.WEBSITE,
             engine=SearchQuery.ELASTICSEARCH,
         )
@@ -6265,24 +6267,26 @@ class DataExportTest(TestCase):
 class TakeOutViewTest(TestCase):
     """Tests for the take_out view."""
 
+    PASSWORD = "a-good-password"
+
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create(
             user__username="taker",
-            user__password=make_password("a-good-password"),
+            user__password=make_password(cls.PASSWORD),
         ).user
 
     def setUp(self) -> None:
         django_cache.clear()
         self.client.force_login(self.user)
 
-    def download(self, password: str = "a-good-password") -> HttpResponse:
+    def download(self, password: str) -> HttpResponse:
         """POST the export form with the given password."""
         return self.client.post(reverse("take_out"), {"password": password})
 
     def test_downloads_export(self, mock_usage: MagicMock) -> None:
         """Does the right password download the user's data?"""
-        response = self.download()
+        response = self.download(self.PASSWORD)
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response["Content-Type"], "application/json")
@@ -6292,19 +6296,23 @@ class TakeOutViewTest(TestCase):
 
     def test_wrong_password_shows_error(self, mock_usage: MagicMock) -> None:
         """Does a wrong password show the form again, without using up the day?"""
-        response = self.download(password="wrong")
+        response = self.download("wrong")
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertContains(response, "Your password was invalid.")
         self.assertNotIn("Content-Disposition", response)
-        self.assertEqual(self.download().status_code, HTTPStatus.OK)
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
 
     def test_one_export_per_day(self, mock_usage: MagicMock) -> None:
         """Is a second export within a day refused with a helpful message?"""
-        self.assertEqual(self.download().status_code, HTTPStatus.OK)
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
 
         with time_machine.travel(now() + timedelta(hours=23), tick=False):
-            response = self.download()
+            response = self.download(self.PASSWORD)
         self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
         self.assertContains(
             response,
@@ -6313,11 +6321,23 @@ class TakeOutViewTest(TestCase):
         )
         self.assertNotIn("Content-Disposition", response)
 
+    def test_failed_export_allows_retry(self, mock_usage: MagicMock) -> None:
+        """Can the user try again after an error while building the export?"""
+        mock_usage.side_effect = RedisConnectionError
+
+        with self.assertRaises(RedisConnectionError):
+            self.download(self.PASSWORD)
+
+        mock_usage.side_effect = None
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
     def test_requires_login(self, mock_usage: MagicMock) -> None:
         """Are anonymous users sent to sign in instead of getting data?"""
         self.client.logout()
 
-        response = self.download()
+        response = self.download(self.PASSWORD)
 
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn(reverse("sign-in"), response["Location"])

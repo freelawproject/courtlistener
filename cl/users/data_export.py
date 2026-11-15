@@ -128,8 +128,8 @@ def build_user_data_export(user: User) -> dict[str, Any]:
 def claim_daily_export(user: User) -> bool:
     """Record an export for the user, unless they already had one today.
 
-    Call this only once the user is allowed to export (e.g. after their
-    password is confirmed), so that failed attempts don't use up the day.
+    Call this only once the export is ready to send, so that a wrong
+    password or an error while building the export doesn't use up the day.
 
     Args:
         user: The user who wants an export.

@@ -513,6 +513,11 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
             request, "profile/take_out.html", {"form": form, "private": True}
         )
 
+    response = JsonResponse(
+        build_user_data_export(request.user), json_dumps_params={"indent": 2}
+    )
+    # Claim the day only once the export is ready, so that an error while
+    # building it doesn't stop the user from trying again.
     if not claim_daily_export(request.user):
         form.add_error(
             None,
@@ -526,9 +531,6 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
             status=HTTPStatus.TOO_MANY_REQUESTS,
         )
 
-    response = JsonResponse(
-        build_user_data_export(request.user), json_dumps_params={"indent": 2}
-    )
     filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
