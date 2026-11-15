@@ -34,7 +34,10 @@ from cl.donate.factories import (
     NeonWebhookEventFactory,
 )
 from cl.donate.management.commands.sync_neon_memberships import (
+    NeonStatus,
     SyncResult,
+    classify_neon_status,
+    select_membership_to_sync,
     sync_membership_from_neon,
 )
 from cl.donate.models import (
@@ -1623,12 +1626,15 @@ def make_neon_membership(
     term_end_date: str | None = "2027-10-04-05:00",
     payment_status: str = "Succeeded",
     status: str | None = "SUCCEEDED",
+    term_start_date: str | None = None,
+    account_id: str = "1234",
 ) -> dict:
     """Build a membership record shaped like the Neon API returns it."""
     return {
         "id": membership_id,
-        "accountId": "1234",
+        "accountId": account_id,
         "membershipLevel": {"id": "2", "name": level_name},
+        "termStartDate": term_start_date,
         "termEndDate": term_end_date,
         "status": status,
         "payments": [{"paymentStatus": payment_status}],
@@ -1636,31 +1642,61 @@ def make_neon_membership(
 
 
 class NeonClientMembershipTest(SimpleTestCase):
-    """Tests for NeonClient.get_primary_active_membership."""
+    """Tests for NeonClient.get_account_memberships."""
 
     @patch("cl.lib.neon_utils.requests.get")
-    def test_returns_first_membership_or_none(self, mock_get) -> None:
-        """Returns Neon's first membership, or None when the list is empty."""
+    def test_lists_memberships_newest_first(self, mock_get) -> None:
+        """Returns Neon's list as-is, or an empty list, with no status filter."""
         neon_membership = make_neon_membership()
-        for memberships, expected in (
-            ([neon_membership], neon_membership),
-            ([], None),
+        for body, expected in (
+            ({"memberships": [neon_membership]}, [neon_membership]),
+            ({"memberships": []}, []),
+            ({}, []),
         ):
-            with self.subTest(memberships=memberships):
+            with self.subTest(body=body):
                 mock_get.return_value = MagicMock(
-                    status_code=200,
-                    **{"json.return_value": {"memberships": memberships}},
+                    status_code=200, **{"json.return_value": body}
                 )
-                result = NeonClient().get_primary_active_membership("1234")
+                result = NeonClient().get_account_memberships("1234")
                 self.assertEqual(result, expected)
                 self.assertTrue(
                     mock_get.call_args.args[0].endswith(
                         "/accounts/1234/memberships"
                     )
                 )
-                params = mock_get.call_args.kwargs["params"]
-                self.assertEqual(params["primaryActiveMembership"], "true")
-                self.assertEqual(params["sortDirection"], "DESC")
+                self.assertEqual(
+                    mock_get.call_args.kwargs["params"],
+                    {
+                        "sortColumn": "date",
+                        "sortDirection": "DESC",
+                        "pageSize": 20,
+                    },
+                )
+
+    @patch("cl.lib.neon_utils.requests.get")
+    def test_gets_membership_or_none_when_missing(self, mock_get) -> None:
+        """Returns the record, None on a 404, and raises on other errors."""
+        neon_membership = make_neon_membership()
+        for status_code, expected in (
+            (HTTPStatus.OK, neon_membership),
+            (HTTPStatus.NOT_FOUND, None),
+        ):
+            with self.subTest(status_code=status_code):
+                mock_get.return_value = MagicMock(
+                    status_code=status_code,
+                    **{"json.return_value": neon_membership},
+                )
+                result = NeonClient().get_membership("200")
+                self.assertEqual(result, expected)
+                self.assertTrue(
+                    mock_get.call_args.args[0].endswith("/memberships/200")
+                )
+        mock_get.return_value = MagicMock(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            **{"raise_for_status.side_effect": requests.HTTPError("500")},
+        )
+        with self.assertRaises(requests.HTTPError):
+            NeonClient().get_membership("200")
 
 
 @override_settings(NEON_MEMBERSHIP_GRACE_PERIOD_DAYS=2)
@@ -1684,9 +1720,25 @@ class SyncNeonMembershipsCommandTest(TestCase):
             level=NeonMembershipLevel.TIER_1,
             termination_date=now() - timedelta(days=5),
         )
-        patcher = patch.object(NeonClient, "get_primary_active_membership")
-        self.mock_get_membership = patcher.start()
+        # Neon answers with the account's own ID unless a test says it was
+        # merged into another one.
+        account_patcher = patch.object(
+            NeonClient,
+            "get_account_by_id",
+            side_effect=lambda account_id: {"accountId": account_id},
+        )
+        self.mock_get_account = account_patcher.start()
+        self.addCleanup(account_patcher.stop)
+        patcher = patch.object(NeonClient, "get_account_memberships")
+        self.mock_list_memberships = patcher.start()
         self.addCleanup(patcher.stop)
+        # Looked up only when the account lists nothing; by default Neon no
+        # longer has the membership either.
+        membership_patcher = patch.object(
+            NeonClient, "get_membership", return_value=None
+        )
+        self.mock_get_membership = membership_patcher.start()
+        self.addCleanup(membership_patcher.stop)
         zoho_patcher = patch(
             "cl.donate.management.commands.sync_neon_memberships"
             ".tag_zoho_record_for_membership"
@@ -1712,8 +1764,30 @@ class SyncNeonMembershipsCommandTest(TestCase):
     def called_account_ids(self) -> set[str]:
         """Return the Neon account ids the mocked client was asked about."""
         return {
-            call.args[0] for call in self.mock_get_membership.call_args_list
+            call.args[0] for call in self.mock_list_memberships.call_args_list
         }
+
+    def make_unpaid_renewal(
+        self, payment_status: int, modified_days_ago: int
+    ) -> None:
+        """Turn the fixture into an unpaid renewal with a future term."""
+        self.membership.termination_date = now() + timedelta(days=300)
+        self.membership.payment_status = payment_status
+        self.membership.save()
+        # auto_now resets date_modified on save, so set it directly.
+        NeonMembership.objects.filter(pk=self.membership.pk).update(
+            date_modified=now() - timedelta(days=modified_days_ago)
+        )
+        self.membership.refresh_from_db()
+
+    def same_term_from_neon(self, **kwargs) -> dict:
+        """Build Neon's record for the fixture's own membership and term end."""
+        return make_neon_membership(
+            membership_id="100",
+            level_name="CL Membership - Tier 1",
+            term_end_date=self.membership.termination_date.date().isoformat(),
+            **kwargs,
+        )
 
     def assert_membership_untouched(self) -> None:
         """Assert the lapsed membership, throttles and Zoho were left alone."""
@@ -1729,11 +1803,11 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_updates_lapsed_membership_from_neon(self) -> None:
         """Syncs id, level, term end and payment, then rebuilds throttles."""
-        self.mock_get_membership.return_value = make_neon_membership()
+        self.mock_list_memberships.return_value = [make_neon_membership()]
 
         call_command("sync_neon_memberships")
 
-        self.mock_get_membership.assert_called_once_with("1234")
+        self.mock_list_memberships.assert_called_once_with("1234")
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.neon_id, "200")
         self.assertEqual(self.membership.level, NeonMembershipLevel.TIER_2)
@@ -1769,7 +1843,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
                     del neon_membership["payments"]
                 else:
                     neon_membership["payments"] = payments
-                self.mock_get_membership.return_value = neon_membership
+                self.mock_list_memberships.return_value = [neon_membership]
 
                 call_command("sync_neon_memberships")
 
@@ -1791,22 +1865,24 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.membership.termination_date = now() - timedelta(hours=30)
         self.membership.save()
         self.assertTrue(self.membership.is_active)
-        self.mock_get_membership.return_value = make_neon_membership()
+        self.mock_list_memberships.return_value = [make_neon_membership()]
 
         call_command("sync_neon_memberships")
 
-        self.mock_get_membership.assert_called_once_with("1234")
+        self.mock_list_memberships.assert_called_once_with("1234")
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.neon_id, "200")
         self.assertTrue(self.membership.is_active)
 
     def test_updates_extended_term_on_same_membership(self) -> None:
         """Picks up a new term end date even when the membership id matches."""
-        self.mock_get_membership.return_value = make_neon_membership(
-            membership_id="100",
-            level_name="CL Membership - Tier 1",
-            term_end_date="2027-01-01",
-        )
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                membership_id="100",
+                level_name="CL Membership - Tier 1",
+                term_end_date="2027-01-01",
+            )
+        ]
 
         call_command("sync_neon_memberships")
 
@@ -1820,11 +1896,13 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_leaves_matching_membership_alone(self) -> None:
         """Keeps a lapse younger than a week when Neon's record matches ours."""
-        self.mock_get_membership.return_value = make_neon_membership(
-            membership_id="100",
-            level_name="CL Membership - Tier 1",
-            term_end_date=self.membership.termination_date.date().isoformat(),
-        )
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                membership_id="100",
+                level_name="CL Membership - Tier 1",
+                term_end_date=self.membership.termination_date.date().isoformat(),
+            )
+        ]
 
         call_command("sync_neon_memberships")
 
@@ -1832,11 +1910,11 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_skips_when_neon_has_no_active_membership(self) -> None:
         """Keeps a lapse younger than a week when Neon has nothing newer."""
-        self.mock_get_membership.return_value = None
+        self.mock_list_memberships.return_value = []
 
         call_command("sync_neon_memberships")
 
-        self.mock_get_membership.assert_called_once_with("1234")
+        self.mock_list_memberships.assert_called_once_with("1234")
         self.assert_membership_untouched()
 
     def test_only_checks_memberships_inside_window(self) -> None:
@@ -1849,25 +1927,323 @@ class SyncNeonMembershipsCommandTest(TestCase):
             NeonMembershipFactory(
                 user=profile.user, termination_date=now() - expired_for
             )
-        self.mock_get_membership.return_value = None
+        # Unpaid rows are selected by their last change instead, with the
+        # same lower and upper bounds applied to that date.
+        for account_id, payment_status, term_offset, modified_ago in (
+            (
+                "unpaid",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=300),
+                timedelta(days=3),
+            ),
+            (
+                "unpaid-recent",
+                MembershipPaymentStatus.PENDING,
+                timedelta(days=300),
+                timedelta(hours=1),
+            ),
+            (
+                "unpaid-old-term",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=-100),
+                timedelta(days=3),
+            ),
+            (
+                "unpaid-stale",
+                MembershipPaymentStatus.FAILED,
+                timedelta(days=300),
+                timedelta(days=91),
+            ),
+            (
+                "paid-future",
+                MembershipPaymentStatus.SUCCEEDED,
+                timedelta(days=300),
+                timedelta(days=3),
+            ),
+        ):
+            profile = UserProfileWithParentsFactory(neon_account_id=account_id)
+            membership = NeonMembershipFactory(
+                user=profile.user,
+                payment_status=payment_status,
+                termination_date=now() + term_offset,
+            )
+            NeonMembership.objects.filter(pk=membership.pk).update(
+                date_modified=now() - modified_ago
+            )
+        self.mock_list_memberships.return_value = []
 
         # Deletion is off so every run sees the same records.
         for options, expected_account_ids in (
-            ({}, {"1234"}),
-            ({"max_days_expired": 0}, {"1234", "too-old"}),
+            ({}, {"1234", "unpaid", "unpaid-old-term"}),
+            (
+                {"max_days_expired": 0},
+                {
+                    "1234",
+                    "too-old",
+                    "unpaid",
+                    "unpaid-old-term",
+                    "unpaid-stale",
+                },
+            ),
             (
                 {"min_hours_expired": 0, "max_days_expired": 30},
-                {"1234", "too-recent"},
+                {
+                    "1234",
+                    "too-recent",
+                    "unpaid",
+                    "unpaid-recent",
+                    "unpaid-old-term",
+                },
             ),
         ):
             with self.subTest(options=options):
-                self.mock_get_membership.reset_mock()
+                self.mock_list_memberships.reset_mock()
                 call_command(
                     "sync_neon_memberships", delete_after_days=0, **options
                 )
                 self.assertEqual(
                     self.called_account_ids(), expected_account_ids
                 )
+
+    def test_adopts_surviving_account_after_neon_merge(self) -> None:
+        """Stores the account Neon merged ours into, then syncs under it."""
+        # Neon answers a merged-away account with the surviving account's
+        # record, so the only signal is a different accountId in the body.
+        self.mock_get_account.side_effect = lambda _: {"accountId": "5678"}
+        self.mock_list_memberships.return_value = [make_neon_membership()]
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_account.assert_called_once_with("1234")
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "5678")
+        self.mock_list_memberships.assert_called_once_with("5678")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.mock_logger.error.assert_not_called()
+
+    def test_reports_merge_into_another_users_account(self) -> None:
+        """Stops when the surviving account already belongs to another user."""
+        UserProfileWithParentsFactory(neon_account_id="5678")
+        self.mock_get_account.side_effect = lambda _: {"accountId": "5678"}
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "1234")
+        self.mock_list_memberships.assert_not_called()
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
+
+    def test_reports_missing_neon_account(self) -> None:
+        """Stops and reports when Neon no longer has the account at all."""
+        self.mock_get_account.side_effect = requests.HTTPError(
+            response=MagicMock(status_code=HTTPStatus.NOT_FOUND)
+        )
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_list_memberships.assert_not_called()
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
+
+    def test_retries_account_lookup_errors_next_run(self) -> None:
+        """Counts a failed account lookup as FAILED and touches nothing."""
+        for error in (
+            requests.ConnectionError("boom"),
+            requests.HTTPError(
+                response=MagicMock(
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+            ),
+        ):
+            with self.subTest(error=type(error).__name__):
+                self.mock_get_account.side_effect = error
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.mock_list_memberships.assert_not_called()
+                self.assert_membership_untouched()
+                self.assertIn("1 failed", out.getvalue())
+
+    def test_select_prefers_running_paid_term(self) -> None:
+        """Picks the paid term running today, not a prepaid future one."""
+        # Neon charges auto-renewals early, so the next term tops the list
+        # while the current one is still running.
+        future = make_neon_membership(
+            membership_id="400",
+            term_start_date="2026-11-08",
+            term_end_date="2026-12-07",
+        )
+        running = make_neon_membership(
+            membership_id="300",
+            term_start_date="2026-10-08",
+            term_end_date="2026-11-07",
+        )
+        newer_failed = make_neon_membership(
+            membership_id="500",
+            term_end_date="2027-12-01",
+            status="FAILED",
+            payment_status="Failed",
+        )
+        older_running = make_neon_membership(
+            membership_id="200", term_end_date="2026-10-20"
+        )
+        for memberships in (
+            [future, running, older_running],
+            [newer_failed, older_running, running],
+        ):
+            with self.subTest(order=[m["id"] for m in memberships]):
+                self.assertEqual(
+                    select_membership_to_sync(memberships), running
+                )
+
+    def test_select_uses_future_term_only_when_none_is_running(self) -> None:
+        """Falls back to the paid term that starts first, e.g. after a gap."""
+        later = make_neon_membership(
+            membership_id="400",
+            term_start_date="2027-01-01",
+            term_end_date="2027-12-31",
+        )
+        sooner = make_neon_membership(
+            membership_id="300",
+            term_start_date="2026-11-01",
+            term_end_date="2026-11-30",
+        )
+        self.assertEqual(select_membership_to_sync([later, sooner]), sooner)
+
+    def test_select_falls_back_to_newest_record(self) -> None:
+        """Returns the newest record when no paid term is running or ahead."""
+        retrying = make_neon_membership(
+            membership_id="400", status="FAILED", payment_status="Processing"
+        )
+        expired_paid = make_neon_membership(
+            membership_id="100",
+            term_end_date=(now() - timedelta(days=5)).date().isoformat(),
+        )
+        for memberships, expected in (
+            ([retrying, expired_paid], retrying),
+            ([expired_paid], expired_paid),
+            ([], None),
+        ):
+            with self.subTest(order=[m["id"] for m in memberships]):
+                self.assertEqual(
+                    select_membership_to_sync(memberships), expected
+                )
+
+    def test_keeps_lapsed_row_while_a_newer_renewal_is_retrying(self) -> None:
+        """A retrying renewal listed above our expired term blocks deletion."""
+        # Old enough to delete; the in-progress record must prevent that.
+        self.membership.termination_date = now() - timedelta(days=10)
+        self.membership.save()
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                membership_id="400",
+                status="FAILED",
+                payment_status="Processing",
+            ),
+            self.same_term_from_neon(),
+        ]
+
+        call_command("sync_neon_memberships")
+
+        self.mock_logger.warning.assert_called_once()
+        self.assert_membership_untouched()
+
+    def test_finds_renewal_listed_below_a_failed_attempt(self) -> None:
+        """Applies a paid renewal even when a later failed attempt tops the list."""
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                membership_id="400",
+                term_end_date="2027-12-01",
+                status="FAILED",
+                payment_status="Failed",
+            ),
+            make_neon_membership(),
+        ]
+
+        call_command("sync_neon_memberships")
+
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
+
+    def test_discovers_account_through_stored_membership(self) -> None:
+        """Adopts the account holding our membership when ours lists nothing."""
+        # A duplicate account Neon has not merged yet: the renewal was bought
+        # under it, so the account we store is empty.
+        self.mock_list_memberships.side_effect = [[], [make_neon_membership()]]
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100", account_id="5678"
+        )
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_called_once_with("100")
+        self.assertEqual(
+            [c.args[0] for c in self.mock_list_memberships.call_args_list],
+            ["1234", "5678"],
+        )
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "5678")
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.neon_id, "200")
+        self.assertTrue(self.membership.is_active)
+        self.mock_logger.error.assert_not_called()
+
+    def test_discovery_changes_nothing_without_a_better_account(self) -> None:
+        """Leaves the profile alone when the lookup gives no other account."""
+        self.mock_list_memberships.return_value = []
+        for label, record in (
+            ("membership gone from Neon", None),
+            ("same account", make_neon_membership(membership_id="100")),
+        ):
+            with self.subTest(label=label):
+                self.mock_list_memberships.reset_mock()
+                self.mock_get_membership.return_value = record
+
+                call_command("sync_neon_memberships")
+
+                self.mock_get_membership.assert_called_with("100")
+                self.mock_list_memberships.assert_called_once_with("1234")
+                self.user_profile.refresh_from_db()
+                self.assertEqual(self.user_profile.neon_account_id, "1234")
+                self.assert_membership_untouched()
+
+    def test_discovery_needs_a_stored_membership_id(self) -> None:
+        """Never looks up a membership when the local row has no neon_id."""
+        self.membership.neon_id = ""
+        self.membership.save()
+        self.mock_list_memberships.return_value = []
+
+        call_command("sync_neon_memberships")
+
+        self.mock_get_membership.assert_not_called()
+        self.mock_list_memberships.assert_called_once_with("1234")
+
+    def test_discovery_stops_when_another_user_holds_the_account(self) -> None:
+        """Reports, and skips, a holding account that belongs to another user."""
+        UserProfileWithParentsFactory(neon_account_id="5678")
+        self.mock_list_memberships.return_value = []
+        self.mock_get_membership.return_value = make_neon_membership(
+            membership_id="100", account_id="5678"
+        )
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_list_memberships.assert_called_once_with("1234")
+        self.user_profile.refresh_from_db()
+        self.assertEqual(self.user_profile.neon_account_id, "1234")
+        self.mock_logger.error.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertIn("1 skipped", out.getvalue())
 
     def test_skips_user_without_neon_account_id(self) -> None:
         """Never calls Neon for a member whose profile has no account id."""
@@ -1876,7 +2252,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
         call_command("sync_neon_memberships")
 
-        self.mock_get_membership.assert_not_called()
+        self.mock_list_memberships.assert_not_called()
         self.assert_membership_untouched()
 
     def test_continues_after_neon_api_error(self) -> None:
@@ -1890,22 +2266,23 @@ class SyncNeonMembershipsCommandTest(TestCase):
         # Memberships are processed oldest expiration first, so the failure
         # hits the other member and ours is still synced afterwards. The
         # failed one is over a week old but must not be deleted unchecked.
-        self.mock_get_membership.side_effect = [
+        self.mock_list_memberships.side_effect = [
             requests.HTTPError("500 Server Error"),
-            make_neon_membership(),
+            [make_neon_membership()],
         ]
         out = StringIO()
 
         call_command("sync_neon_memberships", stdout=out)
 
-        self.assertEqual(self.mock_get_membership.call_count, 2)
+        self.assertEqual(self.mock_list_memberships.call_count, 2)
         other_membership.refresh_from_db()
         self.assertEqual(other_membership.neon_id, "300")
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.neon_id, "200")
         self.assertEqual(self.get_membership_rates(), sorted(TIER_2_RATES))
         self.assertIn(
-            "1 updated, 0 deleted, 0 skipped, 1 failed", out.getvalue()
+            "1 updated, 0 deleted, 0 revoked, 0 skipped, 1 failed",
+            out.getvalue(),
         )
 
     def test_continues_after_unexpected_error(self) -> None:
@@ -1920,9 +2297,9 @@ class SyncNeonMembershipsCommandTest(TestCase):
         del malformed["membershipLevel"]
         # Oldest expiration first, so the malformed record hits the other
         # member, who is old enough to delete but must be left alone.
-        self.mock_get_membership.side_effect = [
-            malformed,
-            make_neon_membership(),
+        self.mock_list_memberships.side_effect = [
+            [malformed],
+            [make_neon_membership()],
         ]
         out = StringIO()
 
@@ -1934,7 +2311,8 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.neon_id, "200")
         self.assertIn(
-            "1 updated, 0 deleted, 0 skipped, 1 failed", out.getvalue()
+            "1 updated, 0 deleted, 0 revoked, 0 skipped, 1 failed",
+            out.getvalue(),
         )
 
     def test_skips_unknown_level_and_edu_without_edu_email(self) -> None:
@@ -1944,9 +2322,9 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.membership.save()
         for level_name in ("Not a real level", "EDU Membership"):
             with self.subTest(level_name=level_name):
-                self.mock_get_membership.return_value = make_neon_membership(
-                    level_name=level_name
-                )
+                self.mock_list_memberships.return_value = [
+                    make_neon_membership(level_name=level_name)
+                ]
 
                 call_command("sync_neon_memberships")
 
@@ -1959,31 +2337,68 @@ class SyncNeonMembershipsCommandTest(TestCase):
         self.membership.save()
         for status, payment_status in (
             ("PENDING", "Pending"),
-            ("FAILED", "Failed"),
+            ("FAILED", "Processing"),
         ):
             with self.subTest(status=status):
-                self.mock_get_membership.return_value = make_neon_membership(
-                    status=status, payment_status=payment_status
-                )
+                self.mock_list_memberships.return_value = [
+                    make_neon_membership(
+                        status=status, payment_status=payment_status
+                    )
+                ]
+                self.mock_logger.warning.reset_mock()
 
                 call_command("sync_neon_memberships")
 
+                self.mock_logger.warning.assert_called_once()
                 self.assert_membership_untouched()
+
+    def test_deletes_lapsed_row_when_neon_confirms_dead(self) -> None:
+        """A week-old lapse whose newest record is dead is deleted, quietly."""
+        # Each subTest deletes its row, so build one per case instead of
+        # reusing the fixture, which the user field's one-to-one forbids.
+        self.membership.delete()
+        for status, payment_status in (
+            ("CANCELED", "Canceled"),
+            ("REFUNDED", "Refunded"),
+            ("FAILED", "Failed"),
+        ):
+            with self.subTest(status=status):
+                membership = NeonMembershipFactory(
+                    user=self.user,
+                    neon_id="100",
+                    level=NeonMembershipLevel.TIER_1,
+                    termination_date=now() - timedelta(days=10),
+                )
+                self.mock_list_memberships.return_value = [
+                    make_neon_membership(
+                        status=status, payment_status=payment_status
+                    )
+                ]
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.assertFalse(
+                    NeonMembership.objects.filter(pk=membership.pk).exists()
+                )
+                self.mock_logger.error.assert_not_called()
+                self.mock_logger.warning.assert_not_called()
+                self.assertIn("1 deleted", out.getvalue())
 
     def test_reports_unexpected_neon_status(self) -> None:
         """Skips and logs an error for statuses the command doesn't handle."""
         for status, payment_status in (
-            ("CANCELED", "Canceled"),
-            ("REFUNDED", "Refunded"),
             ("CANCEL_PENDING", "Succeeded"),
             ("DEFERRED", "Deferred"),
             ("WAITINGLIST", "Pending"),
             (None, "Succeeded"),
         ):
             with self.subTest(status=status):
-                self.mock_get_membership.return_value = make_neon_membership(
-                    status=status, payment_status=payment_status
-                )
+                self.mock_list_memberships.return_value = [
+                    make_neon_membership(
+                        status=status, payment_status=payment_status
+                    )
+                ]
 
                 # The mock accumulates calls across subTests.
                 self.mock_logger.error.reset_mock()
@@ -1995,9 +2410,9 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_reports_missing_term_end_date(self) -> None:
         """Never stores a null termination date from Neon."""
-        self.mock_get_membership.return_value = make_neon_membership(
-            term_end_date=None
-        )
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(term_end_date=None)
+        ]
 
         call_command("sync_neon_memberships")
 
@@ -2006,10 +2421,12 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_ignores_neon_record_no_newer_than_ours(self) -> None:
         """Treats a different but already expired Neon membership as unchanged."""
-        self.mock_get_membership.return_value = make_neon_membership(
-            term_end_date=(now() - timedelta(days=8)).date().isoformat(),
-            status="CANCELED",
-        )
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                term_end_date=(now() - timedelta(days=8)).date().isoformat(),
+                status="CANCELED",
+            )
+        ]
 
         call_command("sync_neon_memberships")
 
@@ -2017,6 +2434,272 @@ class SyncNeonMembershipsCommandTest(TestCase):
         # CANCELED record must not be reported as an error.
         self.mock_logger.error.assert_not_called()
         self.assert_membership_untouched()
+
+    def test_repairs_unpaid_renewal_with_future_term(self) -> None:
+        """Finds a failed renewal by its last change and applies Neon's paid record."""
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 3)
+        self.mock_list_memberships.return_value = [self.same_term_from_neon()]
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_list_memberships.assert_called_once_with("1234")
+        self.membership.refresh_from_db()
+        self.assertEqual(
+            self.membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+        self.assertTrue(self.membership.is_active)
+        self.assertEqual(self.get_membership_rates(), sorted(TIER_1_RATES))
+        self.assertIn("1 updated", out.getvalue())
+
+    def test_leaves_unpaid_renewal_neon_still_retrying(self) -> None:
+        """Keeps a failed renewal untouched, and undeleted, while Neon retries."""
+        # Older than the default 7-day delete threshold on purpose.
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 10)
+        self.mock_list_memberships.return_value = [
+            self.same_term_from_neon(
+                status="FAILED", payment_status="Processing"
+            )
+        ]
+
+        call_command("sync_neon_memberships")
+
+        self.mock_list_memberships.assert_called_once_with("1234")
+        self.mock_logger.warning.assert_called_once()
+        self.assert_membership_untouched()
+        self.assertEqual(
+            self.membership.payment_status, MembershipPaymentStatus.FAILED
+        )
+
+    def test_leaves_failed_row_quiet_when_neon_confirms_failure(self) -> None:
+        """A row already FAILED locally logs nothing when Neon agrees."""
+        self.make_unpaid_renewal(MembershipPaymentStatus.FAILED, 10)
+        self.mock_list_memberships.return_value = [
+            self.same_term_from_neon(status="FAILED", payment_status="Failed")
+        ]
+        out = StringIO()
+
+        call_command("sync_neon_memberships", stdout=out)
+
+        self.mock_logger.warning.assert_not_called()
+        self.mock_logger.error.assert_not_called()
+        self.assert_membership_untouched()
+        self.assertIn("0 revoked", out.getvalue())
+
+    def test_revokes_pending_row_when_neon_confirms_dead(self) -> None:
+        """Marks a PENDING row FAILED once Neon says the payment is dead."""
+        # PENDING grants benefits, so these members had access they never
+        # paid for. The row and its neon_id survive for a late success.
+        for label, memberships in (
+            ("no membership at all", []),
+            (
+                "failed payment",
+                [
+                    self.same_term_from_neon(
+                        status="FAILED", payment_status="Failed"
+                    )
+                ],
+            ),
+            (
+                "canceled",
+                [
+                    self.same_term_from_neon(
+                        status="CANCELED", payment_status="Canceled"
+                    )
+                ],
+            ),
+            (
+                "refunded",
+                [
+                    self.same_term_from_neon(
+                        status="REFUNDED", payment_status="Refunded"
+                    )
+                ],
+            ),
+        ):
+            with self.subTest(label=label):
+                self.make_unpaid_renewal(MembershipPaymentStatus.PENDING, 10)
+                self.assertTrue(self.membership.is_active)
+                self.mock_list_memberships.return_value = memberships
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.membership.refresh_from_db()
+                self.assertEqual(self.membership.neon_id, "100")
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.FAILED,
+                )
+                self.assertFalse(self.membership.is_active)
+                self.mock_logger.error.assert_not_called()
+                self.mock_tag_zoho.delay.assert_not_called()
+                self.assertIn("0 deleted, 1 revoked", out.getvalue())
+
+    def test_never_revokes_a_lapsed_row(self) -> None:
+        """A PENDING row whose term has ended keeps its grace period."""
+        # Neon says the term was paid but is over; the lapsed rule deletes
+        # the row a week after the term end, and revoking earlier would cut
+        # the grace period short.
+        self.membership.termination_date = now() - timedelta(days=2)
+        self.membership.payment_status = MembershipPaymentStatus.PENDING
+        self.membership.save()
+        NeonMembership.objects.filter(pk=self.membership.pk).update(
+            date_modified=now() - timedelta(days=10)
+        )
+        self.membership.refresh_from_db()
+        self.assertTrue(self.membership.is_active)
+        for label, memberships in (
+            ("paid term that just ended", [self.same_term_from_neon()]),
+            ("no membership at all", []),
+        ):
+            with self.subTest(label=label):
+                self.mock_list_memberships.return_value = memberships
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.PENDING,
+                )
+                self.assertTrue(self.membership.is_active)
+                self.assertIn("0 deleted, 0 revoked", out.getvalue())
+
+    def test_keeps_pending_row_until_revoke_threshold(self) -> None:
+        """Leaves a PENDING row alone until it is old enough, or when off."""
+        self.mock_list_memberships.return_value = []
+        for modified_days_ago, options in (
+            (3, {}),
+            (10, {"delete_after_days": 0}),
+            (10, {"delete_after_days": 30}),
+        ):
+            with self.subTest(
+                modified_days_ago=modified_days_ago, options=options
+            ):
+                self.make_unpaid_renewal(
+                    MembershipPaymentStatus.PENDING, modified_days_ago
+                )
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out, **options)
+
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.PENDING,
+                )
+                self.assertTrue(self.membership.is_active)
+                self.assertIn("0 revoked", out.getvalue())
+
+    def test_classify_neon_status(self) -> None:
+        """Reads SUCCEEDED, in-progress, dead and unexpected from a record."""
+        for status, payment_status, expected in (
+            ("SUCCEEDED", "Succeeded", NeonStatus.SUCCEEDED),
+            ("SUCCEEDED", "Failed", NeonStatus.SUCCEEDED),
+            ("PENDING", "Pending", NeonStatus.IN_PROGRESS),
+            ("FAILED", "Processing", NeonStatus.IN_PROGRESS),
+            ("FAILED", "", NeonStatus.IN_PROGRESS),
+            ("FAILED", "Failed", NeonStatus.DEAD),
+            ("CANCELED", "Canceled", NeonStatus.DEAD),
+            ("REFUNDED", "Refunded", NeonStatus.DEAD),
+            ("CANCEL_PENDING", "Succeeded", NeonStatus.UNEXPECTED),
+            ("WAITINGLIST", "Pending", NeonStatus.UNEXPECTED),
+            (None, "Succeeded", NeonStatus.UNEXPECTED),
+        ):
+            with self.subTest(status=status, payment_status=payment_status):
+                record = make_neon_membership(
+                    status=status, payment_status=payment_status
+                )
+                self.assertIs(classify_neon_status(record), expected)
+
+    def test_keeps_unpaid_renewal_when_neon_has_nothing(self) -> None:
+        """Never deletes an unpaid row with a running term, however old or empty."""
+        # Deleting would lose the neon_id a late success webhook needs.
+        self.mock_list_memberships.return_value = []
+        for modified_days_ago in (3, 10):
+            with self.subTest(modified_days_ago=modified_days_ago):
+                self.make_unpaid_renewal(
+                    MembershipPaymentStatus.FAILED, modified_days_ago
+                )
+                out = StringIO()
+
+                call_command("sync_neon_memberships", stdout=out)
+
+                self.assert_membership_untouched()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.FAILED,
+                )
+                self.assertIn("0 deleted", out.getvalue())
+
+    def test_same_term_repairs_unpaid_record(self) -> None:
+        """Applies Neon's paid record for our own term when we are unpaid."""
+        # A failed renewal stored the new term's future end date, and the
+        # retry then succeeded in Neon under the same membership and term.
+        self.membership.termination_date = now() + timedelta(days=300)
+        for payment_status in (
+            MembershipPaymentStatus.FAILED,
+            MembershipPaymentStatus.PENDING,
+        ):
+            with self.subTest(payment_status=payment_status):
+                self.membership.payment_status = payment_status
+                self.membership.save()
+                APIThrottle.objects.filter(user=self.user).delete()
+                self.mock_tag_zoho.reset_mock()
+                neon_membership = self.same_term_from_neon()
+
+                result = sync_membership_from_neon(
+                    self.membership, neon_membership
+                )
+
+                self.assertEqual(result, SyncResult.UPDATED)
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status,
+                    MembershipPaymentStatus.SUCCEEDED,
+                )
+                self.assertTrue(self.membership.is_active)
+                self.assertEqual(
+                    self.get_membership_rates(), sorted(TIER_1_RATES)
+                )
+                self.mock_tag_zoho.delay.assert_called_once_with(
+                    self.user.pk, NeonMembershipLevel.TIER_1
+                )
+
+    def test_same_or_older_term_is_otherwise_unchanged(self) -> None:
+        """Ignores a paid same-term record, and an older term even if unpaid."""
+        self.membership.termination_date = now() + timedelta(days=300)
+        same_term = self.membership.termination_date.date().isoformat()
+        older_term = (now() + timedelta(days=100)).date().isoformat()
+        for payment_status, term_end_date in (
+            (MembershipPaymentStatus.SUCCEEDED, same_term),
+            (MembershipPaymentStatus.FAILED, older_term),
+            (MembershipPaymentStatus.SUCCEEDED, older_term),
+        ):
+            with self.subTest(
+                payment_status=payment_status, term_end_date=term_end_date
+            ):
+                self.membership.payment_status = payment_status
+                self.membership.save()
+                neon_membership = make_neon_membership(
+                    membership_id="100",
+                    level_name="CL Membership - Tier 1",
+                    term_end_date=term_end_date,
+                )
+
+                result = sync_membership_from_neon(
+                    self.membership, neon_membership
+                )
+
+                self.assertEqual(result, SyncResult.UNCHANGED)
+                self.membership.refresh_from_db()
+                self.assertEqual(
+                    self.membership.payment_status, payment_status
+                )
+                self.assertEqual(self.get_membership_rates(), [])
+                self.mock_tag_zoho.delay.assert_not_called()
 
     def test_deletes_stale_membership_neon_confirms_unchanged(self) -> None:
         """Deletes a week-old lapse Neon matches, and only its MEMBERSHIP throttles."""
@@ -2032,11 +2715,13 @@ class SyncNeonMembershipsCommandTest(TestCase):
                 rate=rate,
                 source=source,
             )
-        self.mock_get_membership.return_value = make_neon_membership(
-            membership_id="100",
-            level_name="CL Membership - Tier 1",
-            term_end_date=self.membership.termination_date.date().isoformat(),
-        )
+        self.mock_list_memberships.return_value = [
+            make_neon_membership(
+                membership_id="100",
+                level_name="CL Membership - Tier 1",
+                term_end_date=self.membership.termination_date.date().isoformat(),
+            )
+        ]
 
         call_command("sync_neon_memberships")
 
@@ -2055,7 +2740,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
         """Deletes a week-old lapse when Neon has no active membership."""
         self.membership.termination_date = now() - timedelta(days=8)
         self.membership.save()
-        self.mock_get_membership.return_value = None
+        self.mock_list_memberships.return_value = []
 
         call_command("sync_neon_memberships")
 
@@ -2067,7 +2752,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
         """Honors --delete-after-days, and 0 turns deletion off."""
         self.membership.termination_date = now() - timedelta(days=10)
         self.membership.save()
-        self.mock_get_membership.return_value = None
+        self.mock_list_memberships.return_value = []
 
         call_command("sync_neon_memberships", delete_after_days=0)
         self.assert_membership_untouched()
@@ -2082,7 +2767,7 @@ class SyncNeonMembershipsCommandTest(TestCase):
 
     def test_rejects_delete_threshold_inside_grace_period(self) -> None:
         """--delete-after-days must exceed the grace period unless it is 0."""
-        self.mock_get_membership.return_value = None
+        self.mock_list_memberships.return_value = []
         # The class pins the grace period to 2 days.
         for days in (1, 2):
             with self.subTest(days=days), self.assertRaises(CommandError):
