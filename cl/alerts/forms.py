@@ -6,11 +6,6 @@ from django.urls import reverse
 from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
-from cl.alerts.constants import (
-    FLP_MEMBERSHIP_URL,
-    LEGACY_MEMBERSHIP_HELP_URL,
-    MEMBERSHIP_UPGRADE_BASE_URL,
-)
 from cl.alerts.models import Alert
 from cl.alerts.utils import (
     AlertLimitViolation,
@@ -18,6 +13,11 @@ from cl.alerts.utils import (
     is_match_all_query,
 )
 from cl.donate.models import NeonMembershipLevel
+from cl.donate.utils import (
+    FLP_MEMBERSHIP_URL,
+    LEGACY_MEMBERSHIP_HELP_URL,
+    MEMBERSHIP_UPGRADE_BASE_URL,
+)
 from cl.search.models import SEARCH_TYPES
 
 

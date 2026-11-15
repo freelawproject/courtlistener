@@ -7,11 +7,6 @@ from django.http import QueryDict
 from rest_framework import serializers
 from rest_framework.exceptions import APIException, PermissionDenied
 
-from cl.alerts.constants import (
-    FLP_MEMBERSHIP_URL,
-    LEGACY_MEMBERSHIP_HELP_URL,
-    MEMBERSHIP_UPGRADE_BASE_URL,
-)
 from cl.alerts.models import (
     Alert,
     DocketAlert,
@@ -26,6 +21,11 @@ from cl.alerts.utils import (
 )
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.donate.models import NeonMembershipLevel
+from cl.donate.utils import (
+    FLP_MEMBERSHIP_URL,
+    LEGACY_MEMBERSHIP_HELP_URL,
+    MEMBERSHIP_UPGRADE_BASE_URL,
+)
 from cl.search.models import SEARCH_TYPES
 
 # The number of days the alert frequency estimation averages over, matching

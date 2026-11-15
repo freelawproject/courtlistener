@@ -14,13 +14,11 @@ from django.views.decorators.http import require_POST
 from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
-from cl.alerts.constants import (
-    LEGACY_MEMBERSHIP_HELP_URL,
-    RECAP_ALERT_QUOTAS,
-)
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
+from cl.donate.utils import LEGACY_MEMBERSHIP_HELP_URL
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import (
     ratelimit_deny_list,

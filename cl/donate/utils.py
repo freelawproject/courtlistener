@@ -3,16 +3,25 @@ from datetime import datetime
 from django.db import models
 from django.utils import timezone
 
-from cl.alerts.constants import (
-    LEGACY_MEMBERSHIP_HELP_URL,
-    MEMBERSHIP_UPGRADE_BASE_URL,
-)
 from cl.donate.models import (
     MembershipPaymentStatus,
     NeonMembership,
     NeonMembershipLevel,
 )
 
+# Free Law Project membership URLs. They are used all over the code (alert
+# forms, the Search Alerts API, the alert modal and the profile's Membership
+# page), so they live here. The upgrade URL is a base path; callers append the
+# user's Neon membership id.
+FLP_MEMBERSHIP_URL = "https://free.law/membership/"
+MEMBERSHIP_UPGRADE_BASE_URL = (
+    "https://donate.free.law/constituent/memberships/upgrade/"
+)
+# Legacy memberships can't be upgraded through Neon's standard flow; sending
+# them to MEMBERSHIP_UPGRADE_BASE_URL 404s (see #7136). Route them to a help
+# page that explains how to get more features instead (e.g. cancel the legacy
+# membership and join again).
+LEGACY_MEMBERSHIP_HELP_URL = "https://wiki.free.law/c/courtlistener/help/memberships/individual-memberships/legacy-memberships"
 # Where members sign in to Neon to change their plan, payment frequency,
 # profile or contact information.
 DONOR_PORTAL_URL = "https://donate.free.law/login"
