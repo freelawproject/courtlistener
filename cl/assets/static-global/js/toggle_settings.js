@@ -1,49 +1,60 @@
-function showGrowl(message, type) {
-  $.bootstrapGrowl(message, {
-    type: type,
-    align: 'center',
-    width: 'auto',
-    delay: 2000,
-    allow_dismiss: false,
-    offset: { from: 'top', amount: 80 },
-  });
-}
-
-function toggleDocketAlert(e) {
+function toggleSettings(e) {
   e.preventDefault();
   let button = $(this),
-    icon = button.find('i'),
-    // The docket page puts a caret dropdown next to the button that has to
-    // change color with it.
-    dropdownToggle = button.next('.dropdown-toggle');
+    id = button.data('id'),
+    enable_message = button.data('enableMessage'),
+    disable_message = button.data('disableMessage'),
+    button_icon = button.find('i'),
+    button_enable_class = button_icon.data('enableIconClass'),
+    button_disable_class = button_icon.data('disableIconClass'),
+    alert_text = button.find('.alert_btn_txt'),
+    url = button.attr('href');
 
-  icon.removeClass().addClass('fa fa-spinner fa-pulse');
+  button_icon.removeClass().addClass('fa fa-spinner fa-pulse');
   $.ajax({
     method: 'POST',
-    url: button.attr('href'),
-    data: { id: button.data('id') },
+    url: url,
+    data: { id: id },
     success: function (data) {
       $('.bootstrap-growl').alert('close');
-      showGrowl(data, 'success');
+      $.bootstrapGrowl(data, {
+        type: 'success',
+        align: 'center',
+        width: 'auto',
+        delay: 2000,
+        allow_dismiss: false,
+        offset: { from: 'top', amount: 80 },
+      });
+      if (/disabled/g.exec(data)) {
+        button_icon.removeClass().addClass('fa ' + button_enable_class);
+        button.removeClass('btn-danger').addClass('btn-success');
+        alert_text.text(enable_message);
 
-      let disabled = /disabled/.test(data);
-      icon
-        .removeClass()
-        .addClass('fa ' + icon.data(disabled ? 'enableIconClass' : 'disableIconClass'));
-      button
-        .add(dropdownToggle)
-        .toggleClass('btn-success', disabled)
-        .toggleClass('btn-danger', !disabled);
-      button
-        .find('.alert_btn_txt')
-        .text(button.data(disabled ? 'enableMessage' : 'disableMessage'));
+        if (button.next('.dropdown-toggle')[0]){
+          button.next('.dropdown-toggle')[0].className = 'btn btn-success dropdown-toggle';
+        }
+      } else {
+        button_icon.removeClass().addClass('fa ' + button_disable_class);
+        button.removeClass('btn-success').addClass('btn-danger');
+        if (button.next('.dropdown-toggle')[0]){
+          button.next('.dropdown-toggle')[0].className = 'btn btn-danger dropdown-toggle';
+        }
+        alert_text.text(disable_message);
+      }
     },
-    error: function () {
-      showGrowl('An error occurred. Please try again.', 'danger');
+    error: function (data) {
+      $.bootstrapGrowl('An error occurred. Please try again.', {
+        type: 'danger',
+        align: 'center',
+        width: 'auto',
+        delay: 2000,
+        allow_dismiss: false,
+        offset: { from: 'top', amount: 80 },
+      });
     },
   });
 }
 
 $(document).ready(function () {
-  $('.toggle-docket-alert').on('click', toggleDocketAlert);
+  $('.toggle-docket-alert').on('click', toggleSettings);
 });

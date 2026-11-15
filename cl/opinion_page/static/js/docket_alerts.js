@@ -15,7 +15,7 @@ window.addEventListener("message", function (event){
         // toggle settings.
         anchors = $('.' + bad_class);
         anchors.off();
-        anchors.on("click", toggleDocketAlert);
+        anchors.on("click", toggleSettings);
       }
     });
   }
