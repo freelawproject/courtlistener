@@ -146,6 +146,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         cls.user_member_tier_1.user.save()
         NeonMembership.objects.create(
             level=NeonMembershipLevel.TIER_1,
+            neon_id="12345",
             user=cls.user_member_tier_1.user,
             termination_date=cls.membership_termination_date,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
