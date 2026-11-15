@@ -1,5 +1,3 @@
-
-
 import sys
 
 from django.db import migrations
@@ -8,13 +6,18 @@ from cl.lib.migration_utils import load_migration_fixture, make_new_user
 
 
 def load_fixture(apps, schema_editor):
-    if 'test' not in sys.argv:
-        fixture = 'bar_membership_data'
-        load_migration_fixture(apps, schema_editor, fixture, 'users')
+    if "test" not in sys.argv:
+        fixture = "bar_membership_data"
+        load_migration_fixture(apps, schema_editor, fixture, "users")
 
     # Add tenn user group permissions
-    Group = apps.get_model("auth", "Group",)
-    Group.objects.create(name="tenn_work_uploaders",)
+    Group = apps.get_model(
+        "auth",
+        "Group",
+    )
+    Group.objects.create(
+        name="tenn_work_uploaders",
+    )
 
     # Make users
     make_new_user(
@@ -51,12 +54,10 @@ def unload_fixture(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0001_initial'),
+        ("users", "0001_initial"),
     ]
 
     operations = [
         migrations.RunPython(load_fixture, reverse_code=unload_fixture),
     ]
-

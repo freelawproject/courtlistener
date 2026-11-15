@@ -6237,7 +6237,10 @@ class MembershipPageTest(TestCase):
             response = self.client.get(self.url)
         self.assertContains(response, "CL Membership - Tier 2")
         self.assertContains(response, "<dt>Term ends</dt>")
-        self.assertContains(response, "January 14, 2027")
+        # The term end is shown with its time zone, in the site's time zone
+        # until local-time.js swaps in the visitor's.
+        self.assertContains(response, "January 14, 2027 at 4:00 AM PST")
+        self.assertContains(response, 'datetime="2027-01-14T12:00:00+00:00"')
         self.assertContains(response, "memberships/upgrade/98765")
         self.assertContains(response, "Upgrade Membership")
         self.assertNotContains(response, "Become a Member")

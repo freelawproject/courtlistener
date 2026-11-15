@@ -28,6 +28,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.formats import date_format
+from django.utils.html import format_html
 from django.utils.timezone import localdate, localtime, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
@@ -273,26 +274,20 @@ class MembershipDetail(TypedDict):
 def build_membership_details(
     membership: NeonMembership,
 ) -> list[MembershipDetail]:
-    """Build the Level / Status / Payment / Term rows of the Membership page.
+    """Build the Level / Term / Payment / Status rows of the Membership page.
 
-    Values are display-ready. Payment is only listed for inactive memberships,
-    where it usually explains why. An active membership's term always "ends".
-    An inactive one can still have an end date in the future (e.g., a declined
-    renewal payment), so its term row says "ended" only once the date has
-    passed.
+    Values are display-ready. The term end is a ``<time>`` element showing the
+    time in the site's time zone, which ``local-time.js`` rewrites in the
+    visitor's own time zone. Status comes last, preceded by Payment for
+    inactive memberships, where it usually explains why. An active
+    membership's term always "ends". An inactive one can still have an end
+    date in the future (e.g., a declined renewal payment), so its term row says
+    "ended" only once the date has passed.
     """
     is_active = membership.is_active
     details: list[MembershipDetail] = [
-        {"label": "Level", "value": membership.get_level_display()},
-        {"label": "Status", "value": "Active" if is_active else "Inactive"},
+        {"label": "Level", "value": membership.get_level_display()}
     ]
-    if not is_active:
-        details.append(
-            {
-                "label": "Payment",
-                "value": membership.get_payment_status_display(),
-            }
-        )
     if termination_date := membership.termination_date:
         term_ended = not is_active and (
             localdate(termination_date) < localdate()
@@ -300,9 +295,25 @@ def build_membership_details(
         details.append(
             {
                 "label": "Term ended" if term_ended else "Term ends",
-                "value": date_format(localtime(termination_date), "F j, Y"),
+                "value": format_html(
+                    '<time class="local-time" datetime="{}">{}</time>',
+                    termination_date.isoformat(),
+                    date_format(
+                        localtime(termination_date), r"F j, Y \a\t g:i A T"
+                    ),
+                ),
             }
         )
+    if not is_active:
+        details.append(
+            {
+                "label": "Payment",
+                "value": membership.get_payment_status_display(),
+            }
+        )
+    details.append(
+        {"label": "Status", "value": "Active" if is_active else "Inactive"}
+    )
     return details
 
 

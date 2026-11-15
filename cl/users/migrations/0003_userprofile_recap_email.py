@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0002_load_initial_data'),
+        ("users", "0002_load_initial_data"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='userprofile',
-            name='recap_email',
-            field=models.EmailField(blank=True, help_text='Generated recap email address for the user.', max_length=254),
+            model_name="userprofile",
+            name="recap_email",
+            field=models.EmailField(
+                blank=True,
+                help_text="Generated recap email address for the user.",
+                max_length=254,
+            ),
         ),
     ]

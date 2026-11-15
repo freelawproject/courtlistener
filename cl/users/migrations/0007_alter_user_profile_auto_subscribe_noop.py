@@ -4,15 +4,17 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0006_add_auto_subscribe'),
+        ("users", "0006_add_auto_subscribe"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='userprofile',
-            name='auto_subscribe',
-            field=models.BooleanField(default=True, help_text="If enabled, for every new case that comes in from the user's recap.email address, a new docket subscription for the case will be created; if disabled we'll ask users if they want to subscribe to the case."),
+            model_name="userprofile",
+            name="auto_subscribe",
+            field=models.BooleanField(
+                default=True,
+                help_text="If enabled, for every new case that comes in from the user's recap.email address, a new docket subscription for the case will be created; if disabled we'll ask users if they want to subscribe to the case.",
+            ),
         ),
     ]

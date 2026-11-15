@@ -4,14 +4,16 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0007_alter_user_profile_auto_subscribe_noop'),
+        ("users", "0007_alter_user_profile_auto_subscribe_noop"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='emailsent',
-            options={'verbose_name': 'Sent Email', 'verbose_name_plural': 'Emails Sent'},
+            name="emailsent",
+            options={
+                "verbose_name": "Sent Email",
+                "verbose_name_plural": "Emails Sent",
+            },
         ),
     ]
