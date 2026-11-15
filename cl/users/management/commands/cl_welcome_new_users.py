@@ -11,7 +11,7 @@ from django.utils.timezone import make_aware
 from cl.lib.command_utils import VerboseCommand, logger
 
 
-def get_welcome_recipients(time_now: datetime) -> QuerySet:
+def get_welcome_recipients(time_now: datetime) -> QuerySet[User]:
     """Get users that signed up in the last 24 hours to send a welcome email.
 
     Args:
