@@ -275,7 +275,7 @@ def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
     membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
         request,
-        "profile/donations.html",
+        "profile/membership.html",
         {
             "page": "profile_your_support",
             "private": True,
