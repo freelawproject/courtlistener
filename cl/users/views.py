@@ -2,6 +2,7 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from typing import TypedDict
 
 from django.conf import settings
 from django.contrib import messages
@@ -26,7 +27,8 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import localdate, now
+from django.utils.formats import date_format
+from django.utils.timezone import localdate, localtime, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -261,6 +263,46 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+class MembershipDetail(TypedDict):
+    """One labelled row in the membership details list."""
+
+    label: str
+    value: str
+
+
+def build_membership_details(
+    membership: NeonMembership,
+) -> list[MembershipDetail]:
+    """Build the Level / Status / Payment / Term rows of the Membership page.
+
+    Values are display-ready. Payment is only listed for inactive memberships,
+    where it usually explains why. An inactive membership can still have a
+    term end date in the future (e.g., a declined renewal payment), so the
+    term row says "ended" only once the date has passed.
+    """
+    is_active = membership.is_active
+    details: list[MembershipDetail] = [
+        {"label": "Level", "value": membership.get_level_display()},
+        {"label": "Status", "value": "Active" if is_active else "Inactive"},
+    ]
+    if not is_active:
+        details.append(
+            {
+                "label": "Payment",
+                "value": membership.get_payment_status_display(),
+            }
+        )
+    if termination_date := membership.termination_date:
+        term_ended = localdate(termination_date) < localdate()
+        details.append(
+            {
+                "label": "Term ended" if term_ended else "Term ends",
+                "value": date_format(localtime(termination_date), "F j, Y"),
+            }
+        )
+    return details
+
+
 @login_required
 @never_cache
 def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
@@ -268,9 +310,7 @@ def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     The membership may exist but be inactive (e.g., a failed payment or an
     ended term), so the template checks ``membership.is_active`` rather than
-    only whether a membership exists. The term end date can still be in the
-    future for an inactive membership (e.g., a declined renewal payment), so
-    ``term_has_ended`` tells the template which wording to use for it.
+    only whether a membership exists.
     """
     membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
@@ -280,10 +320,8 @@ def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
             "page": "profile_your_support",
             "private": True,
             "membership": membership,
-            "term_has_ended": bool(
-                membership
-                and membership.termination_date
-                and localdate(membership.termination_date) < localdate()
+            "details": (
+                build_membership_details(membership) if membership else []
             ),
             "upgrade_url": (
                 get_membership_upgrade_url(membership) if membership else ""

@@ -6206,11 +6206,13 @@ class MembershipPageTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create the user and the URLs shared by the tests."""
         cls.user = UserProfileWithParentsFactory.create().user
         cls.url = reverse("profile_your_support")
         cls.contact_url = f"{reverse('contact')}?issue_type=memberships"
 
     def setUp(self) -> None:
+        """Log the user in; the page requires authentication."""
         self.client.force_login(self.user)
 
     def test_non_member_is_invited_to_join(self) -> None:
