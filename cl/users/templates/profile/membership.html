@@ -36,7 +36,7 @@
           <dt>Status</dt>
           <dd>Active</dd>
           {% if membership.termination_date %}
-            <dt>{% if term_has_ended %}Term ended{% else %}Term ends{% endif %}</dt>
+            <dt>Term ends</dt>
             <dd>{{ membership.termination_date|date:"F j, Y" }}</dd>
           {% endif %}
         </dl>
