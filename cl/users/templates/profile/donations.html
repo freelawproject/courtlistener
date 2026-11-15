@@ -36,7 +36,7 @@
           <dt>Status</dt>
           <dd>Active</dd>
           {% if membership.termination_date %}
-            <dt>Term ends</dt>
+            <dt>{% if term_has_ended %}Term ended{% else %}Term ends{% endif %}</dt>
             <dd>{{ membership.termination_date|date:"F j, Y" }}</dd>
           {% endif %}
         </dl>
@@ -44,7 +44,7 @@
           <a href="{{ upgrade_url }}"
              class="btn btn-primary"
              target="_blank" rel="noopener noreferrer">
-            {% if is_legacy_membership %}Get More Features{% else %}Upgrade Membership{% endif %}
+            Upgrade Membership
           </a>
         </p>
       {% elif membership %}
@@ -62,7 +62,7 @@
           <dt>Payment</dt>
           <dd>{{ membership.get_payment_status_display }}</dd>
           {% if membership.termination_date %}
-            <dt>Term ended</dt>
+            <dt>{% if term_has_ended %}Term ended{% else %}Term ends{% endif %}</dt>
             <dd>{{ membership.termination_date|date:"F j, Y" }}</dd>
           {% endif %}
         </dl>
@@ -87,14 +87,14 @@
             <i class="fa fa-heart-o"></i>&nbsp;Become a Member
           </a>
         </p>
-      {% endif %}
 
-      <h3 class="v-offset-above-3" id="membership-help">Not seeing your membership?</h3>
-      <ul>
-        <li>Log in to the <a href="{{ donor_portal_url }}" target="_blank" rel="noopener noreferrer">donor portal</a> to make sure your membership is active.</li>
-        <li>Make sure the email address on your CourtListener account matches the one in the donor portal.</li>
-        <li>Still stuck? Email us at <a href="mailto:memberships@free.law">memberships@free.law</a>.</li>
-      </ul>
+        <h3 class="v-offset-above-3" id="membership-help">Not seeing your membership?</h3>
+        <ul>
+          <li>Log in to the <a href="{{ donor_portal_url }}" target="_blank" rel="noopener noreferrer">donor portal</a> to make sure your membership is active.</li>
+          <li>Make sure the email address on your CourtListener account matches the one in the donor portal.</li>
+          <li>Still stuck? <a href="{% url "contact" %}?issue_type=memberships">Contact us</a>.</li>
+        </ul>
+      {% endif %}
 
       <p class="v-offset-above-2">
         Your generosity deserves transparency. You can create an account in our donor portal to access your detailed donation list, including one-time and monthly contributions. To upgrade your membership, change your payment frequency or profile, manage donations, or update your contact information, log in to the portal.
@@ -103,7 +103,7 @@
         class="btn btn-lg btn-primary">Log in to the Donor Portal</a>
       </p>
       <p class="text-center v-offset-above-2">
-        If you have any questions, please get in touch <a href="mailto:donate@free.law">donate@free.law</a>. We'd be happy to hear from you.
+        If you have any questions, please <a href="{% url "contact" %}?issue_type=memberships">get in touch</a>. We'd be happy to hear from you.
       </p>
     </div>
   </div>

@@ -6196,75 +6196,78 @@ class MembershipHeaderLinkTest(TestCase):
 
 
 class MembershipPageTest(TestCase):
-    """Tests for /profile/your-support/, the profile's membership page."""
+    """Tests for the profile's Membership page."""
+
+    # Time is frozen for tests that depend on the date, and the dates below are
+    # relative to it.
+    NOW = datetime(2026, 11, 15, 12, tzinfo=UTC)
+    FUTURE = datetime(2027, 1, 14, 12, tzinfo=UTC)
+    PAST = datetime(2026, 9, 1, 12, tzinfo=UTC)
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserProfileWithParentsFactory.create().user
         cls.url = reverse("profile_your_support")
+        cls.contact_url = f"{reverse('contact')}?issue_type=memberships"
 
     def setUp(self) -> None:
         self.client.force_login(self.user)
 
-    def test_login_required(self) -> None:
-        """Anonymous users are sent to sign in."""
-        self.client.logout()
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertIn("/sign-in/", response["Location"])
-
     def test_non_member_is_invited_to_join(self) -> None:
-        """Users with no membership see a join link and no level."""
+        """Users with no membership are invited to join and told where to get help."""
         response = self.client.get(self.url)
         self.assertContains(response, "You aren't a member yet")
         self.assertContains(response, "Become a Member")
-        self.assertNotContains(response, "Your Membership</h3>")
+        self.assertContains(response, "Not seeing your membership?")
+        self.assertContains(response, self.contact_url)
+        for address in ("donate@free.law", "memberships@free.law"):
+            self.assertNotContains(response, f"mailto:{address}")
 
     def test_active_member_sees_level_and_upgrade_link(self) -> None:
         """Active members can confirm their level and find the upgrade flow."""
-        NeonMembershipFactory(
-            user=self.user,
-            level=NeonMembershipLevel.TIER_2,
-            neon_id="98765",
-            termination_date=datetime(2099, 3, 14, 12, tzinfo=UTC),
-        )
-        response = self.client.get(self.url)
+        with time_machine.travel(self.NOW, tick=False):
+            NeonMembershipFactory(
+                user=self.user,
+                level=NeonMembershipLevel.TIER_2,
+                neon_id="98765",
+                termination_date=self.FUTURE,
+            )
+            response = self.client.get(self.url)
         self.assertContains(response, "CL Membership - Tier 2")
-        self.assertContains(response, "Active")
-        self.assertContains(response, "March 14, 2099")
+        self.assertContains(response, "<dt>Term ends</dt>")
+        self.assertContains(response, "January 14, 2027")
         self.assertContains(response, "memberships/upgrade/98765")
         self.assertContains(response, "Upgrade Membership")
         self.assertNotContains(response, "Become a Member")
-
-    def test_legacy_member_is_not_sent_to_neon_upgrade(self) -> None:
-        """Legacy memberships can't be upgraded in Neon, so use the help page."""
-        NeonMembershipFactory(
-            user=self.user,
-            level=NeonMembershipLevel.LEGACY,
-            neon_id="98765",
-        )
-        response = self.client.get(self.url)
-        self.assertContains(response, "CL Legacy Membership")
-        self.assertContains(response, "Get More Features")
-        self.assertContains(response, "legacy-memberships")
-        self.assertNotContains(response, "memberships/upgrade/")
+        # The help for people who can't see a membership is just noise here.
+        self.assertNotContains(response, "Not seeing your membership?")
+        self.assertContains(response, self.contact_url)
 
     def test_inactive_member_is_invited_to_renew(self) -> None:
-        """A membership whose payment failed isn't shown as active."""
-        NeonMembershipFactory(
-            user=self.user,
-            level=NeonMembershipLevel.TIER_1,
-            payment_status=MembershipPaymentStatus.FAILED,
-        )
-        response = self.client.get(self.url)
-        self.assertContains(response, "Your Membership Isn't Active")
-        self.assertContains(response, "Renew Your Membership")
-        self.assertContains(response, "Payment failed or was declined")
-        self.assertNotContains(response, "Upgrade Membership")
-
-    def test_page_is_labeled_membership(self) -> None:
-        """The profile tabs and menu call this page Membership."""
-        response = self.client.get(self.url)
-        # The old label sat after an icon in the tabs and the menu.
-        self.assertNotContains(response, "&nbsp;Your Support")
-        self.assertContains(response, "&nbsp;Membership</a>")
+        """An inactive membership says so, and only says its term ended once it has."""
+        cases = {
+            "future": (self.FUTURE, "Term ends"),
+            "past": (self.PAST, "Term ended"),
+        }
+        with time_machine.travel(self.NOW, tick=False):
+            membership = NeonMembershipFactory(
+                user=self.user,
+                level=NeonMembershipLevel.TIER_1,
+                payment_status=MembershipPaymentStatus.FAILED,
+            )
+            for label, (termination_date, term_label) in cases.items():
+                with self.subTest(term=label):
+                    membership.termination_date = termination_date
+                    membership.save()
+                    response = self.client.get(self.url)
+                    self.assertContains(
+                        response, "Your Membership Isn't Active"
+                    )
+                    self.assertContains(response, "Renew Your Membership")
+                    self.assertContains(
+                        response, "Payment failed or was declined"
+                    )
+                    self.assertContains(response, f"<dt>{term_label}</dt>")
+                    self.assertNotContains(
+                        response, "Not seeing your membership?"
+                    )

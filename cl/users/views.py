@@ -26,7 +26,7 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import now
+from django.utils.timezone import localdate, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -51,7 +51,7 @@ from cl.api.utils import (
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
-from cl.donate.models import NeonMembership, NeonMembershipLevel
+from cl.donate.models import NeonMembership
 from cl.donate.utils import DONOR_PORTAL_URL, get_membership_upgrade_url
 from cl.favorites.forms import NoteForm
 from cl.favorites.utils import NOTEABLE_MODELS
@@ -263,12 +263,14 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
+def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Show the user's membership level and status, and how to manage it.
 
     The membership may exist but be inactive (e.g., a failed payment or an
     ended term), so the template checks ``membership.is_active`` rather than
-    only whether a membership exists.
+    only whether a membership exists. The term end date can still be in the
+    future for an inactive membership (e.g., a declined renewal payment), so
+    ``term_has_ended`` tells the template which wording to use for it.
     """
     membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
@@ -278,8 +280,10 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
             "page": "profile_your_support",
             "private": True,
             "membership": membership,
-            "is_legacy_membership": bool(
-                membership and membership.level == NeonMembershipLevel.LEGACY
+            "term_has_ended": bool(
+                membership
+                and membership.termination_date
+                and localdate(membership.termination_date) < localdate()
             ),
             "upgrade_url": (
                 get_membership_upgrade_url(membership) if membership else ""
