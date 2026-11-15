@@ -39,6 +39,7 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    ParentheticalSerializer,
     PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
@@ -63,12 +64,14 @@ from cl.search.filters import (
     OpinionClusterFilter,
     OpinionFilter,
     OpinionsCitedFilter,
+    ParentheticalFilter,
     RECAPDocumentFilter,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     BankruptcyInformation,
+    Citation,
     ClusterRedirection,
     Court,
     Docket,
@@ -77,6 +80,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     OriginatingCourtInformation,
+    Parenthetical,
     RECAPDocument,
     Tag,
 )
@@ -393,6 +397,74 @@ class OpinionsCitedViewSet(
     # Additional cursor ordering fields
     cursor_ordering_fields = ["id"]
     queryset = OpinionsCited.objects.all().order_by("-id")
+
+
+class ParentheticalViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
+    """Short descriptions judges write about the cases they cite.
+
+    Filter by described_opinion to see what other courts said about an
+    opinion, or by describing_opinion to see what an opinion said about
+    other cases.
+    """
+
+    # This endpoint never computes groups. That is a heavy write done at
+    # ingestion or when someone opens the Summaries page; until then, group
+    # is null.
+    serializer_class = ParentheticalSerializer
+    filterset_class = ParentheticalFilter
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Both are indexed. Ordering by score uses page number pagination.
+    ordering_fields = ("id", "score")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["id"]
+    queryset = (
+        Parenthetical.objects.select_related(
+            "describing_opinion__cluster__docket",
+            "described_opinion__cluster",
+            "group",
+        )
+        .prefetch_related(
+            Prefetch(
+                "describing_opinion__cluster__citations",
+                queryset=Citation.objects.only(
+                    "id", "cluster_id", "volume", "reporter", "page", "type"
+                ),
+            )
+        )
+        # Load only the columns the serializer uses. Otherwise every row
+        # pulls both opinions' full text fields and their whole clusters.
+        .only(
+            "id",
+            "text",
+            "score",
+            "describing_opinion__id",
+            "describing_opinion__cluster__id",
+            "describing_opinion__cluster__case_name",
+            "describing_opinion__cluster__date_filed",
+            "describing_opinion__cluster__docket__id",
+            "describing_opinion__cluster__docket__court_id",
+            "described_opinion__id",
+            "described_opinion__cluster__id",
+            "described_opinion__cluster__case_name",
+            "described_opinion__cluster__slug",
+            "group__id",
+            "group__opinion_id",
+            "group__representative_id",
+            "group__score",
+            "group__size",
+        )
+        .order_by("-id")
+    )
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):

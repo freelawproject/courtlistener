@@ -51,6 +51,8 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     OriginatingCourtInformation,
+    Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
     Tag,
 )
@@ -275,6 +277,97 @@ class OpinionsCitedSerializer(
 
     class Meta:
         model = OpinionsCited
+        fields = "__all__"
+
+
+class ParentheticalGroupSerializer(
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Serialize a ParentheticalGroup for embedding inside a Parenthetical.
+
+    Includes links to the opinion it describes and to its representative
+    parenthetical.
+    """
+
+    opinion_id = serializers.ReadOnlyField()
+    opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        read_only=True,
+        style={"base_template": "input.html"},
+    )
+    representative_id = serializers.ReadOnlyField()
+    representative = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="parenthetical-detail",
+        read_only=True,
+        style={"base_template": "input.html"},
+    )
+
+    class Meta:
+        model = ParentheticalGroup
+        fields = [
+            "id",
+            "opinion_id",
+            "opinion",
+            "representative_id",
+            "representative",
+            "score",
+            "size",
+        ]
+
+
+class ParentheticalSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """Serialize a Parenthetical with links to both opinions and its group.
+
+    The explicit ``HyperlinkedRelatedField`` declarations mirror
+    ``OpinionsCitedSerializer``: without them DRF issues a query that pulls
+    back every Opinion. ``group`` is embedded so a client gets the grouping
+    context in the same response, avoiding a follow-up request per row.
+    """
+
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    describing_opinion_id = serializers.ReadOnlyField()
+    describing_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        queryset=Opinion.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    describing_opinion_case_name = serializers.CharField(
+        source="describing_opinion.cluster.case_name", read_only=True
+    )
+    describing_opinion_citation = serializers.CharField(
+        source="describing_opinion.cluster.citation_string", read_only=True
+    )
+    describing_opinion_date_filed = serializers.DateField(
+        source="describing_opinion.cluster.date_filed", read_only=True
+    )
+    describing_opinion_court_id = serializers.CharField(
+        source="describing_opinion.cluster.docket.court_id", read_only=True
+    )
+    described_opinion_id = serializers.ReadOnlyField()
+    described_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        queryset=Opinion.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    described_opinion_case_name = serializers.CharField(
+        source="described_opinion.cluster.case_name", read_only=True
+    )
+    group_id = serializers.ReadOnlyField()
+    group = ParentheticalGroupSerializer(many=False, read_only=True)
+
+    class Meta:
+        model = Parenthetical
         fields = "__all__"
 
 
