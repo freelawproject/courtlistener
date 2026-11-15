@@ -51,12 +51,14 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
     if not user.is_authenticated or not hasattr(user, "profile"):
         return None
 
-    level = user.membership.level if user.profile.is_member else "free"
-    upgrade_url = (
-        get_membership_upgrade_url(user.membership)
-        if user.profile.is_member
-        else ""
+    # request.user is typed as a union that has no "membership", and a missing
+    # reverse one-to-one raises an AttributeError subclass, so getattr's
+    # default covers users without a membership.
+    membership = (
+        getattr(user, "membership", None) if user.profile.is_member else None
     )
+    level = membership.level if membership else "free"
+    upgrade_url = get_membership_upgrade_url(membership) if membership else ""
     # Legacy memberships can't be upgraded online, so the modal routes
     # them to a help page instead of the Neon upgrade flow (see #7136).
     is_legacy = level == NeonMembershipLevel.LEGACY

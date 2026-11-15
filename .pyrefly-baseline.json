@@ -3719,20 +3719,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
       "column": 11,
       "path": "cl/search/views.py",
       "name": "invalid-argument",
