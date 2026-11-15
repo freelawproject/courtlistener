@@ -76,7 +76,7 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
         "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
         "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
         "level": level,
-        "upgrade_url": upgrade_url,
+        "upgradeUrl": upgrade_url,
         "isLegacy": is_legacy,
         "legacyHelpUrl": LEGACY_MEMBERSHIP_HELP_URL,
         "counts": counts,
