@@ -21,9 +21,7 @@ class VerboseCommand(BaseCommand):
         Verbosity above 1 also sets Juriscraper's logger to debug.
         """
         verbosity = options.get("verbosity")
-        if not verbosity:
-            logger.setLevel(logging.WARNING)
-        elif verbosity == 0:
+        if not verbosity or verbosity == 0:
             logger.setLevel(logging.WARNING)
         elif verbosity == 1:  # default
             logger.setLevel(logging.INFO)

@@ -360,14 +360,14 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site.method = "LOCAL"
         parsed_site = async_to_sync(site.parse)()
 
-        with self.captureOnCommitCallbacks(execute=True):
-            with mock.patch(
-                "cl.lib.celery_utils.get_task_wait"
-            ) as patched_wait:
-                patched_wait.return_value = 0
-                async_to_sync(cl_scrape_oral_arguments.Command().scrape_court)(
-                    parsed_site, full_crawl=True
-                )
+        with (
+            self.captureOnCommitCallbacks(execute=True),
+            mock.patch("cl.lib.celery_utils.get_task_wait") as patched_wait,
+        ):
+            patched_wait.return_value = 0
+            async_to_sync(cl_scrape_oral_arguments.Command().scrape_court)(
+                parsed_site, full_crawl=True
+            )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()

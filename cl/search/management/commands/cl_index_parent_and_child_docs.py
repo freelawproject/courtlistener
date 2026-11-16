@@ -357,12 +357,12 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
-        document_type = options.get("document_type", None)
+        document_type = options.get("document_type")
         chunk_size = self.options["chunk_size"]
         pk_offset = options["pk_offset"]
         auto_resume = options.get("auto_resume", False)
         update_from_event_tables = EventTable(
-            options.get("update_from_event_tables", None)
+            options.get("update_from_event_tables")
         )
         # call_command doesn't check `choices` on optional arguments.
         if (source := ES_SOURCE_BY_NAME.get(options["source"])) is None:
@@ -389,9 +389,9 @@ class Command(VerboseCommand):
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
             )
-        start_date: date | None = options.get("start_date", None)
-        end_date: date | None = options.get("end_date", None)
-        non_null_field: str | None = options.get("non_null_field", None)
+        start_date: date | None = options.get("start_date")
+        end_date: date | None = options.get("end_date")
+        non_null_field: str | None = options.get("non_null_field")
 
         es_document = None
         match search_type:

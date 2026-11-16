@@ -109,8 +109,8 @@ class Command(VerboseCommand):
         """
         super().handle(*args, **options)
         self.options = options
-        start_date: date | None = options.get("start_date", None)
-        end_date: date | None = options.get("end_date", None)
+        start_date: date | None = options.get("start_date")
+        end_date: date | None = options.get("end_date")
         action = options.get("action")
         testing_mode = self.options.get("testing_mode", False)
 

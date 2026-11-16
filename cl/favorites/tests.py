@@ -182,9 +182,8 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         rd = RECAPDocumentFactory(docket_entry__docket=self.docket_1)
         NoteFactory(content_object=rd, user=self.user)
 
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                NoteFactory(content_object=rd, user=self.user)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            NoteFactory(content_object=rd, user=self.user)
 
         other_user = UserFactory()
         NoteFactory(content_object=rd, user=other_user)

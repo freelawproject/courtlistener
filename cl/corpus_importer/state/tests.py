@@ -2054,11 +2054,13 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         loader = self.loader()
 
         # Stop the load partway, as a dying process would.
-        with patch.object(
-            loader, "_dispatch", side_effect=[None, None, OSError("gone")]
+        with (
+            patch.object(
+                loader, "_dispatch", side_effect=[None, None, OSError("gone")]
+            ),
+            self.assertRaises(OSError),
         ):
-            with self.assertRaises(OSError):
-                loader.load()
+            loader.load()
 
         # The checkpoint was written at the top of row 2, by which point only
         # row 1 had been dispatched. Row 2 went out after it and is dispatched
@@ -2226,12 +2228,14 @@ class RunDatabaseTest(SimpleTestCase):
         The patch has to outlive the download, so this wraps the whole context
         rather than handing one back.
         """
-        with patch(
-            "cl.corpus_importer.state.run_db.scrape_bucket_storage",
-            return_value=FakeStorage(bucket),
+        with (
+            patch(
+                "cl.corpus_importer.state.run_db.scrape_bucket_storage",
+                return_value=FakeStorage(bucket),
+            ),
+            downloaded_run_database(key) as database,
         ):
-            with downloaded_run_database(key) as database:
-                yield database
+            yield database
 
     def test_downloads_the_key_to_a_temporary_file(self) -> None:
         """Does the database arrive on local disk, under its own name, from the configured bucket?"""
@@ -2259,12 +2263,12 @@ class RunDatabaseTest(SimpleTestCase):
 
     def test_cleans_up_after_a_load_that_raises(self) -> None:
         """Does the copy go away even when the caller fails mid-load?"""
-        with self.assertRaises(ValueError):
-            with self.download(
-                FakeBucket(), "nycourts_gov/run.db"
-            ) as database:
-                path = database
-                raise ValueError("the load blew up")
+        with (
+            self.assertRaises(ValueError),
+            self.download(FakeBucket(), "nycourts_gov/run.db") as database,
+        ):
+            path = database
+            raise ValueError("the load blew up")
 
         self.assertFalse(path.exists())
 

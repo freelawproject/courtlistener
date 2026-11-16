@@ -227,7 +227,7 @@ def update_es_documents(
                 | OpinionCluster()
                 | Opinion()
                 | SCOTUSDocument()
-            ) if mapping_fields.get("self", None):
+            ) if mapping_fields.get("self"):
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 should_compute_embeddings = (
@@ -504,7 +504,7 @@ def update_reverse_related_documents(
         instance.pk,
     )
     fields_map_to_pass: dict[str, str] | None = fields_map.copy()
-    if fields_map.get("all", None):
+    if fields_map.get("all"):
         related_instance = None
         fields_map_to_pass = None
 

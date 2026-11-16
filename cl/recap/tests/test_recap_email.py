@@ -3106,12 +3106,7 @@ class GetAndCopyRecapAttachments(TestCase):
         )
         rds_all = RECAPDocument.objects.all()
         for rd in rds_all:
-            if rd.attachment_number == 1:
-                with rd.filepath_local.open(mode="rb") as local_path:
-                    self.assertEqual(
-                        local_path.read(), b"Hello World from magic"
-                    )
-            elif rd.attachment_number == 2:
+            if rd.attachment_number == 1 or rd.attachment_number == 2:
                 with rd.filepath_local.open(mode="rb") as local_path:
                     self.assertEqual(
                         local_path.read(), b"Hello World from magic"

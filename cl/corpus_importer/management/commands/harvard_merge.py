@@ -368,7 +368,7 @@ def merge_opinion_clusters(
         )
         return
 
-    if only_fastcase and "Fastcase" != get_data_source(harvard_data):
+    if only_fastcase and get_data_source(harvard_data) != "Fastcase":
         logger.info("Skipping non-fastcase opinion cluster")
         return
 

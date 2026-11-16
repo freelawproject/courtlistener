@@ -25,8 +25,8 @@ def sort_harvard_opinions(options: dict) -> None:
     Args:
         options: dict of arguments passed to the command
     """
-    skip_until = options.get("skip_until", None)
-    limit = options.get("limit", None)
+    skip_until = options.get("skip_until")
+    limit = options.get("limit")
 
     # The filepath_json_harvard field can only be filled by the harvard importer,
     # this helps us confirm that it was imported from a Harvard json. We exclude
@@ -174,8 +174,8 @@ def sort_columbia_opinions(options: dict) -> None:
         options: dict of arguments passed to the command
     """
     xml_dir = options["xml_dir"]
-    skip_until = options.get("skip_until", None)
-    limit = options.get("limit", None)
+    skip_until = options.get("skip_until")
+    limit = options.get("limit")
 
     clusters = (
         OpinionCluster.objects.filter(

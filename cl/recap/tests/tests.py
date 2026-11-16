@@ -4894,13 +4894,15 @@ class RecapAddAttorneyTest(TestCase):
         # Without the savepoint fix, the IntegrityError from create()
         # would break the transaction and the recovery get() would
         # raise TransactionManagementError.
-        with transaction.atomic():
-            with mock.patch.object(
+        with (
+            transaction.atomic(),
+            mock.patch.object(
                 AttorneyOrganization.objects,
                 "get",
                 side_effect=get_side_effect,
-            ):
-                a_pk = add_attorney(self.atty, self.p, self.d)
+            ),
+        ):
+            a_pk = add_attorney(self.atty, self.p, self.d)
 
         a = Attorney.objects.get(pk=a_pk)
         self.assertTrue(
