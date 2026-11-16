@@ -743,7 +743,7 @@ def get_doc_from_es[DocumentT: ESDocumentType](
                 refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
             )
         except (ConflictError, RequestError) as exc:
-            logger.error(
+            logger.exception(
                 "Error indexing the %s with ID: %s. Exception was: %s",
                 es_document.Django.model.__name__.capitalize(),
                 instance_id,
@@ -1215,7 +1215,7 @@ def index_parent_and_child_docs(
                     refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                 )
             except (ConflictError, RequestError) as exc:
-                logger.error(
+                logger.exception(
                     "Error indexing the %s with ID: %s. Exception was: %s",
                     model_label,
                     instance_id,
@@ -2156,7 +2156,7 @@ def download_embedding(
             file_contents = f.read().decode("utf-8")
         return json.loads(file_contents)
     except FileNotFoundError:
-        logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
+        logger.exception("Embeddings for opinion ID:%s doesn't exist.", pk)
         return None
 
 

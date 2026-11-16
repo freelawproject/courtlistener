@@ -236,7 +236,7 @@ def add_or_update_case_db(self: Task, case_id: str) -> None:
     except CourtQueryError as exc:
         retries_remaining = self.max_retries - self.request.retries
         if retries_remaining == 0:
-            logger.error("%s", exc)
+            logger.exception("%s", exc)
             return None
         logger.info("%s %s retries remaining.", exc, retries_remaining)
         r = get_redis_interface("CACHE")

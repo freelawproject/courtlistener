@@ -48,10 +48,10 @@ def handle_cluster_redirection[
 
             # Without a resolved, named route there is no URL to rebuild.
             if request.resolver_match is None:
-                raise exc
+                raise
             url_name = request.resolver_match.url_name
             if url_name is None:
-                raise exc
+                raise
 
             # redirect to the same URL, only change the target PK
             url_kwargs = dict(kwargs)

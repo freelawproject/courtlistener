@@ -290,7 +290,7 @@ class Command(CommandUtils, BaseCommand):
             )
 
         except ClientError as e:
-            logger.error(
+            logger.exception(
                 "Error fetching volume directories for %s: %s",
                 reporter_slug,
                 str(e),
@@ -378,7 +378,7 @@ class Command(CommandUtils, BaseCommand):
 
             return cases
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error fetching CasesMetadata.json for %s volume %s: %s",
                 reporter_slug,
                 volume,
@@ -398,7 +398,9 @@ class Command(CommandUtils, BaseCommand):
             )
             return json.loads(response["Body"].read().decode("utf-8"))
         except Exception as e:
-            logger.error("Error fetching ReportersMetadata.json: %s", str(e))
+            logger.exception(
+                "Error fetching ReportersMetadata.json: %s", str(e)
+            )
             return []
 
     def is_valid_case_metadata(self, case_meta: dict[str, Any]) -> bool:

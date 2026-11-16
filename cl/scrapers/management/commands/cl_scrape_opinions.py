@@ -407,7 +407,7 @@ class Command(ScraperCommand):
                     next_case_date,
                     **lookup_params,
                 )
-            except SingleDuplicateError as exc:
+            except SingleDuplicateError:
                 # track clusters if they have more than 1 sub opinions but one
                 # of them is a duplicate
                 if len(opinions_content) > 1:
@@ -417,7 +417,7 @@ class Command(ScraperCommand):
                         opinions_to_download,
                         exc_info=True,
                     )
-                raise exc
+                raise
 
             # Not a duplicate, carry on
             logger.info(

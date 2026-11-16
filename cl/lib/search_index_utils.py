@@ -194,4 +194,4 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
         if raise_error:
             # If the error is of any other type, raises the original
             # BulkIndexError for debugging.
-            raise exc
+            raise

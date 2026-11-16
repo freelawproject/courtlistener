@@ -91,7 +91,7 @@ def mirrored_code(
     try:
         return int(mirror[member.name].value)
     except KeyError:
-        logger.error(
+        logger.exception(
             "Juriscraper's %s.%s is not mirrored in CourtListener; storing "
             "UNASSIGNED. Add the member to cl.search.state.new_york."
             "vocabularies.%s.",

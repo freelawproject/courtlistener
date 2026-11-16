@@ -2512,7 +2512,9 @@ class RetrieveFilteredFieldsMixin:
         try:
             request = getattr(self, "context", {})["request"]
         except KeyError:
-            logger.error("Serializer context does not have access to request.")
+            logger.exception(
+                "Serializer context does not have access to request."
+            )
             return [], {}
 
         params = request.GET

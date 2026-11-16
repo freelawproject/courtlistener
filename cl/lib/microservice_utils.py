@@ -189,7 +189,7 @@ async def doc_page_count_service(doc: AbstractPDF) -> Response:
     except ClientError as error:
         if error.response["Error"]["Code"] == "NoSuchKey":
             raise NoSuchKey("Key not found: The specified key does not exist.")
-        raise error
+        raise
 
 
 @retry(
@@ -215,4 +215,4 @@ async def check_redactions_service(rd: RECAPDocument) -> Response:
     except ClientError as error:
         if error.response["Error"]["Code"] == "NoSuchKey":
             raise NoSuchKey("Key not found: The specified key does not exist.")
-        raise error
+        raise

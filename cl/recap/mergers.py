@@ -1031,7 +1031,7 @@ def add_create_docket_entry_transaction(d, docket_entry):
                 de_created = True
         except DocketEntry.MultipleObjectsReturned:
             if pacer_seq_no is None:
-                logger.error(
+                logger.exception(
                     "Multiple docket entries found for document "
                     "entry number '%s' while processing '%s'",
                     docket_entry["document_number"],
@@ -2331,7 +2331,7 @@ async def merge_attachment_page_data(
                 "docket_entry", "docket_entry__docket"
             ).aget(**params)
 
-    except RECAPDocument.MultipleObjectsReturned as exc:
+    except RECAPDocument.MultipleObjectsReturned:
         if pacer_case_id:
             await clean_duplicate_documents(params)
             main_rd = await RECAPDocument.objects.select_related(
@@ -2340,8 +2340,8 @@ async def merge_attachment_page_data(
         else:
             # Unclear how to proceed and we don't want to associate this data
             # with the wrong case. We must punt.
-            raise exc
-    except RECAPDocument.DoesNotExist as exc:
+            raise
+    except RECAPDocument.DoesNotExist:
         found_main_rd = False
         migrated_description = ""
         if not is_acms_attachment:
@@ -2361,7 +2361,7 @@ async def merge_attachment_page_data(
                         await main_rd.asave()
                     found_main_rd = True
                     break
-                except RECAPDocument.MultipleObjectsReturned as exc:
+                except RECAPDocument.MultipleObjectsReturned:
                     if pacer_case_id:
                         await clean_duplicate_documents(params)
                         main_rd = await RECAPDocument.objects.select_related(
@@ -2378,7 +2378,7 @@ async def merge_attachment_page_data(
                         break
                     # Unclear how to proceed and we don't want to associate
                     # this data with the wrong case. We must punt.
-                    raise exc
+                    raise
                 except RECAPDocument.DoesNotExist:
                     continue
         # Can't find the docket to associate with the attachment metadata
@@ -2387,7 +2387,7 @@ async def merge_attachment_page_data(
         # particularly acute for those that get free look emails and then go to
         # the attachment page.
         if not found_main_rd:
-            raise exc
+            raise
         rd = RECAPDocument(
             docket_entry=main_rd.docket_entry,
             document_type=RECAPDocument.PACER_DOCUMENT,

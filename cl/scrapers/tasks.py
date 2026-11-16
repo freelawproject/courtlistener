@@ -254,7 +254,7 @@ def extract_opinion_content(
         opinion.cluster.save()
         opinion.save()
     except Exception:
-        logger.error(
+        logger.exception(
             "****Error saving text to the db for: %s****\n%s",
             opinion,
             traceback.format_exc(),
@@ -392,7 +392,7 @@ def extract_doc_content(
         opinion.cluster.save()
         opinion.save()
     except Exception:
-        logger.error(
+        logger.exception(
             "****Error saving text to the db for: %s****\n%s",
             opinion,
             traceback.format_exc(),

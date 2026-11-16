@@ -87,7 +87,7 @@ class CourtFactory(DjangoModelFactory):
                 ).evaluate(None, None, {"locale": None})
                 count = count + 1
                 if count > 3:
-                    raise (exp)
+                    raise
 
 
 class DocketFactory(DjangoModelFactory):

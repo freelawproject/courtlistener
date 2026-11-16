@@ -104,7 +104,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 section,
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error while loading the sitemap class '%s' for section %s: %s",
                 sitemapClass.__name__,
                 section,

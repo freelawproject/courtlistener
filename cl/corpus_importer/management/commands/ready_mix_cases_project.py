@@ -382,10 +382,10 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                 # Continuing here will skip this court for this iteration; not
                 # a huge deal.
                 continue
-            except Exception as e:
+            except Exception:
                 # Cleanup
                 r.hincrby("iquery_status", court_id, -1)
-                raise e
+                raise
 
         iterations_completed += 1
         remaining_iterations = options["iterations"] - iterations_completed

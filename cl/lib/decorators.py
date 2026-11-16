@@ -295,12 +295,12 @@ def cache_page_ignore_params[
                 else:
                     cache = caches[cache_alias]
             except InvalidCacheBackendError as e:
-                logger.error(
+                logger.exception(
                     "Cache alias '%s' not found. Error: %s",
                     cache_alias,
                     str(e),
                 )
-                raise e
+                raise
 
             response = cache.get(cache_key)
             if response is not None:

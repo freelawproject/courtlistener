@@ -138,7 +138,7 @@ def process_succeeded_request(
                         ),
                     )
                 except (TypeError, ValueError) as e:
-                    logger.error(
+                    logger.exception(
                         "Could not serialize JSON for task %s: %r",
                         task.llm_key,
                         e,
@@ -241,7 +241,7 @@ def handle_request(
             and now() - request.date_started > MAX_REQUEST_AGE
         )
         if too_old:
-            logger.error(
+            logger.exception(
                 "Request %s has been in progress since %s "
                 "(over %s). Marking as failed.",
                 request.pk,

@@ -308,7 +308,7 @@ async def check_if_feed_changed_base(
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
             return None
-        raise exc
+        raise
 
     return rss_feed.data
 

@@ -500,7 +500,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
                     # behavior has been in place for years, we're retaining it
                     # for now. We've added Sentry logging to capture these
                     # cases for future debugging.
-                    logger.error(
+                    logger.exception(
                         "Multiple RECAPDocuments returned when processing pdf upload"
                     )
                     rd = RECAPDocument(
@@ -4029,7 +4029,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                     (h.status_code, h.headers.get("location", ""))
                     for h in response.history
                 ]
-                logger.error(
+                logger.exception(
                     "Texas docket parse failed for EPQ %s after inline retry: %s | "
                     "url=%s status=%s len=%s redirects=%s preview=%r",
                     epq.pk,

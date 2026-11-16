@@ -79,7 +79,7 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
             proxy_response = check_if_global_outage(session, url)
         except requests.RequestException as e:
             logger.error("Problem hitting proxy: %s", e)
-            raise e
+            raise
 
         j = proxy_response.json()
         if j["status_code"] is not None:

@@ -446,7 +446,7 @@ def get_and_save_free_document_report(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.error("%s at %s (%s to %s).", exc, court_id, start, end)
+            logger.exception("%s at %s (%s to %s).", exc, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         logger.info(
             "%s at %s (%s to %s). Retrying.", exc, court_id, start, end
@@ -708,7 +708,7 @@ def process_free_opinion_result(
                 rd_created = False
     except IntegrityError as e:
         msg = f"Raised IntegrityError: {e}"
-        logger.error(msg)
+        logger.exception(msg)
         if self.request.retries == self.max_retries:
             result.error_msg = msg
             result.save()
@@ -716,7 +716,7 @@ def process_free_opinion_result(
         raise self.retry(exc=e)
     except DatabaseError as e:
         msg = f"Unable to complete database transaction:\n{e}"
-        logger.error(msg)
+        logger.exception(msg)
         result.error_msg = msg
         result.save()
         self.request.chain = None
@@ -809,7 +809,7 @@ def get_and_process_free_pdf(
                 f"{exc.response.status_code}."
             )
             if self.request.retries == self.max_retries:
-                logger.error(msg)
+                logger.exception(msg)
                 self.request.chain = None
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -818,7 +818,7 @@ def get_and_process_free_pdf(
             "Ran into unknown HTTPError while getting PDF: "
             f"{exc.response.status_code}. Aborting."
         )
-        logger.error(msg)
+        logger.exception(msg)
         self.request.chain = None
         return None
     except PacerLoginException as exc:
@@ -1751,7 +1751,7 @@ def probe_or_scrape_iquery_pages(
                 court_blocked_time, total_accumulated_time = (
                     compute_blocked_court_wait(court_blocked_attempts - 1)
                 )
-                logger.error(
+                logger.exception(
                     "The court %s has blocked the iquery page probing "
                     "for around %s hours.",
                     court_id,
@@ -1890,7 +1890,7 @@ def probe_or_scrape_iquery_pages(
         except IntegrityError:
             # Individual IntegrityError retries failed for the report. Log the
             # error and try the next report.
-            logger.error(
+            logger.exception(
                 "IntegrityError occurred when processing iquery page for "
                 "court: %s and pacer_case_id: %s",
                 court_id,
@@ -1925,7 +1925,7 @@ def get_docket_by_pacer_case_id(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.error("%s Aborting chain.", exc)
+            logger.exception("%s Aborting chain.", exc)
             self.request.chain = None
             return None
         logger.info("%s Retrying.", exc)
@@ -2227,7 +2227,7 @@ def get_attachment_page_by_rd(
             )
             raise self.retry(exc=exc)
         msg = "Ran into unknown HTTPError. %s. Aborting."
-        logger.error(msg, exc.response.status_code)
+        logger.exception(msg, exc.response.status_code)
         self.request.chain = None
         return None
     except RequestError as exc:
@@ -2259,7 +2259,7 @@ def get_bankr_claims_registry(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
-            logger.error("%s Max retries completed. Aborting chain.", exc)
+            logger.exception("%s Max retries completed. Aborting chain.", exc)
             return data
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
@@ -3022,7 +3022,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.error("%s Aborting.", exc)
+            logger.exception("%s Aborting.", exc)
             return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
@@ -3062,7 +3062,7 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
     try:
         pacer_doc_id = report.data
     except ParsingException:
-        logger.error("Unable to get redirect for %s", rd)
+        logger.exception("Unable to get redirect for %s", rd)
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
@@ -3536,7 +3536,7 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
             api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
         )
     except ValidationError as e:
-        logger.error(
+        logger.exception(
             "LLM - Response validation error for cluster_id=%s, recap_document_id=%s",
             cluster_pk,
             recap_document_id,
@@ -3986,7 +3986,7 @@ def merge_scotus_docket_entry(
                 # the unnumbered lookups to avoid creating a duplicate.
                 pass
             except SCOTUSDocketEntry.MultipleObjectsReturned:
-                logger.error(
+                logger.exception(
                     "Multiple matching SCOTUSDocketEntries found for entry_number "
                     "%s on Docket %s.",
                     entry_number,
@@ -4021,7 +4021,7 @@ def merge_scotus_docket_entry(
                     )
                     de_created = True
                 except SCOTUSDocketEntry.MultipleObjectsReturned:
-                    logger.error(
+                    logger.exception(
                         "Multiple matching SCOTUSDocketEntries found for sequence_number "
                         "%s on Docket %s (extra %r).",
                         sequence_number,
@@ -4030,7 +4030,7 @@ def merge_scotus_docket_entry(
                     )
                     return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
-                logger.error(
+                logger.exception(
                     "Multiple matching SCOTUSDocketEntries found for description "
                     "%s on Docket %s (extra %r).",
                     input_docket_entry["description"],
@@ -4536,7 +4536,7 @@ def merge_texas_trial_court_data(
         try:
             court = Court.objects.get(pk=court_id)
         except Court.DoesNotExist:
-            logger.error("Court with ID %s not found.", court_id)
+            logger.exception("Court with ID %s not found.", court_id)
             court = None
         else:
             court_name = court.full_name
@@ -4627,7 +4627,7 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
             )
     except CaseTransfer.MultipleObjectsReturned:
         # This should never happen
-        logger.error(
+        logger.exception(
             "Found multiple matching CaseTransfer objects.",
         )
         return MergeResult.failed("CaseTransfer")
@@ -4642,7 +4642,7 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
             )
         except CaseTransfer.MultipleObjectsReturned:
             # Should never happen
-            logger.error(
+            logger.exception(
                 "Found multiple matching CaseTransfer objects.",
             )
             return MergeResult.failed("CaseTransfer")
@@ -4790,14 +4790,14 @@ def merge_texas_docket_entry(
         try:
             docket_entry = matching_sequence_numbers.get()
         except TexasDocketEntry.MultipleObjectsReturned:
-            logger.error(
+            logger.exception(
                 "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
                 sequence_number,
                 docket.pk,
             )
             docket_entry = matching_sequence_numbers.first()
         except TexasDocketEntry.DoesNotExist:
-            logger.error(
+            logger.exception(
                 "Could not find matching TexasDocketEntry with sequence number %s on Docket %s. Creating new docket entry, which may be a duplicate...",
                 sequence_number,
                 docket.pk,
@@ -5224,7 +5224,7 @@ def merge_texas_case_transfers(
                             pk=coa_transfer_origin_court_id
                         )
                     except Court.DoesNotExist:
-                        logger.error(
+                        logger.exception(
                             "Court with ID %s not found while populating CaseTransfer.origin_court.",
                             coa_transfer_origin_court_id,
                         )
@@ -5264,7 +5264,7 @@ def merge_texas_case_transfers(
                 pk=appeal_transfer_origin_court_id
             )
         except Court.DoesNotExist:
-            logger.error(
+            logger.exception(
                 "Court with ID %s not found while populating CaseTransfer.origin_court with appeal type.",
                 appeal_transfer_origin_court_id,
             )
@@ -5385,7 +5385,7 @@ def merge_texas_docket(
             try:
                 lower_court = Court.objects.get(pk=lower_court_id)
             except Court.DoesNotExist:
-                logger.error(
+                logger.exception(
                     "Could not find lower court with ID %s to set appeal_from for Texas docket.",
                     lower_court_id,
                 )
@@ -5485,7 +5485,7 @@ def texas_ingest_docket_task(
         if not is_texas_docket(docket_data):
             raise ValueError("Docket parser failed to produce a valid Docket")
     except Exception as e:
-        logger.error(
+        logger.exception(
             "Encountered error parsing Texas docket at URL %s: %s",
             meta.case_url,
             str(e),
@@ -5809,7 +5809,7 @@ def merge_state_scrape_row(
     try:
         loader_class = get_loader(loader)
     except KeyError:
-        logger.error(
+        logger.exception(
             "Cannot merge row %s: no state scrape loader named %r.",
             row,
             loader,
@@ -5821,7 +5821,7 @@ def merge_state_scrape_row(
     try:
         label, result, files = loader_class.merge_payload(payload)
     except ValidationError as error:
-        logger.error(
+        logger.exception(
             "Row %s of the %s run no longer validates for %s: %s",
             row,
             loader,

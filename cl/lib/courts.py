@@ -159,7 +159,7 @@ def find_court_object_by_name(
     try:
         return Court.objects.get(pk=court_ids[0])
     except Court.DoesNotExist:
-        logger.error(
+        logger.exception(
             "Court object does not exist in DB for id '%s' (name: '%s').",
             court_ids[0],
             lower_court_name,

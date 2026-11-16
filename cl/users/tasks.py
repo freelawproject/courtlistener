@@ -89,7 +89,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
                 exc.response.status_code != HTTPStatus.INTERNAL_SERVER_ERROR
                 or self.request.retries == self.max_retries
             ):
-                raise exc
+                raise
             raise self.retry(exc=exc)
         profile.neon_account_id = new_account_id
         profile.save(update_fields=["neon_account_id"])

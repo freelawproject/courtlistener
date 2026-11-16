@@ -508,7 +508,7 @@ class JKentScrapeLoader[
         try:
             payload = json.loads(row[self.payload_column])
         except (json.JSONDecodeError, TypeError) as error:
-            logger.error(
+            logger.exception(
                 "%s of %s: could not decode %s: %s",
                 self._identify(None, number),
                 self.database.name,
@@ -519,7 +519,7 @@ class JKentScrapeLoader[
         try:
             normalized = self.normalize(payload, row)
         except UnusableScrape as error:
-            logger.error(
+            logger.exception(
                 "%s of %s: refusing to merge it: %s",
                 self._identify(payload, number),
                 self.database.name,

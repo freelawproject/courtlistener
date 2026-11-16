@@ -2465,7 +2465,7 @@ def fetch_es_results(
         if "Failed to parse query" in str(e):
             logger.warning("Failed to parse query: %s", e)
         else:
-            logger.error("Multi-search API Error: %s", e)
+            logger.exception("Multi-search API Error: %s", e)
     return [], 0, error, None, None
 
 

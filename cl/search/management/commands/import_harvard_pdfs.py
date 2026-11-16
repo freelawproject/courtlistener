@@ -256,12 +256,12 @@ class Command(BaseCommand):
                 logger.info("Dry run: Would fetch PDF from %s", pdf_path)
 
         except OpinionCluster.DoesNotExist:
-            logger.error(
+            logger.exception(
                 "Cluster id: %s doesn't exist.",
                 entry.get("cl_cluster_id", "Unknown"),
             )
         except KeyError as e:
-            logger.error(
+            logger.exception(
                 "Missing key in entry: %s. Entry: %s",
                 e,
                 json.dumps(entry, indent=2),
@@ -305,7 +305,7 @@ class Command(BaseCommand):
                     if result is not None:
                         total_downloaded += result
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Error processing entry %s: %s", entry, str(e)
                     )
 

@@ -326,7 +326,7 @@ def extract_with_llm(
             api_key=env("DOCKET_NUMBER_CLEANING_API_KEY"),
         )
     except ValidationError as e:
-        logger.error(
+        logger.exception(
             "LLM - Response validation error for batch=%s",
             f"{batch}",
             extra={
