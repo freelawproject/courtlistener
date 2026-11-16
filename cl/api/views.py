@@ -339,10 +339,7 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).acount()
-    # An exact COUNT(*) scans the whole citations table, which takes longer
-    # than the request timeout in production. Since the response is only
-    # cached after it's built, that left the endpoint timing out forever.
-    # Postgres's planner estimate is instant and close enough for the wiki.
+    # Do an estimate, since an exact count is too slow on this table
     citation_count = await sync_to_async(get_total_estimate_count)(
         Citation._meta.db_table
     )

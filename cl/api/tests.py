@@ -149,7 +149,6 @@ from cl.search.api_views import (
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
-    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -473,31 +472,20 @@ class WikiDataRssFeedTests(TestCase):
             "D. Full Feed", data["podcasts"]["oral_argument_courts"]
         )
 
-    def test_citation_count_uses_estimate(self) -> None:
+    @patch("cl.api.views.get_total_estimate_count", return_value=12345)
+    async def test_citation_count_uses_estimate(
+        self, mock_estimate: MagicMock
+    ) -> None:
         """Is citation_count read from Postgres's estimate, not COUNT(*)?
 
         An exact count of the citations table outlasts the request timeout
         in production, and the payload is only cached once it's built, so
         an exact count leaves the endpoint timing out on every request.
         """
-        CitationWithParentsFactory.create_batch(3)
-        table = Citation._meta.db_table
-        with connection.cursor() as cursor:
-            # The estimate is only populated once the table is analyzed.
-            cursor.execute(f"ANALYZE {connection.ops.quote_name(table)}")
-
-        with CaptureQueriesContext(connection) as ctx:
-            r = self.client.get(reverse("wiki_data"))
+        r = await self.async_client.get(reverse("wiki_data"))
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(
-            json.loads(r.content)["citation_count"], Citation.objects.count()
-        )
-        citation_counts = [
-            q["sql"]
-            for q in ctx.captured_queries
-            if "COUNT(" in q["sql"] and f'"{table}"' in q["sql"]
-        ]
-        self.assertEqual(citation_counts, [])
+        self.assertEqual(json.loads(r.content)["citation_count"], 12345)
+        mock_estimate.assert_called_once_with(Citation._meta.db_table)
 
     async def test_bust_cache_param(self) -> None:
         """Does ?bust_cache rebuild the cached response for staff only?
