@@ -1,3 +1,5 @@
+"""Factories for unmatched citations."""
+
 from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 

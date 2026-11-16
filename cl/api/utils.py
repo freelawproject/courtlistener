@@ -1,3 +1,5 @@
+"""Shared REST API helpers: serializers, filters, throttles, and usage logging."""
+
 import logging
 import time
 import warnings
@@ -227,6 +229,7 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """
 
     def to_html(self, request, queryset, view):
+        """Render no filter controls."""
         return ""
 
 
@@ -408,6 +411,7 @@ class NoEmptyFilterSet(FilterSet):
     def __init__(
         self, data=None, queryset=None, *, relationship=None, **kwargs
     ):
+        """Build the filterset, dropping empty parameters from ``data``."""
         # Remove any empty query parameters from the QueryDict. Fixes #2066
         if data:
             # Make a mutable copy so we can tweak it.
@@ -419,7 +423,13 @@ class NoEmptyFilterSet(FilterSet):
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
+    """Metadata that also describes the view's filters."""
+
     def determine_metadata(self, request, view):
+        """Add each filter's type and lookup types to the view's metadata.
+
+        The API root has no filterset, so its metadata is returned unchanged.
+        """
         metadata = super().determine_metadata(request, view)
         filters: OrderedDict[str, OrderedDict[str, Any]] = OrderedDict()
         if not hasattr(view, "filterset_class"):
@@ -519,12 +529,14 @@ class LoggingMixin:
     milestones = get_milestone_range("SM", "XXXL")
 
     def initial(self, request, *args, **kwargs):
+        """Set ``requested_at`` to now, for timing the request."""
         super().initial(request, *args, **kwargs)
 
         # For logging the timing in self.finalize_response
         self.requested_at = now()
 
     def finalize_response(self, request, response, *args, **kwargs):
+        """Log the request's usage stats unless the response is an exception."""
         response = super().finalize_response(
             request, response, *args, **kwargs
         )
@@ -639,6 +651,7 @@ class CacheListMixin:
     # Ensure that permissions are maintained and not cached!
     @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
+        """List results, cached for a minute per cookie and authorization."""
         return super().list(*args, **kwargs)
 
 
@@ -668,6 +681,11 @@ class NoFilterCacheListMixin:
     """
 
     def list(self, request, *args, **kwargs):
+        """List results, using and filling the cache for eligible requests.
+
+        V3 requests and requests with pagination, dynamic fields, or filters
+        are never cached. Cached responses last ten minutes.
+        """
         queryset = self.filter_queryset(self.get_queryset())
         has_filters = queryset.query.has_filters()
         is_count_request = (
@@ -1171,6 +1189,7 @@ class CloudFrontIdentMixin:
     """
 
     def get_ident(self, request):
+        """Identify the client by its CloudFront viewer address, if present."""
         return get_ratelimit_ident(request) or super().get_ident(request)
 
 
@@ -1219,6 +1238,7 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
     throttle_type = ThrottleType.API
 
     def __init__(self):
+        """Load the scope's default rates, which may be one rate or a list."""
         raw = self.THROTTLE_RATES.get(self.scope)
         if raw is None:
             self.rate = None
@@ -1239,6 +1259,7 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
         return self.scope == "user" and promo_doubling_applies(request.user)
 
     def get_cache_key(self, request, view):
+        """Get the throttle's cache key, with a separate key while the x2 promo applies."""
         key = super().get_cache_key(request, view)
         if key is None:
             return None
@@ -1261,6 +1282,11 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
         return rates
 
     def allow_request(self, request, view):
+        """Check the request against every effective rate.
+
+        Requests are allowed if the scope has no rate or there is no cache
+        key for the request.
+        """
         if self.rate is None:
             return True
 
@@ -1386,6 +1412,11 @@ class AlertThrottle(ExceptionalUserRateThrottle):
     throttle_type = ThrottleType.ALERTS
 
     def allow_request(self, request, view):
+        """Check the request against the user's configured alert rates.
+
+        This throttle always allows anonymous users and users without an
+        ALERTS override.
+        """
         if not request.user or not request.user.is_authenticated:
             return True
 
@@ -1449,6 +1480,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         return len(citation_objs)
 
     def get_cache_key_for_citations(self, request, view):
+        """Get the user's cache key for the citation throttle."""
         return self.cache_format % {
             "scope": "citations",
             "ident": request.user.pk,
@@ -1478,6 +1510,13 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         return overrides.get(request.user.username) or default_rates
 
     def throttle_request_by_citation_count(self, request, view):
+        """Throttle the request if the user's citations exceed any rate window.
+
+        If no window is exceeded, the request's citation count is recorded.
+
+        Raises:
+            Throttled: If any rate window has been exceeded.
+        """
         rates = self.get_citations_rate(request)
         parsed: list[tuple[int, int]] = [
             (n, d)
@@ -1524,6 +1563,11 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         self.cache.set(self.key, self.history, max_duration)
 
     def allow_request(self, request, view):
+        """Check the request against both the citation and request rates.
+
+        Raises:
+            Throttled: If the citation rate has been exceeded.
+        """
         self.throttle_request_by_citation_count(request, view)
         return super().allow_request(request, view)
 
@@ -1583,6 +1627,7 @@ class ApiUsageRateThrottle(ExceptionalUserRateThrottle):
     scope = "api_usage"
 
     def get_effective_rates(self, request) -> list[str]:
+        """Use the scope's default rates, ignoring per-user overrides."""
         return self.default_rates
 
 
@@ -1619,6 +1664,8 @@ class RECAPUploaders(DjangoModelPermissions):
 
 
 class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
+    """Let users with view access read and users with email upload access post."""
+
     perms_map = {
         "POST": ["%(app_label)s.has_recap_email_upload_access"],
         "GET": ["%(app_label)s.view_%(model_name)s"],
@@ -2031,6 +2078,8 @@ def update_webhook_event_after_request(
 
 
 class WebhookKeyType(TypedDict):
+    """The ``webhook`` key of a webhook event's payload."""
+
     event_type: int
     version: int
     date_created: str | None
@@ -2217,12 +2266,14 @@ class DynamicFieldsMixin:
     def get_filter_fields(
         self, params, level, source, default=None, include_parent=True
     ):
+        """Split a comma-separated fields parameter, or return ``default`` if it is missing."""
         try:
             return params.split(",")
         except AttributeError:
             return default
 
     def get_omit_fields(self, params, level, source):
+        """Split a comma-separated omit parameter, or return an empty list if it is missing."""
         return self.get_filter_fields(
             params, level, source, default=[], include_parent=False
         )
@@ -2248,6 +2299,7 @@ class NestedDynamicFieldsMixin(DynamicFieldsMixin):
 
     @property
     def prevent_nested_processing(self):
+        """Always False, so every nesting level filters its fields."""
         return False
 
     def get_filter_fields(
@@ -2325,6 +2377,8 @@ def compute_level(serializer) -> int:
 
 
 class RetrieveFilteredFieldsMixin:
+    """Serializer mixin that works out which model fields the ``fields`` and ``omit`` parameters leave out."""
+
     @staticmethod
     def _get_concrete_fields_for_model(model: type[Model]) -> list[str]:
         return [
@@ -2535,6 +2589,10 @@ class DeferredFieldsMixin:
     """
 
     def get_queryset(self) -> QuerySet:
+        """Get the queryset with the serializer's omitted fields deferred.
+
+        Querysets that use ``values()`` or ``annotate()`` are returned as is.
+        """
         qs = super().get_queryset()  # type: ignore[misc]
         # Skip for queries that uses values() or annotate()
         if qs.query.values_select or qs.query.annotations:

@@ -1,3 +1,5 @@
+"""Retry finding citations in opinions with unmatched citations."""
+
 from cl.citations.management.commands import find_citations
 from cl.citations.models import UnmatchedCitation
 from cl.lib.command_utils import VerboseCommand
@@ -13,6 +15,7 @@ class Command(find_citations.Command):
     timings: list[float] = []
 
     def add_arguments(self, parser):
+        """Add the resolve-failures flag and queue option, replacing find_citations' options."""
         VerboseCommand.add_arguments(self, parser)
         parser.add_argument(
             "--resolve-failures",

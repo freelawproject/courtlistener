@@ -1,3 +1,5 @@
+"""Filter out parentheticals that don't describe the cited case."""
+
 import re
 
 _MODIFIABLE = r"(omissions?|quotations?|quotes?|headings?|(quotations? )?marks|ellips.s|cites?|citations?|emphas.s|italics?|footnotes?|alterations?|punctuation|modifications?|brackets?|bracketed material|formatting)"
@@ -80,11 +82,13 @@ PARENTHETICAL_BLOCKLIST_REGEX = re.compile(
 
 
 def is_parenthetical_descriptive(text: str) -> bool:
+    """Check that a parenthetical, once cleaned, doesn't match the blocklist."""
     text = clean_parenthetical_text(text)
     return not re.match(PARENTHETICAL_BLOCKLIST_REGEX, text)
 
 
 def clean_parenthetical_text(text: str) -> str:
+    """Remove star page numbers, long dash runs, and excess whitespace from a parenthetical."""
     # Remove star page numbers (e.g. *389)
     text = re.sub(r"\* ?\d+", " ", text)
     # Remove weird "word ----- word" stuff (but don't screw up something like "123 U.S. ---")

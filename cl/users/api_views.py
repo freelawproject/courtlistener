@@ -1,3 +1,5 @@
+"""Htmx viewsets for managing a user's webhooks and viewing their events."""
+
 from http import HTTPStatus
 
 from django.core.paginator import Paginator
@@ -36,6 +38,7 @@ class WebhooksViewSet(ModelViewSet):
         return Webhook.objects.filter(user=user).order_by("date_created")
 
     def list(self, request, *args, **kwargs):
+        """Render the user's webhooks."""
         webhooks = self.get_queryset()
         return Response(
             {"webhooks": webhooks},
@@ -43,6 +46,7 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
+        """Delete a webhook and trigger a refresh of the webhook list."""
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
@@ -51,6 +55,7 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def retrieve(self, request, *args, **kwargs):
+        """Render the update form for a webhook."""
         instance = self.get_object()
         update = True
         form = WebhookForm(update, request.user, instance=instance)
@@ -60,6 +65,11 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def create(self, request, *args, **kwargs):
+        """Create a webhook for the user.
+
+        On success, responds with 201 and triggers a refresh of the webhook
+        list. Otherwise, re-renders the create form with its errors.
+        """
         update = False
         webhook = Webhook()
         form = WebhookForm(
@@ -80,6 +90,11 @@ class WebhooksViewSet(ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
+        """Update a webhook.
+
+        On success, responds with 200 and triggers a refresh of the webhook
+        list. Otherwise, re-renders the update form with its errors.
+        """
         instance = self.get_object()
         update = True
         form = WebhookForm(
@@ -101,6 +116,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def render_form(self, request, *args, **kwargs):
+        """Render an empty webhook create form."""
         webhook = Webhook()
         update = False
         form = WebhookForm(update, request.user, instance=webhook)
@@ -274,6 +290,7 @@ class WebhookEventViewSet(ModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
+        """Render a page of 20 of the user's filtered webhook events."""
         webhook_events = self.filter_queryset(self.get_queryset())
         page_number = self.request.query_params.get("page")
         paginator = Paginator(webhook_events, 20)

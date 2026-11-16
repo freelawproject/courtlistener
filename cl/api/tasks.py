@@ -1,3 +1,5 @@
+"""Celery tasks for sending webhook events."""
+
 import json
 
 from elasticsearch.dsl.response import Hit

@@ -1,3 +1,5 @@
+"""Specifications that declare how a merger merges each field of its model."""
+
 from __future__ import annotations
 
 import functools
@@ -48,9 +50,16 @@ type Transformer[Scrape, Params, Transformed] = Callable[
 
 
 class MergerSpecification[Scrape, Params, Output](ABC):
+    """Base for a merger class attribute that declares how one model field is merged.
+
+    Assigning a specification on a ``Merger`` subclass registers it under
+    the attribute's name, which must be a field of the merger's model.
+    """
+
     __slots__ = ("_name",)
 
     def __init__(self, /):
+        """Build a specification; its name is set when it is assigned on a merger."""
         self._name: str = ""
 
     def run_validation(
@@ -90,7 +99,9 @@ class MergerSpecification[Scrape, Params, Output](ABC):
         owner.__registry__.register(self)
 
     @abstractmethod
-    def transform(self, scrape: Scrape, params: Params) -> Output: ...
+    def transform(self, scrape: Scrape, params: Params) -> Output:
+        """Get the field's value from the scrape and params."""
+        ...
 
 
 class AttributeMerger[Scrape, Params, Transform](
@@ -538,6 +549,8 @@ class RelatedMerger[
     MergerSpecification[Scrape, Params, Transform],
     ABC,
 ):
+    """Base specification for merging a related object with its own merger."""
+
     __slots__ = "merger", "attribute"
 
     def __init__(
@@ -545,11 +558,13 @@ class RelatedMerger[
         merger: type[Merger[Child, RelatedParams[Params], RM]],
         attribute: AttributeMerger[Scrape, Params, Transform],
     ):
+        """Build the specification with the merger used for related objects and the attribute that gets their inputs."""
         super().__init__()
         self.merger: type[Merger[Child, RelatedParams[Params], RM]] = merger
         self.attribute: AttributeMerger[Scrape, Params, Transform] = attribute
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a relation to the related merger's model."""
         errors = super().validate(field)
         if not field.related_model:
             errors.append(
@@ -577,7 +592,9 @@ class RelatedMerger[
     @abstractmethod
     def merge(
         self, parent: RM | None, scrape: Scrape, params: Params
-    ) -> MergeResult: ...
+    ) -> MergeResult:
+        """Merge the related objects for ``parent`` from the scrape."""
+        ...
 
     @override
     def transform(self, scrape: Scrape, params: Params) -> Transform:
@@ -602,6 +619,7 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
         merger: type[Merger[Child, RelatedParams[Params], RM]],
         attribute: AttributeMerger[Scrape, Params, Child | None],
     ):
+        """Build the specification, assuming a forward relation until validated."""
         super().__init__(merger, attribute)
         self.forward: bool = True
         self.parent_name: str | None = None
@@ -655,6 +673,12 @@ def OneToOneRelation[Scrape, Params, Child, RM: Model](
     merger: type[Merger[Child, RelatedParams[Params], RM]],
     attribute: AttributeMerger[Scrape, Params, Child | None],
 ) -> Any:
+    """Declare a one-to-one relation merged with ``merger``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related model. An attribute that yields ``None`` skips the
+    relation.
+    """
     return OneToOneMerger(merger, attribute)
 
 
@@ -684,6 +708,7 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         *,
         strategy: ManyStrategy = ManyStrategy.REPLACE,
     ):
+        """Build the specification with how to treat existing related objects."""
         super().__init__(merger, attribute)
         self.strategy: ManyStrategy = strategy
 
@@ -754,6 +779,7 @@ class OneToManyMerger[Scrape, Params, Child, RM: Model](
     """
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a one-to-many relation to the merger's model."""
         errors = super().validate(field)
         if not field.one_to_many:
             errors.append(
@@ -768,6 +794,11 @@ def OneToManyRelation[Scrape, Params, Child, RM: Model](
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
+    """Declare a one-to-many relation merged with ``merger``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related objects' type.
+    """
     return OneToManyMerger(merger, attribute, strategy=strategy)
 
 
@@ -799,6 +830,17 @@ class ManyToManyMerger[
         strategy: ManyStrategy = ManyStrategy.REPLACE,
         through_strategy: ManyStrategy = ManyStrategy.REPLACE,
     ):
+        """Build the specification with an optional merger for the through rows.
+
+        Args:
+            merger: Merges the related objects.
+            attribute: Gets the related objects' inputs from the parent's
+                scrape and params.
+            through: Merges the through rows linking the parent to each
+                related object.
+            strategy: How to treat existing related objects.
+            through_strategy: How to treat existing through rows.
+        """
         super().__init__(merger, attribute, strategy=strategy)
         self.through: (
             type[Merger[Transform, ThroughParameters[Params], ThruM]] | None
@@ -806,6 +848,11 @@ class ManyToManyMerger[
         self.through_strategy: ManyStrategy = through_strategy
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field is a many-to-many relation.
+
+        With a through merger, also check that the field's through and
+        related models match the mergers' models.
+        """
         errors = super().validate(field)
         if not field.many_to_many:
             errors.append(
@@ -930,6 +977,11 @@ def ManyToManyRelation[Scrape, Params, Child, ThruM: Model, RM: Model](
     strategy: ManyStrategy = ManyStrategy.REPLACE,
     through_strategy: ManyStrategy = ManyStrategy.REPLACE,
 ) -> Any:
+    """Declare a many-to-many relation merged with ``merger`` and, optionally, ``through``.
+
+    Typed as ``Any`` so it can be assigned to a class attribute annotated
+    with the related objects' type.
+    """
     return ManyToManyMerger(
         merger,
         attribute,

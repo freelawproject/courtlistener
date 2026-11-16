@@ -1,3 +1,5 @@
+"""REST API permission classes."""
+
 import random
 
 from django.conf import settings
@@ -14,12 +16,19 @@ class IsOwner(permissions.BasePermission):
     """Only allow changes to visualizations by its owner."""
 
     def has_object_permission(self, request, view, obj):
+        """Allow safe methods for anyone and other methods for the object's user."""
         if request.method in permissions.SAFE_METHODS:
             return True
         return obj.user == request.user
 
 
 class V3APIPermission(permissions.BasePermission):
+    """Block anonymous and new users from the V3 API.
+
+    Only applies when ``BLOCK_NEW_V3_USERS`` is set. Users are checked
+    against Redis sets of known and blocked V3 users.
+    """
+
     r = get_redis_interface("STATS")
     v3_blocked_message = (
         "As a new user, you don't have permission to access V3 of the API. "
@@ -56,10 +65,12 @@ class V3APIPermission(permissions.BasePermission):
 
     @staticmethod
     def is_v3_api_request(request: Request) -> bool:
+        """Check if the request is for the V3 API."""
         return getattr(request, "version", None) == "v3"
 
     @staticmethod
     def check_request() -> bool:
+        """Randomly select about one in 50 requests for checking."""
         # Check 1 in 50 requests.
         if random.randint(1, 50) == 1:
             return True

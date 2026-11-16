@@ -1,3 +1,5 @@
+"""Annotate opinion HTML with links to the opinions it cites."""
+
 import html
 import re
 from collections.abc import Mapping, Sequence

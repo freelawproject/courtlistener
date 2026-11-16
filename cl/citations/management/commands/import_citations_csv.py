@@ -99,9 +99,12 @@ def process_csv_data(data: DataFrame, delay_s: float, reindex: bool) -> None:
 
 
 class Command(BaseCommand):
+    """Add citations from a CSV file to their clusters."""
+
     help = "Add citations to clusters using a csv file"
 
     def __init__(self, *args, **kwargs):
+        """Build the command."""
         super().__init__(*args, **kwargs)
 
     def existing_path_type(self, path: str):
@@ -120,6 +123,7 @@ class Command(BaseCommand):
         return path
 
     def add_arguments(self, parser):
+        """Add the CSV path, row range, limit, delay, and reindex options."""
         parser.add_argument(
             "--csv",
             type=self.existing_path_type,
@@ -160,6 +164,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Load the CSV's selected rows and add their citations.
+
+        Does nothing if the start row is after the end row or no rows are
+        selected.
+        """
         if options["end_row"] and options["start_row"] > options["end_row"]:
             logger.info("--start-row can't be greater than --end-row")
             return
