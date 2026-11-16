@@ -145,5 +145,4 @@ def get_cosine_similarity(left_str: str, right_str: str) -> float:
 
     if not denominator:
         return 0.0
-    else:
-        return float(numerator) / denominator
+    return float(numerator) / denominator

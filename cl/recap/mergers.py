@@ -724,7 +724,7 @@ def get_order_of_docket(
         if current_num == nxt_num:
             # Not sure if this is possible. No known instances in the wild.
             continue
-        elif current_num < nxt_num:
+        if current_num < nxt_num:
             order = "asc"
         elif current_num > nxt_num:
             order = "desc"
@@ -802,15 +802,14 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
                 current_date_filed, de["recap_sequence_index"]
             )
             continue
-        else:
-            # prev is None --> First item on the list; OR
-            # current is different than previous --> Changed date.
-            # Take same action: Reset the index & assign it.
-            de["recap_sequence_index"] = 1
-            de["recap_sequence_number"] = make_recap_sequence_number(
-                current_date_filed, de["recap_sequence_index"]
-            )
-            continue
+        # prev is None --> First item on the list; OR
+        # current is different than previous --> Changed date.
+        # Take same action: Reset the index & assign it.
+        de["recap_sequence_index"] = 1
+        de["recap_sequence_number"] = make_recap_sequence_number(
+            current_date_filed, de["recap_sequence_index"]
+        )
+        continue
 
     # Cleanup
     [de.pop("recap_sequence_index", None) for de in docket_entries]
@@ -1305,8 +1304,7 @@ async def add_docket_entries(
         )
         if response is None:
             continue
-        else:
-            de, de_created = response[0], response[1]
+        de, de_created = response[0], response[1]
 
         # Snapshot the merged fields so the save (and its ES indexing and
         # pghistory side effects) can be skipped when a re-uploaded entry is
@@ -2380,10 +2378,9 @@ async def merge_attachment_page_data(
                             await main_rd.asave()
                         found_main_rd = True
                         break
-                    else:
-                        # Unclear how to proceed and we don't want to associate
-                        # this data with the wrong case. We must punt.
-                        raise exc
+                    # Unclear how to proceed and we don't want to associate
+                    # this data with the wrong case. We must punt.
+                    raise exc
                 except RECAPDocument.DoesNotExist:
                     continue
         # Can't find the docket to associate with the attachment metadata
@@ -2393,17 +2390,16 @@ async def merge_attachment_page_data(
         # the attachment page.
         if not found_main_rd:
             raise exc
-        else:
-            rd = RECAPDocument(
-                docket_entry=main_rd.docket_entry,
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=main_rd.document_number,
-                description=migrated_description,
-                pacer_doc_id=pacer_doc_id,
-            )
-            rds_created.append(rd)
-            rds_affected.append(rd)
-            await rd.asave()
+        rd = RECAPDocument(
+            docket_entry=main_rd.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number=main_rd.document_number,
+            description=migrated_description,
+            pacer_doc_id=pacer_doc_id,
+        )
+        rds_created.append(rd)
+        rds_affected.append(rd)
+        await rd.asave()
 
     # We got the right item. Update/create all the attachments for
     # the docket entry.

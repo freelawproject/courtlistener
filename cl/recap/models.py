@@ -253,10 +253,9 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return f"ProcessingQueue {self.pk}: {self.court_id} case #{self.pacer_case_id} ({self.get_upload_type_display()})"
-        elif self.upload_type == UPLOAD_TYPE.PDF:
+        if self.upload_type == UPLOAD_TYPE.PDF:
             return f"ProcessingQueue: {self.pk}: {self.court_id}.{self.pacer_case_id or None}.{self.document_number or None}.{self.attachment_number or 0} ({self.get_upload_type_display()})"
-        else:
-            return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
+        return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
     class Meta:
         permissions = (

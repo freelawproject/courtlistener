@@ -54,7 +54,7 @@ def create_or_update_row(
             fjc_row = FjcIntegratedDatabase.objects.create(**values)
             logger.info("Added row: %s", fjc_row)
             break
-        elif existing_row_count == 1:
+        if existing_row_count == 1:
             existing_rows.update(date_modified=now(), **values)
             fjc_row = existing_rows[0]
             logger.info(f"Updated row: {fjc_row}")
@@ -246,10 +246,9 @@ class Command(VerboseCommand, CommandUtils):
                     raise NotImplementedError(
                         "This file type not implemented."
                     )
-                else:
-                    values = self.convert_to_cl_data_model(
-                        row, options["filetype"]
-                    )
+                values = self.convert_to_cl_data_model(
+                    row, options["filetype"]
+                )
                 create_or_update_row(values)
 
     def normalize_nulls(self, row):

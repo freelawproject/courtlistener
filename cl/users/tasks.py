@@ -30,8 +30,7 @@ def abort_or_retry(task, exc):
     """Abort a task if we've run out of retries. Else, retry it."""
     if task.request.retries == task.max_retries:
         return
-    else:
-        raise task.retry(exc=exc)
+    raise task.retry(exc=exc)
 
 
 @app.task(

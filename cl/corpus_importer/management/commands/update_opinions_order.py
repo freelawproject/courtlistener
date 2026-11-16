@@ -203,7 +203,7 @@ def sort_columbia_opinions(options: dict) -> None:
             # Only one opinion is shown, no need to order
             logger.info("Skipping opinion cluster with only one opinion.")
             continue
-        elif (
+        if (
             len(op_types) == 2
             and Opinion.LEAD in op_types
             and len(set(op_types)) == 2

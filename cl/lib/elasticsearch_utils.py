@@ -1678,22 +1678,20 @@ def build_child_docs_query(
         if not exclude_docs_for_empty_field:
             if cd["type"] == SEARCH_TYPES.OPINION:
                 return child_query_opinion
-            else:
-                if parties_has_parent_query:
-                    return parties_has_parent_query
-                return child_query_recap
-        else:
-            filters = [
-                Q("exists", field=exclude_docs_for_empty_field),
-            ]
+            if parties_has_parent_query:
+                return parties_has_parent_query
+            return child_query_recap
+        filters = [
+            Q("exists", field=exclude_docs_for_empty_field),
+        ]
 
-            if cd["type"] == SEARCH_TYPES.OPINION:
-                filters.append(child_query_opinion)
-            else:
-                if parties_has_parent_query:
-                    filters.append(parties_has_parent_query)
-                filters.append(child_query_recap)
-            return Q("bool", filter=filters)
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            filters.append(child_query_opinion)
+        else:
+            if parties_has_parent_query:
+                filters.append(parties_has_parent_query)
+            filters.append(child_query_recap)
+        return Q("bool", filter=filters)
 
     query_dict = child_docs_query.to_dict()
     if "filter" in query_dict["bool"]:

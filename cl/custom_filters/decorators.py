@@ -91,8 +91,7 @@ def check_honeypot[
             response = verify_honeypot_value(request, field_name)
             if response:
                 return response
-            else:
-                return func(request, *args, **kwargs)
+            return func(request, *args, **kwargs)
 
         return inner
 

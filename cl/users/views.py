@@ -700,10 +700,9 @@ def register(request: HttpRequest) -> HttpResponse:
             "register/register.html",
             {"form": form, "consent_form": consent_form, "private": False},
         )
-    else:
-        # The user is already logged in. Direct them to their settings page as
-        # a logical fallback
-        return HttpResponseRedirect(reverse("view_settings"))
+    # The user is already logged in. Direct them to their settings page as
+    # a logical fallback
+    return HttpResponseRedirect(reverse("view_settings"))
 
 
 @never_cache

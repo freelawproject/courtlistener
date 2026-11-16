@@ -46,21 +46,17 @@ class TimeStampField(serializers.Field):
                 return serializers.DateTimeField(
                     default_timezone=self.timezone
                 ).to_representation(value)
-            else:
-                if django_tz.is_naive(value):
-                    value = django_tz.make_aware(value, datetime.UTC)
-                return serializers.DateTimeField().to_representation(
-                    django_tz.localtime(value)
-                )
+            if django_tz.is_naive(value):
+                value = django_tz.make_aware(value, datetime.UTC)
+            return serializers.DateTimeField().to_representation(
+                django_tz.localtime(value)
+            )
         if isinstance(value, str):
             parsed_datetime = parser.parse(value)
             return serializers.DateTimeField(
                 default_timezone=self.timezone
             ).to_representation(parsed_datetime)
-        else:
-            raise serializers.ValidationError(
-                "Date or DateTime object expected."
-            )
+        raise serializers.ValidationError("Date or DateTime object expected.")
 
 
 class DateOrDateTimeField(serializers.Field):
@@ -70,10 +66,9 @@ class DateOrDateTimeField(serializers.Field):
         """Render datetimes and dates, returning other values unchanged."""
         if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
-        elif isinstance(value, datetime.date):
+        if isinstance(value, datetime.date):
             return serializers.DateField().to_representation(value)
-        else:
-            return value
+        return value
 
 
 class CoerceDateField(serializers.Field):

@@ -332,9 +332,8 @@ def es_save_document(
             document_content=doc,
             app_label=app_label,
         )
-    else:
-        self.request.chain = None
-        return None
+    self.request.chain = None
+    return None
 
 
 def document_fields_to_update(

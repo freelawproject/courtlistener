@@ -53,8 +53,7 @@ def get_school(schoolname, testing=False):
         school = schools[0]
         if school.is_alias_of is not None:
             return school.is_alias_of
-        else:
-            return school
+        return school
 
     # print('No exact matches: ' + schoolname + '. Running "contains".')
 
@@ -66,9 +65,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -95,9 +93,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple normalized matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -239,8 +236,7 @@ def get_suffix(suffstr):
     }
     if suffstr:
         return ""
-    else:
-        return suffdict[suffstr]
+    return suffdict[suffstr]
 
 
 def get_races(str_race):

@@ -82,12 +82,11 @@ class WebhooksViewSet(ModelViewSet):
                 status=HTTPStatus.CREATED,
                 headers={"HX-Trigger": "webhooksListChanged"},
             )
-        else:
-            return render(
-                request,
-                "includes/webhooks_htmx/webhooks-form-create.html",
-                {"webhook_form": form},
-            )
+        return render(
+            request,
+            "includes/webhooks_htmx/webhooks-form-create.html",
+            {"webhook_form": form},
+        )
 
     def update(self, request, *args, **kwargs):
         """Update a webhook.
@@ -107,12 +106,11 @@ class WebhooksViewSet(ModelViewSet):
                 status=HTTPStatus.OK,
                 headers={"HX-Trigger": "webhooksListChanged"},
             )
-        else:
-            return render(
-                request,
-                "includes/webhooks_htmx/webhooks-form-update.html",
-                {"webhook_form": form, "webhook_id": instance.pk},
-            )
+        return render(
+            request,
+            "includes/webhooks_htmx/webhooks-form-update.html",
+            {"webhook_form": form, "webhook_id": instance.pk},
+        )
 
     @action(detail=False, methods=["get"])
     def render_form(self, request, *args, **kwargs):

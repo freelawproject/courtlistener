@@ -551,12 +551,11 @@ class Command(ScraperCommand):
             if last_court_in_list:
                 if not daemon_mode:
                     break
-                else:
-                    logger.info(
-                        "All jurisdictions done. Looping back to "
-                        "the beginning because daemon mode is enabled."
-                    )
-                    i = 0
+                logger.info(
+                    "All jurisdictions done. Looping back to "
+                    "the beginning because daemon mode is enabled."
+                )
+                i = 0
             else:
                 i += 1
             time.sleep(wait)

@@ -50,10 +50,9 @@ def readable_dir(prospective_dir: str) -> str:
         )
     if os.access(prospective_dir, os.R_OK):
         return prospective_dir
-    else:
-        raise argparse.ArgumentTypeError(
-            f"readable_dir:{prospective_dir} is not a readable dir"
-        )
+    raise argparse.ArgumentTypeError(
+        f"readable_dir:{prospective_dir} is not a readable dir"
+    )
 
 
 def _argparse_volumes(volumes_arg: str) -> list[int]:

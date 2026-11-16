@@ -329,8 +329,7 @@ class CountESTasksTestCase(SimpleTestCase):
         # Call the task
         if immutable_signature:
             return task.s(*args, **kwargs)
-        else:
-            task.apply_async(args=args, kwargs=kwargs)
+        task.apply_async(args=args, kwargs=kwargs)
 
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""

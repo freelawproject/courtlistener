@@ -202,13 +202,12 @@ class ESList:
                 item.step,
             )
             return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
+        # Not slicing.
+        try:
+            return self._item_cache[item]
+        except IndexError:
+            # No results!
+            return []
 
     def append(self, p_object):
         """Lightly override the append method so we get items duplicated in our cache."""

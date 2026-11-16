@@ -65,13 +65,11 @@ def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
         if "." in name:
             attr, subname = name.split(".", 1)
             return deepgetattr(getattr(obj, attr), subname, default)
-        else:
-            return getattr(obj, name)
+        return getattr(obj, name)
     except AttributeError:
         if default is _UNSPECIFIED:
             raise
-        else:
-            return default
+        return default
 
 
 def chunks[T](
@@ -544,10 +542,9 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
     if sort_string == "dateFiled asc":
         return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
+    if sort_string == "dateFiled desc":
         return "entry_date_filed desc"
-    else:
-        return sort_string
+    return sort_string
 
 
 def append_value_in_cache(key: str, value: object) -> None:

@@ -101,7 +101,7 @@ def _make_glob_from_args(
             f"{page}.*.json",
         )
         return [glob_path]
-    elif reporter and volumes:
+    if reporter and volumes:
         glob_paths = []
         for volume in volumes:
             glob_path = os.path.join(
@@ -112,7 +112,7 @@ def _make_glob_from_args(
             )
             glob_paths.append(glob_path)
         return glob_paths
-    elif reporter:
+    if reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
         glob_path = os.path.join(
             settings.MEDIA_ROOT,

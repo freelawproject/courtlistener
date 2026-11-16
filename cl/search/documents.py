@@ -1517,14 +1517,14 @@ class ESRECAPDocument(
         """Get the full name of the docket's assigned judge, falling back to the assigned-to string."""
         if instance.docket_entry.docket.assigned_to:
             return instance.docket_entry.docket.assigned_to.name_full
-        elif instance.docket_entry.docket.assigned_to_str:
+        if instance.docket_entry.docket.assigned_to_str:
             return instance.docket_entry.docket.assigned_to_str
 
     def prepare_referredTo(self, instance):
         """Get the full name of the docket's referred judge, falling back to the referred-to string."""
         if instance.docket_entry.docket.referred_to:
             return instance.docket_entry.docket.referred_to.name_full
-        elif instance.docket_entry.docket.referred_to_str:
+        if instance.docket_entry.docket.referred_to_str:
             return instance.docket_entry.docket.referred_to_str
 
     def prepare_docket_id(self, instance):
@@ -1783,14 +1783,14 @@ class DocketDocument(
         """Get the full name of the assigned judge, falling back to the assigned-to string."""
         if instance.assigned_to:
             return instance.assigned_to.name_full
-        elif instance.assigned_to_str:
+        if instance.assigned_to_str:
             return instance.assigned_to_str
 
     def prepare_referredTo(self, instance):
         """Get the full name of the referred judge, falling back to the referred-to string."""
         if instance.referred_to:
             return instance.referred_to.name_full
-        elif instance.referred_to_str:
+        if instance.referred_to_str:
             return instance.referred_to_str
 
     def prepare_chapter(self, instance):
@@ -2406,26 +2406,25 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return html_decode(
                 strip_tags(instance.html_columbia.translate(null_map))
             )
-        elif instance.html_lawbox:
+        if instance.html_lawbox:
             return html_decode(
                 strip_tags(instance.html_lawbox.translate(null_map))
             )
-        elif instance.xml_harvard:
+        if instance.xml_harvard:
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
-        elif instance.xml_scan:
+        if instance.xml_scan:
             return html_decode(
                 strip_tags(instance.xml_scan.translate(null_map))
             )
-        elif instance.html_anon_2020:
+        if instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
             )
-        elif instance.html:
+        if instance.html:
             return html_decode(strip_tags(instance.html.translate(null_map)))
-        else:
-            return escape(instance.plain_text.translate(null_map))
+        return escape(instance.plain_text.translate(null_map))
 
     def prepare_cluster_id(self, instance):
         """Get the cluster's ID."""

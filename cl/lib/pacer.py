@@ -490,11 +490,10 @@ def normalize_attorney_contact(
             if m:
                 atty_info["fax"] = normalize_us_phone_number(clean_line)
             continue
-        else:
-            m = phone_digits_re.search(clean_line)
-            if m:
-                atty_info["phone"] = normalize_us_phone_number(clean_line)
-                continue
+        m = phone_digits_re.search(clean_line)
+        if m:
+            atty_info["phone"] = normalize_us_phone_number(clean_line)
+            continue
 
         # First line containing an ampersand? These are usually law firm names.
         if "&" in line and i == 0:

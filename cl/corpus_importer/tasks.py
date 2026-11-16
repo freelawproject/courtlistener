@@ -814,14 +814,13 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
-        else:
-            msg = (
-                "Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None
+        msg = (
+            "Ran into unknown HTTPError while getting PDF: "
+            f"{exc.response.status_code}. Aborting."
+        )
+        logger.error(msg)
+        self.request.chain = None
+        return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -2227,11 +2226,10 @@ def get_attachment_page_by_rd(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting."
-            logger.error(msg, exc.response.status_code)
-            self.request.chain = None
-            return None
+        msg = "Ran into unknown HTTPError. %s. Aborting."
+        logger.error(msg, exc.response.status_code)
+        self.request.chain = None
+        return None
     except RequestError as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)

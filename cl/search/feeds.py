@@ -45,8 +45,7 @@ def get_item(item):
     """Normalize grouped and non-grouped results to return the item itself."""
     if "doclist" in item:
         return item["doclist"]["docs"][0]
-    else:
-        return item
+    return item
 
 
 def cleanup_control_chars(
@@ -185,10 +184,9 @@ class SearchFeed(Feed):
             if not is_naive(entry_date):
                 # Handle non-naive dates
                 return midnight_pt(entry_date)
-            else:
-                return localize_naive_datetime_to_court_timezone(
-                    get_item(item)["court_id"], entry_date
-                )
+            return localize_naive_datetime_to_court_timezone(
+                get_item(item)["court_id"], entry_date
+            )
         except KeyError:
             # Get pub_date for Opinions
             return midnight_pt(get_item(item)["dateFiled"])
@@ -281,7 +279,7 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def get_object(self, request):
         """Use no object, since the feed covers every court."""
-        return None
+        return
 
     def items(self, obj):
         """Do a match all search query. Return the first 20 results."""

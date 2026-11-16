@@ -697,12 +697,12 @@ class Command(VerboseCommand):
         """
         if not opts.get("date_start") and not opts.get("date_end"):
             return True
-        elif not opts.get("date_start") or not opts.get("date_end"):
+        if not opts.get("date_start") or not opts.get("date_end"):
             logger.error(
                 "Both --date-start and --date-end must be specified together."
             )
             return False
-        elif opts.get("date_start") > opts.get("date_end"):
+        if opts.get("date_start") > opts.get("date_end"):
             logger.error(
                 "--date-end must be greater than or equal to --date-start."
             )
