@@ -2338,11 +2338,11 @@ class TexasDocketEntrySourceTest(TestCase):
                 )
 
     def test_only_sources_that_send_alerts_opt_in(self) -> None:
-        """Do RECAP and SCOTUS, whose mergers send docket alerts, opt in, while Texas keeps the default of no alerts menu?"""
+        """Do RECAP, SCOTUS and Texas, whose mergers send docket alerts, opt in?"""
         cases = {
             "RECAP": (docket_entry_sources.RECAP, True),
             "SCOTUS": (docket_entry_sources.SCOTUS, True),
-            "TEXAS": (docket_entry_sources.TEXAS, False),
+            "TEXAS": (docket_entry_sources.TEXAS, True),
         }
         for name, (source, expected) in cases.items():
             with self.subTest(source=name):
@@ -2604,13 +2604,13 @@ class TexasDocketPageTest(TestCase):
                 self.assertNotIn("Buy on PACER", content)
 
     def test_alerts_menu_follows_supports_docket_alerts(self) -> None:
-        """Is the alerts menu hidden for Texas, whose alerts aren't sent yet, and shown again as soon as its source supports docket alerts, in both stacks?"""
-        with_alerts = replace(
-            docket_entry_sources.TEXAS, supports_docket_alerts=True
+        """Does each stack show the alerts menu for Texas, whose mergers send docket alerts, and hide it for a source that doesn't?"""
+        without_alerts = replace(
+            docket_entry_sources.TEXAS, supports_docket_alerts=False
         )
         cases = (
-            ("texas", docket_entry_sources.TEXAS, False),
-            ("texas with alerts", with_alerts, True),
+            ("texas", docket_entry_sources.TEXAS, True),
+            ("source without alerts", without_alerts, False),
         )
         for name, source, shows_menu in cases:
             for new_design in (False, True):
@@ -3127,10 +3127,10 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
                 self.assertEqual(r.status_code, status)
 
     @override_settings(
-        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag_and_offers_no_alerts"
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag"
     )
-    def test_texas_docket_needs_its_flag_and_offers_no_alerts(self) -> None:
-        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown without the alerts button, since Texas doesn't send docket alerts yet?"""
+    def test_texas_docket_needs_its_flag(self) -> None:
+        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown with the alerts button, since Texas sends docket alerts?"""
         # Sync, since override_flag queries the DB when it's entered.
         self.client.login(username="pandora", password="password")
         url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
@@ -3140,9 +3140,29 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         with override_flag("texas_docket_page", active=True):
             r = self.client.get(url)
             self.assertEqual(r.status_code, HTTPStatus.OK)
-            self.assertNotIn(
+            self.assertIn(
                 'data-enable-message="Get Alerts"', r.content.decode()
             )
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_source_without_alerts_offers_no_button"
+    )
+    @override_flag("texas_docket_page", active=True)
+    def test_source_without_alerts_offers_no_button(self) -> None:
+        """Does the page leave out the alerts button for a source that doesn't send docket alerts?"""
+        self.client.login(username="pandora", password="password")
+        without_alerts = replace(
+            docket_entry_sources.TEXAS, supports_docket_alerts=False
+        )
+        url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
+        with mock.patch.dict(
+            docket_entry_sources.BY_COURT_ID, {"tex": without_alerts}
+        ):
+            r = self.client.get(url)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotIn(
+            'data-enable-message="Get Alerts"', r.content.decode()
+        )
 
     @override_settings(
         WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_share_link_on_the_docket_page"

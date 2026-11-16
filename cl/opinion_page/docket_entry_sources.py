@@ -1026,6 +1026,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     ),
     admin_document_label="Texas Document",
     launch_flag="texas_docket_page",
+    supports_docket_alerts=True,
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
