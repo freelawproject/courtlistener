@@ -67,7 +67,8 @@ class OAuthMetadataTest(APITestCase):
         # Dynamic Client Registration is retired, so nothing to advertise.
         self.assertNotIn("registration_endpoint", body)
 
-    def test_registration_endpoint_is_gone(self):
+    def test_registration_endpoint_is_gone(self) -> None:
+        """Retired registration paths must return 404."""
         for path in ("/o/register/", "/o/register/some-client-id/"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.post(path).status_code, 404)
@@ -87,7 +88,7 @@ class OAuthMetadataTest(APITestCase):
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
-    """Non-DCR code paths (admin, shell, direct ORM) must be held to the same loopback-only policy for http:// redirect URIs that the DCR serializer enforces. This exercises the pre_save signal in ``cl.oauth.signals``."""
+    """Every save path (admin, shell, direct ORM) must enforce the loopback-only policy for http:// redirect URIs, via the pre_save signal in ``cl.oauth.signals``."""
 
     def _make_app(self, redirect_uris: str) -> Application:
         return Application(
