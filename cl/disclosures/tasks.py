@@ -1,3 +1,5 @@
+"""Celery tasks and helpers for importing financial disclosures."""
+
 import datetime
 
 import requests
@@ -137,6 +139,7 @@ class ChristmasError(Exception):
     """Error class for representing a Christmas date being found."""
 
     def __init__(self, message: str) -> None:
+        """Build the error with a message."""
         self.message = message
 
 

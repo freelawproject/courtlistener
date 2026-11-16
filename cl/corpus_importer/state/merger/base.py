@@ -1,3 +1,5 @@
+"""Declarative mergers that write scraped data into Django models."""
+
 from __future__ import annotations
 
 import json
@@ -57,6 +59,8 @@ def auto_now_fields(model: type[Model]) -> tuple[str, ...]:
 
 
 class MergerSpecRegistry[Scrape, Params]:
+    """A merger's specifications, by field name, grouped by kind."""
+
     def __init__(
         self,
         *,
@@ -66,6 +70,7 @@ class MergerSpecRegistry[Scrape, Params]:
         one_to_one: dict[str, OneToOneMerger[Scrape, Params, Any, Model]]
         | None = None,
     ):
+        """Build a registry, empty unless specifications are given."""
         self.related: dict[
             str, RelatedMerger[Scrape, Params, Any, Any, Model]
         ] = related or {}
@@ -122,11 +127,13 @@ class MergerSpecRegistry[Scrape, Params]:
         return errors
 
     def update(self, other: Self):
+        """Add another registry's specifications to this one in place."""
         self.related.update(other.related)
         self.attr.update(other.attr)
         self.one_to_one.update(other.one_to_one)
 
     def register(self, spec: MergerSpecification[Scrape, Params, Any]):
+        """Add a specification under its name, by kind; unknown kinds are logged."""
         match spec:
             case AttributeMerger():
                 self.attr[spec._name] = spec
@@ -140,10 +147,13 @@ class MergerSpecRegistry[Scrape, Params]:
         self._transformers[spec._name] = spec.transform
 
     def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
+        """Get every specification's transformed value, by field name."""
         return {k: v(scrape, params) for k, v in self._transformers.items()}
 
 
 class MergerMeta(type):
+    """Metaclass that gives each merger class its own copy of its bases' specifications."""
+
     @classmethod
     def __prepare__(
         cls,
@@ -235,6 +245,11 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
 
     @classmethod
     def guarantee_valid(cls):
+        """Raise if the merger's configuration has errors.
+
+        Raises:
+            TypeError: If validation found any errors, listing all of them.
+        """
         if cls.errors:
             raise TypeError(
                 "Invalid merger configuration for {}:\n{}".format(
@@ -263,6 +278,16 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
         params: Params | Sequence[Params],
         manager: Manager[M] | None = None,
     ) -> tuple[MergeResult, list[Self]]:
+        """Build a merger for each scrape, sharing one params value or taking one per scrape.
+
+        Mergers that use the natural key have their existing objects looked
+        up in a single query. When scrapes share a natural key, the earlier
+        merger is marked as failed and the failure is added to the result.
+        Natural keys matching several objects are also marked as failed.
+
+        Returns:
+            The result of setting up the mergers, and the mergers.
+        """
         result = MergeResult.unnecessary()
         if isinstance(params, Sequence):
             if len(params) != len(scrapes):
@@ -567,6 +592,11 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
         return result
 
     def create_new(self) -> tuple[M, MergeResult]:
+        """Create the object from the transformed attributes, merging its forward one-to-one relations first.
+
+        Returns:
+            The created object and the combined result of the creates.
+        """
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.__registry__.one_to_one.items():

@@ -1,3 +1,5 @@
+"""Scrape and save new opinions from court sites with Juriscraper."""
+
 import signal
 import sys
 import time
@@ -233,14 +235,18 @@ def save_everything(
 
 
 class Command(ScraperCommand):
+    """Scrape new opinions from one or more courts, once or in a loop."""
+
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
     juriscraper_module_type = "opinions"
     scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
+        """Build the command with the default output streams and colors, ignoring the arguments."""
         super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
+        """Add the daemon, rate, and full crawl options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--daemon",
@@ -278,6 +284,12 @@ class Command(ScraperCommand):
         ocr_available: bool = True,
         backscrape: bool = False,
     ):
+        """Ingest the cases on a parsed site page.
+
+        Stops early if the page hash is unchanged (unless ``full_crawl``) or
+        too many consecutive duplicates are found. The page hash is saved afterwards
+        unless this is a full crawl or a case had bad content.
+        """
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -425,6 +437,13 @@ class Command(ScraperCommand):
         dup_checker: DupChecker,
         court: Court,
     ):
+        """Save a scraped case's docket, cluster, opinions, and citations, then queue extraction of each opinion.
+
+        Raises:
+            SingleDuplicateError: If an opinion is a duplicate.
+            ConsecutiveDuplicatesError: If the scraper should stop because
+                of duplicates.
+        """
         opinions_content = await self.get_opinions_content(
             item, site, court, dup_checker, next_case_date
         )
@@ -476,6 +495,18 @@ class Command(ScraperCommand):
             await self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
+        """Scrape each requested court with an enabled opinion scraper, waiting between courts.
+
+        The wait between enabled courts is ``--rate`` minutes divided by the
+        number of requested courts.
+
+        In daemon mode, loops over the courts until SIGTERM is received.
+        Errors while scraping one court are reported without stopping the
+        others.
+
+        Raises:
+            CommandError: If no scraper modules can be imported.
+        """
         super().handle(*args, **options)
         global die_now
 

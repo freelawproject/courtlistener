@@ -1,3 +1,5 @@
+"""Set the ordering key of sub-opinions in Harvard and Columbia clusters."""
+
 import argparse
 import re
 import time
@@ -231,12 +233,20 @@ def sort_columbia_opinions(options: dict) -> None:
 
 
 class Command(VerboseCommand):
+    """Sort the sub-opinions of Harvard or Columbia clusters."""
+
     help = "Add ordering Key for sub opinions"
 
     def __init__(self, *args, **kwargs):
+        """Build the command."""
         super().__init__(*args, **kwargs)
 
     def valid_actions(self, s):
+        """Parse an action name into its function.
+
+        Raises:
+            argparse.ArgumentTypeError: If the action is unknown.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -247,6 +257,7 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        """Add the skip-until, limit, action, delay, and XML directory options."""
         parser.add_argument(
             "--skip-until",
             help="Specific cluster id to skip until",
@@ -282,6 +293,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action."""
         super().handle(*args, **options)
         options["action"](options)
 

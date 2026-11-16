@@ -1,3 +1,5 @@
+"""REST API viewsets for search models and search queries."""
+
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import cast
@@ -85,6 +87,8 @@ from cl.search.models import (
 class OriginatingCourtInformationViewSet(
     DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for originating court information."""
+
     serializer_class = OriginalCourtInformationSerializer
     permission_classes = [
         DjangoModelPermissions,
@@ -104,6 +108,8 @@ class OriginatingCourtInformationViewSet(
 class BankruptcyInformationViewSet(
     NoFilterCacheListMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for bankruptcy information."""
+
     serializer_class = BankruptcyInformationSerializer
     permission_classes = [
         DjangoModelPermissions,
@@ -141,6 +147,8 @@ class DocketViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for dockets."""
+
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
@@ -184,6 +192,8 @@ class DocketEntryViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for docket entries, with their RECAP documents."""
+
     permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
@@ -222,6 +232,8 @@ class RECAPDocumentViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for RECAP documents."""
+
     permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
     filterset_class = RECAPDocumentFilter
@@ -244,6 +256,8 @@ class RECAPDocumentViewSet(
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for courts other than testing courts, allowing deep pagination."""
+
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
     permission_classes = [
@@ -272,6 +286,8 @@ class OpinionClusterViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for opinion clusters, redirecting deleted clusters."""
+
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
@@ -305,6 +321,14 @@ class OpinionClusterViewSet(
     ).order_by("-id")
 
     def retrieve(self, request, *args, **kwargs):
+        """Get a cluster, or follow the redirection for a deleted cluster.
+
+        Clusters deleted because they were sealed get a 410 response, and
+        other redirected clusters get a 301 to their new cluster.
+
+        Raises:
+            Http404: If the cluster doesn't exist and has no redirection.
+        """
         try:
             # First, try to get the object normally
             return super().retrieve(request, *args, **kwargs)
@@ -344,6 +368,8 @@ class OpinionViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for opinions."""
+
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
@@ -382,6 +408,8 @@ class OpinionsCitedViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for citations between opinions."""
+
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
     permission_classes = [
@@ -396,6 +424,8 @@ class OpinionsCitedViewSet(
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for tags."""
+
     permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = TagSerializer
     # Default cursor ordering key
@@ -410,11 +440,14 @@ class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 
 
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):
+    """V3 search API endpoint."""
+
     # Default permissions use Django permissions, so here we AllowAny,
     # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny, V3APIPermission)
 
     def list(self, request, *args, **kwargs):
+        """Search and return a page of results, or the form's errors with a 400 status."""
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -485,6 +518,8 @@ class _ESResultSerializers:
 
 
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
+    """V4 search API endpoint, with semantic search for posted embeddings."""
+
     # Search results aren't backed by a model, so the project-wide
     # DjangoModelPermissions default doesn't apply. Require authentication
     # to prevent anonymous crawlers from spreading expensive queries across
@@ -587,6 +622,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         return paginator.get_paginated_response(result_list, cached_response)
 
     def list(self, request, *args, **kwargs):
+        """Search and return a page of results, or the form's errors with a 400 status."""
         search_form = SearchForm(request.GET, request=request)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -598,6 +634,15 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         )
 
     def create(self, request, *args, **kwargs):
+        """Run a semantic opinion search with the posted embedding.
+
+        Invalid query parameters or body return their errors with a 400
+        status.
+
+        Raises:
+            ValidationError: If the search type isn't opinions, ``semantic``
+                isn't set, or no embedding was posted.
+        """
         # Validate query parameters (from URL) and request body (JSON)
         query_params = SearchForm(request.GET, request=request)
         request_body = VectorSerializer(data=request.data)

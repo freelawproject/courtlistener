@@ -1,3 +1,5 @@
+"""Helpers for parsing URLs and validating redirects."""
+
 from ada_url import URL
 from django.conf import settings
 from django.http import Http404, HttpRequest

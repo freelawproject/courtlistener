@@ -1,3 +1,5 @@
+"""Score how descriptive a parenthetical is."""
+
 import re
 from math import log
 

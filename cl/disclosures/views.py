@@ -1,3 +1,5 @@
+"""Views for searching and viewing financial disclosures."""
+
 import operator
 from functools import reduce
 
