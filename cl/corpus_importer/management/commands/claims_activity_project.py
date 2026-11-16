@@ -173,7 +173,7 @@ def make_csv_file() -> None:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        if not data == {} and not data == []:
+        if data != {} and data != []:
             dataframe = pd.DataFrame()
             for row in data:
                 # Create rows for claims without attachments.

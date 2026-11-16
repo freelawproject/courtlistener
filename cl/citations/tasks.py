@@ -253,7 +253,7 @@ def store_opinion_citations_and_update_parentheticals(
     citation_resolutions: dict[
         MatchedResourceType, list[SupportedCitationType]
     ] = {}
-    has_single_segment = True if len(segments) == 1 else False
+    has_single_segment = len(segments) == 1
     for kwarg_segment in segments:
         # Extract citations
         logger.debug("Extracting citations for opinion %s", opinion.pk)

@@ -681,7 +681,7 @@ def make_mag_bk_judge(item, testing=False):
     if not pd.isnull(item["GENDER"]):
         gender = get_gender(item["GENDER"])
 
-    if not item["NAME_SUFFIX"] == "":
+    if item["NAME_SUFFIX"] != "":
         suffix = get_suffix(item["NAME_SUFFIX"])
     else:
         suffix = ""

@@ -242,16 +242,14 @@ def is_doc_common_header(line: str) -> bool:
         return True
     if line.startswith(bad_starters):
         return True
-    if (
+    return bool(
         PAGINATION_RE.search(line)
         or PAGINATION_COLON_RE.search(line)
         or doc_filed_re.search(line)
         or date_re.search(line)
         or time_re.search(line)
         or received_re.search(line)
-    ):
-        return True
-    return False
+    )
 
 
 def needs_ocr(content: str, page_count: int | None = None) -> bool:

@@ -323,7 +323,7 @@ class School(AbstractDateTimeModel):
     @property
     def is_alias(self):
         """Whether the school is an alias of another school."""
-        return True if self.is_alias_of is not None else False
+        return self.is_alias_of is not None
 
     def save(self, *args, **kwargs):
         """Validate and save the school."""

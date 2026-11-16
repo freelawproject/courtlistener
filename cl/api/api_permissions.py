@@ -72,9 +72,7 @@ class V3APIPermission(permissions.BasePermission):
     def check_request() -> bool:
         """Randomly select about one in 50 requests for checking."""
         # Check 1 in 50 requests.
-        if random.randint(1, 50) == 1:
-            return True
-        return False
+        return random.randint(1, 50) == 1
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         """Check if the user has permission to access the V3 API.

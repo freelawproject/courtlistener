@@ -190,9 +190,7 @@ class UserProfile(models.Model):
         """
         # Don't check if the email is confirmed. They can't log in if so.
         domain = self.user.email.split("@")[1]
-        if domain in settings.UNLIMITED_DOCKET_ALERT_EMAIL_DOMAINS:
-            return True
-        return False
+        return domain in settings.UNLIMITED_DOCKET_ALERT_EMAIL_DOMAINS
 
     def can_make_another_alert(self, recap_installed: bool = False) -> bool:
         """Can the user make another alert?
@@ -370,10 +368,7 @@ class EmailFlag(AbstractDateTimeModel):
         Returns:
             bool: True if so, False if not.
         """
-        if now() < self.next_retry_date:
-            return True
-        else:
-            return False
+        return now() < self.next_retry_date
 
     def __str__(self) -> str:
         return f"{self.get_flag_type_display()} for {self.email_address}"

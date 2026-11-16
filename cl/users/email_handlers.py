@@ -383,9 +383,7 @@ def under_backoff_waiting_period(email_address: str) -> bool:
         email_address=email_address,
         flag_type=FLAG_TYPES.BACKOFF,
     ).last()
-    if backoff_event.under_waiting_period if backoff_event else False:
-        return True
-    return False
+    return bool(backoff_event.under_waiting_period if backoff_event else False)
 
 
 def is_not_email_banned(email_address: str) -> bool:
@@ -401,9 +399,7 @@ def is_not_email_banned(email_address: str) -> bool:
         email_address=email_address,
         flag_type=FLAG_TYPES.BAN,
     )
-    if not banned_email.exists():
-        return True
-    return False
+    return bool(not banned_email.exists())
 
 
 def add_bcc_random(

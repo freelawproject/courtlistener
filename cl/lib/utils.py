@@ -283,12 +283,16 @@ def check_query_for_disallowed_wildcards(query_string: str) -> bool:
     # Match any term with less than 3 chars that starts with !
     root_expander_short_term = r"(?:^|\s)\![^\s]{1,2}(?=$|\s)"
 
-    if any(
-        re.search(pattern, query_string)
-        for pattern in [wildcard_start, wildcard_end, root_expander_short_term]
-    ):
-        return True
-    return False
+    return bool(
+        any(
+            re.search(pattern, query_string)
+            for pattern in [
+                wildcard_start,
+                wildcard_end,
+                root_expander_short_term,
+            ]
+        )
+    )
 
 
 def perform_special_character_replacements(query_string: str) -> str:

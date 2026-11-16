@@ -490,7 +490,7 @@ def email_search_results(self: Task, user_id: int, query: str):
         for row in search_results:
             if csv_transformations:
                 for key, function in csv_transformations.items():
-                    row[key] = function(row[key] if key in row else row)
+                    row[key] = function(row.get(key, row))
 
             clean_dict = {
                 camel_to_snake(key): value for key, value in row.items()

@@ -683,11 +683,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             continue
 
         alert_triggered_id = alert_triggered.pk
-        case_only_alert = (
-            True
-            if alert_triggered.alert_type == SEARCH_TYPES.DOCKETS
-            else False
-        )
+        case_only_alert = alert_triggered.alert_type == SEARCH_TYPES.DOCKETS
         if case_only_alert and has_document_alert_hit_been_triggered(
             r, alert_triggered_id, "co", document_content_copy["docket_id"]
         ):

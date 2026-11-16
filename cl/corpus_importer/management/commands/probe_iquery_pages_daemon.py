@@ -107,7 +107,7 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         court_ids = get_iquery_pacer_courts_to_scrape()
         iterations_completed = 0
         r = get_redis_interface("CACHE")
-        testing = True if testing_iterations else False
+        testing = bool(testing_iterations)
         latest_case_ids = get_latest_pacer_case_id_for_courts(court_ids, r)
 
         while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:

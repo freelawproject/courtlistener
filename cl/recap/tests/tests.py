@@ -5989,9 +5989,9 @@ class RecapDocketTaskTest(TestCase):
                 self.assertEqual(
                     d.nature_of_suit,
                     (
-                        nature_of_suit_from_row
-                        if not initial_nature_of_suit
-                        else initial_nature_of_suit
+                        initial_nature_of_suit
+                        if initial_nature_of_suit
+                        else nature_of_suit_from_row
                     ),
                     msg="The nature_of_suit does not match.",
                 )
@@ -6032,9 +6032,9 @@ class RecapDocketTaskTest(TestCase):
                 self.assertEqual(
                     d.nature_of_suit,
                     (
-                        incoming_nature_of_suit
-                        if not initial_nature_of_suit
-                        else initial_nature_of_suit
+                        initial_nature_of_suit
+                        if initial_nature_of_suit
+                        else incoming_nature_of_suit
                     ),
                     msg="The nature_of_suit does not match.",
                 )

@@ -178,7 +178,7 @@ def check_for_match(new_case: str, possibilities: list[str]) -> bool:
         match = difflib.get_close_matches(
             new_case, possibilities, n=1, cutoff=0.7
         )[0]
-        return True if match else False
+        return bool(match)
     except IndexError:
         # No good matches.
         return False
@@ -632,7 +632,7 @@ def add_opinions(
             author_str = ""
             author_tag_str = ""
 
-        per_curiam = True if author_tag_str == "Per Curiam" else False
+        per_curiam = author_tag_str == "Per Curiam"
         # If Per Curiam is True set author string to Per Curiam
         if per_curiam:
             author_str = "Per Curiam"

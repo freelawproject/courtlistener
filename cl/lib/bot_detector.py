@@ -13,10 +13,7 @@ def base_bot_matcher(
     is in the user agent for the request provided.
     """
     ua = request.headers.get("user-agent", "Testing U-A")
-    for bot in known_bots:
-        if bot in ua.lower():
-            return True
-    return False
+    return any(bot in ua.lower() for bot in known_bots)
 
 
 def is_bot(request: HttpRequest) -> bool:

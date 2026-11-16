@@ -175,9 +175,7 @@ def is_legacy_template(path: str) -> bool:
         return False
     if is_redesign_template(path) or is_cotton_component(path):
         return False
-    if path.endswith("new_base.html"):
-        return False
-    return True
+    return not path.endswith("new_base.html")
 
 
 def is_input_css(path: str) -> bool:

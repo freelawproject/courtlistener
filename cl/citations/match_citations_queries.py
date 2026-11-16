@@ -212,7 +212,7 @@ def es_search_db_for_full_citation(
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
 
-    citation_found = True if len(results) > 0 else False
+    citation_found = len(results) > 0
     if len(results) == 1:
         return results, citation_found
     if len(results) > 1:

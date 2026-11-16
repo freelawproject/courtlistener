@@ -82,14 +82,13 @@ def removeLeftMargin(s: str) -> str:
     lines = s.split("\n")
     marginSizes = []
     for line in lines:
-        if len(line) > 0:
-            if line[0] == " ":
-                # if the line has length and starts with a space
-                newlength = len(line.lstrip())
-                oldlength = len(line)
-                diff = oldlength - newlength
-                if diff != 0:
-                    marginSizes.append(oldlength - newlength)
+        if len(line) > 0 and line[0] == " ":
+            # if the line has length and starts with a space
+            newlength = len(line.lstrip())
+            oldlength = len(line)
+            diff = oldlength - newlength
+            if diff != 0:
+                marginSizes.append(oldlength - newlength)
 
     mode = max([marginSizes.count(y), y] for y in marginSizes)[1]
     lines_out = []

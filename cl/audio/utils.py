@@ -83,7 +83,4 @@ def transcription_was_hallucinated(audio: Audio) -> bool:
     expected_number_of_unique_words = intercept + linear_coef * audio.duration
 
     # Accepts a variation up to 50% less from the line of best fit
-    if unique_words > expected_number_of_unique_words * tolerance:
-        return False
-
-    return True
+    return not unique_words > expected_number_of_unique_words * tolerance

@@ -55,8 +55,7 @@ def clean_up_duplicate_appellate_entries(
             # Look for docket entries that use the pacer_doc_id as number or
             # unnumbered entries.
             des = docket.docket_entries.filter(
-                Q(entry_number__gt=10_000_000)
-                | Q(entry_number=None and ~Q(description__exact=""))
+                Q(entry_number__gt=10_000_000) | Q(entry_number=None)
             )
             for de in des.iterator():
                 related_rd = de.recap_documents.filter(

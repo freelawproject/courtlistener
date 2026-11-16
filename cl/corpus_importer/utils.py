@@ -1065,10 +1065,7 @@ def content_too_different(
     """
     if len(file_characters) > 10000:
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)
-        if cosine_sim > 0.97:
-            return False
-        else:
-            return True
+        return not cosine_sim > 0.97
 
     percent_match = compare_documents(file_characters, cl_characters)
     if percent_match < 60:
@@ -1108,9 +1105,7 @@ def case_names_dont_overlap(
     file_case = f"{case_name_full} {case_name_abbreviation}"
     overlap = winnow_case_name(case.case_name) & winnow_case_name(file_case)
 
-    if not overlap:
-        return True
-    return False
+    return bool(not overlap)
 
 
 def cosine_similarity_too_different(
@@ -1138,9 +1133,7 @@ def cosine_similarity_too_different(
         similarities.append(similarity)
     max_similarity = max(similarities)
 
-    if max_similarity < 0.3:
-        return True
-    return False
+    return max_similarity < 0.3
 
 
 def has_too_similar_citation(

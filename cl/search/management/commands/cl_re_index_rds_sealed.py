@@ -123,7 +123,7 @@ class Command(VerboseCommand):
         chunk = []
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
-        use_streaming_bulk = True if testing_mode else False
+        use_streaming_bulk = bool(testing_mode)
         # Indexing Parent and their child documents.
         for item_id in items:
             chunk.append(item_id)

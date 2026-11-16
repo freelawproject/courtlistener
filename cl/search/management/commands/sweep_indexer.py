@@ -371,7 +371,7 @@ class Command(VerboseCommand):
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
-        use_streaming_bulk = True if testing_mode else False
+        use_streaming_bulk = bool(testing_mode)
         document_type, search_type, es_document = task_params
         for item in items:
             if isinstance(item, tuple):

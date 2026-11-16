@@ -143,7 +143,7 @@ def naturalduration(
         61 --> 1:01
         3602 --> 1:00:02
     """
-    seconds = 0 if not seconds else seconds
+    seconds = seconds if seconds else 0
     seconds = int(seconds)
 
     len_day = 86400

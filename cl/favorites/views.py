@@ -359,7 +359,7 @@ async def delete_prayer_view(
                 "document_id": recap_document_obj.pk,
                 "count": prayer_counts.get(recap_document_obj.pk, 0),
                 "regular_size": regular_size,
-                "should_swap": True if source != "user_prayer_list" else False,
+                "should_swap": source != "user_prayer_list",
                 "outcome": outcome,
                 "document_number": recap_document_obj.document_number,
                 "attachment_number": recap_document_obj.attachment_number,

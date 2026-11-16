@@ -52,10 +52,7 @@ def unmatched_citation_is_valid(
     # Note that both Citation.__str__ and UnmatchedCitation.__str__ use
     # the standardized volume, reporter and page values, so they are
     # comparable
-    if citation.corrected_citation() in self_citations:
-        return False
-
-    return True
+    return citation.corrected_citation() not in self_citations
 
 
 def update_unmatched_citations_status(

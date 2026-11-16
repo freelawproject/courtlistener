@@ -528,7 +528,7 @@ class Command(VerboseCommand):
         chunk = []
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
-        use_streaming_bulk = True if testing_mode else False
+        use_streaming_bulk = bool(testing_mode)
         # Indexing Parent and their child documents.
         for item in items:
             item_id = item
@@ -674,7 +674,7 @@ class Command(VerboseCommand):
         # Process parent and child documents to remove.
         # Remove multiple RECAPDocuments at once according to the chunk size.
         # Otherwise, remove one element at a time for main documents with children.
-        if not event_doc_type == EventTable.RECAP_DOCUMENT:
+        if event_doc_type != EventTable.RECAP_DOCUMENT:
             chunk_size = 1
         count = len(documents_to_delete)
         self.process_queryset(

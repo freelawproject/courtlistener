@@ -2662,7 +2662,7 @@ async def get_document_number_for_appellate(
     # 1-1, 1-2, 1-3 or in ACMS 1.1, 1.2 in those cases the document number is
     # the left number.
     document_number_split = re.split(r"[-.]", document_number)
-    if not len(document_number_split) == 1:
+    if len(document_number_split) != 1:
         document_number = document_number_split[0]
 
     if is_long_appellate_document_number(document_number):
@@ -4186,7 +4186,7 @@ def merge_scotus_docket(
         ):
             oci = d.originating_court_information
             # Create originating_court_information if missing
-            oci = OriginatingCourtInformation() if not oci else oci
+            oci = oci if oci else OriginatingCourtInformation()
 
             oci.docket_number = (
                 ", ".join(lower_court_case_numbers)
