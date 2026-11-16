@@ -1,3 +1,5 @@
+"""Celery tasks for importing PACER, state, and archival data and uploading to the Internet Archive."""
+
 from __future__ import annotations
 
 import asyncio
@@ -239,6 +241,7 @@ env = environ.FileAwareEnv()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
+    """Increment and save the object's Internet Archive upload failure count."""
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -389,6 +392,11 @@ async def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
+    """Download a RECAP item to ``MEDIA_ROOT/recap/<filename>``.
+
+    Existing files are kept unless ``clobber`` is set. Timeouts, HTTP errors,
+    and an existing file are logged rather than raised.
+    """
     logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
@@ -870,11 +878,16 @@ def get_and_process_free_pdf(
 
 
 class OverloadedException(Exception):
-    pass
+    """Raised when the Internet Archive's S3 API is overloaded."""
 
 
 @app.task(bind=True)
 def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
+    """Upload a RECAP document's PDF to the Internet Archive.
+
+    On success, the archive URL is saved on the document and its failure
+    count is cleared. On failure, its failure count is incremented.
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
     file_name = get_document_filename(
@@ -1043,6 +1056,11 @@ def upload_to_ia(
 
 @app.task
 def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+    """Set a free document log's status and completion date.
+
+    Returns:
+        The status, or None if the log doesn't exist.
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
@@ -1057,6 +1075,11 @@ def mark_court_done_on_date(log_id: int, status: int) -> int | None:
 
 @app.task(ignore_result=True)
 def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
+    """Delete a free document row, if it still exists.
+
+    Returns:
+        A list holding the RECAP document PK from ``data``.
+    """
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -1714,7 +1737,7 @@ def probe_or_scrape_iquery_pages(
                 exc,
             )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         except HTTPStatusError:
             # Set expiration accordingly and value to 2 to difference from
@@ -1758,7 +1781,7 @@ def probe_or_scrape_iquery_pages(
                     next_blocked_court_wait / 3600,
                 )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         if report is not None:
             # Find and update/store the Docket.
@@ -1794,7 +1817,7 @@ def probe_or_scrape_iquery_pages(
             highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
         )
         delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-        return None
+        return
 
     if not reports_data:
         today = localtime().weekday()
@@ -2475,10 +2498,9 @@ async def download_pacer_pdf_by_rd(
             )
         else:
             report = FreeOpinionReport(pacer_court_id, s)
-            # Juriscraper annotates this argument as int, but PACER IDs are strings.
             r, r_msg = await report.download_pdf(
                 pacer_case_id,
-                cast(Any, pacer_doc_id),
+                pacer_doc_id,
                 magic_number,
                 # Without a magic number, Juriscraper sends this as multipart
                 # form data, and httpx only accepts str/bytes values there.
@@ -2520,10 +2542,9 @@ async def download_pdf_by_magic_number(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     ) as s:
         report = FreeOpinionReport(court_id, s)
-        # Juriscraper annotates this argument as int, but PACER IDs are strings.
         return await report.download_pdf(
             pacer_case_id,
-            cast(Any, pacer_doc_id),
+            pacer_doc_id,
             magic_number,
             appellate,
             de_seq_num,
@@ -2924,7 +2945,7 @@ def get_pacer_doc_by_rd_and_description(
         msg = f"Aborting. Did not find civil cover sheet for {rd}."
         logger.error(msg)
         self.request.chain = None
-        return None
+        return
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -3005,7 +3026,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             logger.error("%s Aborting.", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3080,6 +3101,7 @@ def make_csv_file(
 
 
 def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
+    """Make the key for a docket's enqueued list of creditors query."""
     return f"list.creditors.enqueued:{court_id}-{d_number_file_name}"
 
 
@@ -3118,7 +3140,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3156,7 +3178,7 @@ async def query_and_save_list_of_creditors_base(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return None
+            return
 
         # Check if HTML report for this docket_number already exists, if so
         # omit it. Otherwise, query the pacer_case_id and the list of creditors
@@ -3179,7 +3201,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             if not result:
                 logger.info(
@@ -3192,7 +3214,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             pacer_case_id = result.get("pacer_case_id")
             if not pacer_case_id:
@@ -3206,7 +3228,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             logger.info("File %s doesn't exist.", html_file)
             logger.info(
@@ -3230,7 +3252,7 @@ async def query_and_save_list_of_creditors_base(
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
                 logger.info("Invalid POST param for %s, aborting...", court_id)
-                return None
+                return
 
             await report.query(
                 pacer_case_id=pacer_case_id,
@@ -3656,7 +3678,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Docket %s does not exist; skipping.",
             docket_id,
         )
-        return None
+        return
 
     scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
 
@@ -3666,7 +3688,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: No questions_presented_url for docket %s.",
             docket_id,
         )
-        return None
+        return
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
@@ -3675,7 +3697,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "for docket %s; skipping.",
             docket_id,
         )
-        return None
+        return
 
     logger.info(
         "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
@@ -3692,7 +3714,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 docket_id,
                 qp_url,
             )
-            return None
+            return
 
         tmp, _ = result
         filename = f"{docket_id}-qp.pdf"
@@ -4927,6 +4949,7 @@ def is_texas_appellate_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasCourtOfAppealsDocket]:
+    """Check if a Texas docket is from an appellate court."""
     return d["court_type"] == CourtType.APPELLATE.value
 
 
@@ -4935,6 +4958,7 @@ def is_texas_supreme_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
+    """Check if a Texas docket's court type is ``CourtType.SUPREME``."""
     return d["court_type"] == CourtType.SUPREME.value
 
 

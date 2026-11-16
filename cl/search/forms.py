@@ -1,3 +1,5 @@
+"""Search forms and helpers for cleaning their data."""
+
 import datetime
 import re
 from collections import OrderedDict
@@ -56,6 +58,8 @@ def blend[F: Field](field: F, *, as_str_types: Iterable[str]) -> F:
 
 
 class SearchForm(forms.Form):
+    """The main search form."""
+
     #
     # Blended fields
     #
@@ -588,6 +592,7 @@ class SearchForm(forms.Form):
     )
 
     def get_date_field_names(self):
+        """Get the prefixes of the date field names, before the first underscore."""
         return {
             f_name.split("_")[0]
             for f_name, f in self.fields.items()
@@ -595,6 +600,11 @@ class SearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
+        """Build the form, adding a field for each court.
+
+        Uses the ``courts`` keyword argument, or the active courts if it is
+        not given.
+        """
         self.courts = kwargs.pop("courts", None)
         self.request = kwargs.pop("request", None)
         self.is_semantic_frontend_active = kwargs.pop(
@@ -857,6 +867,8 @@ class SearchForm(forms.Form):
 
 
 class CorpusSearchForm(forms.Form):
+    """Search form for the corpus search pages."""
+
     case_name = forms.CharField(
         required=False,
         label="Case Name",

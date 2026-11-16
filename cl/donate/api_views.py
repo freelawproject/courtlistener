@@ -1,3 +1,5 @@
+"""REST API endpoint that processes Neon membership webhooks."""
+
 import datetime
 import logging
 from collections import defaultdict
@@ -42,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
+    """A Neon membership webhook payload."""
+
     eventTrigger = serializers.CharField(required=True)
     eventTimestamp = serializers.DateTimeField(required=True)
     data = serializers.DictField()
@@ -50,6 +54,8 @@ class NeonMembershipWebhookSerializer(serializers.Serializer):
 class MembershipWebhookViewSet(
     mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
+    """API endpoint that receives membership webhooks from Neon."""
+
     permission_classes = [AllowNeonWebhook]
     # Neon posts from a few fixed addresses with no API user, so the
     # default anonymous throttles count every webhook it sends against a
@@ -346,7 +352,7 @@ class MembershipWebhookViewSet(
             # issues.
             #
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-            return None
+            return
 
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
@@ -379,7 +385,7 @@ class MembershipWebhookViewSet(
                     email["from_email"],
                     [user.email],
                 )
-                return None
+                return
 
             if not user.profile.email_confirmed:
                 if user.profile.stub_account:

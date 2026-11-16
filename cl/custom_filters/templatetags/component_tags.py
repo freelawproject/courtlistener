@@ -1,3 +1,5 @@
+"""Template tags for requiring and rendering a page's scripts."""
+
 import logging
 from pathlib import Path
 

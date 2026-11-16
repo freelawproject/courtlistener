@@ -1,3 +1,5 @@
+"""View decorators that set up view tracking in the template context."""
+
 from collections.abc import Coroutine
 from functools import wraps
 from inspect import iscoroutinefunction

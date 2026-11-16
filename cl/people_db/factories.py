@@ -1,3 +1,5 @@
+"""Factories for judges, parties, and attorneys."""
+
 from django.utils.timezone import now
 from factory import (
     Faker,
@@ -33,6 +35,8 @@ Faker.add_provider(LegalProvider)
 
 
 class PersonFactory(DjangoModelFactory):
+    """Make a female person with a random name, suffix, and birthplace."""
+
     class Meta:
         model = Person
 
@@ -47,6 +51,8 @@ class PersonFactory(DjangoModelFactory):
 
 
 class PositionFactory(DjangoModelFactory):
+    """Make a judge position."""
+
     class Meta:
         model = Position
 
@@ -54,6 +60,8 @@ class PositionFactory(DjangoModelFactory):
 
 
 class PersonWithChildrenFactory(PersonFactory):
+    """Make a person with a judge position."""
+
     positions = RelatedFactory(
         PositionFactory,
         factory_related_name="person",
@@ -61,6 +69,8 @@ class PersonWithChildrenFactory(PersonFactory):
 
 
 class RaceFactory(DjangoModelFactory):
+    """Make a race with a random value."""
+
     class Meta:
         model = Race
 
@@ -68,6 +78,8 @@ class RaceFactory(DjangoModelFactory):
 
 
 class SchoolFactory(DjangoModelFactory):
+    """Make a school with a random EIN."""
+
     class Meta:
         model = School
 
@@ -75,6 +87,8 @@ class SchoolFactory(DjangoModelFactory):
 
 
 class EducationFactory(DjangoModelFactory):
+    """Make an education record with a random degree level."""
+
     class Meta:
         model = Education
 
@@ -82,6 +96,8 @@ class EducationFactory(DjangoModelFactory):
 
 
 class PoliticalAffiliationFactory(DjangoModelFactory):
+    """Make a political affiliation with a random party and source."""
+
     class Meta:
         model = PoliticalAffiliation
 
@@ -95,6 +111,8 @@ class PoliticalAffiliationFactory(DjangoModelFactory):
 
 
 class ABARatingFactory(DjangoModelFactory):
+    """Make an ABA rating with a random rating."""
+
     class Meta:
         model = ABARating
 
@@ -102,6 +120,8 @@ class ABARatingFactory(DjangoModelFactory):
 
 
 class AttorneyOrganizationFactory(DjangoModelFactory):
+    """Make an attorney organization with a random name and address."""
+
     class Meta:
         model = AttorneyOrganization
 
@@ -112,11 +132,15 @@ class AttorneyOrganizationFactory(DjangoModelFactory):
 
 
 class AttorneyOrganizationAssociationFactory(DjangoModelFactory):
+    """Make an association between an attorney and an organization."""
+
     class Meta:
         model = AttorneyOrganizationAssociation
 
 
 class AttorneyFactory(DjangoModelFactory):
+    """Make an attorney with a random name, associated with organizations on a docket."""
+
     class Meta:
         model = Attorney
 
@@ -124,12 +148,18 @@ class AttorneyFactory(DjangoModelFactory):
 
     @post_generation
     def docket(self, create, extracted, **kwargs):
+        """Set the docket used for the attorney's organization associations."""
         if not create:
             return
         self.docket = extracted
 
     @post_generation
     def organizations(self, create, extracted, **kwargs):
+        """Associate the attorney with the given organizations, or with one new organization.
+
+        The associations are made on the attorney's docket. Nothing is made
+        unless the attorney is being created.
+        """
         if not create:
             return
 
@@ -151,11 +181,15 @@ class AttorneyFactory(DjangoModelFactory):
 
 
 class RoleFactory(DjangoModelFactory):
+    """Make an attorney's role."""
+
     class Meta:
         model = Role
 
 
 class PartyFactory(DjangoModelFactory):
+    """Make a party with a random name, with attorneys on a docket."""
+
     class Meta:
         model = Party
 
@@ -170,6 +204,11 @@ class PartyFactory(DjangoModelFactory):
 
     @post_generation
     def attorneys(self, create, extracted, **kwargs):
+        """Give the party roles for the given attorneys, or for one new attorney.
+
+        The roles are made on the party's docket. Nothing is made unless the
+        party is being created.
+        """
         if not create:
             return
 
@@ -187,6 +226,11 @@ class PartyFactory(DjangoModelFactory):
 
 
 class PartyTypeFactory(DjangoModelFactory):
+    """Make a party type with a new party.
+
+    The party type itself is only created when a docket is given.
+    """
+
     class Meta:
         model = PartyType
 
