@@ -28,13 +28,15 @@ from cl.corpus_importer.utils import (
     match_based_text,
 )
 from cl.lib.argparse_types import _argparse_volumes
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -383,7 +385,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 location=options["location"],
             )
             if len(found_court) != 1:
-                logging.warning(
+                logger.warning(
                     "Court not found for %s at %s",
                     data["court"]["name"],
                     file_path,

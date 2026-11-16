@@ -14,7 +14,6 @@ from django.utils.encoding import force_bytes
 from django.utils.html import format_html, strip_tags
 from juriscraper.lib.string_utils import titlecase
 
-from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
@@ -38,6 +37,8 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CitationRedirectorForm(forms.Form):
@@ -579,7 +580,7 @@ class BaseCourtUploadForm(forms.Form):
 
         extract_opinion_content.delay(opinions[0].pk, ocr_available=True)
 
-        logging.info(
+        logger.info(
             "Successfully added object cluster: %s for %s",
             cluster.id,
             self.cleaned_data.get("court_str"),
