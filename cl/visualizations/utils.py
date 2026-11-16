@@ -1,3 +1,5 @@
+"""Build the network data for a visualization."""
+
 import time
 
 from cl.visualizations.exceptions import TooManyNodes

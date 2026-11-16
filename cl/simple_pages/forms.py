@@ -1,3 +1,5 @@
+"""The contact form."""
+
 import re
 from typing import Any
 
@@ -16,6 +18,8 @@ SEALING_KEYWORDS_REGEX = re.compile(
 
 
 class ContactForm(forms.Form):
+    """Contact form whose required fields depend on the issue type."""
+
     SUPPORT_REQUEST = "support"
     PARTNERSHIPS = "partnerships"
     API_HELP = "api"
@@ -243,6 +247,7 @@ class ContactForm(forms.Form):
         account_email: str = "",
         **kwargs: Any,
     ) -> None:
+        """Build the form for a user, linking the documentation checkbox to the help pages."""
         super().__init__(*args, **kwargs)
         self.is_authenticated = is_authenticated
         self.account_email = account_email
@@ -259,6 +264,11 @@ class ContactForm(forms.Form):
         )
 
     def clean(self) -> dict[str, Any] | None:
+        """Require the fields for the chosen issue type.
+
+        Also requires an email from anonymous users, the documentation
+        checkbox for support issues, and a link in removal requests.
+        """
         cleaned_data: dict[str, Any] | None = super().clean()
         if cleaned_data is None:
             return cleaned_data
@@ -344,6 +354,7 @@ class ContactForm(forms.Form):
         return cleaned_data
 
     def get_issue_type_display(self) -> str:
+        """Get the label of the chosen issue type, or "Unidentified Type"."""
         value = self.cleaned_data.get("issue_type", "")
         return dict(self.ISSUE_TYPE_CHOICES).get(value, "Unidentified Type")
 

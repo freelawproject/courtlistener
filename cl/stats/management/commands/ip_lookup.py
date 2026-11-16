@@ -1,3 +1,5 @@
+"""Look up the users behind IP addresses in the API logs."""
+
 import sys
 from datetime import timedelta
 
@@ -10,9 +12,12 @@ from cl.lib.redis_utils import get_redis_interface
 
 
 class Command(BaseCommand):
+    """Print the user each IP address made V4 API requests as."""
+
     help = "Look up users associated with IP addresses from Redis API logs"
 
     def add_arguments(self, parser) -> None:
+        """Add the IP address, stdin, and days options."""
         parser.add_argument(
             "ips",
             nargs="*",
@@ -31,6 +36,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Search each day's IP map, newest first, and report found and missing IPs.
+
+        Each IP is reported for the most recent day it was found.
+        """
         ips = list(options["ips"])
 
         if options["stdin"]:

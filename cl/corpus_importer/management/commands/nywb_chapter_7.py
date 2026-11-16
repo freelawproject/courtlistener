@@ -1,3 +1,5 @@
+"""Purchase W.D.N.Y. Chapter 7 bankruptcy dockets and petitions listed in a CSV."""
+
 import argparse
 import csv
 import os
@@ -73,6 +75,8 @@ def get_dockets(options):
 
 
 class Command(VerboseCommand):
+    """Purchase dockets or petitions from PACER for the cases in a CSV."""
+
     help = "Purchase dockets and bankruptcy filings from PACER"
 
     allowed_tasks = [
@@ -81,6 +85,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, file, and task options."""
         parser.add_argument(
             "--queue",
             default="batch0",
@@ -114,6 +119,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "get_dockets":
             get_dockets(options)

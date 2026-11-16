@@ -1,3 +1,5 @@
+"""Compute and store a cluster's parenthetical groups."""
+
 import logging
 
 from asgiref.sync import sync_to_async
@@ -30,6 +32,7 @@ async def get_or_create_parenthetical_groups(
 @sync_to_async
 @transaction.atomic
 def atomic_create_parenthetical_groups(cluster: OpinionCluster) -> None:
+    """Async wrapper that creates a cluster's parenthetical groups in a transaction."""
     create_parenthetical_groups(cluster)
 
 

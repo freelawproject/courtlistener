@@ -1,3 +1,5 @@
+"""Write opinions to disk as HTML files."""
+
 import os
 from pathlib import Path
 
@@ -11,9 +13,12 @@ from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
+    """Render opinions with HTML content to files grouped by filing date."""
+
     help = "A simple script to serialize all opinions to disk as HTML"
 
     def add_arguments(self, parser):
+        """Add the output directory option."""
         parser.add_argument(
             "--output-directory",
             type=readable_dir,
@@ -22,6 +27,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Render each opinion with HTML content to ``<output>/<year>/<month>/<day>/<pk>.html``."""
         super().handle(*args, **options)
 
         ops = Opinion.objects.exclude(

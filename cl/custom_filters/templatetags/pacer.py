@@ -1,3 +1,5 @@
+"""Template filters for PACER documents."""
+
 from django import template
 
 from cl.search.models import RECAPDocument

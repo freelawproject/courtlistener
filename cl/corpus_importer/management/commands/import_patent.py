@@ -1,3 +1,5 @@
+"""Download patent dockets from TXWD and DED for a client."""
+
 import os
 import time
 
@@ -110,9 +112,12 @@ def get_dockets(options: dict) -> None:
 
 
 class Command(VerboseCommand):
+    """Download the patent dockets."""
+
     help = """Get all patent dockets since 2012 in TXWD and DED"""
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, and limit options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -133,6 +138,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Download the dockets with the client's PACER credentials.
+
+        Raises:
+            AssertionError: If FLP's PACER credentials are configured.
+        """
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if PACER_USERNAME == "mlissner.flp":
             raise AssertionError(

@@ -1,3 +1,5 @@
+"""Strategies for combining a scraped value with the value already stored."""
+
 from collections.abc import Callable
 
 type Strategy[Scrape, Existing, Output = Scrape | Existing] = Callable[
