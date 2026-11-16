@@ -2348,6 +2348,30 @@ class TexasDocketEntrySourceTest(TestCase):
             with self.subTest(source=name):
                 self.assertEqual(source.supports_docket_alerts, expected)
 
+    def test_download_label_follows_the_stored_format(self) -> None:
+        """Is a Texas file's download button named after its stored format, since TAMES also serves HTML, WordPerfect and MP3 files, while RECAP keeps "Download PDF"?"""
+        cases = [
+            ("recap/texas.pdf", "Download PDF"),
+            ("recap/texas.mp3", "Download MP3"),
+            ("recap/texas.wpd", "Download WPD"),
+            ("recap/texas", "Download File"),
+        ]
+        for path, label in cases:
+            with self.subTest(path=path):
+                document = TexasDocument(filepath_local=path)
+                self.assertEqual(
+                    docket_entry_sources.TEXAS.document_download_label(
+                        document
+                    ),
+                    label,
+                )
+        self.assertEqual(
+            docket_entry_sources.RECAP.document_download_label(
+                RECAPDocument(filepath_local="recap/doc.pdf")
+            ),
+            "Download PDF",
+        )
+
     def test_only_indexed_sources_opt_into_entry_search(self) -> None:
         """Do RECAP and SCOTUS, whose entries are in the search index, opt into "Search this docket", while Texas keeps the default of no search box?"""
         cases = {
@@ -2601,6 +2625,21 @@ class TexasDocketPageTest(TestCase):
                     content = self.client.get(self.url).content.decode()
                     self.assertEqual("Get Alerts" in content, shows_menu)
                     self.assertEqual("Share Alert Link" in content, shows_menu)
+
+    def test_download_button_names_the_stored_format(self) -> None:
+        """Does each stack label a stored MP3 "Download MP3" rather than promise a PDF?"""
+        TexasDocument.objects.filter(pk=self.document.pk).update(
+            filepath_local="recap/gov.uscourts.tex.1.mp3"
+        )
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Download MP3", content)
+                self.assertNotIn("Download PDF", content)
 
     def test_search_box_follows_supports_entry_search(self) -> None:
         """Is "Search this docket" hidden for Texas, whose entries aren't in the search index, and shown again once its source supports entry search, in both stacks?"""

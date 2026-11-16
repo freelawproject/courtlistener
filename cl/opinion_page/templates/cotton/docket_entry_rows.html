@@ -99,11 +99,11 @@
                           menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
                           position="bottom-end"
                           widget_aria_label="Download options for {{ document.label }}"
-                          trigger_aria_label="Download PDF"
+                          trigger_aria_label="{{ document.download_label }}"
                           menu_aria_label="Download sources"
                         >
                           <c-slot name="button_content">
-                            Download PDF
+                            {{ document.download_label }}
                             {% svg "chevron" class="w-3 h-3 text-white ml-1" aria_hidden="true" %}
                           </c-slot>
                           <c-slot name="menu_content">

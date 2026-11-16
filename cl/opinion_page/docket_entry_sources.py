@@ -9,6 +9,7 @@ unrelated docket *data* sources in ``cl.search.docket_sources``
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
 from django.db.models import (
@@ -192,6 +193,11 @@ def _document_description(document: Any) -> str:
     return document.description
 
 
+def _download_pdf_label(document: Any) -> str:
+    """Return the download button's label for a source whose stored files are always PDFs."""
+    return "Download PDF"
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -277,6 +283,11 @@ class DocketEntrySource:
     ``supports_docket_alerts``, it defaults to False so a new source only
     shows the box once it's indexed.
 
+    ``document_download_label`` returns the label of the button that
+    downloads a document's stored file, which ``attach_display_fields`` puts
+    on ``document.download_label``. It's "Download PDF" unless the source
+    stores other formats.
+
     ``exports_entries_without_documents`` says whether the CSV export gives
     an entry with no documents its own row, with empty document columns.
     Without it, the export only writes one row per document, which suits
@@ -338,6 +349,7 @@ class DocketEntrySource:
     supports_entry_search: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
+    document_download_label: Callable[[Any], str] = _download_pdf_label
     exports_entries_without_documents: bool = False
 
 
@@ -351,6 +363,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
     document.display_description = source.document_display_description(
         document
     )
+    document.download_label = source.document_download_label(document)
 
 
 # RECAP
@@ -804,6 +817,18 @@ def _texas_document_display_description(document: TexasDocument) -> str:
     return conditional_escape(document.description)
 
 
+def _texas_document_download_label(document: TexasDocument) -> str:
+    """Return the download button's label, named after the stored file's format.
+
+    TAMES serves PDFs but also HTML, WordPerfect and MP3 files, which are
+    stored as they came, so "Download PDF" would be wrong for those.
+    """
+    extension = PurePosixPath(document.filepath_local.name).suffix
+    if not extension:
+        return "Download File"
+    return f"Download {extension.lstrip('.').upper()}"
+
+
 def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a Texas docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
@@ -1004,6 +1029,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
+    document_download_label=_texas_document_download_label,
     exports_entries_without_documents=True,
     metadata_sections=_texas_metadata_sections,
 )

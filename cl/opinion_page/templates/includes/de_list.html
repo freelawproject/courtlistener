@@ -116,7 +116,7 @@
                           {% if rd.date_upload %}
                      title="Uploaded {{ rd.date_upload|timezone:timezone }}"
                           {% endif %}>
-                    Download PDF
+                    {{ rd.download_label }}
                   </a>
                   <button type="button"
                           class="btn btn-primary btn-xs dropdown-toggle"
@@ -168,7 +168,7 @@
                      role="button"
                      class="btn btn-primary btn-xs"
                      rel="nofollow"
-                     title="Download PDF"><i class="fa fa-download"></i>
+                     title="{{ rd.download_label }}"><i class="fa fa-download"></i>
                   </a>
                 {% elif rd.is_sealed %}
                   {# Unreachable for SCOTUSDocument -- it has no is_sealed field. #}
