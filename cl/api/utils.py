@@ -2113,7 +2113,7 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     match webhook.version:
         case WebhookVersions.v1:
             deprecation_date = get_webhook_deprecation_date(
-                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
+                settings.WEBHOOK_V1_DEPRECATION_DATE
             )
         case WebhookVersions.v2:
             deprecation_date = None

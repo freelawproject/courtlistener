@@ -68,7 +68,7 @@ async def get_cached_court_counts(
         cache.set(
             cache_key,
             court_counts,
-            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
+            timeout=settings.QUERY_RESULTS_CACHE,
         )
     return court_counts or {}
 

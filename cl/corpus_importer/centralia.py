@@ -162,7 +162,7 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
         ("cid_pages", "CID-encoded pages"),
     ):
         if pages := diagnostics.get(field):
-            return False, f"{why} {list(pages)[:5]}, needs OCR"  # type: ignore
+            return False, f"{why} {list(pages)[:5]}, needs OCR"
 
     writings = payload.get("opinions") or []
     if not writings:
