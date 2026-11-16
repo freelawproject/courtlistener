@@ -1305,23 +1305,21 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
-            with (
-                mock.patch(
-                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                    side_effect=lambda x, y: True,
-                ),
-                self.captureOnCommitCallbacks(execute=True),
-            ):
-                audio = AudioFactory.create(
-                    case_name="Lorem Ipsum Natural Gas",
-                    docket_id=self.docket_2.pk,
-                    duration=420,
-                    local_path_original_file="test/audio/ander_v._leo.mp3",
-                    local_path_mp3=self.filepath_local,
-                    sha1="a49ada009774496ac01fb49818837e2296705c97",
-                    stt_status=Audio.STT_COMPLETE,
-                )
+            audio = AudioFactory.create(
+                case_name="Lorem Ipsum Natural Gas",
+                docket_id=self.docket_2.pk,
+                duration=420,
+                local_path_original_file="test/audio/ander_v._leo.mp3",
+                local_path_mp3=self.filepath_local,
+                sha1="a49ada009774496ac01fb49818837e2296705c97",
+                stt_status=Audio.STT_COMPLETE,
+            )
 
         params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,

@@ -133,15 +133,15 @@ def resolve_fullcase_citation(
             result_id = db_search_results[0]["id"]
             try:
                 return Opinion.objects.get(pk=result_id)
-            except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
+            except Opinion.DoesNotExist, Opinion.MultipleObjectsReturned:
                 pass
 
-    # Case 2: FullLawCitation (TODO: implement support)
-    elif type(full_citation) is FullLawCitation:
-        pass
-
+    # Case 2: FullLawCitation (TODO: implement support) and
     # Case 3: FullJournalCitation (TODO: implement support)
-    elif type(full_citation) is FullJournalCitation:
+    elif (
+        type(full_citation) is FullLawCitation
+        or type(full_citation) is FullJournalCitation
+    ):
         pass
 
     # If no Opinion can be matched, just return a placeholder object

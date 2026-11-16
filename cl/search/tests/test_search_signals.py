@@ -67,24 +67,26 @@ class RECAPDocumentReceiverTests(TestCase):
         ]
 
         for test_case in test_cases:
-            with self.subTest(test_case=test_case):
-                with patch(
+            with (
+                self.subTest(test_case=test_case),
+                patch(
                     "cl.citations.tasks.find_citations_and_parantheticals_for_recap_documents.apply_async"
-                ) as mock_apply:
-                    recap_doc = RECAPDocumentFactory.create(
-                        plain_text='"During the whole of his trip down town and return[,] Cornish had been ill, the journey being marked by frequent interruptions necessitated by the condition of his stomach and bowels. People v. Molineux, 168 NY 264, 275-276 (N.Y. 1901)."',
-                        ocr_status=test_case.ocr_status,
-                        docket_entry=DocketEntryFactory(),
+                ) as mock_apply,
+            ):
+                recap_doc = RECAPDocumentFactory.create(
+                    plain_text='"During the whole of his trip down town and return[,] Cornish had been ill, the journey being marked by frequent interruptions necessitated by the condition of his stomach and bowels. People v. Molineux, 168 NY 264, 275-276 (N.Y. 1901)."',
+                    ocr_status=test_case.ocr_status,
+                    docket_entry=DocketEntryFactory(),
+                )
+
+                recap_doc.save(update_fields=test_case.update_fields)
+
+                if test_case.expect_enqueue:
+                    mock_apply.assert_called_once_with(
+                        args=([recap_doc.pk],), queue="celery"
                     )
-
-                    recap_doc.save(update_fields=test_case.update_fields)
-
-                    if test_case.expect_enqueue:
-                        mock_apply.assert_called_once_with(
-                            args=([recap_doc.pk],), queue="celery"
-                        )
-                    else:
-                        mock_apply.assert_not_called()
+                else:
+                    mock_apply.assert_not_called()
 
     def test_receiver_honors_citation_queue_override(self):
         """A batch job can steer the citation task off the default queue by setting ``citation_queue`` on the instance before saving."""

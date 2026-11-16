@@ -334,16 +334,18 @@ class RateLimitedRequestManagerTest(SimpleTestCase):
             return httpx.Response(403)
 
         session = httpx.AsyncClient(transport=httpx.MockTransport(respond))
-        with mock.patch(
-            "cl.scrapers.management.commands.back_scrape_dockets.asyncio.sleep"
-        ) as sleep:
-            with self.assertRaises(httpx.HTTPStatusError):
-                async with RateLimitedRequestManager(
-                    requests_per_second=0,
-                    max_backoff_seconds=1,
-                    session=session,
-                ) as manager:
-                    await manager.get("https://search.txcourts.gov/")
+        with (
+            mock.patch(
+                "cl.scrapers.management.commands.back_scrape_dockets.asyncio.sleep"
+            ) as sleep,
+            self.assertRaises(httpx.HTTPStatusError),
+        ):
+            async with RateLimitedRequestManager(
+                requests_per_second=0,
+                max_backoff_seconds=1,
+                session=session,
+            ) as manager:
+                await manager.get("https://search.txcourts.gov/")
 
         self.assertEqual(len(attempts), 2)
         sleep.assert_awaited_once_with(1)

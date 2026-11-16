@@ -240,11 +240,10 @@ def send_scheduled_alerts(rate: str) -> None:
     Raises:
         InvalidDateError: If monthly alerts are run after the 28th.
     """
-    if rate == Alert.MONTHLY:
-        if date.today().day > 28:
-            raise InvalidDateError(
-                "Monthly alerts cannot be run on the 29th, 30th or 31st."
-            )
+    if rate == Alert.MONTHLY and date.today().day > 28:
+        raise InvalidDateError(
+            "Monthly alerts cannot be run on the 29th, 30th or 31st."
+        )
     query_and_send_alerts_by_rate(rate)
 
 

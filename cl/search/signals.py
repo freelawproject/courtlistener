@@ -674,22 +674,26 @@ def handle_recap_doc_change(
     """Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations. More functionality can be put here later. There may be things currently in the save function of RECAPDocument that would be better placed here for reasons of maintainability and testability."""
     # Whenever pdf text is processed, it will update the plain_text field.
     # When we get updated text for a doc, we want to parse it for citations.
-    if update_fields is not None and "plain_text" in update_fields:
-        # Even though the task itself filters for qualifying ocr_status,
-        # we don't want to clog the TQ with unnecessary items.
-        if instance.ocr_status in (
+    # Even though the task itself filters for qualifying ocr_status,
+    # we don't want to clog the TQ with unnecessary items.
+    if (
+        update_fields is not None
+        and "plain_text" in update_fields
+        and instance.ocr_status
+        in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
-        ):
-            # Batch jobs may set ``citation_queue`` on the instance to route
-            # this task off the default queue and avoid clogging it.
-            queue = (
-                getattr(instance, "citation_queue", None)
-                or DEFAULT_RD_CITATION_QUEUE
-            )
-            find_citations_and_parantheticals_for_recap_documents.apply_async(
-                args=([instance.pk],), queue=queue
-            )
+        )
+    ):
+        # Batch jobs may set ``citation_queue`` on the instance to route
+        # this task off the default queue and avoid clogging it.
+        queue = (
+            getattr(instance, "citation_queue", None)
+            or DEFAULT_RD_CITATION_QUEUE
+        )
+        find_citations_and_parantheticals_for_recap_documents.apply_async(
+            args=([instance.pk],), queue=queue
+        )
 
     if (
         instance.es_rd_field_tracker.has_changed("is_available")

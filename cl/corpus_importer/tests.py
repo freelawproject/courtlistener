@@ -2477,8 +2477,7 @@ class TexasMergerTest(TestCase):
         ]
 
         actual_flags = [
-            True if i in appellate_brief_indices else False
-            for i in range(len(case_events))
+            i in appellate_brief_indices for i in range(len(case_events))
         ]
 
         docket_dict = TexasFinalCourtDocketDictFactory(

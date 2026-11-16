@@ -357,12 +357,12 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
-        document_type = options.get("document_type", None)
+        document_type = options.get("document_type")
         chunk_size = self.options["chunk_size"]
         pk_offset = options["pk_offset"]
         auto_resume = options.get("auto_resume", False)
         update_from_event_tables = EventTable(
-            options.get("update_from_event_tables", None)
+            options.get("update_from_event_tables")
         )
         # call_command doesn't check `choices` on optional arguments.
         if (source := ES_SOURCE_BY_NAME.get(options["source"])) is None:
@@ -389,9 +389,9 @@ class Command(VerboseCommand):
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
             )
-        start_date: date | None = options.get("start_date", None)
-        end_date: date | None = options.get("end_date", None)
-        non_null_field: str | None = options.get("non_null_field", None)
+        start_date: date | None = options.get("start_date")
+        end_date: date | None = options.get("end_date")
+        non_null_field: str | None = options.get("non_null_field")
 
         es_document = None
         match search_type:
@@ -526,11 +526,10 @@ class Command(VerboseCommand):
             document_type = "child"
 
         chunk = []
-        processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
-        use_streaming_bulk = True if testing_mode else False
+        use_streaming_bulk = bool(testing_mode)
         # Indexing Parent and their child documents.
-        for item in items:
+        for processed_count, item in enumerate(items, 1):
             item_id = item
             changed_fields = []
             if missing and es_document:
@@ -557,7 +556,6 @@ class Command(VerboseCommand):
                 if isinstance(item, tuple):
                     item_id, changed_fields = item
                 chunk.append(item_id)
-            processed_count += 1
             last_item = count == processed_count
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
@@ -674,7 +672,7 @@ class Command(VerboseCommand):
         # Process parent and child documents to remove.
         # Remove multiple RECAPDocuments at once according to the chunk size.
         # Otherwise, remove one element at a time for main documents with children.
-        if not event_doc_type == EventTable.RECAP_DOCUMENT:
+        if event_doc_type != EventTable.RECAP_DOCUMENT:
             chunk_size = 1
         count = len(documents_to_delete)
         self.process_queryset(

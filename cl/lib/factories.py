@@ -61,11 +61,10 @@ class RelatedFactoryVariableList(RelatedFactoryList):
         """
         size = context.extra.pop("size", None)
         data = context.extra.pop("data", [])
-        if size and data:
-            if size != len(data):
-                raise TypeError(
-                    "RelatedFactoryVariableList you can only use data or size, not both."
-                )
+        if size and data and size != len(data):
+            raise TypeError(
+                "RelatedFactoryVariableList you can only use data or size, not both."
+            )
 
         if not size and not data:
             size = self.size

@@ -709,9 +709,7 @@ def include_recap_document_hit(
     """
     alert_in_rd_hits = alert_id in recap_document_hits
     alert_in_docket_hits = alert_id in docket_hits
-    if alert_in_docket_hits and not alert_in_rd_hits:
-        return False
-    return True
+    return not (alert_in_docket_hits and not alert_in_rd_hits)
 
 
 def get_field_names(mapping_dict):

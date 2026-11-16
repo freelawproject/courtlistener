@@ -83,12 +83,9 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
             raise e
 
         j = proxy_response.json()
-        if j["status_code"] is not None:
-            # Down from our server, but up from our proxy. Yikes!
-            return True
-        else:
-            # Down from our server, and down from our proxy. OK.
-            return False
+        # Up from our proxy while down from our server is a problem (Yikes!).
+        # Down from both is a real outage, which is OK.
+        return j["status_code"] is not None
 
     # Up from our server. OK.
     return False

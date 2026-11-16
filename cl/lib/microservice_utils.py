@@ -2,7 +2,7 @@
 
 import json
 import logging
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from io import BufferedReader
 from typing import Any
 
@@ -137,12 +137,11 @@ async def microservice(
                 await clean_up_recap_document_file(item)
                 upload_file = None
 
-        upload_context = nullcontext(upload_file)
-        if upload_file is None and filepath:
-            filename = filepath
-            upload_context = open(filepath, "rb")
+        with ExitStack() as stack:
+            if upload_file is None and filepath:
+                filename = filepath
+                upload_file = stack.enter_context(open(filepath, "rb"))
 
-        with upload_context as upload_file:
             files = (
                 {"file": (filename, upload_file)}
                 if upload_file is not None

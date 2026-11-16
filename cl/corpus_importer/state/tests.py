@@ -112,22 +112,23 @@ def merger_test[**P, R](
             with connection.execute_wrapper(count_query):
                 output = f(*args, **kwargs)
 
-            if expected_query_count is not None:
-                if isinstance(args[0], TestCase):
-                    # It's okay if the query count is below the expect amount, but we still assert it isn't to force
-                    # the expectation to be updated whenever performance is improved.
-                    if isinstance(expected_query_count, int):
-                        args[0].assertEqual(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be equal to expectation.",
-                        )
-                    elif isinstance(expected_query_count, range):
-                        args[0].assertIn(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be in expected range.",
-                        )
+            if expected_query_count is not None and isinstance(
+                args[0], TestCase
+            ):
+                # It's okay if the query count is below the expect amount, but we still assert it isn't to force
+                # the expectation to be updated whenever performance is improved.
+                if isinstance(expected_query_count, int):
+                    args[0].assertEqual(
+                        counts["merger"],
+                        expected_query_count,
+                        "Merger query count should be equal to expectation.",
+                    )
+                elif isinstance(expected_query_count, range):
+                    args[0].assertIn(
+                        counts["merger"],
+                        expected_query_count,
+                        "Merger query count should be in expected range.",
+                    )
 
             return output
 
@@ -1557,11 +1558,11 @@ class LoaderPreflightTest(LoaderTestCase):
         logging.disable(logging.NOTSET)
         self.addCleanup(logging.disable)
 
-        with self.assertLogs("cl.corpus_importer.state.loader", "ERROR"):
-            with self.assertRaises(PreflightFailed) as raised:
-                self.loader(
-                    self.loader_class(extra_checks=(Failing(),))
-                ).load()
+        with (
+            self.assertLogs("cl.corpus_importer.state.loader", "ERROR"),
+            self.assertRaises(PreflightFailed) as raised,
+        ):
+            self.loader(self.loader_class(extra_checks=(Failing(),))).load()
 
         self.assertIn(
             "the schema is not the one expected", str(raised.exception)
@@ -2054,11 +2055,13 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         loader = self.loader()
 
         # Stop the load partway, as a dying process would.
-        with patch.object(
-            loader, "_dispatch", side_effect=[None, None, OSError("gone")]
+        with (
+            patch.object(
+                loader, "_dispatch", side_effect=[None, None, OSError("gone")]
+            ),
+            self.assertRaises(OSError),
         ):
-            with self.assertRaises(OSError):
-                loader.load()
+            loader.load()
 
         # The checkpoint was written at the top of row 2, by which point only
         # row 1 had been dispatched. Row 2 went out after it and is dispatched
@@ -2226,12 +2229,14 @@ class RunDatabaseTest(SimpleTestCase):
         The patch has to outlive the download, so this wraps the whole context
         rather than handing one back.
         """
-        with patch(
-            "cl.corpus_importer.state.run_db.scrape_bucket_storage",
-            return_value=FakeStorage(bucket),
+        with (
+            patch(
+                "cl.corpus_importer.state.run_db.scrape_bucket_storage",
+                return_value=FakeStorage(bucket),
+            ),
+            downloaded_run_database(key) as database,
         ):
-            with downloaded_run_database(key) as database:
-                yield database
+            yield database
 
     def test_downloads_the_key_to_a_temporary_file(self) -> None:
         """Does the database arrive on local disk, under its own name, from the configured bucket?"""
@@ -2259,12 +2264,12 @@ class RunDatabaseTest(SimpleTestCase):
 
     def test_cleans_up_after_a_load_that_raises(self) -> None:
         """Does the copy go away even when the caller fails mid-load?"""
-        with self.assertRaises(ValueError):
-            with self.download(
-                FakeBucket(), "nycourts_gov/run.db"
-            ) as database:
-                path = database
-                raise ValueError("the load blew up")
+        with (
+            self.assertRaises(ValueError),
+            self.download(FakeBucket(), "nycourts_gov/run.db") as database,
+        ):
+            path = database
+            raise ValueError("the load blew up")
 
         self.assertFalse(path.exists())
 
@@ -2277,9 +2282,11 @@ class RunDatabaseTest(SimpleTestCase):
             )
         )
 
-        with self.assertRaises(RunDatabaseUnavailable) as caught:
-            with self.download(bucket, "nycourts_gov/nope.db"):
-                pass
+        with (
+            self.assertRaises(RunDatabaseUnavailable) as caught,
+            self.download(bucket, "nycourts_gov/nope.db"),
+        ):
+            pass
 
         self.assertIn(
             "s3://scrapes/nycourts_gov/nope.db", str(caught.exception)
@@ -2289,9 +2296,11 @@ class RunDatabaseTest(SimpleTestCase):
         """Is a prefix handed over in place of a database refused before anything is downloaded?"""
         bucket = FakeBucket()
 
-        with self.assertRaises(RunDatabaseUnavailable):
-            with self.download(bucket, "nycourts_gov/"):
-                pass
+        with (
+            self.assertRaises(RunDatabaseUnavailable),
+            self.download(bucket, "nycourts_gov/"),
+        ):
+            pass
 
         self.assertEqual(bucket.calls, [])
 

@@ -597,31 +597,30 @@ def clone_audio_files(
             id=audio_json["id"], defaults=audio_json
         )
 
-        if local_path_mp3:
-            if (
-                not audio.local_path_mp3
-                or not audio.local_path_mp3.storage.exists(
-                    audio.local_path_mp3.name
-                )
-            ):
-                print("Download, file doesn't exist in local storage")
-                try:
-                    _, year, month, day, _ = local_path_mp3.split("/")
-                    file_with_date = datetime(int(year), int(month), int(day))
-                    # Set this attribute on the instance so make_upload_path can use it
-                    setattr(audio, "file_with_date", file_with_date.date())
+        if local_path_mp3 and (
+            not audio.local_path_mp3
+            or not audio.local_path_mp3.storage.exists(
+                audio.local_path_mp3.name
+            )
+        ):
+            print("Download, file doesn't exist in local storage")
+            try:
+                _, year, month, day, _ = local_path_mp3.split("/")
+                file_with_date = datetime(int(year), int(month), int(day))
+                # Set this attribute on the instance so make_upload_path can use it
+                setattr(audio, "file_with_date", file_with_date.date())
 
-                    prod_url = f"{PROD_STORAGE_PATH}/{local_path_mp3}"
-                    print(f"Downloading MP3 from {prod_url}")
+                prod_url = f"{PROD_STORAGE_PATH}/{local_path_mp3}"
+                print(f"Downloading MP3 from {prod_url}")
 
-                    r = requests.get(prod_url, stream=True)
-                    if r.status_code == 200:
-                        filename = local_path_mp3.split("/")[-1]
-                        audio.local_path_mp3.save(
-                            filename, ContentFile(r.content), save=True
-                        )
-                except Exception as e:
-                    print(f"Failed to download audio file: {e}")
+                r = requests.get(prod_url, stream=True)
+                if r.status_code == 200:
+                    filename = local_path_mp3.split("/")[-1]
+                    audio.local_path_mp3.save(
+                        filename, ContentFile(r.content), save=True
+                    )
+            except Exception as e:
+                print(f"Failed to download audio file: {e}")
 
         action = "Created" if created else "Updated"
         print(

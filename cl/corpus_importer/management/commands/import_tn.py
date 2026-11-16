@@ -85,7 +85,7 @@ def import_tn_corpus(
         file: Location of our overriding data json file
         ocr_available: Whether you can do OCR during the import
     """
-    ready = False if skip_until else True
+    ready = not skip_until
 
     if log:
         logging.getLogger().setLevel(logging.INFO)

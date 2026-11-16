@@ -37,9 +37,9 @@ def parenthetical_score(
     # "*ing that..." is the absolute gold standard
     if re.match(_HOLDING_THAT, description):
         score += 400
-    elif re.match(_GERUND_THAT, description):
-        score += 300
-    elif re.match(_HOLDING, description):
+    elif re.match(_GERUND_THAT, description) or re.match(
+        _HOLDING, description
+    ):
         score += 300
     # in general gerunds are nice, but are often not descriptive if they're
     # too short

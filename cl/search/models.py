@@ -2289,9 +2289,7 @@ class Court(models.Model):
     @property
     def is_terminated(self):
         """Whether the court has an end date."""
-        if self.end_date:
-            return True
-        return False
+        return bool(self.end_date)
 
     class Meta:
         ordering = ["position"]

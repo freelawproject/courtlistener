@@ -178,9 +178,7 @@ def check_elasticsearch() -> bool:
     ):
         return False
 
-    if cluster_health["status"] == "green":
-        return True
-    return False
+    return cluster_health["status"] == "green"
 
 
 def check_postgresql() -> bool:

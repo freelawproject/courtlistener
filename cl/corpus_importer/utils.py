@@ -500,9 +500,10 @@ def merge_docket_numbers(
             similarity = get_cosine_similarity(
                 cl_clean_docket, file_cleaned_docket
             )
-            if similarity > 0.8:
-                if len(file_cleaned_docket) > len(cl_clean_docket):
-                    return file_cleaned_docket
+            if similarity > 0.8 and len(file_cleaned_docket) > len(
+                cl_clean_docket
+            ):
+                return file_cleaned_docket
     else:
         # CL docket doesn't have a docket number, add the one from  file
         return file_cleaned_docket
@@ -563,11 +564,14 @@ def merge_case_names(
         # We don't care if data is empty or both are empty
         pass
 
-    if cluster_case_name_full and cluster_case_name:
-        if len(cluster_case_name) > len(cluster_case_name_full):
-            # Swap field values
-            update_dict["case_name"] = cluster_case_name_full
-            update_dict["case_name_full"] = cluster_case_name
+    if (
+        cluster_case_name_full
+        and cluster_case_name
+        and len(cluster_case_name) > len(cluster_case_name_full)
+    ):
+        # Swap field values
+        update_dict["case_name"] = cluster_case_name_full
+        update_dict["case_name_full"] = cluster_case_name
 
     return update_dict
 
@@ -1028,10 +1032,8 @@ def length_too_different(
         return True
 
     diff = len(file_characters) / len(cl_characters)
-    if not (0.3 < diff < 3):
-        # Content too dissimilar in length to compare
-        return True
-    return False
+    # Content too dissimilar in length to compare
+    return not (0.3 < diff < 3)
 
 
 def content_too_different(
@@ -1065,10 +1067,7 @@ def content_too_different(
     """
     if len(file_characters) > 10000:
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)
-        if cosine_sim > 0.97:
-            return False
-        else:
-            return True
+        return not cosine_sim > 0.97
 
     percent_match = compare_documents(file_characters, cl_characters)
     if percent_match < 60:
@@ -1108,9 +1107,7 @@ def case_names_dont_overlap(
     file_case = f"{case_name_full} {case_name_abbreviation}"
     overlap = winnow_case_name(case.case_name) & winnow_case_name(file_case)
 
-    if not overlap:
-        return True
-    return False
+    return bool(not overlap)
 
 
 def cosine_similarity_too_different(
@@ -1138,9 +1135,7 @@ def cosine_similarity_too_different(
         similarities.append(similarity)
     max_similarity = max(similarities)
 
-    if max_similarity < 0.3:
-        return True
-    return False
+    return max_similarity < 0.3
 
 
 def has_too_similar_citation(

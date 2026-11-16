@@ -77,9 +77,10 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
     """
     skips: dict[int, set[str]] = {}
     for i, line in enumerate(lines, 1):
-        if m := _line_skip_directive_re.search(line):
-            if names := _skippable_names(m.group(1)):
-                skips[i] = names
+        if (m := _line_skip_directive_re.search(line)) and (
+            names := _skippable_names(m.group(1))
+        ):
+            skips[i] = names
     return skips
 
 
@@ -175,9 +176,7 @@ def is_legacy_template(path: str) -> bool:
         return False
     if is_redesign_template(path) or is_cotton_component(path):
         return False
-    if path.endswith("new_base.html"):
-        return False
-    return True
+    return not path.endswith("new_base.html")
 
 
 def is_input_css(path: str) -> bool:

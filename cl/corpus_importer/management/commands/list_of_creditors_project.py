@@ -5,6 +5,7 @@ import csv
 import itertools
 import os
 import re
+from contextlib import ExitStack
 from typing import TypedDict, cast
 
 from asgiref.sync import async_to_sync
@@ -63,99 +64,105 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     regex = re.compile(r"([^/]+).csv")
     base_path = options["base_path"]
     csv_files = []
-    for file in options["files"]:
-        f = open(f"{base_path}/{file}", encoding="utf-8")
-        reader = csv.DictReader(f)
-        match = regex.search(file)
-        if match:
-            court_id = match.group(1)
-            court_id = map_cl_to_pacer_id(court_id)
-            file_tuple = (court_id, reader)
-            csv_files.append(file_tuple)
-        else:
-            raise ValueError(f"Bad file name {file}")
-
-    session = async_to_sync(log_into_pacer)(
-        username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
-    )
-    throttle = CeleryThrottle(queue_name=q)
-    completed = 0
-    for i, rows in enumerate(
-        itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
-    ):
-        # Iterate over all the courts files at the same time.
-        for j, row in enumerate(rows):
-            # Iterate over each court and row court.
-            completed += 1
-            if completed < options["offset"]:
-                continue
-            if completed >= options["limit"] > 0:
-                break
-
-            court_id = csv_files[j][0]
-            if row is None:
-                # Some courts have fewer rows than others; if a row in this
-                # court is empty, skip it.
-                continue
-
-            logger.info(f"Doing {court_id} and row {i} ...")
-            docket_number = make_bankr_docket_number(
-                row["DOCKET"], row["OFFICE"]
+    with ExitStack() as stack:
+        for file in options["files"]:
+            f = stack.enter_context(
+                open(f"{base_path}/{file}", encoding="utf-8")
             )
-            d_number_file_name = docket_number.replace(":", "-")
-
-            # Check if the reports directory already exists
-            html_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports"
-            )
-            if not os.path.exists(html_path):
-                # Create the directory if it doesn't exist
-                os.makedirs(html_path)
-
-            # Check if the court_id directory already exists
-            court_id_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports", court_id
-            )
-            if not os.path.exists(court_id_path):
-                # Create the court_id if it doesn't exist
-                os.makedirs(court_id_path)
-
-            html_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "list_of_creditors",
-                "reports",
-                court_id,
-                f"{court_id}-{d_number_file_name}.html",
-            )
-
-            if os.path.exists(html_file):
-                logger.info(
-                    f"The report {html_file} already exist court: {court_id}"
-                )
-                continue
-
-            newly_enqueued = enqueue_get_list_of_creditors(
-                court_id, d_number_file_name
-            )
-            if newly_enqueued:
-                logger.info(
-                    f"Enqueueing case: {docket_number}, court:{court_id}..."
-                )
-                throttle.maybe_wait()
-                query_and_save_list_of_creditors.si(
-                    session,
-                    court_id,
-                    d_number_file_name,
-                    docket_number,
-                    html_file,
-                    i,
-                    row,
-                ).set(queue=q).apply_async()
+            reader = csv.DictReader(f)
+            match = regex.search(file)
+            if match:
+                court_id = match.group(1)
+                court_id = map_cl_to_pacer_id(court_id)
+                file_tuple = (court_id, reader)
+                csv_files.append(file_tuple)
             else:
-                logger.info(
-                    f"The report {html_file} is currently being processed in "
-                    f"another task, court: {court_id}"
+                raise ValueError(f"Bad file name {file}")
+
+        session = async_to_sync(log_into_pacer)(
+            username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
+        )
+        throttle = CeleryThrottle(queue_name=q)
+        completed = 0
+        for i, rows in enumerate(
+            itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
+        ):
+            # Iterate over all the courts files at the same time.
+            for j, row in enumerate(rows):
+                # Iterate over each court and row court.
+                completed += 1
+                if completed < options["offset"]:
+                    continue
+                if completed >= options["limit"] > 0:
+                    break
+
+                court_id = csv_files[j][0]
+                if row is None:
+                    # Some courts have fewer rows than others; if a row in
+                    # this court is empty, skip it.
+                    continue
+
+                logger.info(f"Doing {court_id} and row {i} ...")
+                docket_number = make_bankr_docket_number(
+                    row["DOCKET"], row["OFFICE"]
                 )
+                d_number_file_name = docket_number.replace(":", "-")
+
+                # Check if the reports directory already exists
+                html_path = os.path.join(
+                    settings.MEDIA_ROOT, "list_of_creditors", "reports"
+                )
+                if not os.path.exists(html_path):
+                    # Create the directory if it doesn't exist
+                    os.makedirs(html_path)
+
+                # Check if the court_id directory already exists
+                court_id_path = os.path.join(
+                    settings.MEDIA_ROOT,
+                    "list_of_creditors",
+                    "reports",
+                    court_id,
+                )
+                if not os.path.exists(court_id_path):
+                    # Create the court_id if it doesn't exist
+                    os.makedirs(court_id_path)
+
+                html_file = os.path.join(
+                    settings.MEDIA_ROOT,
+                    "list_of_creditors",
+                    "reports",
+                    court_id,
+                    f"{court_id}-{d_number_file_name}.html",
+                )
+
+                if os.path.exists(html_file):
+                    logger.info(
+                        f"The report {html_file} already exist court: {court_id}"
+                    )
+                    continue
+
+                newly_enqueued = enqueue_get_list_of_creditors(
+                    court_id, d_number_file_name
+                )
+                if newly_enqueued:
+                    logger.info(
+                        f"Enqueueing case: {docket_number}, court:{court_id}..."
+                    )
+                    throttle.maybe_wait()
+                    query_and_save_list_of_creditors.si(
+                        session,
+                        court_id,
+                        d_number_file_name,
+                        docket_number,
+                        html_file,
+                        i,
+                        row,
+                    ).set(queue=q).apply_async()
+                else:
+                    logger.info(
+                        f"The report {html_file} is currently being processed "
+                        f"in another task, court: {court_id}"
+                    )
 
 
 class Command(VerboseCommand):

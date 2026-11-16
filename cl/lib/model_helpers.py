@@ -43,9 +43,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 def is_docket_number(value: str) -> bool:
     """Check if a string starts with a district or appellate bankruptcy docket number."""
     pattern = rf"{dist_d_num_regex}|{appellate_bankr_d_num_regex}"
-    if re.match(pattern, value):
-        return True
-    return False
+    return bool(re.match(pattern, value))
 
 
 def clean_docket_number(docket_number: str | None) -> str:
@@ -534,12 +532,10 @@ def validate_partial_date[M: Model](
 
         # If a partial date, are days/month set to 1?
         bad_date = False
-        if granularity == GRANULARITY_YEAR:
-            if d.month != 1 and d.day != 1:
-                bad_date = True
-        if granularity == GRANULARITY_MONTH:
-            if d.day != 1:
-                bad_date = True
+        if granularity == GRANULARITY_YEAR and d.month != 1 and d.day != 1:
+            bad_date = True
+        if granularity == GRANULARITY_MONTH and d.day != 1:
+            bad_date = True
         if bad_date:
             raise ValidationError(
                 {
@@ -608,15 +604,14 @@ def validate_supervisor(instance: Any) -> None:
       clerk.
     """
     sup = instance.supervisor
-    if sup:
-        if not sup.is_judge:
-            raise ValidationError(
-                {
-                    "supervisor": "The supervisor field can only be set to a "
-                    f"judge, but '{sup.name_full}' does not appear to have ever "
-                    "been a judge."
-                }
-            )
+    if sup and not sup.is_judge:
+        raise ValidationError(
+            {
+                "supervisor": "The supervisor field can only be set to a "
+                f"judge, but '{sup.name_full}' does not appear to have ever "
+                "been a judge."
+            }
+        )
 
     if sup and not instance.is_clerkship:
         raise ValidationError(

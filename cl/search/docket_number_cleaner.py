@@ -135,9 +135,7 @@ def is_generic(s: str, court_map: str) -> bool:
         True if `s` matches any pattern for the given `court_map`, False otherwise.
     """
     patterns = generic_patterns.get(court_map, [])
-    if any(re.fullmatch(p, s) for p in patterns):
-        return True
-    return False
+    return bool(any(re.fullmatch(p, s) for p in patterns))
 
 
 def prelim_clean_F(s: str) -> str:

@@ -2736,9 +2736,8 @@ def process_feed_query_results(
     Returns:
         None. The function modifies the response in place.
     """
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        if not jurisdiction:
-            limit_inner_hits(cd, response, cd["type"])
+    if cd["type"] == SEARCH_TYPES.OPINION and not jurisdiction:
+        limit_inner_hits(cd, response, cd["type"])
     set_results_highlights(response, cd["type"])
 
 
@@ -3229,9 +3228,7 @@ def build_full_join_es_queries(
             else cd.get("q", ""),
             only_queries=True,
         )
-        has_text_query = (
-            True if string_query or has_valid_semantic_query else False
-        )
+        has_text_query = bool(string_query or has_valid_semantic_query)
 
         # If child filters are set, add a has_child query as a filter to the
         # parent query to exclude results without matching children.
@@ -3394,7 +3391,7 @@ def get_child_top_hits_limit(
     # trigger the "View Additional Results" button on the frontend.
     query_hits_limit = (
         0
-        if (search_type == SEARCH_TYPES.PEOPLE and not api_version == "v4")
+        if (search_type == SEARCH_TYPES.PEOPLE and api_version != "v4")
         else child_limit + 1
     )
     return child_limit, query_hits_limit
@@ -3470,7 +3467,7 @@ def do_es_api_query(
         Query for child documents, or None if there is no need to query
         child documents.
     """
-    alerts = True if hl_tag == ALERTS_HL_TAG else False
+    alerts = hl_tag == ALERTS_HL_TAG
     try:
         es_queries = build_es_base_query(
             search_query, cd, cd["highlight"], api_version, alerts=alerts

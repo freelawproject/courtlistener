@@ -2703,10 +2703,12 @@ class TestS3CacheHelpers(TestCase):
         mock_s3_cache = MagicMock()
         mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
 
-        with patch("cl.lib.s3_cache.caches", mock_caches):
-            with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
-                cache = get_s3_cache("db_cache")
-                self.assertEqual(cache, mock_s3_cache)
+        with (
+            patch("cl.lib.s3_cache.caches", mock_caches),
+            patch("cl.lib.s3_cache.switch_is_active", return_value=True),
+        ):
+            cache = get_s3_cache("db_cache")
+            self.assertEqual(cache, mock_s3_cache)
 
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_make_s3_cache_key_no_prefix_in_development(self) -> None:

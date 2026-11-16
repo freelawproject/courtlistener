@@ -466,9 +466,8 @@ def get_pdfs(
         f"{task_name} {count} items from PACER from {date_start} to {date_end}."
     )
     throttle = CeleryThrottle(queue_name=q)
-    completed = 0
     cycle_checker = CycleChecker()
-    for pk, court_id in rows_list:
+    for completed, (pk, court_id) in enumerate(rows_list, start=1):
         # Wait until the queue is short enough
         throttle.maybe_wait()
 
@@ -511,7 +510,6 @@ def get_pdfs(
         # Opinions. Introduce some time variability between consecutive tasks
         # to help the hash checks in `recap_document_into_opinions` work
         c.apply_async(countdown=random.uniform(3, 10))
-        completed += 1
 
         if completed % 1000 == 0:
             logger.info(

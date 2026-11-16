@@ -491,9 +491,11 @@ def make_federal_judge(item, testing=False):
         if len(dod_state) > 2:
             dod_state = ""
 
-        if not pd.isnull(item["Middle Name"]):
-            if len(item["Middle Name"]) == 1:
-                item["Middle Name"] += "."
+        if (
+            not pd.isnull(item["Middle Name"])
+            and len(item["Middle Name"]) == 1
+        ):
+            item["Middle Name"] += "."
 
         if not pd.isnull(item["Gender"]):
             gender = get_gender(item["Gender"])
@@ -674,14 +676,13 @@ def make_mag_bk_judge(item, testing=False):
             f"Name already exists for record being imported {name}"
         )
 
-    if not pd.isnull(item["NAME_MIDDLE"]):
-        if len(item["NAME_MIDDLE"]) == 1:
-            item["NAME_MIDDLE"] += "."
+    if not pd.isnull(item["NAME_MIDDLE"]) and len(item["NAME_MIDDLE"]) == 1:
+        item["NAME_MIDDLE"] += "."
 
     if not pd.isnull(item["GENDER"]):
         gender = get_gender(item["GENDER"])
 
-    if not item["NAME_SUFFIX"] == "":
+    if item["NAME_SUFFIX"] != "":
         suffix = get_suffix(item["NAME_SUFFIX"])
     else:
         suffix = ""

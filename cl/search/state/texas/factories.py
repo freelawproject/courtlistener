@@ -155,7 +155,7 @@ class TexasCommonDataDictFactory(DictFactory):
                     attachments=ce["attachments"],
                 ),
                 filter(
-                    lambda e: True if random.random() < 0.1 else False,
+                    lambda e: random.random() < 0.1,
                     d.case_events,
                 ),
             )

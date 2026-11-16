@@ -322,9 +322,7 @@ class S3Cache(RequestHandler):
         Allows us to avoid an extra `storage.exists` call when `save` and
         `load` are both enabled.
         """
-        if self.storage.exists(key):
-            return True
-        return False
+        return bool(self.storage.exists(key))
 
     def make_s3_key(self, request: ScheduledRequest) -> str:
         """Make the S3 key for a request from its URL path and a hash of its method, path, and parameters."""

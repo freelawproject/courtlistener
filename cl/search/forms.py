@@ -717,15 +717,18 @@ class SearchForm(forms.Form):
         if (
             self.cleaned_data["type"] == SEARCH_TYPES.OPINION
             or not self.cleaned_data["type"]
+        ) and not self.cleaned_data["order_by"]:
+            return self.fields["order_by"].initial
+        elif (
+            self.cleaned_data["type"] == SEARCH_TYPES.ORAL_ARGUMENT
+            and not self.cleaned_data["order_by"]
         ):
-            if not self.cleaned_data["order_by"]:
-                return self.fields["order_by"].initial
-        elif self.cleaned_data["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-            if not self.cleaned_data["order_by"]:
-                return "dateArgued desc"
-        elif self.cleaned_data["type"] == SEARCH_TYPES.PEOPLE:
-            if not self.cleaned_data["order_by"]:
-                return "name_reverse asc"
+            return "dateArgued desc"
+        elif (
+            self.cleaned_data["type"] == SEARCH_TYPES.PEOPLE
+            and not self.cleaned_data["order_by"]
+        ):
+            return "name_reverse asc"
         return self.cleaned_data["order_by"]
 
     def clean_type(self):

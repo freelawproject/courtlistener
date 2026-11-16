@@ -3935,33 +3935,33 @@ class SearchAlertsOAESTests(
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
         mock_date = timezone.localtime(now()).replace(day=1, hour=5)
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
         ):
-            with (
-                time_machine.travel(mock_date, tick=False),
-                self.captureOnCommitCallbacks(execute=True),
-            ):
-                # When the Audio object is created it should trigger an alert.
-                transcript = (
-                    "RT Test OA transcript Fusce luctus, eros vitae "
-                    "iaculis tincidunt, sem ligula maximus est, "
-                    "in pulvinar lacus augue eget enim. Nam viverra "
-                    "leo ut lectus varius, a dapibus ante lobortis. "
-                )
-                rt_oral_argument = AudioWithParentsFactory.create(
-                    case_name="Audio Case",
-                    docket__court=self.court_1,
-                    docket__date_argued=now().date(),
-                    docket__docket_number="19-5735",
-                    stt_status=Audio.STT_COMPLETE,
-                    judges="John Smith",
-                    stt_transcript=transcript,
-                    stt_source=Audio.STT_OPENAI_WHISPER,
-                )
+            # When the Audio object is created it should trigger an alert.
+            transcript = (
+                "RT Test OA transcript Fusce luctus, eros vitae "
+                "iaculis tincidunt, sem ligula maximus est, "
+                "in pulvinar lacus augue eget enim. Nam viverra "
+                "leo ut lectus varius, a dapibus ante lobortis. "
+            )
+            rt_oral_argument = AudioWithParentsFactory.create(
+                case_name="Audio Case",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5735",
+                stt_status=Audio.STT_COMPLETE,
+                judges="John Smith",
+                stt_transcript=transcript,
+                stt_source=Audio.STT_OPENAI_WHISPER,
+            )
 
         # Send RT alerts
         with time_machine.travel(mock_date, tick=False):
@@ -4275,15 +4275,17 @@ class SearchAlertsOAESTests(
         previous_date=None,
     ):
         self.mock_tally_stat.reset_mock()
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
+            time_machine.travel(mock_date, tick=False),
         ):
-            with time_machine.travel(mock_date, tick=False):
-                # Call dly command
-                call_command("cl_send_scheduled_alerts", rate=rate)
+            # Call dly command
+            call_command("cl_send_scheduled_alerts", rate=rate)
 
         # Confirm tally_stat was called with the expected increment.
         self.mock_tally_stat.assert_called_once()
@@ -4413,10 +4415,12 @@ class SearchAlertsOAESTests(
             mock_date = timezone.localtime(now()).replace(
                 month=1, day=30, hour=0
             )
-            with time_machine.travel(mock_date, tick=False):
+            with (
+                time_machine.travel(mock_date, tick=False),
                 # Call mly command
-                with self.assertRaises(InvalidDateError):
-                    call_command("cl_send_scheduled_alerts", rate="mly")
+                self.assertRaises(InvalidDateError),
+            ):
+                call_command("cl_send_scheduled_alerts", rate="mly")
 
         # Send mly alerts.
         current_date = timezone.localtime(timezone.now()).replace(

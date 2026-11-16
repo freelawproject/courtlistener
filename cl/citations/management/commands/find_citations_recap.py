@@ -106,12 +106,10 @@ class Command(VerboseCommand):
 
         chunk = []
         chunk_size = 25
-        processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
 
-        for doc in docs:
+        for processed_count, doc in enumerate(docs, 1):
             throttle.maybe_wait()
-            processed_count += 1
             last_item = self.count == processed_count
             chunk.append(doc.pk)
 

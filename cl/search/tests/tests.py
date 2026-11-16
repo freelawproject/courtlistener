@@ -268,27 +268,24 @@ class ModelTest(TestCase):
         op_1.save()
 
         # Can we update an opinion using an existing position?
-        with transaction.atomic():
-            with self.assertRaises(IntegrityError):
-                op_3.ordering_key = 2
-                op_3.save()
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            op_3.ordering_key = 2
+            op_3.save()
 
         # Validate unique cluster/order
-        with transaction.atomic():
-            with self.assertRaises(IntegrityError):
-                op = OpinionFactory(
-                    cluster=cluster,
-                    type=Opinion.ADDENDUM,
-                )
-                op.ordering_key = 3
-                op.save()
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            op = OpinionFactory(
+                cluster=cluster,
+                type=Opinion.ADDENDUM,
+            )
+            op.ordering_key = 3
+            op.save()
 
         # Can we use avoid negative positions?
-        with transaction.atomic():
-            with self.assertRaises(ValidationError):
-                op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
-                op.ordering_key = -1
-                op.save()
+        with transaction.atomic(), self.assertRaises(ValidationError):
+            op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
+            op.ordering_key = -1
+            op.save()
 
         # Can we order the opinions from a cluster using the field?
         qs = (
@@ -419,15 +416,14 @@ class DocketValidationTest(TestCase):
             pacer_case_id="asdf",
             court_id=self.court.pk,
         )
-        with transaction.atomic():
-            with self.assertRaises(IntegrityError):
-                Docket.objects.create(
-                    source=Docket.RECAP_AND_SCRAPER,
-                    docket_number="asdf",
-                    docket_number_raw="asdf",
-                    pacer_case_id="asdf",
-                    court_id=self.court.pk,
-                )
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            Docket.objects.create(
+                source=Docket.RECAP_AND_SCRAPER,
+                docket_number="asdf",
+                docket_number_raw="asdf",
+                pacer_case_id="asdf",
+                court_id=self.court.pk,
+            )
 
 
 class RECAPDocumentValidationTest(TestCase):

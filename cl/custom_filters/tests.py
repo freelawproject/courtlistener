@@ -662,9 +662,11 @@ class TestComponentTags(SimpleTestCase):
             ("js/foo.min.js", False, "js/foo.min.js"),
         )
         for path, debug, expected in test_cases:
-            with self.subTest(path=path, debug=debug):
-                with self.settings(DEBUG=debug):
-                    self.assertEqual(_resolved_path(path), expected)
+            with (
+                self.subTest(path=path, debug=debug),
+                self.settings(DEBUG=debug),
+            ):
+                self.assertEqual(_resolved_path(path), expected)
 
     def test_defer_flag_coercion(self) -> None:
         """Booleans and their string spellings coerce; anything else raises."""
@@ -680,9 +682,11 @@ class TestComponentTags(SimpleTestCase):
                 self.assertEqual(_coerce_defer(value, "js/foo.js"), expected)
 
         for invalid in ("yes", "1", None, 2):
-            with self.subTest(value=invalid):
-                with self.assertRaises(TemplateSyntaxError):
-                    _coerce_defer(invalid, "js/foo.js")
+            with (
+                self.subTest(value=invalid),
+                self.assertRaises(TemplateSyntaxError),
+            ):
+                _coerce_defer(invalid, "js/foo.js")
 
     def test_conflicting_defer_flags_raise(self) -> None:
         """Requiring one script with conflicting defer flags is an error."""
@@ -768,20 +772,22 @@ class TestComponentTags(SimpleTestCase):
             ),
         ]
         for files, expected in cases:
-            with self.subTest(files=sorted(files)):
-                with override_settings(
-                    STATICFILES_DIRS=[self._static_dir(files)]
-                ):
-                    self.assertEqual(_script_problems("js/thing"), expected)
+            with (
+                self.subTest(files=sorted(files)),
+                override_settings(STATICFILES_DIRS=[self._static_dir(files)]),
+            ):
+                self.assertEqual(_script_problems("js/thing"), expected)
 
     def test_problems_surface_as_warnings(self) -> None:
         """Each problem with a stub's files becomes one warning."""
         find = self._resolver({"js/ghost.js": self._file(b"a=1")})
-        with mock.patch.object(component_tags.finders, "find", find):
-            with self.settings(DEBUG=True):
-                require_script(self.context, "js/ghost")
-                with self.assertLogs(LOGGER, level="WARNING") as logs:
-                    rendered = self._render()
+        with (
+            mock.patch.object(component_tags.finders, "find", find),
+            self.settings(DEBUG=True),
+        ):
+            require_script(self.context, "js/ghost")
+            with self.assertLogs(LOGGER, level="WARNING") as logs:
+                rendered = self._render()
 
         self.assertEqual(len(logs.records), 1)
         self.assertIn("js/ghost.min.js is missing", logs.output[0])
@@ -796,21 +802,25 @@ class TestComponentTags(SimpleTestCase):
                 "js/ghost.min.js": self._file(b"a=1"),
             }
         )
-        with mock.patch.object(component_tags.finders, "find", find):
-            with self.settings(DEBUG=True):
-                require_script(self.context, "js/ghost", defer=True)
-                with self.assertNoLogs(LOGGER, level="WARNING"):
-                    self._render()
+        with (
+            mock.patch.object(component_tags.finders, "find", find),
+            self.settings(DEBUG=True),
+        ):
+            require_script(self.context, "js/ghost", defer=True)
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                self._render()
 
     def test_warning_is_emitted_once_per_request(self) -> None:
         """Repeated requires warn once and hit the filesystem once."""
         find = mock.Mock(side_effect=self._resolver({}))
-        with mock.patch.object(component_tags.finders, "find", find):
-            with self.settings(DEBUG=True):
-                require_script(self.context, "js/ghost")
-                require_script(self.context, "js/ghost")
-                with self.assertLogs(LOGGER, level="WARNING") as logs:
-                    self._render()
+        with (
+            mock.patch.object(component_tags.finders, "find", find),
+            self.settings(DEBUG=True),
+        ):
+            require_script(self.context, "js/ghost")
+            require_script(self.context, "js/ghost")
+            with self.assertLogs(LOGGER, level="WARNING") as logs:
+                self._render()
 
         # Both variants are missing, so one warning each — not four.
         self.assertEqual(len(logs.records), 2)
@@ -843,9 +853,11 @@ class TestComponentTags(SimpleTestCase):
         with self.settings(DEBUG=True):
             require_script(self.context, "js/alpine/plugins/ghost")
 
-        with self.settings(DEBUG=False):
-            with self.assertNoLogs(LOGGER, level="WARNING"):
-                _warn_about_unusable_scripts(self.request)
+        with (
+            self.settings(DEBUG=False),
+            self.assertNoLogs(LOGGER, level="WARNING"),
+        ):
+            _warn_about_unusable_scripts(self.request)
 
         mock_find.assert_not_called()
 

@@ -1142,7 +1142,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 if order_name in ("", "invalid"):
                     direction = "-"
                     order_name = "hit"
-                das.sort(key=sorter, reverse=True if direction else False)
+                das.sort(key=sorter, reverse=bool(direction))
                 self.assertEqual(
                     list(c["docket_alerts"]),
                     das,

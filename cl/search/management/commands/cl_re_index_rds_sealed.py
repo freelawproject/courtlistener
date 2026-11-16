@@ -121,13 +121,11 @@ class Command(VerboseCommand):
         testing_mode = self.options["testing_mode"]
         chunk_size = self.options["chunk_size"]
         chunk = []
-        processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
-        use_streaming_bulk = True if testing_mode else False
+        use_streaming_bulk = bool(testing_mode)
         # Indexing Parent and their child documents.
-        for item_id in items:
+        for processed_count, item_id in enumerate(items, 1):
             chunk.append(item_id)
-            processed_count += 1
             last_item = count == processed_count
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()

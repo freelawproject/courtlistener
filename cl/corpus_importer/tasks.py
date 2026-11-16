@@ -2662,7 +2662,7 @@ async def get_document_number_for_appellate(
     # 1-1, 1-2, 1-3 or in ACMS 1.1, 1.2 in those cases the document number is
     # the left number.
     document_number_split = re.split(r"[-.]", document_number)
-    if not len(document_number_split) == 1:
+    if len(document_number_split) != 1:
         document_number = document_number_split[0]
 
     if is_long_appellate_document_number(document_number):
@@ -3383,10 +3383,12 @@ def recap_document_into_opinions(
     ]:
         return task_data
 
-    if jurisdiction == Court.FEDERAL_DISTRICT:
-        if "cv" not in docket.docket_number_raw.lower():
-            logger.info("Skipping non-civil opinion in district court")
-            return task_data
+    if (
+        jurisdiction == Court.FEDERAL_DISTRICT
+        and "cv" not in docket.docket_number_raw.lower()
+    ):
+        logger.info("Skipping non-civil opinion in district court")
+        return task_data
 
     hash_exists_qs = Opinion.objects.filter(sha1=recap_document.sha1)
     if hash_exists_qs.exists():
@@ -4186,7 +4188,7 @@ def merge_scotus_docket(
         ):
             oci = d.originating_court_information
             # Create originating_court_information if missing
-            oci = OriginatingCourtInformation() if not oci else oci
+            oci = oci if oci else OriginatingCourtInformation()
 
             oci.docket_number = (
                 ", ".join(lower_court_case_numbers)

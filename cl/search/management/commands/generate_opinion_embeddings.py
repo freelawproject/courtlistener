@@ -135,7 +135,7 @@ class Command(VerboseCommand):
         upload_queue = options["upload_queue"]
         database = options["database"]
         token_count_limit = options["token_count"]
-        count = options.get("count", None)
+        count = options.get("count")
         auto_resume = options["auto_resume"]
         min_opinion_size = settings.MIN_OPINION_SIZE
         start_id = options["start_id"]

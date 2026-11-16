@@ -264,13 +264,11 @@ class Command(VerboseCommand):
         sys.stdout.flush()
 
         chunk = []
-        processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
         throttle.update_min_items(throttle_min_items)
 
-        for opinion_pk in opinion_pks:
+        for processed_count, opinion_pk in enumerate(opinion_pks, 1):
             throttle.maybe_wait()
-            processed_count += 1
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % opinions_per_task == 0 or last_item:

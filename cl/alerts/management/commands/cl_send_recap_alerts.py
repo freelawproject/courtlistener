@@ -699,9 +699,7 @@ def query_and_send_alerts(
         alerts_sent = []
         for alert in alerts:
             search_params = QueryDict(alert.query.encode(), mutable=True)
-            case_only_alert = (
-                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
-            )
+            case_only_alert = alert.alert_type == SEARCH_TYPES.DOCKETS
             # Override the alert type to RECAP, since DOCKETS alerts should
             # behave exactly like RECAP alerts.
             search_params["type"] = SEARCH_TYPES.RECAP
@@ -795,9 +793,7 @@ def query_and_schedule_alerts(
             results, parent_results, child_results = query_alerts(
                 search_params
             )
-            case_only_alert = (
-                True if alert.alert_type == SEARCH_TYPES.DOCKETS else False
-            )
+            case_only_alert = alert.alert_type == SEARCH_TYPES.DOCKETS
             # Override the alert type to RECAP, since DOCKETS alerts should
             # behave exactly like RECAP alerts.
             search_params["type"] = SEARCH_TYPES.RECAP
@@ -899,7 +895,7 @@ class Command(VerboseCommand):
         testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")
         query_date: datetime.datetime | None = options["query_date"]
-        custom_date = True if query_date else False
+        custom_date = bool(query_date)
 
         if query_date is not None:
             # Convert the provided query_date to midnight.
