@@ -21,6 +21,8 @@ lint.select = [
   "LOG",
   # flake8-logging-format
   "G",
+  # flake8-simplify
+  "SIM"
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules
@@ -31,6 +33,8 @@ lint.ignore = [
   "SIM105",
   # if-else-block-instead-of-if-exp
   "SIM108",
+  # in-dict-keys
+  "SIM118",
   # undocumented-magic-method
   "D105",
   # undocumented-public-nested-class

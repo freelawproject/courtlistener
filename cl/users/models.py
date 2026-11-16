@@ -212,7 +212,7 @@ class UserProfile(models.Model):
         limit = settings.MAX_FREE_DOCKET_ALERTS
         if recap_installed:
             limit += settings.DOCKET_ALERT_RECAP_BONUS
-        if any(
+        return any(
             [
                 # Place performant checks first
                 self.unlimited_docket_alerts,
@@ -220,9 +220,7 @@ class UserProfile(models.Model):
                 self.is_member,
                 self.user.docket_alerts.subscriptions().count() < limit,
             ]
-        ):
-            return True
-        return False
+        )
 
     @property
     def recent_api_usage(self) -> dict[str, int]:

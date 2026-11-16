@@ -329,10 +329,9 @@ def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
         op.decompose()
     headmatter = []
     soup = fix_footnotes(soup)
-    index = 0
     casebody = soup.find("casebody")
     assert casebody is not None
-    for element in casebody.find_all(recursive=False):
+    for index, element in enumerate(casebody.find_all(recursive=False)):
         element = fix_pagination(element)
         element_id = element.get("id", "")
         if (
@@ -343,7 +342,6 @@ def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
             headmatter.append(f"<br>{str(element)}")
         else:
             headmatter.append(str(element))
-        index += 1
 
     return {"headmatter": "".join(headmatter)}
 

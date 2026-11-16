@@ -526,11 +526,10 @@ class Command(VerboseCommand):
             document_type = "child"
 
         chunk = []
-        processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
         use_streaming_bulk = bool(testing_mode)
         # Indexing Parent and their child documents.
-        for item in items:
+        for processed_count, item in enumerate(items, 1):
             item_id = item
             changed_fields = []
             if missing and es_document:
@@ -557,7 +556,6 @@ class Command(VerboseCommand):
                 if isinstance(item, tuple):
                     item_id, changed_fields = item
                 chunk.append(item_id)
-            processed_count += 1
             last_item = count == processed_count
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()

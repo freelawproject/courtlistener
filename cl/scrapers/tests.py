@@ -2088,9 +2088,11 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             ("H", "brad heath archive is audio-only"),
         )
         for source, reason in invalid_char_cases:
-            with self.subTest(source=source, reason=reason):
-                with self.assertRaises(ValidationError):
-                    ClusterSources.validate_source(source)
+            with (
+                self.subTest(source=source, reason=reason),
+                self.assertRaises(ValidationError),
+            ):
+                ClusterSources.validate_source(source)
 
         # Wrong canonical order
         misordered_cases = (
@@ -2100,9 +2102,11 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             ("CC", "duplicates collapse in frozenset"),
         )
         for source, reason in misordered_cases:
-            with self.subTest(source=source, reason=reason):
-                with self.assertRaises(ValidationError):
-                    ClusterSources.validate_source(source)
+            with (
+                self.subTest(source=source, reason=reason),
+                self.assertRaises(ValidationError),
+            ):
+                ClusterSources.validate_source(source)
 
     def test_string_merging(self):
         """Can we merge strings while reducing repetition?"""

@@ -364,7 +364,6 @@ class Command(VerboseCommand):
         """
         testing_mode = self.options.get("testing_mode", False)
         chunk = []
-        processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
             poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,  # type: ignore
@@ -373,7 +372,7 @@ class Command(VerboseCommand):
         )
         use_streaming_bulk = bool(testing_mode)
         document_type, search_type, es_document = task_params
-        for item in items:
+        for processed_count, item in enumerate(items, 1):
             if isinstance(item, tuple):
                 item_id = item[0]
                 parent_document_id = item[1]
@@ -381,7 +380,6 @@ class Command(VerboseCommand):
                 item_id = item
                 parent_document_id = item
 
-            processed_count += 1
             last_item = count == processed_count
             if es_document and self.sweep_indexer_action == "missing":
                 doc_id = get_es_doc_id(es_document, item_id)

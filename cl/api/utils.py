@@ -263,16 +263,17 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
 
         # Skip validation for views without a filterset (e.g., search API views
         # that use their own form-based validation)
-        if filterset_class is not None:
-            if unknown_params := detect_unknown_filter_params(
+        if filterset_class is not None and (
+            unknown_params := detect_unknown_filter_params(
                 request.query_params, filterset_class
-            ):
-                raise ValidationError(
-                    {
-                        "detail": "Unknown filter parameters are not allowed.",
-                        "unknown_params": sorted(unknown_params),
-                    }
-                )
+            )
+        ):
+            raise ValidationError(
+                {
+                    "detail": "Unknown filter parameters are not allowed.",
+                    "unknown_params": sorted(unknown_params),
+                }
+            )
 
         # Return queryset unchanged - actual filtering is done by
         # DisabledHTMLFilterBackend

@@ -410,9 +410,11 @@ class JKentScrapeLoader[
             The row's position in the query, counting from one, and the
             row itself.
         """
-        with self.connected() as connection:
-            with closing(connection.execute(self.query)) as cursor:
-                yield from enumerate(cursor, start=1)
+        with (
+            self.connected() as connection,
+            closing(connection.execute(self.query)) as cursor,
+        ):
+            yield from enumerate(cursor, start=1)
 
     @contextmanager
     def connected(self) -> Iterator[sqlite3.Connection]:

@@ -215,15 +215,14 @@ def es_search_db_for_full_citation(
     citation_found = len(results) > 0
     if len(results) == 1:
         return results, citation_found
-    if len(results) > 1:
-        if full_citation.metadata.defendant:
-            # We get to this part when we are resolving full case citations to annotate them
-            # e.g. "People v. Williams, 307 Ill. Dec. 312" and being cited in an opinion
-            results = es_case_name_query(
-                query,
-                full_citation,
-                citing_opinion,
-            )
+    if len(results) > 1 and full_citation.metadata.defendant:
+        # We get to this part when we are resolving full case citations to annotate them
+        # e.g. "People v. Williams, 307 Ill. Dec. 312" and being cited in an opinion
+        results = es_case_name_query(
+            query,
+            full_citation,
+            citing_opinion,
+        )
 
     # Return all possible results
     return results, citation_found

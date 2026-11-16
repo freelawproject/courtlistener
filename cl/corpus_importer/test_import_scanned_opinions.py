@@ -1619,9 +1619,11 @@ class ImportFromScanningBucketTest(TestCase):
             {"all": True, "opinion_id": "12"},
             {"scan_id": ["1", "2"], "opinion_id": "12"},
         ]:
-            with self.subTest(options=options):
-                with self.assertRaises(CommandError):
-                    self.import_from_bucket({}, **options)
+            with (
+                self.subTest(options=options),
+                self.assertRaises(CommandError),
+            ):
+                self.import_from_bucket({}, **options)
 
     def test_failed_read_does_not_stop_the_run(self) -> None:
         """Does a missing key log the failure and leave the run going?"""

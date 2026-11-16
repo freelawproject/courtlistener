@@ -713,13 +713,13 @@ def allow_es_audio_indexing(
     Returns:
         True if indexing should be avoided, False otherwise.
     """
-    if isinstance(instance, Audio) and (
-        update_fields and "processing_complete" in update_fields
-    ):
-        # Allow indexing Audio instances for which 'processing_complete' is
-        # present in update_fields.
-        return True
-    return False
+    # Allow indexing Audio instances for which 'processing_complete' is
+    # present in update_fields.
+    return bool(
+        isinstance(instance, Audio)
+        and update_fields
+        and "processing_complete" in update_fields
+    )
 
 
 def remove_non_judge_person_and_positions_from_index(

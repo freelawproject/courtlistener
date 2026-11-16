@@ -76,15 +76,17 @@ class Command(VerboseCommand):
                 batch_end,
             )
 
-            with pgtrigger.ignore("search.Docket:update_update"):
-                with transaction.atomic():
-                    try:
-                        qs.update(docket_number_raw=F("docket_number"))
-                    except IntegrityError:
-                        logger.error(
-                            "Docket.docket_number_raw population failed",
-                            exc_info=True,
-                        )
+            with (
+                pgtrigger.ignore("search.Docket:update_update"),
+                transaction.atomic(),
+            ):
+                try:
+                    qs.update(docket_number_raw=F("docket_number"))
+                except IntegrityError:
+                    logger.error(
+                        "Docket.docket_number_raw population failed",
+                        exc_info=True,
+                    )
 
             # prevent affecting all tests with this sleep
             if not TESTING:

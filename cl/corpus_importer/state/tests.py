@@ -112,22 +112,23 @@ def merger_test[**P, R](
             with connection.execute_wrapper(count_query):
                 output = f(*args, **kwargs)
 
-            if expected_query_count is not None:
-                if isinstance(args[0], TestCase):
-                    # It's okay if the query count is below the expect amount, but we still assert it isn't to force
-                    # the expectation to be updated whenever performance is improved.
-                    if isinstance(expected_query_count, int):
-                        args[0].assertEqual(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be equal to expectation.",
-                        )
-                    elif isinstance(expected_query_count, range):
-                        args[0].assertIn(
-                            counts["merger"],
-                            expected_query_count,
-                            "Merger query count should be in expected range.",
-                        )
+            if expected_query_count is not None and isinstance(
+                args[0], TestCase
+            ):
+                # It's okay if the query count is below the expect amount, but we still assert it isn't to force
+                # the expectation to be updated whenever performance is improved.
+                if isinstance(expected_query_count, int):
+                    args[0].assertEqual(
+                        counts["merger"],
+                        expected_query_count,
+                        "Merger query count should be equal to expectation.",
+                    )
+                elif isinstance(expected_query_count, range):
+                    args[0].assertIn(
+                        counts["merger"],
+                        expected_query_count,
+                        "Merger query count should be in expected range.",
+                    )
 
             return output
 
@@ -1557,11 +1558,11 @@ class LoaderPreflightTest(LoaderTestCase):
         logging.disable(logging.NOTSET)
         self.addCleanup(logging.disable)
 
-        with self.assertLogs("cl.corpus_importer.state.loader", "ERROR"):
-            with self.assertRaises(PreflightFailed) as raised:
-                self.loader(
-                    self.loader_class(extra_checks=(Failing(),))
-                ).load()
+        with (
+            self.assertLogs("cl.corpus_importer.state.loader", "ERROR"),
+            self.assertRaises(PreflightFailed) as raised,
+        ):
+            self.loader(self.loader_class(extra_checks=(Failing(),))).load()
 
         self.assertIn(
             "the schema is not the one expected", str(raised.exception)
@@ -2281,9 +2282,11 @@ class RunDatabaseTest(SimpleTestCase):
             )
         )
 
-        with self.assertRaises(RunDatabaseUnavailable) as caught:
-            with self.download(bucket, "nycourts_gov/nope.db"):
-                pass
+        with (
+            self.assertRaises(RunDatabaseUnavailable) as caught,
+            self.download(bucket, "nycourts_gov/nope.db"),
+        ):
+            pass
 
         self.assertIn(
             "s3://scrapes/nycourts_gov/nope.db", str(caught.exception)
@@ -2293,9 +2296,11 @@ class RunDatabaseTest(SimpleTestCase):
         """Is a prefix handed over in place of a database refused before anything is downloaded?"""
         bucket = FakeBucket()
 
-        with self.assertRaises(RunDatabaseUnavailable):
-            with self.download(bucket, "nycourts_gov/"):
-                pass
+        with (
+            self.assertRaises(RunDatabaseUnavailable),
+            self.download(bucket, "nycourts_gov/"),
+        ):
+            pass
 
         self.assertEqual(bucket.calls, [])
 

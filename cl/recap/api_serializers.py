@@ -147,6 +147,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "should have claims registry pages.".format(attrs["court"])
                 )
 
+        # Appellate court dockets. Is the court valid?
         if attrs["upload_type"] in [
             UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
             UPLOAD_TYPE.APPELLATE_DOCKET,
@@ -154,13 +155,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
-        ]:
-            # Appellate court dockets. Is the court valid?
-            if not async_to_sync(is_appellate_court)(attrs["court"].pk):
-                raise ValidationError(
-                    "{} is not an appellate court ID. Did you mean to use the "
-                    "upload_type for district dockets?".format(attrs["court"])
-                )
+        ] and not async_to_sync(is_appellate_court)(attrs["court"].pk):
+            raise ValidationError(
+                "{} is not an appellate court ID. Did you mean to use the "
+                "upload_type for district dockets?".format(attrs["court"])
+            )
 
         if attrs["upload_type"] == UPLOAD_TYPE.PDF:
             # PDFs require pacer_doc_id and document_number values.

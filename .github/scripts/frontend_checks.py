@@ -77,9 +77,10 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
     """
     skips: dict[int, set[str]] = {}
     for i, line in enumerate(lines, 1):
-        if m := _line_skip_directive_re.search(line):
-            if names := _skippable_names(m.group(1)):
-                skips[i] = names
+        if (m := _line_skip_directive_re.search(line)) and (
+            names := _skippable_names(m.group(1))
+        ):
+            skips[i] = names
     return skips
 
 

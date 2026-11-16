@@ -3383,10 +3383,12 @@ def recap_document_into_opinions(
     ]:
         return task_data
 
-    if jurisdiction == Court.FEDERAL_DISTRICT:
-        if "cv" not in docket.docket_number_raw.lower():
-            logger.info("Skipping non-civil opinion in district court")
-            return task_data
+    if (
+        jurisdiction == Court.FEDERAL_DISTRICT
+        and "cv" not in docket.docket_number_raw.lower()
+    ):
+        logger.info("Skipping non-civil opinion in district court")
+        return task_data
 
     hash_exists_qs = Opinion.objects.filter(sha1=recap_document.sha1)
     if hash_exists_qs.exists():

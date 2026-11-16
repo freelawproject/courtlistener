@@ -4415,10 +4415,12 @@ class SearchAlertsOAESTests(
             mock_date = timezone.localtime(now()).replace(
                 month=1, day=30, hour=0
             )
-            with time_machine.travel(mock_date, tick=False):
+            with (
+                time_machine.travel(mock_date, tick=False),
                 # Call mly command
-                with self.assertRaises(InvalidDateError):
-                    call_command("cl_send_scheduled_alerts", rate="mly")
+                self.assertRaises(InvalidDateError),
+            ):
+                call_command("cl_send_scheduled_alerts", rate="mly")
 
         # Send mly alerts.
         current_date = timezone.localtime(timezone.now()).replace(

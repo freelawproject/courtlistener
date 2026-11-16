@@ -208,7 +208,6 @@ class Command(VerboseCommand):
         Returns:
             The number of RECAP documents processed for this batch.
         """
-        affected_rds = 0
         chunk = []
         rd_queryset = (
             RECAPDocument.objects.filter(docket_entry__docket_id__in=batch_ids)
@@ -219,9 +218,8 @@ class Command(VerboseCommand):
             "Getting the count of recap documents that need to be fixed in this batch."
         )
         count = rd_queryset.count()
-        for rd_id_to_fix in rd_queryset.iterator():
+        for affected_rds, rd_id_to_fix in enumerate(rd_queryset.iterator(), 1):
             chunk.append(rd_id_to_fix)
-            affected_rds += 1
             last_item = count == affected_rds
             if affected_rds % self.chunk_size == 0 or last_item:
                 self.throttle.maybe_wait()
@@ -265,12 +263,10 @@ class Command(VerboseCommand):
 
         batch_ids = []
         batch_number = 0
-        affected_dockets = 0
-        for docket_id in docket_ids_queryset.iterator(
-            chunk_size=self.docket_batch_size
+        for affected_dockets, docket_id in enumerate(
+            docket_ids_queryset.iterator(chunk_size=self.docket_batch_size), 1
         ):
             batch_ids.append(docket_id)
-            affected_dockets += 1
             if len(batch_ids) >= self.docket_batch_size:
                 batch_number += 1
                 logger.info(

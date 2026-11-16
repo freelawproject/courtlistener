@@ -75,19 +75,23 @@ def identify_parallel_citations(
             parallel_citation.append(citations[i + 1])
         else:
             # Not close enough. Append what we've got and start a new list.
-            if len(parallel_citation) > 1:
-                if tuple(parallel_citation[::-1]) not in parallel_citations:
-                    # If the reversed tuple isn't in the set already, add it.
-                    # This makes sure a document with many references to the
-                    # same case only gets counted once.
-                    parallel_citations.add(tuple(parallel_citation))
+            if (
+                len(parallel_citation) > 1
+                and tuple(parallel_citation[::-1]) not in parallel_citations
+            ):
+                # If the reversed tuple isn't in the set already, add it.
+                # This makes sure a document with many references to the
+                # same case only gets counted once.
+                parallel_citations.add(tuple(parallel_citation))
             parallel_citation = [citations[i + 1]]
 
     # In case the last item had a citation.
-    if len(parallel_citation) > 1:
-        if tuple(parallel_citation[::-1]) not in parallel_citations:
-            # Ensure the reversed tuple isn't in the set already (see above).
-            parallel_citations.add(tuple(parallel_citation))
+    if (
+        len(parallel_citation) > 1
+        and tuple(parallel_citation[::-1]) not in parallel_citations
+    ):
+        # Ensure the reversed tuple isn't in the set already (see above).
+        parallel_citations.add(tuple(parallel_citation))
     return parallel_citations
 
 

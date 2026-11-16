@@ -2234,9 +2234,11 @@ async def clean_duplicate_attachment_entries(
         for attachment in attachment_dicts:
             attachment_number = attachment["attachment_number"]
             pacer_doc_id = attachment["pacer_doc_id"]
-            if dupe.pacer_doc_id == pacer_doc_id:
-                if dupe.attachment_number != attachment_number:
-                    await dupe.adelete()
+            if (
+                dupe.pacer_doc_id == pacer_doc_id
+                and dupe.attachment_number != attachment_number
+            ):
+                await dupe.adelete()
     if not await dupe_doc_ids.aexists():
         return
     dupes = rds.filter(

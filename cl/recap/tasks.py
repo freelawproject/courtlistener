@@ -630,94 +630,96 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    with pq.filepath_local.open("rb") as zip_bytes:
-        with ZipFile(zip_bytes, "r") as archive:
-            # Security: Check for zip bombs.
-            max_file_size = convert_size_to_bytes("200MB")
-            for zip_info in archive.infolist():
-                if zip_info.file_size < max_file_size:
-                    continue
-                await mark_pq_status(
-                    pq,
-                    f"Zip too large; possible zip bomb. File in zip named {zip_info.filename} "
-                    f"would be {zip_info.file_size} bytes expanded.",
-                    PROCESSING_STATUS.INVALID_CONTENT,
-                )
-                return {"new_pqs": [], "tasks": []}
+    with (
+        pq.filepath_local.open("rb") as zip_bytes,
+        ZipFile(zip_bytes, "r") as archive,
+    ):
+        # Security: Check for zip bombs.
+        max_file_size = convert_size_to_bytes("200MB")
+        for zip_info in archive.infolist():
+            if zip_info.file_size < max_file_size:
+                continue
+            await mark_pq_status(
+                pq,
+                f"Zip too large; possible zip bomb. File in zip named {zip_info.filename} "
+                f"would be {zip_info.file_size} bytes expanded.",
+                PROCESSING_STATUS.INVALID_CONTENT,
+            )
+            return {"new_pqs": [], "tasks": []}
 
-            # For each document in the zip, create a new PQ
-            new_pqs = []
-            tasks = []
-            skipped_files = []
-            for file_name in archive.namelist():
-                file_content = archive.read(file_name)
-                f = SimpleUploadedFile(file_name, file_content)
+        # For each document in the zip, create a new PQ
+        new_pqs = []
+        tasks = []
+        skipped_files = []
+        for file_name in archive.namelist():
+            file_content = archive.read(file_name)
+            f = SimpleUploadedFile(file_name, file_content)
 
-                # Security: whoever built the zip named its members, and the
-                # PQs below are created directly, so they never pass through
-                # ProcessingQueueSerializer's PDF check. Confirm the contents
-                # here instead, or a member named `1-main.pdf` holding
-                # anything at all gets stored and served as a document.
-                if not content_is_pdf(f):
-                    skipped_files.append(file_name)
-                    continue
+            # Security: whoever built the zip named its members, and the
+            # PQs below are created directly, so they never pass through
+            # ProcessingQueueSerializer's PDF check. Confirm the contents
+            # here instead, or a member named `1-main.pdf` holding
+            # anything at all gets stored and served as a document.
+            if not content_is_pdf(f):
+                skipped_files.append(file_name)
+                continue
 
-                file_name = file_name.split(".pdf")[0]
-                if "-" in file_name:
-                    doc_num, att_num = file_name.split("-")
-                    if att_num == "main":
-                        att_num = None
-                else:
-                    doc_num = file_name
+            file_name = file_name.split(".pdf")[0]
+            if "-" in file_name:
+                doc_num, att_num = file_name.split("-")
+                if att_num == "main":
                     att_num = None
+            else:
+                doc_num = file_name
+                att_num = None
 
-                if att_num:
-                    # An attachment, ∴ nuke the pacer_doc_id value, since it
-                    # corresponds to the main doc only.
-                    pacer_doc_id = ""
-                else:
-                    pacer_doc_id = pq.pacer_doc_id
+            if att_num:
+                # An attachment, ∴ nuke the pacer_doc_id value, since it
+                # corresponds to the main doc only.
+                pacer_doc_id = ""
+            else:
+                pacer_doc_id = pq.pacer_doc_id
 
-                # Create a new PQ and enqueue it for processing
-                new_pq = await ProcessingQueue.objects.acreate(
-                    court_id=pq.court_id,
-                    uploader_id=pq.uploader_id,
-                    pacer_case_id=pq.pacer_case_id,
-                    pacer_doc_id=pacer_doc_id,
-                    document_number=doc_num,
-                    attachment_number=att_num,
-                    filepath_local=f,
-                    status=PROCESSING_STATUS.ENQUEUED,
-                    upload_type=UPLOAD_TYPE.PDF,
-                    debug=pq.debug,
-                    source=pq.source,
-                )
-                new_pqs.append(new_pq.pk)
-                await process_recap_pdf(new_pq.pk)
+            # Create a new PQ and enqueue it for processing
+            new_pq = await ProcessingQueue.objects.acreate(
+                court_id=pq.court_id,
+                uploader_id=pq.uploader_id,
+                pacer_case_id=pq.pacer_case_id,
+                pacer_doc_id=pacer_doc_id,
+                document_number=doc_num,
+                attachment_number=att_num,
+                filepath_local=f,
+                status=PROCESSING_STATUS.ENQUEUED,
+                upload_type=UPLOAD_TYPE.PDF,
+                debug=pq.debug,
+                source=pq.source,
+            )
+            new_pqs.append(new_pq.pk)
+            await process_recap_pdf(new_pq.pk)
 
-            if skipped_files and not new_pqs:
-                await mark_pq_status(
-                    pq,
-                    f"Zip contained no PDFs. Skipped: {oxford_join(skipped_files)}.",
-                    PROCESSING_STATUS.INVALID_CONTENT,
-                )
-                return {"new_pqs": [], "tasks": []}
+        if skipped_files and not new_pqs:
+            await mark_pq_status(
+                pq,
+                f"Zip contained no PDFs. Skipped: {oxford_join(skipped_files)}.",
+                PROCESSING_STATUS.INVALID_CONTENT,
+            )
+            return {"new_pqs": [], "tasks": []}
 
-            # At the end, mark the pq as successful and return the PQ
-            message = f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}"
-            if skipped_files:
-                message += (
-                    f". Skipped files that are not PDFs: "
-                    f"{oxford_join(skipped_files)}"
-                )
-            await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
+        # At the end, mark the pq as successful and return the PQ
+        message = f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}"
+        if skipped_files:
+            message += (
+                f". Skipped files that are not PDFs: "
+                f"{oxford_join(skipped_files)}"
+            )
+        await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
-            # Returning the tasks allows tests to wait() for the PDFs to complete
-            # before checking assertions.
-            return {
-                "new_pqs": new_pqs,
-                "tasks": tasks,
-            }
+        # Returning the tasks allows tests to wait() for the PDFs to complete
+        # before checking assertions.
+        return {
+            "new_pqs": new_pqs,
+            "tasks": tasks,
+        }
 
 
 async def process_recap_docket(pk):
@@ -1365,9 +1367,12 @@ async def process_case_query_page(pk):
     # Update the docket if the case name has changed and contains
     # docket entries
     content_updated = False
-    if current_case_name != d.case_name and d.pk:
-        if await d.docket_entries.aexists():
-            content_updated = True
+    if (
+        current_case_name != d.case_name
+        and d.pk
+        and await d.docket_entries.aexists()
+    ):
+        content_updated = True
 
     if pq.debug:
         await associate_related_instances(pq, d_id=d.pk)

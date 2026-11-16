@@ -4355,11 +4355,10 @@ class ProcessingQueueApiFilterTest(TestCase):
 def mock_bucket_open(message_id, r, read_file=False):
     """This function mocks bucket.open() method in order to call a recap.email notification fixture."""
     test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+    contents = (test_dir / message_id).read_bytes()
     if read_file:
-        with open(test_dir / message_id, "rb") as file:
-            return file.read()
-    recap_mail_example = open(test_dir / message_id, "rb")
-    return recap_mail_example
+        return contents
+    return BytesIO(contents)
 
 
 class DebugRecapUploadtest(TestCase):
@@ -7153,12 +7152,14 @@ class WebhooksRetries(TestCase):
         ):
             # Try to retry on the exact time, 3 minutes later.
             next_retry_date = fake_now + timedelta(minutes=3)
-            with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch("cl.api.webhooks.send_webhook_event"):
-                    # webhook_e1 shouldn't be retried since its parent webhook
-                    # is disabled.
-                    retried_webhooks = retry_webhook_events()
-                    self.assertEqual(retried_webhooks, 0)
+            with (
+                time_machine.travel(next_retry_date, tick=False),
+                mock.patch("cl.api.webhooks.send_webhook_event"),
+            ):
+                # webhook_e1 shouldn't be retried since its parent webhook
+                # is disabled.
+                retried_webhooks = retry_webhook_events()
+                self.assertEqual(retried_webhooks, 0)
 
     def test_retry_webhook_events(
         self,
@@ -7210,42 +7211,50 @@ class WebhooksRetries(TestCase):
             ),
         ):
             next_retry_date = fake_now + timedelta(minutes=1)
-            with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch(
+            with (
+                time_machine.travel(next_retry_date, tick=False),
+                mock.patch(
                     "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
-                ):
-                    webhooks_to_retry = retry_webhook_events()
-                    # No webhooks events should be retried since it's no time.
-                    self.assertEqual(webhooks_to_retry, 0)
+                ),
+            ):
+                webhooks_to_retry = retry_webhook_events()
+                # No webhooks events should be retried since it's no time.
+                self.assertEqual(webhooks_to_retry, 0)
 
             # Try to retry on the exact time, 3 minutes later.
             next_retry_date = fake_now + timedelta(minutes=3)
-            with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch(
+            with (
+                time_machine.travel(next_retry_date, tick=False),
+                mock.patch(
                     "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
-                ):
-                    # Only webhook_e1 should be retried.
-                    webhooks_to_retry = retry_webhook_events()
-                    self.assertEqual(webhooks_to_retry, 1)
+                ),
+            ):
+                # Only webhook_e1 should be retried.
+                webhooks_to_retry = retry_webhook_events()
+                self.assertEqual(webhooks_to_retry, 1)
 
             # Try to retry 5 minutes later.
             next_retry_date = fake_now + timedelta(minutes=5)
-            with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch(
+            with (
+                time_machine.travel(next_retry_date, tick=False),
+                mock.patch(
                     "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
-                ):
-                    # Only webhook_e1 should be retried.
-                    webhooks_to_retry = retry_webhook_events()
-                    self.assertEqual(webhooks_to_retry, 1)
+                ),
+            ):
+                # Only webhook_e1 should be retried.
+                webhooks_to_retry = retry_webhook_events()
+                self.assertEqual(webhooks_to_retry, 1)
 
             # Try to retry 10 hours later.
             next_retry_date = fake_now + timedelta(hours=10)
-            with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch(
+            with (
+                time_machine.travel(next_retry_date, tick=False),
+                mock.patch(
                     "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
-                ):
-                    webhooks_to_retry = retry_webhook_events()
-                    self.assertEqual(webhooks_to_retry, 1)
+                ),
+            ):
+                webhooks_to_retry = retry_webhook_events()
+                self.assertEqual(webhooks_to_retry, 1)
 
             webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
             # Retry without mocking send_webhook_event
@@ -8124,9 +8133,9 @@ class WebhooksRetries(TestCase):
             (96, 4, 3),  # 4 days after, No new email out
         ]
         time_to_check = now_time.replace(hour=12, minute=00)
-        minute_delay = 0
-        for hours, email_out, days in iterations:
-            minute_delay += 1
+        for minute_delay, (hours, email_out, days) in enumerate(
+            iterations, start=1
+        ):
             hours_after = time_to_check + timedelta(
                 hours=hours, minutes=minute_delay
             )

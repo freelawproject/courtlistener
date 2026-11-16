@@ -334,9 +334,10 @@ def merge_structured_opinion_into_cl_opinion(
     opinion.per_curiam = (
         normalize_centralia_opinion_type(centralia_type) == "per-curiam"
     )
-    if not opinion.per_curiam:
-        if author_name := extracted.get("author_name"):
-            opinion.author_str = titlecase(author_name)
+    if not opinion.per_curiam and (
+        author_name := extracted.get("author_name")
+    ):
+        opinion.author_str = titlecase(author_name)
 
     cluster = opinion.cluster
     cluster_fields = []

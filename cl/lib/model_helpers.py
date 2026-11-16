@@ -532,9 +532,8 @@ def validate_partial_date[M: Model](
 
         # If a partial date, are days/month set to 1?
         bad_date = False
-        if granularity == GRANULARITY_YEAR:
-            if d.month != 1 and d.day != 1:
-                bad_date = True
+        if granularity == GRANULARITY_YEAR and d.month != 1 and d.day != 1:
+            bad_date = True
         if granularity == GRANULARITY_MONTH and d.day != 1:
             bad_date = True
         if bad_date:

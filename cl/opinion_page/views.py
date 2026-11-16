@@ -240,13 +240,16 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     # auser() is typed as AbstractBaseUser | AnonymousUser; the default user
     # model makes this exact.
     user = cast(User | AnonymousUser, await request.auser())
-    if not user.is_staff and not user.is_superuser:
-        if not await user.groups.filter(
+    if (
+        not user.is_staff
+        and not user.is_superuser
+        and not await user.groups.filter(
             name__in=[f"uploaders_{pk}"]
-        ).aexists():
-            raise PermissionDenied(
-                "You do not have permission to access this page."
-            )
+        ).aexists()
+    ):
+        raise PermissionDenied(
+            "You do not have permission to access this page."
+        )
 
     # Fix type checker errors
     upload_form: Any
