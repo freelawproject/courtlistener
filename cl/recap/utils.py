@@ -90,7 +90,7 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     return court_id
 
 
-def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
+def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet[RECAPDocument]:
     """Return the main RECAPDocument queryset for a given court and pacer_doc_id.
 
     Args:
