@@ -15,15 +15,13 @@ from cl.search.models import Docket, RECAPDocument
 def extract_unextracted_rds(
     queue: str, chunk_size: int, db_connection: str = "default"
 ) -> None:
-    """Performs content extraction for all recap documents that need to be
-    extracted.
+    """Performs content extraction for all recap documents that need to be extracted.
 
-    :param queue: The celery queue to use
-    :param chunk_size: The number of items to extract in a single celery task.
-    :param db_connection: The database connection to use.
-    :return: None
+    Args:
+        queue: The celery queue to use
+        chunk_size: The number of items to extract in a single celery task.
+        db_connection: The database connection to use.
     """
-
     rd_needs_extraction = (
         RECAPDocument.objects.using(db_connection)
         .filter(

@@ -60,9 +60,7 @@ class RssFeedStatus(AbstractDateTimeModel):
 
 
 class RssItemCache(models.Model):
-    """A cache for hashes of the RSS models to make it faster to look them up
-    and merge them in.
-    """
+    """A cache for hashes of the RSS models to make it faster to look them up and merge them in."""
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -103,10 +101,12 @@ class RssFeedData(AbstractDateTimeModel):
         self,
         metadata_only: bool = False,
     ) -> None:
-        """Reprocess the RSS feed
+        """Reprocess the RSS feed.
 
-        :param metadata_only: If True, only do the metadata, not the docket
-        entries.
+        Args:
+            metadata_only: If True, only do the metadata, not the docket
+                entries.
+
         when doing medata only since no entries are modified).
         """
         from cl.recap_rss.tasks import merge_rss_feed_contents

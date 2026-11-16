@@ -3,10 +3,7 @@ from rest_framework import exceptions, permissions
 
 
 class AllowNeonWebhook(permissions.BasePermission):
-    """
-    Validates requests received from Neon by verifying the included signature
-    against a configured secret token.
-    """
+    """Validates requests received from Neon by verifying the included signature against a configured secret token."""
 
     def has_permission(self, request, view):
         if settings.DEVELOPMENT:

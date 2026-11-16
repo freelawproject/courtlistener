@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable, Coroutine
 from functools import wraps
 from hashlib import md5
-from inspect import iscoroutinefunction
+from inspect import cleandoc, iscoroutinefunction
 from math import ceil
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -73,13 +73,18 @@ def tiered_cache[**P, R](
     that calls it. Every other process stays stale for up to
     ``memory_timeout``.
 
-    :param memory_timeout: Timeout in seconds for the in-memory tier. Must be
-        at least 1 second and no greater than ``redis_timeout``.
-    :param redis_timeout: Timeout in seconds for the Redis tier. Must be at
-        least 1 second.
-    :raises ValueError: If either timeout is under a second, or if the memory
-        timeout is longer than the Redis timeout.
-    :return: Decorated function with tiered caching.
+    Args:
+        memory_timeout: Timeout in seconds for the in-memory tier. Must be
+            at least 1 second and no greater than ``redis_timeout``.
+        redis_timeout: Timeout in seconds for the Redis tier. Must be at
+            least 1 second.
+
+    Returns:
+        Decorated function with tiered caching.
+
+    Raises:
+        ValueError: If either timeout is under a second, or if the memory
+            timeout is longer than the Redis timeout.
 
     Example:
         @tiered_cache(memory_timeout=60, redis_timeout=300)
@@ -174,18 +179,14 @@ def retry[**P, R](
     https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
     original from: https://wiki.python.org/moin/PythonDecoratorLibrary#Retry
 
-    :param ExceptionToCheck: the exception to check. may be a tuple of
-    exceptions to check
-    :type ExceptionToCheck: Exception or tuple
-    :param tries: number of times to try (not retry) before giving up
-    :type tries: int
-    :param delay: initial delay between retries in seconds
-    :type delay: int
-    :param backoff: backoff multiplier e.g. value of 2 will double the delay
-    each retry
-    :type backoff: int
-    :param logger: logger to use. If None, print
-    :type logger: logging.Logger instance
+    Args:
+        ExceptionToCheck: the exception to check. may be a tuple of
+            exceptions to check
+        tries: number of times to try (not retry) before giving up
+        delay: initial delay between retries in seconds
+        backoff: backoff multiplier e.g. value of 2 will double the delay
+            each retry
+        logger: logger to use. If None, print
     """
 
     def _log_wait(exc: Exception, wait: float) -> None:
@@ -246,19 +247,23 @@ def cache_page_ignore_params[
     DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]],
 ]:
     """Cache the result of a view while ignoring URL query parameters.
+
     Ensuring that the cache is consistent for different requests with varying
     query strings.
 
-    WARNING:
-    - Do not use this decorator on views that rely on query parameters to
-      generate unique content.
-    - Do not use this decorator on views that require authentication or
-    session-based data, as this will cache content for all users, potentially
-    exposing confidential information.
+    Warning:
+        - Do not use this decorator on views that rely on query parameters to
+          generate unique content.
+        - Do not use this decorator on views that require authentication or
+          session-based data, as this will cache content for all users,
+          potentially exposing confidential information.
 
-    :param timeout: Cache duration (seconds).
-    :param cache_alias: The cache alias to use.
-    :return: The decorated view function, caching its response.
+    Args:
+        timeout: Cache duration (seconds).
+        cache_alias: The cache alias to use.
+
+    Returns:
+        The decorated view function, caching its response.
     """
 
     def decorator(
@@ -321,44 +326,57 @@ def cache_page_ignore_params[
     return decorator
 
 
-FIELD_DOCSTRING_EXTRACTION_RE: re.Pattern[str] = re.compile(
-    r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
-    re.IGNORECASE | re.MULTILINE,
-)
 _SPACES_RE = re.compile(r"\s+")
+_ATTRIBUTE_ENTRY_RE = re.compile(r"(\w+)(?:\s*\([^)]*\))?:\s*(.*)")
+
+
+def _indent(line: str) -> int:
+    """Count the leading whitespace characters of a line."""
+    return len(line) - len(line.lstrip())
 
 
 def document_model[M: models.Model](model: type[M]) -> type[M]:
-    """
-    Decorator for Django models to use docstrings to populate unset
-    help_text and db_comment field attributes.
-    """
-    model_fields: dict[str, models.Field] = dict(
-        [(field.name, field) for field in model._meta.local_fields]
-    )
-    docstring = model.__doc__
-    if docstring is None:
+    """Decorator for Django models to use docstrings to populate unset help_text and db_comment field attributes."""
+    if model.__doc__ is None:
         return model
-    ivar_docs = [
-        (match.group(1).strip(), match.group(2).strip())
-        for match in FIELD_DOCSTRING_EXTRACTION_RE.finditer(docstring)
-    ]
-    field_docs = dict(
-        [
-            (
-                field_name,
-                _SPACES_RE.sub(" ", docstring).strip(),
-            )
-            for field_name, docstring in ivar_docs
-            if field_name in model_fields
-        ]
-    )
+    lines = cleandoc(model.__doc__).splitlines()
+    try:
+        start = next(
+            i for i, line in enumerate(lines) if line.strip() == "Attributes:"
+        )
+    except StopIteration:
+        return model
 
-    for field_name, field in model_fields.items():
-        if field_name not in field_docs:
+    section_indent = _indent(lines[start])
+    entry_indent: int | None = None
+    entries: dict[str, list[str]] = {}
+    current: list[str] = []
+    for line in lines[start + 1 :]:
+        if not line.strip():
+            continue
+        indent = _indent(line)
+        if indent <= section_indent:
+            break
+        if entry_indent is None:
+            entry_indent = indent
+        if indent == entry_indent and (
+            match := _ATTRIBUTE_ENTRY_RE.fullmatch(line.strip())
+        ):
+            current = entries.setdefault(match.group(1), [])
+            current.append(match.group(2))
+        else:
+            current.append(line)
+
+    field_docs = {
+        name: doc
+        for name, parts in entries.items()
+        if (doc := _SPACES_RE.sub(" ", " ".join(parts)).strip())
+    }
+
+    for field in model._meta.local_fields:
+        if (doc := field_docs.get(field.name)) is None:
             continue
 
-        doc = field_docs[field_name]
         if not field.help_text:
             field.help_text = doc
         if not field.db_comment:

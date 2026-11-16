@@ -73,6 +73,9 @@
               <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
               {% if cluster.headmatter %}
                 <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+                {% if separate_syllabus %}
+                  <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                {% endif %}
               {% else %}
 
                   {% if cluster.correction %}

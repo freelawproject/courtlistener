@@ -34,19 +34,20 @@ class OptionsType(TypedDict):
 def enqueue_get_list_of_creditors(
     court_id: str, d_number_file_name: str
 ) -> bool:
-    """Get list of creditors semaphore"""
+    """Get list of creditors semaphore."""
     key = make_list_of_creditors_key(court_id, d_number_file_name)
     return create_redis_semaphore("CACHE", key, ttl=60 * 60)
 
 
 def query_and_save_creditors_data(options: OptionsType) -> None:
-    """Queries and parses claims activity for a list of courts and a specified
-     date range.
+    """Queries and parses claims activity for a list of courts and a specified date range.
 
-    :param options: The options of the command.
-    :return: None, output files are stored in disk.
+    Args:
+        options: The options of the command.
+
+    Returns:
+        None, output files are stored in disk.
     """
-
     if CLIENT_PACER_USERNAME == "" or CLIENT_PACER_PASSWORD == "":
         logger.info(
             "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "

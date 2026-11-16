@@ -11,26 +11,32 @@ def get_redis_interface(
 ) -> Redis:
     """Pick an existing redis connection from the global object.
 
-    :param db_name: The name of the database to use, as defined in our settings
-    :param decode_responses: Whether to decode responses with utf-8. If you're
-    putting binary data (like a picked object) into redis, don't try to decode
-    it.
-    :return Redis interface using django settings
+    Args:
+        db_name: The name of the database to use, as defined in our settings
+        decode_responses: Whether to decode responses with utf-8. If you're
+            putting binary data (like a picked object) into redis, don't try to decode
+            it.
+
+    Returns:
+        Redis interface using django settings
     """
     return settings.REDIS_CLIENTS[f"{db_name}-{decode_responses}"]
 
 
 def create_redis_semaphore(r: str | Redis, key: str, ttl: int) -> bool:
-    """Use a redis key to create a semaphore with a specified TTL
+    """Use a redis key to create a semaphore with a specified TTL.
 
     The key is created atomically with SET NX, so if several processes race
     to create the same semaphore, exactly one of them gets True.
 
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :param key: The key to create
-    :param ttl: How long the key should live in seconds.
-    :return: True if the key was created else False
+    Args:
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
+        key: The key to create
+        ttl: How long the key should live in seconds.
+
+    Returns:
+        True if the key was created else False
     """
     if isinstance(r, str):
         r = get_redis_interface(r)
@@ -44,12 +50,12 @@ def create_redis_semaphore(r: str | Redis, key: str, ttl: int) -> bool:
 
 
 def delete_redis_semaphore(r: str | Redis, key: str) -> None:
-    """Delete a redis key
+    """Delete a redis key.
 
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to get_redis_interface.
-    :param key: The key to delete
-    :return: None
+    Args:
+        r: The Redis DB to connect to as a connection interface or str that
+            can be handed off to get_redis_interface.
+        key: The key to delete
     """
     if isinstance(r, str):
         r = get_redis_interface(r)
@@ -67,12 +73,14 @@ def acquire_redis_lock(r: Redis, key: str, ttl: int) -> str:
     If the lock is already in use by another process, it retries until the
     lock is acquired.
 
-    :param r: The Redis DB to connect to as a connection interface.
-    :param key: The key for the lock in Redis.
-    :param ttl: Time-to-live for the lock in milliseconds.
-    :return: A unique identifier for the lock.
-    """
+    Args:
+        r: The Redis DB to connect to as a connection interface.
+        key: The key for the lock in Redis.
+        ttl: Time-to-live for the lock in milliseconds.
 
+    Returns:
+        A unique identifier for the lock.
+    """
     identifier = str(uuid.uuid4())
     while True:
         if r.set(key, identifier, nx=True, px=ttl):
@@ -88,10 +96,10 @@ def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
     identifier matches the current lock value.
     This prevents other processes from mistakenly releasing the lock.
 
-    :param r: The Redis DB to connect to as a connection interface.
-    :param key: The key for the lock in Redis.
-    :param identifier: The unique identifier for the lock.
-    :return: None
+    Args:
+        r: The Redis DB to connect to as a connection interface.
+        key: The key for the lock in Redis.
+        identifier: The unique identifier for the lock.
     """
     # Lua script to release lock
     lua_script = """

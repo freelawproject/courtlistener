@@ -26,14 +26,12 @@ class DupChecker(dict):
         super().__init__(*args, **kwargs)
 
     def _increment(self, current_date):
-        """Increments the dup_count and sets the correct date for the latest
-        dup.
-        """
+        """Increments the dup_count and sets the correct date for the latest dup."""
         self.last_found_date = current_date
         self.dup_count += 1
 
     def reset(self):
-        """Resets the dup counter and date"""
+        """Resets the dup counter and date."""
         self.dup_count = 0
         self.last_found_date = None
 
@@ -57,8 +55,7 @@ class DupChecker(dict):
             return True, url_hash
 
     def abort_by_url_hash(self, url, hash):
-        """Checks whether we should abort due to a hash of the site data being
-        unchanged since the last time a URL was visited.
+        """Checks whether we should abort due to a hash of the site data being unchanged since the last time a URL was visited.
 
         Returns True if we should abort the crawl. Else, returns False. Creates
         the item in the database if it doesn't already exist, assigning it to
@@ -85,8 +82,7 @@ class DupChecker(dict):
         lookup_value,
         lookup_by="sha1",
     ):
-        """Checks if a we have an `object_type` with identical content in the CL
-        corpus by looking up `lookup_value` in the `lookup_by` field.
+        """Checks if a we have an `object_type` with identical content in the CL corpus by looking up `lookup_value` in the `lookup_by` field.
 
         If the item is not a duplicate, we will return None, and the caller
         will proceed normally

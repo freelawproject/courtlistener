@@ -64,7 +64,7 @@ def set_data(field, data):
 
 @register.filter
 def behave(field, names):
-    """https://github.com/anutron/behavior support"""
+    """https://github.com/anutron/behavior support."""
     return set_data(field, f"filters:{names}")
 
 
@@ -72,10 +72,12 @@ def behave(field, names):
 def webhook_status_class(event_status: int) -> str:
     """Map a Webhook Event Status to a bootstrap class.
 
-    :param event_status: The WebhookEvent status.
-    :return: The corresponding css class.
-    """
+    Args:
+        event_status: The WebhookEvent status.
 
+    Returns:
+        The corresponding css class.
+    """
     match event_status:
         case WEBHOOK_EVENT_STATUS.SUCCESSFUL:
             css_class = "text-success"

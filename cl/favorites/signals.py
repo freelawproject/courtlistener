@@ -16,11 +16,7 @@ from .utils import NOTEABLE_MODELS, get_notes_for, prayer_unavailable
     dispatch_uid="check_prayer_availability",
 )
 def check_prayer_availability(sender, instance: Prayer, **kwargs):
-    """
-    Signal to check if a given RecapDocument is available for purchase after a user has requested it
-    as part of the pray-and-pay project.
-    """
-
+    """Signal to check if a given RecapDocument is available for purchase after a user has requested it as part of the pray-and-pay project."""
     rd = instance.recap_document
     user = instance.user
 
@@ -63,10 +59,7 @@ def check_prayer_availability(sender, instance: Prayer, **kwargs):
 def mark_document_accessible_after_prayer_availability_deletion(
     sender, instance: PrayerAvailability, **kwargs
 ):
-    """
-    Signal to to mark the associated RecapDocument as accessible when a
-    PrayerAvailability instance is deleted.
-    """
+    """Signal to to mark the associated RecapDocument as accessible when a PrayerAvailability instance is deleted."""
     recap_document = instance.recap_document
 
     # No need to update if already marked as accessible

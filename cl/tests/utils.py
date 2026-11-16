@@ -26,9 +26,7 @@ from cl.recap.factories import (
 
 class AsyncAPIClient(AsyncClient, APIRequestFactory):
     def credentials(self, **kwargs):
-        """
-        Sets headers that will be used on every outgoing request.
-        """
+        """Sets headers that will be used on every outgoing request."""
         self._credentials = [
             (k.encode("latin1"), v.encode("latin1"))
             for k, v in HttpHeaders(kwargs).items()
@@ -127,9 +125,12 @@ def make_session_client(user_pk: int) -> AsyncAPIClient:
 def parse_csp(response: HttpResponse) -> dict[str, list[str]]:
     """Parses a response's CSP header into a dict of directives.
 
-    :param response: A response carrying a Content-Security-Policy header.
-    :return: A dict mapping each directive name to its list of values. A
-    valueless directive, like upgrade-insecure-requests, maps to an empty list.
+    Args:
+        response: A response carrying a Content-Security-Policy header.
+
+    Returns:
+        A dict mapping each directive name to its list of values. A
+        valueless directive, like upgrade-insecure-requests, maps to an empty list.
     """
     header = response.headers["Content-Security-Policy"]
     directives = {}
@@ -143,19 +144,22 @@ def get_with_wait(
     wait: WebDriverWait,
     locator: tuple[str, str],
 ) -> WebElement:
-    """Get an element from a selenium browser without all the rigamarole
+    """Get an element from a selenium browser without all the rigamarole.
 
-    :param wait: A webdriver wait for a bparticular browser instance
-    :param locator: A two-string tuple that identifies the type of lookup and
-    the lookup string for the lookup. For example, it might be:
-    (By.TAG_NAME, "body")
-    :return: A webelement if it can be found during the wait.
+    Args:
+        wait: A webdriver wait for a bparticular browser instance
+        locator: A two-string tuple that identifies the type of lookup and
+            the lookup string for the lookup. For example, it might be:
+            (By.TAG_NAME, "body")
+
+    Returns:
+        A webelement if it can be found during the wait.
     """
     return wait.until(EC.presence_of_element_located(locator))
 
 
 class MockResponse(Response):
-    """Mock a Request Response"""
+    """Mock a Request Response."""
 
     def __init__(
         self,

@@ -88,11 +88,14 @@ def check_pagination_depth(
     page_number: int,
     max_depth: int = settings.MAX_SEARCH_PAGINATION_DEPTH,
 ) -> None:
-    """Check if the pagination is too deep (indicating a crawler)
+    """Check if the pagination is too deep (indicating a crawler).
 
-    :param page_number: The requested page number.
-    :param max_depth: Maximum allowed pagination depth.
-    :raises PermissionDenied: If page_number exceeds max_depth.
+    Args:
+        page_number: The requested page number.
+        max_depth: Maximum allowed pagination depth.
+
+    Raises:
+        PermissionDenied: If page_number exceeds max_depth.
     """
     if page_number > max_depth:
         logger.warning(
@@ -106,8 +109,9 @@ def make_get_string(
     request: HttpRequest,
     nuke_fields: list[str] | None = None,
 ) -> str:
-    """Makes a get string from the request object. If necessary, it removes
-    the pagination parameters.
+    """Makes a get string from the request object.
+
+    If necessary, it removes the pagination parameters.
     """
     if nuke_fields is None:
         nuke_fields = ["page", "show_alert_modal"]
@@ -232,17 +236,15 @@ async def add_depth_counts(
     search_data: dict[str, Any],
     search_results: Page | list,
 ) -> OpinionCluster | None:
-    """If the search data contains a single "cites" term (e.g., "cites:(123)"),
-    calculate and append the citation depth information between each ES
-    result and the cited OpinionCluster. We only do this for *single* "cites"
-    terms to avoid the complexity of trying to render multiple depth
-    relationships for all the possible result-citation combinations.
+    """If the search data contains a single "cites" term (e.g., "cites:(123)"), calculate and append the citation depth information between each ES result and the cited OpinionCluster. We only do this for *single* "cites" terms to avoid the complexity of trying to render multiple depth relationships for all the possible result-citation combinations.
 
-    :param search_data: The cleaned search form data
-    :param search_results: The paginated ES results
-    :return The OpinionCluster if the lookup was successful
+    Args:
+        search_data: The cleaned search form data
+        search_results: The paginated ES results
+
+    Returns:
+        The OpinionCluster if the lookup was successful
     """
-
     cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
     if (
         len(cites_query_matches) == 1
@@ -273,12 +275,23 @@ async def add_depth_counts(
         return None
 
 
-def store_search_query(request: HttpRequest, search_results: dict) -> None:
-    """Saves an user's search query in a SearchQuery model
+def scotus_frontend_search_enabled(request: HttpRequest) -> bool:
+    """Whether the search frontend (search page, RSS search feed and the create-alert estimate) may include SCOTUS content for this request.
 
-    :param request: the request object
-    :param search_results: the dict returned by `do_es_search` function
-    :return None
+    Staff see SCOTUS before launch, everyone after. It uses the same flag
+    as the SCOTUS docket pages, since results link to them. The search
+    APIs don't use it: they keep SCOTUS hidden until their own launch.
+    Temporary: remove once SCOTUS launches.
+    """
+    return bool(flag_is_active(request, "scotus_docket_page"))
+
+
+def store_search_query(request: HttpRequest, search_results: dict) -> None:
+    """Saves an user's search query in a SearchQuery model.
+
+    Args:
+        request: the request object
+        search_results: the dict returned by `do_es_search` function
     """
     if not flag_is_active(request, "store-search-queries"):
         # Do not store search queries
@@ -323,12 +336,12 @@ def store_search_api_query(
 ) -> None:
     """Store the search query from the Search API.
 
-    :param request: The HTTP request object.
-    :param failed: Boolean indicating if the query execution failed.
-    :param query_time: The time taken to execute the query in milliseconds or
-    None if not applicable.
-    :param engine: The search engine used to execute the query.
-    :return: None
+    Args:
+        request: The HTTP request object.
+        failed: Boolean indicating if the query execution failed.
+        query_time: The time taken to execute the query in milliseconds or
+            None if not applicable.
+        engine: The search engine used to execute the query.
     """
     if is_bot(request):
         return
@@ -383,14 +396,16 @@ def get_micro_cache_key(key_prefix: str = "search_results_cache:") -> str:
 def retrieve_cached_search_results(
     clean_params: dict, key_prefix: str
 ) -> tuple[CachedESSearchResults | None, str]:
-    """
-    Retrieve cached search results based on the GET parameters.
+    """Retrieve cached search results based on the GET parameters.
 
-    :param clean_params: The cleaned search parameters provided by the user.
-    :param key_prefix: The key prefix used to generate the cache key.
-    :return: A two-tuple containing either the cached search results and the
-    cache key based on a prefix and the get parameters, or None and the cache key
-    if no cached results were found.
+    Args:
+        clean_params: The cleaned search parameters provided by the user.
+        key_prefix: The key prefix used to generate the cache key.
+
+    Returns:
+        A two-tuple containing either the cached search results and the
+        cache key based on a prefix and the get parameters, or None and the cache key
+        if no cached results were found.
     """
     sorted_params = dict(sorted(clean_params.items()))
     params_hash = sha256(pickle.dumps(sorted_params))
@@ -413,11 +428,14 @@ def fetch_facets(
     checkboxes reuses cached facet counts (the counts are the same even if the
     facets are checked or unchecked).
 
-    :param search_query: The base Elasticsearch search query.
-    :param cd: Cleaned search parameters.
-    :param search_form: The search form to attach counts to.
-    :param error: Whether the search query had validation errors.
-    :return: A list of BoundField objects with count attributes set.
+    Args:
+        search_query: The base Elasticsearch search query.
+        cd: Cleaned search parameters.
+        search_form: The search form to attach counts to.
+        error: Whether the search query had validation errors.
+
+    Returns:
+        A list of BoundField objects with count attributes set.
     """
     facet_cd = cd if not error else {"type": cd["type"]}
     facet_cache_params = {
@@ -467,11 +485,14 @@ def fetch_facets(
 def get_results_from_paginator(
     paginator: Paginator, page_num: int = 1
 ) -> Page:
-    """Get results Page from Paginator
+    """Get results Page from Paginator.
 
-    :param paginator: The paginator to get results from
-    :param page_num: Page number to request
-    :return: Page object
+    Args:
+        paginator: The paginator to get results from
+        page_num: Page number to request
+
+    Returns:
+        Page object
     """
     try:
         results = paginator.page(page_num)
@@ -486,12 +507,12 @@ def get_results_from_paginator(
 def enrich_search_results(
     results: Page, search_type: str, get_params: CleanData
 ) -> None:
-    """Enrich dataset before returning to user
+    """Enrich dataset before returning to user.
 
-    :param results: A ESPaginator page object
-    :param search_type: The search type
-    :param get_params: A dictionary of parameters sent in request
-    :return: None
+    Args:
+        results: A ESPaginator page object
+        search_type: The search type
+        get_params: A dictionary of parameters sent in request
     """
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
@@ -509,17 +530,19 @@ def fetch_and_paginate_results(
 ) -> tuple[Page | list, int, bool, int | None, int | None]:
     """Fetch and paginate elasticsearch results.
 
-    :param clean_params: The user’s cleaned search parameters.
-    :param search_query: Elasticsearch DSL Search object
-    :param child_docs_count_query: The ES DSL Query to perform the count for
-    child documents if required, otherwise None.
-    :param rows_per_page: Number of records wanted per page
-    :param cache_key: The cache key to use.
-    :return: A five-tuple: the paginated results, the ES query time, whether
-    there was an error, the total number of hits for the main document, and
-    the total number of hits for the child document.
-    """
+    Args:
+        clean_params: The user’s cleaned search parameters.
+        search_query: Elasticsearch DSL Search object
+        child_docs_count_query: The ES DSL Query to perform the count for
+            child documents if required, otherwise None.
+        rows_per_page: Number of records wanted per page
+        cache_key: The cache key to use.
 
+    Returns:
+        A five-tuple: the paginated results, the ES query time, whether
+        there was an error, the total number of hits for the main document, and
+        the total number of hits for the child document.
+    """
     search_type = clean_params["type"]
     page = int(clean_params["page"])
 
@@ -639,14 +662,16 @@ def fetch_and_paginate_results(
 def remove_missing_citations(
     missing_citations: list[FullCaseCitation], cd: CleanData
 ) -> tuple[list[str], str]:
-    """Removes missing citations from the query and returns the missing
-    citations as strings and the modified query.
+    """Removes missing citations from the query and returns the missing citations as strings and the modified query.
 
-    :param missing_citations: A list of FullCaseCitation objects representing
-    the citations that are missing from the query.
-    :param cd: A CleanData object containing the query string.
-    :return: A two-tuple containing a list of missing citation strings and the
-    suggested query string with missing citations removed.
+    Args:
+        missing_citations: A list of FullCaseCitation objects representing
+            the citations that are missing from the query.
+        cd: A CleanData object containing the query string.
+
+    Returns:
+        A two-tuple containing a list of missing citation strings and the
+        suggested query string with missing citations removed.
     """
     missing_citations_str = [
         citation.corrected_citation() for citation in missing_citations
@@ -688,21 +713,29 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
+    include_scotus: bool = False,
 ) -> ESSearchResult:
-    """Run Elasticsearch searching and filtering and prepare data to display
+    """Run Elasticsearch searching and filtering and prepare data to display.
 
-    :param get_params: The request.GET params sent by user.
-    :param rows: The number of Elasticsearch results to request
-    :param facet: Whether to complete faceting in the query
-    :param cache_key: A cache key with which to save the results. Note that it
-    does not do anything clever with the actual query, so if you use this, your
-    cache key should *already* have factored in the query. If None, no caching
-    is set or used. Results are saved for six hours.
-    :param is_csv_export: Indicates if the data being processed is intended for
-    an export process.
-    :param courts: QuerySet of courts used in the jurisdiction picker.
-    :return: A big dict of variables for use in the search results, homepage, or
-    other location.
+    Args:
+        get_params: The request.GET params sent by user.
+        rows: The number of Elasticsearch results to request
+        facet: Whether to complete faceting in the query
+        cache_key: A cache key with which to save the results. Note that it
+            does not do anything clever with the actual query, so if you use this, your
+            cache key should *already* have factored in the query. If None, no caching
+            is set or used. Results are saved for six hours.
+        is_csv_export: Indicates if the data being processed is intended for
+            an export process.
+        courts: QuerySet of courts used in the jurisdiction picker.
+        is_semantic_frontend_active: Whether the semantic search frontend is enabled for this request.
+        include_scotus: Whether RECAP results may include SCOTUS content.
+            Off by default; the search page turns it on with
+            scotus_frontend_search_enabled.
+
+    Returns:
+        A big dict of variables for use in the search results, homepage, or
+        other location.
     """
     if courts is None:
         courts = cast(QuerySet[Court], Court.objects.filter(in_use=True))
@@ -745,6 +778,7 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
+        cd["include_scotus"] = include_scotus
         # Create necessary filters to execute ES query
         search_query = document_type.search()
         try:
@@ -781,6 +815,9 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Part of the micro-cache key, so results cached with and without
+            # SCOTUS are never served to the other side.
+            cleaned_params["include_scotus"] = include_scotus
             # Use a smaller page size for semantic results so the longer
             # chunk previews are less overwhelming to scan.
             if has_semantic_params(cd):
@@ -888,18 +925,19 @@ def do_es_search(
 def get_headers_and_transformations_for_search_export(
     type: str,
 ) -> tuple[list[str], dict[str, Callable[..., Any]] | None]:
-    """
-    Retrieves CSV headers and data transformation functions for a given search
-    type.
+    """Retrieves CSV headers and data transformation functions for a given search type.
 
     This function determines the appropriate CSV headers and data transformation
     functions based on the specified Elasticsearch search type. It combines
     headers and transformations from relevant document classes to generate a
     comprehensive set for CSV export.
 
-    :param type: The type of Elasticsearch search to be performed. Valid values
-        are defined in the `SEARCH_TYPES` enum.
-    :return:  A tuple containing:
+    Args:
+        type: The type of Elasticsearch search to be performed. Valid values
+            are defined in the `SEARCH_TYPES` enum.
+
+    Returns:
+        A tuple containing:
         - A list of strings representing the CSV headers.
         - A dictionary where keys are field names and values are callable functions
           that define the data transformations.
@@ -943,15 +981,18 @@ def get_headers_and_transformations_for_search_export(
 def fetch_es_results_for_csv(
     queryset: QueryDict, search_type: str
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Retrieves matching results from Elasticsearch and returns them as a list
+    """Retrieves matching results from Elasticsearch and returns them as a list.
 
     This method will flatten nested results (like those returned by opinion and
     recap searches) and limit the number of results in the list to
     `settings.MAX_SEARCH_RESULTS_EXPORTED`.
 
-    :param queryset: The query parameters sent by the user.
-    :param search_type: The type of Elasticsearch search to be performed.
-    :return: A tuple containing a list of dictionaries, where each dictionary
+    Args:
+        queryset: The query parameters sent by the user.
+        search_type: The type of Elasticsearch search to be performed.
+
+    Returns:
+        A tuple containing a list of dictionaries, where each dictionary
         represents a single search result and a boolean value indicating
         whether a search error occurred.
     """

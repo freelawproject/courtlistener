@@ -19,7 +19,9 @@ from cl.search.tasks import index_embeddings, retrieve_embeddings
 
 def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for embedding indexing log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return f"{SEARCH_TYPES.OPINION}_embedding_indexing:log"
 
@@ -101,13 +103,12 @@ class Command(VerboseCommand):
         processed_count: int,
         count: int,
     ) -> None:
-        """Schedule a chunk of IDs for embedding retrieval and indexing if the
-        batch is ready.
+        """Schedule a chunk of IDs for embedding retrieval and indexing if the batch is ready.
 
-        :param chunk: List of opinion IDs to be processed in the current batch.
-        :param processed_count: Number of items processed so far.
-        :param count: Total number of items to process.
-        :return: None
+        Args:
+            chunk: List of opinion IDs to be processed in the current batch.
+            processed_count: Number of items processed so far.
+            count: Total number of items to process.
         """
         last_item = count == processed_count
         if processed_count % self.batch_size == 0 or last_item:
@@ -121,13 +122,12 @@ class Command(VerboseCommand):
 
     @staticmethod
     def maybe_log_progress(processed_count: int, opinion_id: int, total: int):
-        """Log progress and store a checkpoint in Redis
-        during indexing every 1000 items.
+        """Log progress and store a checkpoint in Redis during indexing every 1000 items.
 
-        :param processed_count: Number of items processed so far.
-        :param opinion_id: The last opinion ID processed.
-        :param total: Total number of items to process.
-        :return: None
+        Args:
+            processed_count: Number of items processed so far.
+            opinion_id: The last opinion ID processed.
+            total: Total number of items to process.
         """
         if processed_count % 1000 == 0:
             logger.info(

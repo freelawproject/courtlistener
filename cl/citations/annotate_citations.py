@@ -20,10 +20,13 @@ type Annotation = tuple[tuple[int, int], str, str]
 def generate_annotations(
     citation_resolutions: Mapping[MatchedResourceType, Sequence[CitationBase]],
 ) -> list[Annotation]:
-    """Generate the string annotations to insert into the opinion text
+    """Generate the string annotations to insert into the opinion text.
 
-    :param citation_resolutions: A map of lists of citations in the opinion
-    :return The new HTML containing citations
+    Args:
+        citation_resolutions: A map of lists of citations in the opinion
+
+    Returns:
+        The new HTML containing citations
     """
     from cl.opinion_page.views import make_citation_url_dict
 
@@ -98,16 +101,17 @@ def create_cited_html(
     get_citations_kwargs: dict[str, str],
     single_doc: bool = True,
 ) -> str:
-    """Using the opinion itself and a list of citations found within it, make
-    the citations into links to the correct citations.
+    """Using the opinion itself and a list of citations found within it, make the citations into links to the correct citations.
 
-    :param citation_resolutions: A map of lists of citations in the opinion
-    :param get_citations_kwargs: contains the original citation text,
-        used as a fallback when there were no resolutions
-    :param single_doc: anything under 200k characters is a single document
-        this is 99.9% of all opinions.
+    Args:
+        citation_resolutions: A map of lists of citations in the opinion
+        get_citations_kwargs: contains the original citation text,
+            used as a fallback when there were no resolutions
+        single_doc: anything under 200k characters is a single document
+            this is 99.9% of all opinions.
 
-    :return The new HTML containing citations
+    Returns:
+        The new HTML containing citations
     """
     if not citation_resolutions:
         if get_citations_kwargs.get("markup_text"):

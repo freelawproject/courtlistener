@@ -14,7 +14,8 @@ def get_sealed_documents_with_citations() -> list[int]:
     database only has to return the sealed documents that actually have
     something to clean up, instead of every sealed document.
 
-    :return: A sorted list of RECAPDocument IDs.
+    Returns:
+        A sorted list of RECAPDocument IDs.
     """
     cited_opinions = OpinionsCitedByRECAPDocument.objects.filter(
         citing_document__is_sealed=True

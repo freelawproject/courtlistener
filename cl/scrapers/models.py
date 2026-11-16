@@ -7,9 +7,10 @@ from cl.search.models import Court, Docket
 
 
 class UrlHash(models.Model):
-    """A class to hold URLs and the hash of their contents. This could be added
-    to the Court table, except that courts often have more than one URL they
-    parse.
+    """A class to hold URLs and the hash of their contents.
+
+    This could be added to the Court table, except that courts often have more
+    than one URL they parse.
     """
 
     id = models.CharField(
@@ -79,7 +80,7 @@ class PACERFreeDocumentRow(models.Model):
 
 
 class PACERMobilePageData(AbstractDateTimeModel):
-    """Status information about crawling the PACER Mobile UI for a docket"""
+    """Status information about crawling the PACER Mobile UI for a docket."""
 
     docket = models.OneToOneField(
         Docket,

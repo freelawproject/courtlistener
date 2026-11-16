@@ -1,6 +1,4 @@
-"""
-A set of commonly-used words in English that we want to filter in
-NLP tasks, such as parenthetical grouping.
+"""A set of commonly-used words in English that we want to filter in NLP tasks, such as parenthetical grouping.
 
 This set originates from PostgreSQL's stopword corpus, which is licensed under
 the PostgreSQL License (https://www.postgresql.org/about/licence/):

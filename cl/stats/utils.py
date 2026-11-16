@@ -42,7 +42,7 @@ MILESTONES_FLAT = sorted(
 def get_milestone_range(start, end):
     """Return the flattened MILESTONES by range of their keys.
 
-    >>> get_milestone_range('MD', 'LG')
+    >>> get_milestone_range("MD", "LG")
     [1e5, 2.5e5, 5e5, 1e6, 2.5e6, 5e6]
     """
     out = []
@@ -100,10 +100,11 @@ def tally_stat(
        - the event happened today.
        - the event happened once.
 
-    :param name: The stat name (e.g., "search.results" or StatMetric.SEARCH_RESULTS)
-    :param inc: The amount to increment (default: 1)
-    :param date_logged: The date to log the stat for (default: today)
-    :param labels: Optional dict of label names to values for Prometheus metrics
+    Args:
+        name: The stat name (e.g., "search.results" or StatMetric.SEARCH_RESULTS)
+        inc: The amount to increment (default: 1)
+        date_logged: The date to log the stat for (default: today)
+        labels: Optional dict of label names to values for Prometheus metrics
     """
     if not switch_is_active("increment-stats"):
         return None
@@ -153,8 +154,7 @@ def check_redis() -> bool:
 
 
 def check_elasticsearch() -> bool:
-    """
-    Checks the health of the connected Elasticsearch cluster.
+    """Checks the health of the connected Elasticsearch cluster.
 
     it retrieves the cluster health information and returns:
 
@@ -181,7 +181,7 @@ def check_elasticsearch() -> bool:
 
 
 def check_postgresql() -> bool:
-    """Just check if we can connect to postgresql"""
+    """Just check if we can connect to postgresql."""
     try:
         for alias in connections:
             with connections[alias].cursor() as c:
@@ -193,7 +193,7 @@ def check_postgresql() -> bool:
 
 
 def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
-    """Return the replication status information for all publishers
+    """Return the replication status information for all publishers.
 
     The easiest way to detect a problem in a replication set up is to monitor
     the size of the publisher's change lag. That is, how many changes are on
@@ -201,21 +201,22 @@ def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
     query all DBs set up in the config file and send their replication status
     information.
 
-    :return: The status of all configured publications
-    :rtype: A dict of server aliases point to lists of query results dicts:
+    Returns:
+        The status of all configured publications, as a dict of server
+        aliases pointing to lists of query results dicts:
 
-    {"replica": [{
-            slot_name: 'coupa',
-            lsn_distance: 33239
-        }, {
-            slot_name: 'maverick',
-            lsn_distance: 393478,
-        }],
-        "default": [{
-            slot_name: 'replica',
-            lsn_distance: 490348
-        }],
-    }
+            {"replica": [{
+                    slot_name: 'coupa',
+                    lsn_distance: 33239
+                }, {
+                    slot_name: 'maverick',
+                    lsn_distance: 393478,
+                }],
+                "default": [{
+                    slot_name: 'replica',
+                    lsn_distance: 490348
+                }],
+            }
     """
     statuses = {}
     query = """

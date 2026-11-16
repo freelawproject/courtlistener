@@ -38,8 +38,7 @@ class TexasDocketMeta(BaseModel):
 
 
 class CorpusImporterCommand(VerboseCommand, ABC):
-    """Base class for `cl.corpus_importer` commands encapsulating inventory\
-        file reading, celery queue interactions, and redis logging.
+    """Base class for `cl.corpus_importer` commands encapsulating inventory file reading, celery queue interactions, and redis logging.
 
     Uses an inventory CSV from S3 to find files to parse and ingest into the\
         database. Includes ratelimiting and autoresume logic.
@@ -59,7 +58,8 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     Optional methods are:
     - `download_task`: Should return the task used to download files from S3.\
-        A default implementation is provided for convenience."""
+        A default implementation is provided for convenience.
+    """
 
     compose_redis_key: str
 
@@ -137,17 +137,16 @@ class CorpusImporterCommand(VerboseCommand, ABC):
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable:
-        """
-        Optionally performs transformations on the inventory CSV file\
-            before passing it to the download Celery task. Can be used for\
-            instance to merge consecutive rows which represent the same docket\
-            into one object.
+        """Optionally performs transformations on the inventory CSV file before passing it to the download Celery task. Can be used for instance to merge consecutive rows which represent the same docket into one object.
 
-        :param csv_reader: The `csv.Reader` object to use to read the CSV.
+        Args:
+            csv_reader: The `csv.Reader` object to use to read the CSV.
 
-        :return: The transformed inventory CSV iterator. The item of the\
+        Returns:
+            The transformed inventory CSV iterator. The item of the\
             iterable should be a list of arguments to be passed to the\
-            download task."""
+            download task.
+        """
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
     def handle(self, *args, **options):

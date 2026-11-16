@@ -3,6 +3,7 @@ from datetime import date
 from itertools import batched
 
 from django.conf import settings
+from django.core.management import CommandError
 from django.db.models import QuerySet
 
 from cl.lib.argparse_types import valid_date_time
@@ -18,12 +19,14 @@ from cl.lib.indexing_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.documents import (
+    ES_CHILD_ID,
     DocketDocument,
     ESRECAPDocument,
     OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
+from cl.search.es_docket_sources import ES_SOURCE_BY_NAME, RECAP_ES_SOURCE
 from cl.search.management.commands.sweep_indexer import get_es_doc_id
 from cl.search.models import (
     SEARCH_TYPES,
@@ -50,17 +53,32 @@ from cl.search.types import (
 
 
 def compose_redis_key(
-    search_type: str, event_doc_type: EventTable | None = None
+    search_type: str,
+    event_doc_type: EventTable | None = None,
+    source_name: str = RECAP_ES_SOURCE.name,
+    document_type: str | None = None,
 ) -> str:
     """Compose a Redis key based on the search type for indexing log.
 
-    :param search_type: The type of search.
-    :param event_doc_type: An optional EventTable enum member specifying the
-    document type being processed.
-    :return: A Redis key as a string.
+    Args:
+        search_type: The type of search.
+        event_doc_type: An optional EventTable enum member specifying the
+            document type being processed.
+        source_name: The ESDocketSource being indexed. Non-RECAP sources
+            get their own key, so their progress doesn't mix with RECAP's.
+            Ignored when event_doc_type is given.
+        document_type: The --document-type being indexed. Non-RECAP
+            sources get a key per document type, since parent runs log Docket
+            pks and child runs log document pks. Ignored for RECAP.
+
+    Returns:
+        A Redis key as a string.
     """
     if event_doc_type:
         return f"es_{search_type}_{event_doc_type}_indexing:log"
+    if source_name != RECAP_ES_SOURCE.name:
+        suffix = f"_{document_type}" if document_type else ""
+        return f"es_{search_type}_{source_name}{suffix}_indexing:log"
     return f"es_{search_type}_indexing:log"
 
 
@@ -70,18 +88,19 @@ def get_unique_oldest_history_rows(
     pk_offset: int,
     update_from_event_tables: EventTable | None,
 ) -> QuerySet | None:
-    """Retrieve the oldest unique history rows within a given date range for
-    specified event tables.
+    """Retrieve the oldest unique history rows within a given date range for specified event tables.
 
-    :param start_date: The start date for filtering the history rows.
-    :param end_date: The end date for filtering the history rows.
-    :param pk_offset: The PK offset to start from.
-    :param update_from_event_tables: An optional EventTable member to specify
-    the type of event table from which to retrieve history rows.
-    :return: A QuerySet of the oldest unique events within the specified date
-    range for the given event table, or None if no event table is specified.
+    Args:
+        start_date: The start date for filtering the history rows.
+        end_date: The end date for filtering the history rows.
+        pk_offset: The PK offset to start from.
+        update_from_event_tables: An optional EventTable member to specify
+            the type of event table from which to retrieve history rows.
+
+    Returns:
+        A QuerySet of the oldest unique events within the specified date
+        range for the given event table, or None if no event table is specified.
     """
-
     match update_from_event_tables:
         case EventTable.DOCKET:
             return (
@@ -126,20 +145,21 @@ def get_documents_to_update_or_remove(
     event_doc_type: EventTable | None,
     chunk_size: int,
 ) -> tuple[list[int], list[tuple[int, list[str]]], list[int]]:
-    """Determines the documents to update or remove based on changes in
-    specified fields.
+    """Determines the documents to update or remove based on changes in specified fields.
 
-    :param events_to_update: A queryset of the event table instances to update.
-    :param search_type: The search type related to the update/remove action.
-    :param event_doc_type: An optional EventTable enum member specifying the
-    document type to be processed.
-    :param chunk_size: The number of items to retrieve from DB at a time.
-    :return: A four tuple containing, a list of strings containing the fields
-    to be updated, a list containing IDs of parent documents to update, a list
-    containing IDs of child documents to update, a list containing IDs of
-    documents to delete.
+    Args:
+        events_to_update: A queryset of the event table instances to update.
+        search_type: The search type related to the update/remove action.
+        event_doc_type: An optional EventTable enum member specifying the
+            document type to be processed.
+        chunk_size: The number of items to retrieve from DB at a time.
+
+    Returns:
+        A four tuple containing, a list of strings containing the fields
+        to be updated, a list containing IDs of parent documents to update, a list
+        containing IDs of child documents to update, a list containing IDs of
+        documents to delete.
     """
-
     match search_type:
         case SEARCH_TYPES.RECAP if event_doc_type == EventTable.DOCKET:
             tracked_set = Docket.es_rd_field_tracker
@@ -240,6 +260,15 @@ class Command(VerboseCommand):
             help=f"The search type models to index: ({', '.join([SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION])})",
         )
         parser.add_argument(
+            "--source",
+            type=str,
+            default=RECAP_ES_SOURCE.name,
+            choices=list(ES_SOURCE_BY_NAME),
+            help="The docket source to index with the RECAP search type. "
+            "--update-from-event-tables only reads RECAP history tables, so "
+            "it only works with the recap source.",
+        )
+        parser.add_argument(
             "--pk-offset",
             type=int,
             default=0,
@@ -322,9 +351,27 @@ class Command(VerboseCommand):
         update_from_event_tables = EventTable(
             options.get("update_from_event_tables", None)
         )
+        # call_command doesn't check `choices` on optional arguments.
+        if (source := ES_SOURCE_BY_NAME.get(options["source"])) is None:
+            raise CommandError(
+                f"Unknown --source {options['source']}. Choose from: "
+                f"{', '.join(ES_SOURCE_BY_NAME)}."
+            )
+        if source is not RECAP_ES_SOURCE and (
+            search_type != SEARCH_TYPES.RECAP or update_from_event_tables
+        ):
+            raise CommandError(
+                f"--source {source.name} only works with --search-type "
+                f"{SEARCH_TYPES.RECAP} and without --update-from-event-tables."
+            )
         if auto_resume:
             pk_offset = get_last_parent_document_id_processed(
-                compose_redis_key(search_type, update_from_event_tables)
+                compose_redis_key(
+                    search_type,
+                    update_from_event_tables,
+                    source.name,
+                    document_type,
+                )
             )
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
@@ -357,9 +404,9 @@ class Command(VerboseCommand):
                     )
                     return
                 elif document_type == "child":
-                    # Get Docket objects by pk_offset.
+                    # Get the source's documents by pk_offset.
                     queryset = (
-                        RECAPDocument.objects.filter(pk__gte=pk_offset)
+                        source.document_model.objects.filter(pk__gte=pk_offset)
                         .order_by("pk")
                         .values_list("pk", "docket_entry__docket_id")
                     )
@@ -368,8 +415,7 @@ class Command(VerboseCommand):
                 else:
                     queryset = (
                         Docket.objects.filter(
-                            pk__gte=pk_offset,
-                            source__in=Docket.RECAP_SOURCES(),
+                            source.docket_filter(), pk__gte=pk_offset
                         )
                         .order_by("pk")
                         .values_list("pk", flat=True)
@@ -426,21 +472,19 @@ class Command(VerboseCommand):
         task_to_use: str,
         es_document: type[ESDocumentType] | None = None,
     ) -> None:
-        """Process a queryset and execute tasks based on the specified celery
-        task_to_use.
+        """Process a queryset and execute tasks based on the specified celery task_to_use.
 
-        :param items: Iterable of items to process. Items can be a simple
-        iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
-        field changes.
-        :param count: Total number of items expected to process.
-        :param search_type: The search type related to the update/remove action.
-        :param chunk_size: The number of items to process in a single chunk.
-        :param task_to_use: The name of the celery task to execute.
-        :param es_document: Optional: The ES document class for checking
-        document existence in ES.
-        :return: None
+        Args:
+            items: Iterable of items to process. Items can be a simple
+                iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
+                field changes.
+            count: Total number of items expected to process.
+            search_type: The search type related to the update/remove action.
+            chunk_size: The number of items to process in a single chunk.
+            task_to_use: The name of the celery task to execute.
+            es_document: Optional: The ES document class for checking
+                document existence in ES.
         """
-
         event_doc_type = EventTable(
             self.options.get("update_from_event_tables", "")
         )
@@ -449,6 +493,7 @@ class Command(VerboseCommand):
         pk_offset = self.options["pk_offset"]
         document_type = self.options.get("document_type", None)
         missing = self.options.get("missing", False)
+        source = ES_SOURCE_BY_NAME[self.options["source"]]
         fields_map = {}
         if event_doc_type == EventTable.DOCKET:
             fields_map = recap_document_field_mapping["save"][Docket][
@@ -485,7 +530,12 @@ class Command(VerboseCommand):
                     item_id = item
                     parent_document_id = item
 
-                doc_id = get_es_doc_id(es_document, item_id)
+                if es_document is ESRECAPDocument:
+                    doc_id = getattr(
+                        ES_CHILD_ID(item_id), source.child_id_property
+                    )
+                else:
+                    doc_id = get_es_doc_id(es_document, item_id)
                 if not es_document.exists(
                     id=doc_id, routing=parent_document_id
                 ):
@@ -504,6 +554,7 @@ class Command(VerboseCommand):
                             chunk,
                             search_type,
                             use_streaming_bulk=True,
+                            source_name=source.name,
                         ).set(queue=queue).apply_async()
 
                     case "index_parent_or_child_docs_in_es":
@@ -512,6 +563,7 @@ class Command(VerboseCommand):
                             search_type,
                             document_type,
                             use_streaming_bulk=use_streaming_bulk,
+                            source_name=source.name,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(
@@ -540,7 +592,13 @@ class Command(VerboseCommand):
                 if not processed_count % 1000:
                     # Log every 1000 parent documents processed.
                     log_last_document_indexed(
-                        item_id, compose_redis_key(search_type, event_doc_type)
+                        item_id,
+                        compose_redis_key(
+                            search_type,
+                            event_doc_type,
+                            source.name,
+                            self.options.get("document_type"),
+                        ),
                     )
             self.stdout.write(
                 f"Successfully indexed {processed_count} items from pk {pk_offset}."
@@ -553,9 +611,9 @@ class Command(VerboseCommand):
     ) -> None:
         """Index documents that have changed based on the model history tables.
 
-        :param events_to_update: A queryset of the event table instances to update
-        :param search_type: The search type related to the update/remove action.
-        :return: None
+        Args:
+            events_to_update: A queryset of the event table instances to update
+            search_type: The search type related to the update/remove action.
         """
         event_doc_type = EventTable(
             self.options.get("update_from_event_tables", "")

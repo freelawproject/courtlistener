@@ -12,8 +12,11 @@ from cl.lib.utils import deepgetattr
 def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
     """Check the audio file exists in the bucket.
 
-    :param audio: audio object
-    :return: True if audio can be processed by OpenAI API
+    Args:
+        audio: audio object
+
+    Returns:
+        True if audio can be processed by OpenAI API
     """
     # Checks if the the local_path_mp3 is not None and the file exists
     # in the bucket.
@@ -32,12 +35,10 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
 
 
 def handle_open_ai_transcriptions(options) -> None:
-    """Get Audio objects from DB according to `options`,
-    validate and call a celery task for processing them
+    """Get Audio objects from DB according to `options`, validate and call a celery task for processing them.
 
-    :param options: argparse options
-
-    :return None
+    Args:
+        options: argparse options
     """
     # Dispatch goes through cl.audio.dispatch.dispatch_transcribe so its
     # per-pk Redis lock dedupes against the re-enqueue daemon if both run

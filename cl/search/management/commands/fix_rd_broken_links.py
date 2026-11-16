@@ -35,17 +35,18 @@ def get_docket_events_and_slug_count(
     pk_offset: int,
     docket_ids: list[int] | None,
 ) -> QuerySet:
-    """Retrieve docket events that need verification for broken links and their
-     slug count.
+    """Retrieve docket events that need verification for broken links and their slug count.
 
-    :param cut_off_date: The cutoff date for filtering docket events.
-    :param pk_offset: The minimum Docket ID value to consider for auto-resume.
-    :param docket_ids: Optional, the Docket IDs to consider.
-    :return: A queryset of docket events annotated with their slug count,
-    the current slug from the Docket table, and the latest slug in the
-    DocketEvent table.
+    Args:
+        cut_off_date: The cutoff date for filtering docket events.
+        pk_offset: The minimum Docket ID value to consider for auto-resume.
+        docket_ids: Optional, the Docket IDs to consider.
+
+    Returns:
+        A queryset of docket events annotated with their slug count,
+        the current slug from the Docket table, and the latest slug in the
+        DocketEvent table.
     """
-
     # Exclude dockets with no entries.
     docket_has_entries_subquery = DocketEntry.objects.filter(
         docket=OuterRef("id")
@@ -86,16 +87,16 @@ def get_dockets_to_fix(
     pk_offset: int,
     docket_ids: list[int] | None,
 ) -> QuerySet:
-    """Retrieve dockets that require fixing due to broken links by filtering
-    docket events based on their slug count to identify cases where the slugs
-    are inconsistent or multiple unique slugs exist.
+    """Retrieve dockets that require fixing due to broken links by filtering docket events based on their slug count to identify cases where the slugs are inconsistent or multiple unique slugs exist.
 
-    :param cut_off_date: The cutoff date for filtering docket events.
-    :param pk_offset: The minimum ID value to consider.
-    :param docket_ids: Optional, the Docket IDs to consider.
-    :return: A queryset of docket events that need to be fixed.
+    Args:
+        cut_off_date: The cutoff date for filtering docket events.
+        pk_offset: The minimum ID value to consider.
+        docket_ids: Optional, the Docket IDs to consider.
+
+    Returns:
+        A queryset of docket events that need to be fixed.
     """
-
     docket_events_and_slug_count = get_docket_events_and_slug_count(
         cut_off_date, pk_offset, docket_ids
     )
@@ -114,7 +115,9 @@ def get_dockets_to_fix(
 
 def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for indexing log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "es_fix_rd_broken_links:log"
 
@@ -190,12 +193,15 @@ class Command(VerboseCommand):
     def _process_docket_id_batch(
         self, batch_number: int, batch_ids: list[int]
     ) -> int:
-        """Process a batch of docket IDs with broken RECAPDocument links and
-        fix their RDs by re-indexing.
-        :param batch_ids: A batch list of docket IDs.
-        :return: The number of RECAP documents processed for this batch.
-        """
+        """Process a batch of docket IDs with broken RECAPDocument links and fix their RDs by re-indexing.
 
+        Args:
+            batch_number: The batch's position in the run, for logging.
+            batch_ids: A batch list of docket IDs.
+
+        Returns:
+            The number of RECAP documents processed for this batch.
+        """
         affected_rds = 0
         chunk = []
         rd_queryset = (
@@ -238,13 +244,14 @@ class Command(VerboseCommand):
         return count
 
     def get_and_fix_rds(self, cut_off_date: datetime) -> int:
-        """Get the dockets with broken RECAPDocument links and process them in
-        batches of docket IDs.
+        """Get the dockets with broken RECAPDocument links and process them in batches of docket IDs.
 
-        :param cut_off_date: The cutoff date to filter docket events.
-        :return: The total number of RECAP documents affected.
+        Args:
+            cut_off_date: The cutoff date to filter docket events.
+
+        Returns:
+            The total number of RECAP documents affected.
         """
-
         all_affected_rds = 0
         docket_ids_queryset = get_dockets_to_fix(
             cut_off_date, self.pk_offset, self.ids

@@ -32,12 +32,10 @@ def get_full_host(context, username=None, password=None):
 
     No trailing slash.
 
-    :param context: The template context that is passed in.
-    :type context: RequestContext
-    :param username: A HTTP Basic Auth username to show in the URL
-    :type username: str
-    :param password: A HTTP Basic Auth password to show in the URL
-    :type password: str
+    Args:
+        context: The template context that is passed in.
+        username: A HTTP Basic Auth username to show in the URL
+        password: A HTTP Basic Auth password to show in the URL
     """
     if any([username, password]):
         assert all([username, password]), (
@@ -78,12 +76,16 @@ def granular_date(
 ):
     """Return the date truncated according to its granularity.
 
-    :param obj: The object to get the value from
-    :param field_name: The attribute to be converted to a string.
-    :param granularity: The granularity to perform. If None, we assume that
-        getattr(obj, 'date_%s_field_name') will work.
-    :param iso: Whether to return an iso8601 date or a human readable one.
-    :return: A string representation of the date.
+    Args:
+        obj: The object to get the value from
+        field_name: The attribute to be converted to a string.
+        granularity: The granularity to perform. If None, we assume that
+            getattr(obj, 'date_%s_field_name') will work.
+        iso: Whether to return an iso8601 date or a human readable one.
+        default: The value to return when the date is empty.
+
+    Returns:
+        A string representation of the date.
     """
     from cl.people_db.models import (
         GRANULARITY_DAY,
@@ -128,8 +130,10 @@ def granular_date(
 
 @register.filter
 def get(mapping, key):
-    """Emulates the dictionary get. Useful when keys have spaces or other
-    punctuation."""
+    """Emulates the dictionary get.
+
+    Useful when keys have spaces or other punctuation.
+    """
     return mapping.get(key, "")
 
 
@@ -139,21 +143,33 @@ def random_int(a: int, b: int) -> int:
 
 
 @register.filter
+def docket_entry_fragment(doc: AttrDict) -> str:
+    """Return the URL fragment of a RECAP search document's entry on the docket page, e.g. "#entry-7", or "". Use it to link documents without a page of their own to their entry.
+
+    :param doc: The document's ES content, as get_es_doc_content returns it.
+    :return: The fragment, including its "#", or "".
+    """
+    # Imported here because elasticsearch_utils imports models that import
+    # this module, which would make a top-level import circular.
+    from cl.lib.elasticsearch_utils import get_docket_entry_fragment
+
+    return get_docket_entry_fragment(doc)
+
+
+@register.filter
 def get_es_doc_content(
     mapping: AttrDict | dict, scheduled_alert: bool = False
 ) -> AttrDict | dict | str:
-    """
-    Returns the ES document content placed in the "_source" field if the
-    document is an AttrDict, or just returns the content if it's not necessary
-    to extract from "_source" such as in scheduled alerts where the content is
-     a dict.
+    """Returns the ES document content placed in the "_source" field if the document is an AttrDict, or just returns the content if it's not necessary to extract from "_source" such as in scheduled alerts where the content is a dict.
 
-    :param mapping: The AttrDict or dict instance to extract the content from.
-    :param scheduled_alert: A boolean indicating if the content belongs to a
-    scheduled alert where the content is already in place.
-    :return: The ES document content.
-    """
+    Args:
+        mapping: The AttrDict or dict instance to extract the content from.
+        scheduled_alert: A boolean indicating if the content belongs to a
+            scheduled alert where the content is already in place.
 
+    Returns:
+        The ES document content.
+    """
     if scheduled_alert:
         return mapping
     try:
@@ -174,9 +190,12 @@ def citation(obj) -> str:
 def contains_highlights(content: str, alert: bool = False) -> bool:
     """Check if a given string contains the mark tag used in highlights.
 
-    :param content: The input string to check.
-    :param alert: Whether this tag is being used in the alert template.
-    :return: True if the mark highlight tag is found, otherwise False.
+    Args:
+        content: The input string to check.
+        alert: Whether this tag is being used in the alert template.
+
+    Returns:
+        True if the mark highlight tag is found, otherwise False.
     """
     hl_tag = ALERTS_HL_TAG if alert else SEARCH_HL_TAG
     pattern = rf"<{hl_tag}>.*?</{hl_tag}>"
@@ -186,11 +205,13 @@ def contains_highlights(content: str, alert: bool = False) -> bool:
 
 @register.filter
 def render_string_or_list(value: Any) -> Any:
-    """Filter to render list of strings separated by commas or the original
-    value.
+    """Filter to render list of strings separated by commas or the original value.
 
-    :param value: The value to be rendered.
-    :return: The original value or comma-separated values.
+    Args:
+        value: The value to be rendered.
+
+    Returns:
+        The original value or comma-separated values.
     """
     if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
@@ -203,8 +224,7 @@ _HTML_TAG_RE = re.compile(r"(<[^>]+>)")
 
 @register.filter(is_safe=True)
 def highlight_query(text: str, query: str) -> str:
-    """Wrap quoted phrases from *query* in ``<mark>`` tags within
-    already-escaped HTML text.
+    """Wrap quoted phrases from *query* in ``<mark>`` tags within already-escaped HTML text.
 
     Only quoted phrases (e.g. ``"fair use"``) are highlighted — these
     correspond to the keyword component of a hybrid semantic search.
@@ -213,9 +233,12 @@ def highlight_query(text: str, query: str) -> str:
     the ``<mark>`` tags are never broken by word-level truncation.
     Only highlights inside text content — HTML tags are left untouched.
 
-    :param text: The rendered HTML string (already escaped).
-    :param query: The raw search query typed by the user.
-    :return: HTML-safe string with matching phrases wrapped in
+    Args:
+        text: The rendered HTML string (already escaped).
+        query: The raw search query typed by the user.
+
+    Returns:
+        HTML-safe string with matching phrases wrapped in
         ``<mark>``.
     """
     if not query or not text:
@@ -253,16 +276,17 @@ def highlight_query(text: str, query: str) -> str:
 
 @register.filter
 def get_highlight(result: AttrDict | dict[str, Any], field: str) -> Any:
-    """Returns the highlighted version of the field is present, otherwise,
-    falls back to the original field value.
+    """Returns the highlighted version of the field is present, otherwise, falls back to the original field value.
 
-    :param result: The search result object.
-    :param field: The name of the field for which to retrieve the highlighted
-    version.
-    :return: The highlighted field value if available, otherwise, the original
-    field value.
+    Args:
+        result: The search result object.
+        field: The name of the field for which to retrieve the highlighted
+            version.
+
+    Returns:
+        The highlighted field value if available, otherwise, the original
+        field value.
     """
-
     hl_value = None
     original_value = getattr(result, field, "")
     if isinstance(result, AttrDict) and hasattr(result.meta, "highlight"):
@@ -278,25 +302,28 @@ def get_highlight(result: AttrDict | dict[str, Any], field: str) -> Any:
 def extract_q_value(query: str) -> str:
     """Extract the value of the "q" parameter from a URL-encoded query string.
 
-    :param query: The URL-encoded query string.
-    :return: The value of the "q" parameter or an empty string if "q" is not found.
-    """
+    Args:
+        query: The URL-encoded query string.
 
+    Returns:
+        The value of the "q" parameter or an empty string if "q" is not found.
+    """
     parsed_query = urllib.parse.parse_qs(query)
     return parsed_query.get("q", [""])[0]
 
 
 @register.simple_tag(takes_context=True)
 def alerts_supported(context: RequestContext, search_type: str) -> bool:
-    """Determine if search alerts are supported based on the search type and flag
-    status.
+    """Determine if search alerts are supported based on the search type and flag status.
 
-    :param context: The template context, which includes the request, required
-    for the waffle flag.
-    :param search_type: The type of search being performed.
-    :return: True if alerts are supported, False otherwise.
+    Args:
+        context: The template context, which includes the request, required
+            for the waffle flag.
+        search_type: The type of search being performed.
+
+    Returns:
+        True if alerts are supported, False otherwise.
     """
-
     return search_type in (
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.ORAL_ARGUMENT,
@@ -306,13 +333,15 @@ def alerts_supported(context: RequestContext, search_type: str) -> bool:
 
 @register.filter
 def group_courts(courts: list[Court], num_columns: int) -> list:
-    """Divide courts in equal groupings while keeping related courts together
+    """Divide courts in equal groupings while keeping related courts together.
 
-    :param courts: Courts to group.
-    :param num_columns: Number of groups wanted
-    :return: The courts grouped together
+    Args:
+        courts: Courts to group.
+        num_columns: Number of groups wanted
+
+    Returns:
+        The courts grouped together
     """
-
     column_len = len(courts) // num_columns
     remainder = len(courts) % num_columns
 
@@ -336,8 +365,11 @@ def group_courts(courts: list[Court], num_columns: int) -> list:
 
 @register.filter
 def format_date(date_str: str) -> str:
-    """Formats a date string in the format 'F jS, Y'. Useful for formatting
-    ES child document results where dates are not date objects."""
+    """Formats a date string in the format 'F jS, Y'.
+
+    Useful for formatting ES child document results where dates are not date
+    objects.
+    """
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         return date_filter(date_obj, "F jS, Y")
@@ -347,14 +379,15 @@ def format_date(date_str: str) -> str:
 
 @register.filter
 def parse_utc_date(datetime_object: str | datetime) -> datetime:
-    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object
-    and return a timezone-aware datetime in UTC.
+    """Parse an ISO-8601 UTC datetime string or a naive datetime UTC object and return a timezone-aware datetime in UTC.
 
-    :param datetime_object: A string representing a UTC datetime in ISO 8601
-    format or a naive UTC datetime object.
-    :return: A timezone-aware datetime object with UTC as the timezone.
+    Args:
+        datetime_object: A string representing a UTC datetime in ISO 8601
+            format or a naive UTC datetime object.
+
+    Returns:
+        A timezone-aware datetime object with UTC as the timezone.
     """
-
     return make_aware(
         (
             parse_datetime(datetime_object)
@@ -368,7 +401,9 @@ def parse_utc_date(datetime_object: str | datetime) -> datetime:
 @register.filter
 def datetime_in_utc(date_obj) -> str:
     """Formats a datetime object in UTC with timezone displayed.
-    For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
+
+    For example: 'Nov. 25, 2024, 01:28 p.m. UTC'.
+    """
     if date_obj is None:
         return ""
     try:
@@ -382,14 +417,15 @@ def datetime_in_utc(date_obj) -> str:
 
 @register.filter
 def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
-    """Build a query string that includes the docket ID and any existing query
-    parameters.
+    """Build a query string that includes the docket ID and any existing query parameters.
 
-    :param request_q: The current query string, if present.
-    :param docket_id: The docket_id to append to the query string.
-    :return:The query string with the docket_id included.
+    Args:
+        request_q: The current query string, if present.
+        docket_id: The docket_id to append to the query string.
+
+    Returns:
+        The query string with the docket_id included.
     """
-
     if request_q:
         return f"({request_q}) AND docket_id:{docket_id}"
     return f"docket_id:{docket_id}"
@@ -397,10 +433,13 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
 
 @register.filter
 def humanize_number(value):
-    """Formats a number into a human-readable abbreviated form
+    """Formats a number into a human-readable abbreviated form.
 
-    :param value: The number to format. Can be an integer, float, or string representation of a number.
-    :return: The formatted number as a string. If the input cannot be converted to a number, it is returned as-is.
+    Args:
+        value: The number to format. Can be an integer, float, or string representation of a number.
+
+    Returns:
+        The formatted number as a string. If the input cannot be converted to a number, it is returned as-is.
 
     Example usage:
         >>> humanize_number(500)
@@ -463,11 +502,7 @@ def get_attr(obj, attr_name):
 
 @register.filter
 def has_any_perm(perms_for_app, model_name: str) -> bool:
-    """Return True if the user has view, change, or delete permission for
-    the given model name within an app, e.g.
-    ``perms.search|has_any_perm:"docketentry"``. Lets templates check the
-    view/change/delete permission for diferents models.
-    """
+    """Return True if the user has view, change, or delete permission for the given model name within an app, e.g. ``perms.search|has_any_perm:"docketentry"``. Lets templates check the view/change/delete permission for diferents models."""
     return any(
         perms_for_app[f"{action}_{model_name}"]
         for action in ("view", "change", "delete")
@@ -476,7 +511,7 @@ def has_any_perm(perms_for_app, model_name: str) -> bool:
 
 @register.simple_tag
 def get_request_value(request_get, field_name):
-    """Simple tag to get value from request.GET given a field name"""
+    """Simple tag to get value from request.GET given a field name."""
     return request_get.get(field_name, "")
 
 
@@ -508,8 +543,11 @@ def http_url(url: str) -> str:
     Guards against rendering an unvalidated string as a
     ``javascript:`` URI in an ``href`` attribute.
 
-    :param url: The URL to check.
-    :return: The URL if safe, otherwise an empty string.
+    Args:
+        url: The URL to check.
+
+    Returns:
+        The URL if safe, otherwise an empty string.
     """
     if url and url.startswith(("http://", "https://")):
         return url

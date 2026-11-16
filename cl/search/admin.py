@@ -144,13 +144,16 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         form_url: str = "",
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
-        """Add a "Seal Cluster" button to the change form
+        """Add a "Seal Cluster" button to the change form.
 
-        :param request: HttpRequest object
-        :param object_id: PK of the OpinionCluster being edited
-        :param form_url: URL the change form posts to
-        :param extra_context: Additional template context
-        :return: The rendered change form
+        Args:
+            request: HttpRequest object
+            object_id: PK of the OpinionCluster being edited
+            form_url: URL the change form posts to
+            extra_context: Additional template context
+
+        Returns:
+            The rendered change form
         """
         extra_context = extra_context or {}
         extra_context["custom_links"] = [
@@ -167,9 +170,10 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         )
 
     def get_urls(self):
-        """Add custom admin URLs for sealing and blocking-dependency views
+        """Add custom admin URLs for sealing and blocking-dependency views.
 
-        :return: List of url patterns
+        Returns:
+            List of url patterns
         """
         urls = super().get_urls()
         custom_urls = [
@@ -189,7 +193,7 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     def seal_cluster_view(
         self, request: HttpRequest, cluster_id: int
     ) -> HttpResponse:
-        """Confirmation page (GET) and execution (POST) for sealing one cluster
+        """Confirmation page (GET) and execution (POST) for sealing one cluster.
 
         This is the single-object counterpart to the `seal_clusters` action,
         reachable from the "Seal Cluster" button on the change form. Both go
@@ -201,9 +205,12 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         resolved first. Otherwise we render a confirmation form that says
         whether the associated docket will be removed along with the cluster.
 
-        :param request: HttpRequest object
-        :param cluster_id: ID of the OpinionCluster to seal
-        :return: Redirect or rendered confirmation page
+        Args:
+            request: HttpRequest object
+            cluster_id: ID of the OpinionCluster to seal
+
+        Returns:
+            Redirect or rendered confirmation page
         """
         cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
         # `admin_view` only checks that the user is active staff, so gate the
@@ -242,12 +249,14 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     def blocking_confirmation_view(
         self, request: HttpRequest, cluster_id: int
     ) -> HttpResponse:
-        """View that shows confirmation and details of blocking dependencies
-        preventing sealing of a cluster
+        """View that shows confirmation and details of blocking dependencies preventing sealing of a cluster.
 
-        :param request: HttpRequest object
-        :param cluster_id: ID of the OpinionCluster being checked
-        :return: HttpResponse rendering template with blocking relations
+        Args:
+            request: HttpRequest object
+            cluster_id: ID of the OpinionCluster being checked
+
+        Returns:
+            HttpResponse rendering template with blocking relations
         """
         cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
 
@@ -268,15 +277,14 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
 
     @admin.action(description="Seal selected opinion clusters")
     def seal_clusters(self, request: HttpRequest, queryset: QuerySet) -> None:
-        """Custom admin action to seal (delete) selected clusters after ensuring
-        no blocking dependencies exist. Creates a ClusterRedirection record
-        for each sealed cluster
+        """Custom admin action to seal (delete) selected clusters after ensuring no blocking dependencies exist. Creates a ClusterRedirection record for each sealed cluster.
 
         This is the bulk counterpart to `seal_cluster_view`; both share
         `deletion_utils.get_deletion_blockers` and `deletion_utils.seal_cluster`.
 
-        :param request: HttpRequest triggering the action
-        :param queryset: Queryset of selected OpinionCluster
+        Args:
+            request: HttpRequest triggering the action
+            queryset: Queryset of selected OpinionCluster
         """
         # The changelist only requires view or change permission, so gate the
         # deletion the way Django's own delete_selected action does. Checked
@@ -653,9 +661,12 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
     ) -> bool:
         """Prevent deletion of cluster redirections via the admin.
 
-        :param request: The HTTP request.
-        :param obj: The object being deleted, if any.
-        :returns: Always False.
+        Args:
+            request: The HTTP request.
+            obj: The object being deleted, if any.
+
+        Returns:
+            Always False.
         """
         return False
 

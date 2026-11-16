@@ -18,7 +18,9 @@ from cl.lib.indexing_utils import (
 
 def compose_redis_key() -> str:
     """Compose a Redis key for SCOTUS importer log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "scotus_docket_import:log"
 

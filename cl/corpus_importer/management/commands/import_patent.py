@@ -25,10 +25,9 @@ PATENT_TAGS = ["wdtx_ded_patent"]
 def get_dockets(options: dict) -> None:
     """Get Patent litigation from the past 10 years.
 
-    :param options: Options for scraping
-    :return: None
+    Args:
+        options: Options for scraping
     """
-
     start = options["skip_until"]
     stop = options["limit"]
     # Add code to simplify the logic for iterating.

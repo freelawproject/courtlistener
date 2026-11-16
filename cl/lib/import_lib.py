@@ -21,7 +21,7 @@ def get_scotus_judges(d: date) -> QuerySet[Person]:
 
 
 def get_min_dates() -> dict[str, date]:
-    """returns a dictionary with key-value (courtid, minimum date)"""
+    """Returns a dictionary with key-value (courtid, minimum date)."""
     min_dates = {}
     courts = Court.objects.exclude(
         dockets__clusters__source__contains=ClusterSources.COLUMBIA_ARCHIVE
@@ -32,8 +32,7 @@ def get_min_dates() -> dict[str, date]:
 
 
 def get_path_list() -> set[str]:
-    """Returns a set of all the local_path values so we can avoid them in
-    later imports.
+    """Returns a set of all the local_path values so we can avoid them in later imports.
 
     This way, when we run a second, third, fourth import, we can be sure not
     to import a previous item.
@@ -46,7 +45,7 @@ def get_path_list() -> set[str]:
 
 
 def get_courtdates() -> dict[str, date]:
-    """returns a dictionary with key-value (courtid, founding date)"""
+    """Returns a dictionary with key-value (courtid, founding date)."""
     start_dates = {}
     courts = Court.objects.all()
     for court in courts.iterator():
@@ -55,8 +54,7 @@ def get_courtdates() -> dict[str, date]:
 
 
 def get_min_nocite() -> dict[str, date]:
-    """Return a dictionary indicating the earliest case with no citations for
-    every court.
+    """Return a dictionary indicating the earliest case with no citations for every court.
 
     {'ala': Some-date, ...}
     """

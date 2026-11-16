@@ -83,10 +83,13 @@ def get_expired_memberships(
     The window is based on the termination date itself, so memberships still
     inside the grace period are checked while their benefits are intact.
 
-    :param min_hours_expired: Minimum hours since the membership expired.
-    :param max_days_expired: Maximum days since expiration, or None for no
-           upper limit.
-    :return: Memberships ordered by expiration date, with the user and
+    Args:
+        min_hours_expired: Minimum hours since the membership expired.
+        max_days_expired: Maximum days since expiration, or None for no
+               upper limit.
+
+    Returns:
+        Memberships ordered by expiration date, with the user and
            profile loaded.
     """
     right_now = timezone.now()
@@ -124,9 +127,12 @@ def sync_membership_from_neon(
     webhook may already have changed or deleted the row. In that case the
     webhook had newer data: nothing is written and the record is skipped.
 
-    :param membership: The local membership to update.
-    :param neon_membership: A membership record as returned by the Neon API.
-    :return: Whether the record was updated, left unchanged, or skipped.
+    Args:
+        membership: The local membership to update.
+        neon_membership: A membership record as returned by the Neon API.
+
+    Returns:
+        Whether the record was updated, left unchanged, or skipped.
     """
     user = membership.user
     neon_id = str(neon_membership["id"])
@@ -261,8 +267,11 @@ def delete_expired_membership(membership: NeonMembership) -> bool:
     rather than cleared, since clearing it costs a Redis scan and the
     membership was already inactive.
 
-    :param membership: The expired membership to delete.
-    :return: True if the membership was deleted, False if a webhook got
+    Args:
+        membership: The expired membership to delete.
+
+    Returns:
+        True if the membership was deleted, False if a webhook got
         there first.
     """
     with transaction.atomic():
@@ -300,12 +309,15 @@ def check_membership(
     Neon request is logged and reported as FAILED so the caller can move on
     to the next member; any other exception propagates to the caller.
 
-    :param client: The Neon API client.
-    :param membership: The local membership to check, with its user and
-        profile loaded.
-    :param delete_before: Delete confirmed lapses that ended before this
-        instant, or None to never delete.
-    :return: What happened to the membership.
+    Args:
+        client: The Neon API client.
+        membership: The local membership to check, with its user and
+            profile loaded.
+        delete_before: Delete confirmed lapses that ended before this
+            instant, or None to never delete.
+
+    Returns:
+        What happened to the membership.
     """
     user = membership.user
     account_id = user.profile.neon_account_id  # type: ignore
@@ -362,11 +374,14 @@ def sync_expired_memberships(
     they have been expired for at least delete_after_days. Set this value
     to 0 to disable deletion.
 
-    :param min_hours_expired: See `get_expired_memberships`.
-    :param max_days_expired: See `get_expired_memberships`.
-    :param delete_after_days: Age in days past the termination date after
-        which a confirmed-expired membership is deleted. 0 disables deletion.
-    :return: How many memberships ended in each ``SyncResult``.
+    Args:
+        min_hours_expired: See `get_expired_memberships`.
+        max_days_expired: See `get_expired_memberships`.
+        delete_after_days: Age in days past the termination date after
+            which a confirmed-expired membership is deleted. 0 disables deletion.
+
+    Returns:
+        How many memberships ended in each ``SyncResult``.
     """
     client = NeonClient()
     delete_before = (

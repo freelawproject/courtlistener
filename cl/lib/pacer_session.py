@@ -18,8 +18,7 @@ session_key = "session:pacer:cookies:user.%s"
 
 @dataclass
 class SessionData:
-    """
-    The goal of this class is to encapsulate data required for PACER requests.
+    """The goal of this class is to encapsulate data required for PACER requests.
 
     This class serves as a lightweight container for PACER session data,
     excluding authentication details for efficient caching.
@@ -68,8 +67,7 @@ def allow_insecure_cookie_transport(cookies: Cookies) -> None:
 
 
 class ProxyPacerSession(PacerSession):
-    """
-    Route PACER requests, including redirects, through Webhook Sentry.
+    """Route PACER requests, including redirects, through Webhook Sentry.
 
     - Sets the 'X-WhSentry-TLS' header to 'true' for all requests.
     - Replaces 'https://' with 'http://' in the URL before making the request.
@@ -112,8 +110,7 @@ class ProxyPacerSession(PacerSession):
         return response
 
     def _pick_proxy_connection(self) -> str:
-        """
-        Picks a proxy connection string from available options.
+        """Picks a proxy connection string from available options.
 
         this function randomly chooses a string from the
         `settings.EGRESS_PROXY_HOSTS` list and returns it.
@@ -151,13 +148,15 @@ async def log_into_pacer(
     password: str,
     client_code: str | None = None,
 ) -> SessionData:
-    """Log into PACER and returns a SessionData object containing the session's
-    cookies and proxy information.
+    """Log into PACER and returns a SessionData object containing the session's cookies and proxy information.
 
-    :param username: A PACER username
-    :param password: A PACER password
-    :param client_code: A PACER client_code
-    :return: A SessionData object containing the session's cookies and proxy.
+    Args:
+        username: A PACER username
+        password: A PACER password
+        client_code: A PACER client_code
+
+    Returns:
+        A SessionData object containing the session's cookies and proxy.
     """
     async with ProxyPacerSession(
         username=username,
@@ -175,7 +174,7 @@ async def get_or_cache_pacer_cookies(
     client_code: str | None = None,
     refresh: bool = False,
 ) -> SessionData:
-    """Get PACER cookies for a user or create and cache fresh ones
+    """Get PACER cookies for a user or create and cache fresh ones.
 
     For the PACER Fetch API, we store users' PACER cookies in Redis with a
     short expiration timeout. This way, we never store their password, and
@@ -185,13 +184,16 @@ async def get_or_cache_pacer_cookies(
     them, it returns them. If not, it attempts to log the user in and then
     returns the fresh cookies and the proxy used to login(after caching them).
 
-    :param user_pk: The PK of the user attempting to store their credentials.
-    Needed to create the key in Redis.
-    :param username: The PACER username of the user
-    :param password: The PACER password of the user
-    :param client_code: The PACER client code of the user
-    :param refresh: If True, refresh the cookies even if they're already cached
-    :return: A SessionData object containing the session's cookies and proxy.
+    Args:
+        user_pk: The PK of the user attempting to store their credentials.
+            Needed to create the key in Redis.
+        username: The PACER username of the user
+        password: The PACER password of the user
+        client_code: The PACER client code of the user
+        refresh: If True, refresh the cookies even if they're already cached
+
+    Returns:
+        A SessionData object containing the session's cookies and proxy.
     """
     r = get_redis_interface("CACHE", decode_responses=False)
     cookies_data = await get_pacer_cookie_from_cache(user_pk, r=r)
@@ -219,10 +221,13 @@ def get_pacer_cookie_from_cache(
 ) -> SessionData | None:
     """Get the cookie for a user from the cache.
 
-    :param user_pk: The ID of the user, can be a string or an ID
-    :param r: A redis interface. If not provided, a fresh one is used. This is
-    a performance enhancement.
-    :return: The cached session, or None if it is missing or invalid.
+    Args:
+        user_pk: The ID of the user, can be a string or an ID
+        r: A redis interface. If not provided, a fresh one is used. This is
+            a performance enhancement.
+
+    Returns:
+        The cached session, or None if it is missing or invalid.
     """
     if not r:
         r = get_redis_interface("CACHE", decode_responses=False)
@@ -246,10 +251,13 @@ def delete_pacer_cookie_from_cache(
 ) -> None:
     """Deletes the cookie for a user from the cache.
 
-    :param user_pk: The ID of the user, can be a string or an ID
-    :param r: A redis interface. If not provided, a fresh one is used. This is
-    a performance enhancement.
-    :return Either None if no cache cookies or the cookies if they're found.
+    Args:
+        user_pk: The ID of the user, can be a string or an ID
+        r: A redis interface. If not provided, a fresh one is used. This is
+            a performance enhancement.
+
+    Returns:
+        Either None if no cache cookies or the cookies if they're found.
     """
     if not r:
         r = get_redis_interface("CACHE", decode_responses=False)

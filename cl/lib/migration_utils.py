@@ -27,11 +27,11 @@ def load_migration_fixture(
 
     https://stackoverflow.com/a/39743581/64911
 
-    :param apps: Apps at the state of the migration.
-    :param schema_editor: The schema at the time of the migration.
-    :param fixture: A path to the fixture to be loaded.
-    :param app_label: The app label the fixture should be loaded into.
-    :return: None
+    Args:
+        apps: Apps at the state of the migration.
+        schema_editor: The schema at the time of the migration.
+        fixture: A path to the fixture to be loaded.
+        app_label: The app label the fixture should be loaded into.
     """
     # Save the old _get_model_from_node() function. django-stubs omit this
     # private method.

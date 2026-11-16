@@ -41,10 +41,13 @@ from cl.users.models import UserProfile
 def get_note(request: HttpRequest) -> Note | None:
     """Look up the requesting user's Note for the object named in POST data.
 
-    :param request: The request, expected to carry ``content_type`` (a
-        ContentType pk) and ``object_id`` in POST data, identifying the
-        noted object.
-    :return: The user's Note for that object, a blank unsaved Note if the
+    Args:
+        request: The request, expected to carry ``content_type`` (a
+            ContentType pk) and ``object_id`` in POST data, identifying the
+            noted object.
+
+    Returns:
+        The user's Note for that object, a blank unsaved Note if the
         object is valid but has no Note yet, or None if content_type/
         object_id are missing, invalid, or don't resolve to a model in
         NOTEABLE_MODELS.
@@ -108,7 +111,7 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def delete_note(request: HttpRequest) -> HttpResponse:
-    """Delete a user's note
+    """Delete a user's note.
 
     Deletes a note for a user using an ajax call and post data.
     """
@@ -174,9 +177,7 @@ async def view_tag(request, username, tag_name):
 
 
 async def view_tags(request, username):
-    """Show the user their tags if they're looking at their own, or show the
-    public tags of somebody else.
-    """
+    """Show the user their tags if they're looking at their own, or show the public tags of somebody else."""
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
     return TemplateResponse(
@@ -192,7 +193,6 @@ async def view_tags(request, username):
 
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
-
     top_prayers = await get_top_prayers()
 
     page = request.GET.get("page", 1)
@@ -451,7 +451,7 @@ async def user_prayers_view_granted(
 def toggle_prayer_public(
     request: HttpRequest,
 ) -> HttpResponse:
-    """Toggle the user's setting to make pending prayers public"""
+    """Toggle the user's setting to make pending prayers public."""
     user = request.user
     next_toggle_status = not bool(request.POST.get("current_toggle_status"))
     UserProfile.objects.filter(user=user).update(

@@ -24,15 +24,14 @@ from cl.users.email_handlers import (
 
 def get_email_prefix() -> str:
     """Simple helper for getting the prefix for the email counter.
+
     Useful for mocking the logger.
     """
     return "email"
 
 
 def incr_email_counters(pipe: Pipeline) -> None:
-    """increments the temporary counter and adds a new
-    element to the sorted set once it reaches the value of
-    the EMAILS_TEMP_COUNTER setting.
+    """Increments the temporary counter and adds a new element to the sorted set once it reaches the value of the EMAILS_TEMP_COUNTER setting.
 
     Args:
         pipe (Pipeline): A pipeline object.
@@ -51,11 +50,11 @@ def incr_email_counters(pipe: Pipeline) -> None:
 
 
 def get_attempts_in_window(r: Redis) -> int:
-    """
-    Returns the number of elements stored in the set. This method
-    check the current time, and shave off any attempts in the sorted set
-    that are outside of our window, then check the cardinality of the
-    sorted set
+    """Returns the number of elements stored in the set.
+
+    This method check the current time, and shave off any attempts in the
+    sorted set that are outside of our window, then check the cardinality of
+    the sorted set.
 
     Args:
         r (Redis): The Redis DB connection interface.
@@ -100,9 +99,9 @@ def get_email_count(r: Redis) -> int:
 
 
 def check_emergency_brake(r: Redis) -> None:
-    """
-    Checks the emails sent in the last 24 hours. Raises ValueError
-    if our threshold is exceeded.
+    """Checks the emails sent in the last 24 hours.
+
+    Raises ValueError if our threshold is exceeded.
 
     AWS SES uses a sliding window to calculate our email sending quota.
     When it runs out, we cannot recover without waiting ~24 hours, so
@@ -144,8 +143,7 @@ def check_emergency_brake(r: Redis) -> None:
 
 
 class EmailBackend(BaseEmailBackend):
-    """This is a custom email backend to handle sending an email with some
-    extra functions before the email is sent.
+    """This is a custom email backend to handle sending an email with some extra functions before the email is sent.
 
     It is necessary to set the following settings:
     BASE_BACKEND: The base email backend to use to send emails, in our case:

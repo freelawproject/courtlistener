@@ -326,8 +326,7 @@ def ensure_env_file() -> None:
 
 
 def configure_environment(persist: bool) -> None:
-    """Set the variables compose needs, and with `persist` keep them for the
-    rest of the session rather than just this process."""
+    """Set the variables compose needs, and with `persist` keep them for the rest of the session rather than just this process."""
     variables = {
         # Makes `docker compose ...` use these files from anywhere.
         "COMPOSE_FILE": ":".join(str(p) for p in COMPOSE_FILES),
@@ -349,9 +348,10 @@ def configure_environment(persist: bool) -> None:
 
 
 def build_proxy_ca_images() -> None:
-    """Rebuild the stack's base images with the host's CA bundle installed,
-    for the proxy-ca compose override to swap in. Does nothing when the host
-    has no such bundle."""
+    """Rebuild the stack's base images with the host's CA bundle installed, for the proxy-ca compose override to swap in.
+
+    Does nothing when the host has no such bundle.
+    """
     if not os.path.isfile(HOST_CA_BUNDLE):
         return
     for path, pattern, base, tag in PROXY_CA_IMAGES:

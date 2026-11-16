@@ -54,7 +54,7 @@ cnt = CaseNameTweaker()
 
 
 def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
-    """Set a value for Opinion.ordering_key
+    """Set a value for Opinion.ordering_key.
 
     To know the relative order inside the cluster, we must know all the
     opinion types. Opinion types have an inherent order given by the first
@@ -63,9 +63,9 @@ def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
     For scraped clusters we may
     - get 2 of one type. For example, 2 concurrences
 
-    :param opinions_content: a list of tuples; where the first element of each
-        tuple is a metadata dict
-    :return None
+    Args:
+        opinions_content: a list of tuples; where the first element of each
+            tuple is a metadata dict
     """
     types = [
         # we are sure the types key exist, since this is a cluster with more
@@ -102,7 +102,8 @@ def make_objects(
     plural names, like in
     `item.get("disposition") or item.get("dispositions", "")`
 
-    :return: the created objects.
+    Returns:
+        the created objects.
     """
     blocked = item["blocked_statuses"]
     if blocked:
@@ -337,9 +338,10 @@ class Command(ScraperCommand):
         dup_checker,
         next_case_date,
     ) -> list[tuple[dict, bytes, str]]:
-        """Downloads opinions and checks if the content is duplicated
+        """Downloads opinions and checks if the content is duplicated.
 
-        :return: a list of dictionaries containing the binary content and the hash of the content
+        Returns:
+            a list of dictionaries containing the binary content and the hash of the content
         """
         opinions_content = []
         opinions_to_download = []

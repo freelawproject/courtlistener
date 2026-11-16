@@ -1,6 +1,4 @@
-"""
-Process here will be to iterate over every item in the SCDB and to locate it in
-CourtListener.
+"""Process here will be to iterate over every item in the SCDB and to locate it in CourtListener.
 
 Location is done by:
  - Looking in the `scdb_id` field. During the first run of this
@@ -92,8 +90,9 @@ class Command(VerboseCommand):
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
-        """Check if the value passed in is Falsy. If so, set it to the value of
-        new_value.
+        """Check if the value passed in is Falsy.
+
+        If so, set it to the value of new_value.
 
         return ok: Whether the item was set successfully
         """
@@ -149,11 +148,11 @@ class Command(VerboseCommand):
 
     @staticmethod
     def do_citations(cluster, scdb_info):
-        """
-        Handle the citation fields.
+        """Handle the citation fields.
 
-        :param cluster: The Cluster to be changed.
-        :param scdb_info: A dict with the SCDB information.
+        Args:
+            cluster: The Cluster to be changed.
+            scdb_info: A dict with the SCDB information.
         """
         fields = {
             "usCite": ("U.S.", Citation.FEDERAL),
@@ -235,9 +234,7 @@ class Command(VerboseCommand):
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
-        """Go through each of the clusters and see if they have a matching docket
-        number. Return only those ones that do.
-        """
+        """Go through each of the clusters and see if they have a matching docket number. Return only those ones that do."""
         good_cluster_ids = []
         for cluster in clusters:
             dn = cluster.docket.docket_number
@@ -260,14 +257,15 @@ class Command(VerboseCommand):
 
     @staticmethod
     def winnow_by_case_name(clusters, d):
-        """
-        Go through the clusters that are matched and see if one matches by
-        case name.
+        """Go through the clusters that are matched and see if one matches by case name.
 
-        :param clusters: A QuerySet object of clusters.
-        :param d: The matching SCDB data
-        :return: A QuerySet object of clusters, hopefully winnowed to a single
-        result.
+        Args:
+            clusters: A QuerySet object of clusters.
+            d: The matching SCDB data
+
+        Returns:
+            A QuerySet object of clusters, hopefully winnowed to a single
+            result.
         """
         good_cluster_ids = []
         bad_words = ["v", "versus"]
@@ -335,8 +333,9 @@ class Command(VerboseCommand):
     def iterate_scdb_and_take_actions(
         self, action_zero, action_one, action_many, start_row=0
     ):
-        """Iterates over the SCDB, looking for a single match for every item. If
-        a single match is identified it takes the action in the action_one
+        """Iterates over the SCDB, looking for a single match for every item.
+
+        If a single match is identified it takes the action in the action_one
         function using the Cluster identified and the dict of the SCDB
         information.
 

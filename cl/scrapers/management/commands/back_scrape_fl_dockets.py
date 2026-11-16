@@ -1,4 +1,4 @@
-"""Command to back-scrape Florida dockets"""
+"""Command to back-scrape Florida dockets."""
 
 from datetime import date
 from pathlib import Path
@@ -33,10 +33,12 @@ def save_case_to_s3(
     throttle: CeleryThrottle,
     queue_name: str,
 ) -> str:
-    """Save a case to S3 under the given prefix
+    """Save a case to S3 under the given prefix.
 
-    :returns: The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
-    return that as well."""
+    Returns:
+        The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
+        return that as well.
+    """
     key = _make_case_key(base, court_id, case.docket_number)
     content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
     throttle.maybe_wait()

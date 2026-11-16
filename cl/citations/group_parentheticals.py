@@ -1,6 +1,4 @@
-"""
-This module contains the clustering algorithm for grouping
-parentheticals of a case into groups of textually-similar parentheticals.
+"""This module contains the clustering algorithm for grouping parentheticals of a case into groups of textually-similar parentheticals.
 
 The basic idea here is that many cases are summarized in parentheticals by other
 cases repeatedly in similar or even identical ways. We want to identify and group
@@ -78,10 +76,7 @@ class ComputedParentheticalGroup:
 def compute_parenthetical_groups(
     parentheticals: list[Parenthetical],
 ) -> list[ComputedParentheticalGroup]:
-    """
-    Given a list of parentheticals for a case, cluster them based on textual
-    similarity and returns a list of ComputedParentheticalGroup objects containing
-    these clusters and their metadata.
+    """Given a list of parentheticals for a case, cluster them based on textual similarity and returns a list of ComputedParentheticalGroup objects containing these clusters and their metadata.
 
     For example, imagine that a case makes three important
     points of law, and that those are summarized in 200 parentheticals.
@@ -90,8 +85,11 @@ def compute_parenthetical_groups(
     them into three ComputedParentheticalGroups (one for each point of law).
     From there, we put those in a list and return the list of groups.
 
-    :param parentheticals: A list of parentheticals to organize into groups
-    :return: A list of ComputedParentheticalGroup's containing the given parentheticals
+    Args:
+        parentheticals: A list of parentheticals to organize into groups
+
+    Returns:
+        A list of ComputedParentheticalGroup's containing the given parentheticals
     """
     # Clear tokenization cache to avoid cross-request and cross-test contamination.
     # The cache is intended to speed up repeated tokenization within a single
@@ -141,19 +139,18 @@ def compute_parenthetical_groups(
 def get_similarity_graph(
     parenthetical_minhashes: dict[str, MinHash], similarity_index: MinHashLSH
 ) -> Graph:
-    """
-    From the MinHashLSH index, create a dictionary representation of a graph
-    where the nodes represent parentheticals and the edges represent that
-    two nodes are sufficiently similar to each other to be clustered into
-    the same group.
+    """From the MinHashLSH index, create a dictionary representation of a graph where the nodes represent parentheticals and the edges represent that two nodes are sufficiently similar to each other to be clustered into the same group.
 
-    :param parenthetical_minhashes: A dictionary mapping parenthetical IDs to
-    the MinHash object corresponding to the parenthetical's text's tokens
-    :param similarity_index: The MinHashLSH data structure containing all of
-    the MinHash's that we can query
-    :return: A dictionary representation of a graph/network where the nodes/keys
-    are parenthetical IDs and the neighbors/values are the other parentheticals
-    above the defined similarity threshold.
+    Args:
+        parenthetical_minhashes: A dictionary mapping parenthetical IDs to
+            the MinHash object corresponding to the parenthetical's text's tokens
+        similarity_index: The MinHashLSH data structure containing all of
+            the MinHash's that we can query
+
+    Returns:
+        A dictionary representation of a graph/network where the nodes/keys
+        are parenthetical IDs and the neighbors/values are the other parentheticals
+        above the defined similarity threshold.
     """
     similarity_graph: Graph = {}
     for par_key, mhash in parenthetical_minhashes.items():
@@ -166,17 +163,20 @@ def get_similarity_graph(
 def get_graph_component(
     node: str, graph: Graph, visited: set[str]
 ) -> list[str]:
-    """
-    From a given starting node, find the list of nodes connected to it either
-    directly or indirectly. In graph theory terms, this is a "connected
-    component": https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
+    """Find the nodes connected to a starting node directly or indirectly.
 
-    :param node: The starting node from which to probe the component
-    :param graph: A dictionary encoding the graph with key: node and value:
-    list of neighbors
-    :param visited: A set containing the nodes already visited in all groups
-        processing
-    :return: A list of all nodes in param :node's component
+    In graph theory terms, this is a "connected component". See:
+    https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
+
+    Args:
+        node: The starting node from which to probe the component
+        graph: A dictionary encoding the graph with key: node and value:
+            list of neighbors
+        visited: A set containing the nodes already visited in all groups
+            processing
+
+    Returns:
+        A list of all nodes in param :node's component
     """
     if node in visited:
         return []
@@ -200,18 +200,17 @@ def get_group_from_component(
     parenthetical_objects: dict[str, Parenthetical],
     similarity_graph: Graph,
 ) -> ComputedParentheticalGroup:
-    """
-    Given a list of parenthetical IDs representing a component, create a
-    ComputedParentheticalGroup containing the corresponding parenthetical objects,
-    the most representative parenthetical from among the component, and
-    sort the parentheticals by their descriptiveness score.
+    """Given a list of parenthetical IDs representing a component, create a ComputedParentheticalGroup containing the corresponding parenthetical objects, the most representative parenthetical from among the component, and sort the parentheticals by their descriptiveness score.
 
-    :param component: A list of parenthetical IDs to turn into a ComputedParentheticalGroup
-    :param parenthetical_objects: A dictionary mapping parenthetical IDs to the
-    corresponding parenthetical objects
-    :param similarity_graph: A dictionary containing similarity relationships
-    between parentheticals
-    :return: A ComputedParentheticalGroup corresponding to the given component
+    Args:
+        component: A list of parenthetical IDs to turn into a ComputedParentheticalGroup
+        parenthetical_objects: A dictionary mapping parenthetical IDs to the
+            corresponding parenthetical objects
+        similarity_graph: A dictionary containing similarity relationships
+            between parentheticals
+
+    Returns:
+        A ComputedParentheticalGroup corresponding to the given component
     """
     pars_in_group = sorted(
         (parenthetical_objects[par_id] for par_id in component),
@@ -241,15 +240,15 @@ BEST_PARENTHETICAL_SEARCH_THRESHOLD = 0.2
 def get_representative_parenthetical(
     parentheticals: list[Parenthetical], similarity_graph: Graph
 ) -> Parenthetical:
-    """
-    Takes a list of parentheticals sorted by score and returns the parenthetical
-    in the top 20% of score that is most similar to the cluster as a whole
-    (as determined by its number of neighbors)
+    """Takes a list of parentheticals sorted by score and returns the parenthetical in the top 20% of score that is most similar to the cluster as a whole (as determined by its number of neighbors).
 
-    :param parentheticals: A list of parentheticals sorted by score, descending
-    :param similarity_graph: A dictionary encoding the graph with key: node and value:
-    list of neighbors
-    :return: A Parenthetical object of the best parenthetical in the group
+    Args:
+        parentheticals: A list of parentheticals sorted by score, descending
+        similarity_graph: A dictionary encoding the graph with key: node and value:
+            list of neighbors
+
+    Returns:
+        A Parenthetical object of the best parenthetical in the group
     """
     num_parentheticals_to_consider = ceil(
         len(parentheticals) * BEST_PARENTHETICAL_SEARCH_THRESHOLD
@@ -268,11 +267,13 @@ def get_representative_parenthetical(
 # repetition within a single clustering invocation while keeping memory bounded.
 @lru_cache(maxsize=4096)
 def get_parenthetical_tokens(text: str) -> list[str]:
-    """
-    For a given text string, tokenize it, and filter stop words.
+    """For a given text string, tokenize it, and filter stop words.
 
-    :param text: The parenthetical text to tokenize
-    :return: A list of stemmed and filtered tokens from the provided text
+    Args:
+        text: The parenthetical text to tokenize
+
+    Returns:
+        A list of stemmed and filtered tokens from the provided text
     """
     # Remove non-alphanumeric and non-whitespace characters from text
     cleaned_text = re.sub(r"[^A-Za-z0-9 ]+", "", text).lower()

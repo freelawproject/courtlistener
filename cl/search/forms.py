@@ -43,10 +43,13 @@ OPINION_ORDER_BY_CHOICES = (
 def blend[F: Field](field: F, *, as_str_types: Iterable[str]) -> F:
     """Tag a form field with the search types it's displayed for.
 
-    :param field: The form field to tag.
-    :param as_str_types: The search types for which the field should be
-    included in `SearchForm.as_display_dict`.
-    :return: The same field, tagged.
+    Args:
+        field: The form field to tag.
+        as_str_types: The search types for which the field should be
+            included in `SearchForm.as_display_dict`.
+
+    Returns:
+        The same field, tagged.
     """
     setattr(field, "as_str_types", as_str_types)
     return field
@@ -659,10 +662,10 @@ class SearchForm(forms.Form):
     # In short: This is a nasty area. Comments this long are a bad sign for
     # the intrepid developer.
     def clean_q(self):
-        """
-        Cleans up various problems with the query:
-         - lowercase --> camelCase
-         - '|' --> ' OR '
+        """Cleans up the following problems with the query.
+
+        - lowercase --> camelCase
+        - '|' --> ' OR '.
         """
         q = self.cleaned_data["q"]
 
@@ -697,9 +700,7 @@ class SearchForm(forms.Form):
         return q
 
     def clean_order_by(self):
-        """Sets the default order_by value if one isn't provided by the
-        user.
-        """
+        """Sets the default order_by value if one isn't provided by the user."""
         if not self.cleaned_data.get("type"):
             raise ValidationError("Invalid value for type field")
 
@@ -724,9 +725,7 @@ class SearchForm(forms.Form):
         return self.cleaned_data["type"]
 
     def clean(self):
-        """
-        Handles validation fixes that need to be performed across fields.
-        """
+        """Handles validation fixes that need to be performed across fields."""
         cleaned_data = self.cleaned_data
         default_status = "stat_Published"
 
@@ -811,7 +810,7 @@ class SearchForm(forms.Form):
         return cleaned_data
 
     def as_display_dict(self, court_count_human):
-        """Generate a displayable dictionary of the search form
+        """Generate a displayable dictionary of the search form.
 
         This can be useful for displaying on the front end, or converting into
         a useful string. The dictionary looks like:
@@ -821,9 +820,12 @@ class SearchForm(forms.Form):
               'Query': 'bar',
             }
 
-        :param court_count_human: The number of courts being queried or "All",
-        if all courts are being queried.
-        :returns A dictionary of the data
+        Args:
+            court_count_human: The number of courts being queried or "All",
+                if all courts are being queried.
+
+        Returns:
+            A dictionary of the data
         """
         # The search type is usually provided by cleaned data, but can be
         # missing when the form is invalid (and lacks it). If so, just give up.
@@ -847,7 +849,7 @@ class SearchForm(forms.Form):
         return display_dict
 
     def as_text(self, court_count_human):
-        """Create a human-readable string representation of the search form"""
+        """Create a human-readable string representation of the search form."""
         crumbs = []
         for label, value in self.as_display_dict(court_count_human).items():
             crumbs.append(f"{label}: {value}")
@@ -1165,12 +1167,11 @@ def clean_up_date_formats(
 ) -> None:
     """Clean up date formats in a given params dictionary.
 
-    :param cd: The cleaned data dict.
-    :param date_field: The name of the date field to be cleaned up.
-    :param get_params: The query request params.
-    :return: None
+    Args:
+        cd: The cleaned data dict.
+        date_field: The name of the date field to be cleaned up.
+        get_params: The query request params.
     """
-
     for time in ("before", "after"):
         field = f"{date_field}_{time}"
         value = cd.get(field)

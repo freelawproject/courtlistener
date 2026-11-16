@@ -161,14 +161,16 @@ class Organization(AbstractDateTimeModel):
     def seats_used(self) -> int:
         """Count the memberships that hold one of the organization's seats.
 
-        :return: The number of members with a seat.
+        Returns:
+            The number of members with a seat.
         """
         return self.memberships.filter(has_seat=True).count()
 
     def has_free_seat(self) -> bool:
         """Whether one more person can get the organization's benefits.
 
-        :return: True if there is no seat limit or it hasn't been reached.
+        Returns:
+            True if there is no seat limit or it hasn't been reached.
         """
         if self.seat_limit is None:
             return True
@@ -178,8 +180,11 @@ class Organization(AbstractDateTimeModel):
 def normalize_domain(domain: str) -> str:
     """Lowercase a domain and drop a leading "@" and trailing dot.
 
-    :param domain: The domain as typed, e.g. " @Acme-Law.com. ".
-    :return: The domain as stored, e.g. "acme-law.com".
+    Args:
+        domain: The domain as typed, e.g. " @Acme-Law.com. ".
+
+    Returns:
+        The domain as stored, e.g. "acme-law.com".
     """
     return domain.strip().lower().lstrip("@").rstrip(".")
 
@@ -234,8 +239,9 @@ class OrganizationDomain(AbstractDateTimeModel):
     def clean(self) -> None:
         """Normalize the domain and refuse ones nobody may claim.
 
-        :raises ValidationError: For free email providers, or for
-        enforcement on a domain that isn't verified yet.
+        Raises:
+            ValidationError: For free email providers, or for
+                enforcement on a domain that isn't verified yet.
         """
         self.domain = normalize_domain(self.domain)
         labels = self.domain.split(".")
@@ -292,9 +298,10 @@ class SSOConnection(AbstractDateTimeModel):
     def clean(self) -> None:
         """Make sure identities from this IdP can't collide with another's.
 
-        :raises ValidationError: If the SocialApp isn't an OIDC or SAML app,
-        has no provider_id or shares one with another app, or (for SAML)
-        accepts unsigned assertions or sign-ins started at the IdP.
+        Raises:
+            ValidationError: If the SocialApp isn't an OIDC or SAML app,
+                has no provider_id or shares one with another app, or (for SAML)
+                accepts unsigned assertions or sign-ins started at the IdP.
         """
         if self.social_app_id is None:
             return

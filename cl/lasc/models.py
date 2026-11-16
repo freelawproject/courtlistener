@@ -41,7 +41,7 @@ class LASCJSON(AbstractJSON, AbstractDateTimeModel):
 
 
 class LASCPDF(AbstractPDF, AbstractDateTimeModel):
-    """Use the content framework to associate PDFs with our dockets"""
+    """Use the content framework to associate PDFs with our dockets."""
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -93,7 +93,7 @@ class LASCPDF(AbstractPDF, AbstractDateTimeModel):
 
 
 class QueuedCase(AbstractDateTimeModel):
-    """Cases we have yet to fetch
+    """Cases we have yet to fetch.
 
     This table is populated by crawling the date search interface.
     """
@@ -165,7 +165,7 @@ class CaseIDQuerySet(models.query.QuerySet):
 
 
 class Docket(AbstractDateTimeModel):
-    """High-level table to contain all other LASC-related data"""
+    """High-level table to contain all other LASC-related data."""
 
     json_document = GenericRelation(
         LASCJSON,
@@ -314,9 +314,7 @@ class QueuedPDF(AbstractDateTimeModel):
 
 
 class DocumentImage(AbstractDateTimeModel):
-    """Represents documents that are filed and scanned into the online system,
-    most of which are available to us.
-    """
+    """Represents documents that are filed and scanned into the online system, most of which are available to us."""
 
     """
         # caseNumber
@@ -450,9 +448,7 @@ class DocumentImage(AbstractDateTimeModel):
 
 
 class DocumentFiled(AbstractDateTimeModel):
-    """Filings on the docket whether or not they're digitally available to
-    anyone accessing the system.
-    """
+    """Filings on the docket whether or not they're digitally available to anyone accessing the system."""
 
     """
     # "CaseNumber": "18STCV02953",
@@ -491,7 +487,7 @@ class DocumentFiled(AbstractDateTimeModel):
 
 
 class Action(AbstractDateTimeModel):
-    """Actions registered on a docket"""
+    """Actions registered on a docket."""
 
     """
         # "IsPurchaseable": false,
@@ -576,7 +572,8 @@ class CrossReference(AbstractDateTimeModel):
 
 
 class Party(AbstractDateTimeModel):
-    """
+    """Party.
+
     # "EntityNumber": "3",
     # "PartyFlag": "L",
     # "DateOfBirthString": "",
@@ -591,7 +588,6 @@ class Party(AbstractDateTimeModel):
     # "DivisionCode": "CV",
     # "PartyTypeCode": "D",
     # "Name": "HERNANDEZ ANGEL ORTIZ AKA ANGEL HERNANDEZ"
-
     """
 
     docket = models.ForeignKey(
@@ -657,7 +653,8 @@ class FutureProceedingManager(models.Manager):
 
 
 class Proceeding(AbstractDateTimeModel):
-    """
+    """Proceeding.
+
     "ProceedingDateString": "08/24/2018",
     "CourtAlt": "",
     "CaseNumber": "BZ215634",
@@ -672,7 +669,7 @@ class Proceeding(AbstractDateTimeModel):
     "Judge": "Lowry, Stephen M.",
     "CourthouseName": "",
     "DivisionCode": "",
-    "Event": "DSU - RFO (Modification Hearing)
+    "Event": "DSU - RFO (Modification Hearing)"
     """
 
     docket = models.ForeignKey(
@@ -739,8 +736,7 @@ class Proceeding(AbstractDateTimeModel):
 
 
 class TentativeRuling(AbstractDateTimeModel):
-    """
-    Sample data taken from random cases.
+    """Sample data taken from random cases.
 
     "CaseNumber": "VC065473",
     "HearingDate": "2019-07-11T00:00:00-07:00",

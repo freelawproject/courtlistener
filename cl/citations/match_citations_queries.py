@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 from elasticsearch.dsl.query import Query
@@ -22,13 +21,14 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def fetch_citations(search_query: Search) -> list[Hit]:
-    """Fetches citation matches from Elasticsearch based on the provided
-    search query.
+    """Fetches citation matches from Elasticsearch based on the provided search query.
 
-    :param search_query: The Elasticsearch DSL Search object.
-    :return: A list of ES Hits objects.
+    Args:
+        search_query: The Elasticsearch DSL Search object.
+
+    Returns:
+        A list of ES Hits objects.
     """
-
     citation_hits = []
     #  Sorts by id, then ordering_key with missing values sorted last
     search_query = search_query.sort(
@@ -50,12 +50,14 @@ def es_reverse_match(
     results: list[Hit],
     citing_opinion: Opinion,
 ) -> list[Hit]:
-    """Elasticsearch method that uses the case name of the found document to
-    verify that it is a match on the original.
+    """Elasticsearch method that uses the case name of the found document to verify that it is a match on the original.
 
-    :param results: The Response object containing search results.
-    :param citing_opinion: The citing opinion to confirm the reverse match.
-    :return: A list of OpinionDocument matched.
+    Args:
+        results: The Response object containing search results.
+        citing_opinion: The citing opinion to confirm the reverse match.
+
+    Returns:
+        A list of OpinionDocument matched.
     """
     opinion_document = OpinionDocument.search()
     for result in results:
@@ -100,15 +102,16 @@ def es_case_name_query(
     citation: SupportedCitationType,
     citing_opinion: Opinion | None = None,
 ) -> list[Hit]:
-    """Execute an Elasticsearch query to find case names based on a given
-    citation and citing opinion.
+    """Execute an Elasticsearch query to find case names based on a given citation and citing opinion.
 
-    :param search_query: The base query to perform the search.
-    :param citation: The citation object containing metadata about the case.
-    :param citing_opinion: The opinion object where the case name should appear
+    Args:
+        search_query: The base query to perform the search.
+        citation: The citation object containing metadata about the case.
+        citing_opinion: The opinion object where the case name should appear
 
-    :return: A elasticsearch Response object with the search results or a list
-    of OpinionDocument objects if matches are found.
+    Returns:
+        A elasticsearch Response object with the search results or a list
+        of OpinionDocument objects if matches are found.
     """
     query, length = make_name_param(
         citation.metadata.defendant, citation.metadata.plaintiff
@@ -142,13 +145,15 @@ def es_case_name_query(
 def es_search_db_for_full_citation(
     full_citation: FullCaseCitation,
 ) -> tuple[list[Hit], bool]:
-    """For a citation object, try to match it to an item in the database using
-    a variety of heuristics.
-    :param full_citation: A FullCaseCitation instance.
-    :return: A two tuple, the ElasticSearch Result object with the results, or an empty list if
-     no hits and a boolean indicating whether the citation was found.
-    """
+    """For a citation object, try to match it to an item in the database using a variety of heuristics.
 
+    Args:
+        full_citation: A FullCaseCitation instance.
+
+    Returns:
+        A two tuple, the ElasticSearch Result object with the results, or an empty list if
+        no hits and a boolean indicating whether the citation was found.
+    """
     # do_resolve_citations attaches the citing Opinion to FullCaseCitations
     citing_opinion: Opinion | None = getattr(
         full_citation, "citing_opinion", None
@@ -225,12 +230,16 @@ def es_search_db_for_full_citation(
 def es_get_query_citation(
     cd: CleanData,
 ) -> tuple[Hit | None, list[FullCaseCitation]]:
-    """Extract citations from the query. If it's a single citation, search for
-     it into ES, and if found, return it.
+    """Extract citations from the query.
 
-    :param cd: A CleanData instance.
-    :return: A two tuple the ES Hit object or None and the list of
-    missing citations from the query.
+    If it's a single citation, search for it into ES, and if found, return it.
+
+    Args:
+        cd: A CleanData instance.
+
+    Returns:
+        A two tuple the ES Hit object or None and the list of
+        missing citations from the query.
     """
     missing_citations: list[FullCaseCitation] = []
     if not cd.get("q"):

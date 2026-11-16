@@ -18,20 +18,19 @@ def import_opinions_from_recap(
     db_connection: str = "default",
     skip_citation_finding: bool = True,
 ) -> None:
-    """Import recap documents into opinion db
+    """Import recap documents into opinion db.
 
-    :param jurisdiction: Court Jurisdiction if not FD
-    :param court: Court ID if any
-    :param skip_until: Court ID to re-start at
-    :param total_count: The number of new opinions to add
-    :param queue: The queue to use for celery
-    :param db_connection: The db to use
-    :param skip_citation_finding: if True, the ingestion task will not create
-        a `find_citations_and_parentheticals_for_opinion_by_pks` task.
-        This is helpful to prevent creating too many single-opinion tasks
-        during bulk work
-
-    :return: None
+    Args:
+        jurisdiction: Court Jurisdiction if not FD
+        court_str: Court ID if any
+        skip_until: Court ID to re-start at
+        total_count: The number of new opinions to add
+        queue: The queue to use for celery
+        db_connection: The db to use
+        skip_citation_finding: if True, the ingestion task will not create
+            a `find_citations_and_parentheticals_for_opinion_by_pks` task.
+            This is helpful to prevent creating too many single-opinion tasks
+            during bulk work
     """
     court_query = Court.objects.using(db_connection)
 

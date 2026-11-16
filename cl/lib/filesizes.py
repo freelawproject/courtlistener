@@ -11,9 +11,12 @@ def convert_size_to_bytes(size_str: str) -> int:
     To reverse this, see hurry.filesize or the Django filesizeformat template
     filter.
 
-    :param size_str: A human-readable string representing a file size, e.g.,
-    "22 megabytes".
-    :return: The number of bytes represented by the string.
+    Args:
+        size_str: A human-readable string representing a file size, e.g.,
+            "22 megabytes".
+
+    Returns:
+        The number of bytes represented by the string.
     """
     multipliers = {
         "kilobyte": 1024,

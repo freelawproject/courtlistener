@@ -9,7 +9,7 @@ from cl.scrapers.utils import save_response
 
 
 def add_backscraper_arguments(parser) -> None:
-    """Adds backscraper specific optional arguments to the parser"""
+    """Adds backscraper specific optional arguments to the parser."""
     parser.add_argument(
         "--backscrape-start",
         dest="backscrape_start",
@@ -50,21 +50,20 @@ class Command(cl_scrape_opinions.Command):
         mod: ModuleType,
         options: dict,
     ) -> None:
-        """Parse the site and scrape it using the backscraper
+        """Parse the site and scrape it using the backscraper.
 
-        :param mod: The juriscraper Site object to scrape
-        :param options: argparse kwargs dictionary. May contain the following keys:
-            - full_crawl: Whether or not to do a full crawl (Ignored value)
-            - backscrape_start: string which may be a date, year, index, etc.
-                which is parsed and used by a scraper as start value for the
-                range to be backscraped
-            - backscrape_end: end value for backscraper range
-            - days_interval: days between each (start, end) date pairs in the
-                Site.back_scrape_iterable
-            - backscrape_wait: Seconds to wait after consuming each element
-                of the backscrape iterable
-
-        :return: None
+        Args:
+            mod: The juriscraper Site object to scrape
+            options: argparse kwargs dictionary. May contain the following keys:
+                - full_crawl: Whether or not to do a full crawl (Ignored value)
+                - backscrape_start: string which may be a date, year, index, etc.
+                    which is parsed and used by a scraper as start value for the
+                    range to be backscraped
+                - backscrape_end: end value for backscraper range
+                - days_interval: days between each (start, end) date pairs in the
+                    Site.back_scrape_iterable
+                - backscrape_wait: Seconds to wait after consuming each element
+                    of the backscrape iterable
         """
         court_str = mod.__name__.split(".")[-1].split("_")[0]
         logger.info(f'Using court_str: "{court_str}"')

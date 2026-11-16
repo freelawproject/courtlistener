@@ -266,6 +266,7 @@ def save_docket_response(
         court_id: Court identifier extracted from response data
         case_meta: Optional metadata dict from the scraper (e.g., case_number,
             date_filed, etc.) to save alongside the response
+        skip_meta: Don't save case_meta, for callers that save it separately
 
     Returns:
         Tuple of (bucket_name, base_key) for locating stored files. HTML
@@ -402,7 +403,6 @@ def _checkpoint_and_sleep(
     sleep_minutes: int,
 ) -> None:
     """Checkpoint to Redis and sleep at every batch boundary."""
-
     logger.info("Processed %d cases", case_count)
 
     if auto_resume:

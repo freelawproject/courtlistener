@@ -3,9 +3,7 @@ from collections.abc import Callable
 
 
 def print_timing[**P, R](func: Callable[P, R]) -> Callable[P, R]:
-    """A decorator to print the length of time a function takes to
-    complete.
-    """
+    """A decorator to print the length of time a function takes to complete."""
 
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         t1 = time.time()

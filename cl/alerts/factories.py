@@ -21,7 +21,7 @@ class DocketAlertFactory(DjangoModelFactory):
 
 
 class DocketAlertWithParentsFactory(DocketAlertFactory):
-    """Make an alert on a particular docket"""
+    """Make an alert on a particular docket."""
 
     docket = SubFactory(DocketFactory)
 

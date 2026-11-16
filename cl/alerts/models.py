@@ -19,9 +19,12 @@ def check_valid_alert_type_or_raise_error(
 ) -> None:
     """Validate the alert type against allowed values.
 
-    :param value: The alert type to validate.
-    :param valid_types: A Dict containing the allowed alert types.
-    :return: None. Raises a ValidationError if the alert type is not supported.
+    Args:
+        value: The alert type to validate.
+        valid_types: A Dict containing the allowed alert types.
+
+    Returns:
+        None. Raises a ValidationError if the alert type is not supported.
     """
     if value not in valid_types:
         raise ValidationError(f"Unsupported alert type: {value}")
@@ -29,8 +32,9 @@ def check_valid_alert_type_or_raise_error(
 
 def validate_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported.
-    :param value: The alert type to validate.
-    :return: None.
+
+    Args:
+        value: The alert type to validate.
     """
     valid_types = dict(SEARCH_TYPES.SUPPORTED_ALERT_TYPES)
     check_valid_alert_type_or_raise_error(value, valid_types)
@@ -38,8 +42,9 @@ def validate_alert_type(value: str) -> None:
 
 def validate_recap_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported RECAP type.
-    :param value: The alert type to validate.
-    :return: None.
+
+    Args:
+        value: The alert type to validate.
     """
     valid_types = dict(SEARCH_TYPES.RECAP_ALERT_TYPES)
     check_valid_alert_type_or_raise_error(value, valid_types)
@@ -114,7 +119,9 @@ class Alert(AbstractDateTimeModel):
         Raises ValidationError: If alert_type was changed from or to a non-RECAP
          or non-DOCKET type. This prevents alerts from being indexed into an
          incompatible percolator index while still remaining in the old one.
-        :return: None if alert_type hasn't changed or change is allowed.
+
+        Returns:
+            None if alert_type hasn't changed or change is allowed.
         """
         if self.pk is None or not self.tracker.has_changed("alert_type"):
             return
@@ -195,7 +202,7 @@ class DateJSONEncoder(DjangoJSONEncoder):
 
 
 class SCHEDULED_ALERT_HIT_STATUS:
-    """ScheduledAlertHit Status Types"""
+    """ScheduledAlertHit Status Types."""
 
     SCHEDULED = 0
     SENT = 1
@@ -206,9 +213,7 @@ class SCHEDULED_ALERT_HIT_STATUS:
 
 
 class ScheduledAlertHit(AbstractDateTimeModel):
-    """Store alert hits triggered by a percolated document in Elasticsearch,to
-    be sent later according to the user-defined rate.
-    """
+    """Store alert hits triggered by a percolated document in Elasticsearch,to be sent later according to the user-defined rate."""
 
     alert = models.ForeignKey(
         Alert,

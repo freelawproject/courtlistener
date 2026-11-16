@@ -64,8 +64,9 @@ class DateOrDateTimeField(serializers.Field):
 
 
 class CoerceDateField(serializers.Field):
-    """Coerces datetime-like inputs into a date representation. If the input
-    is not a datetime, it returns the date directly.
+    """Coerces datetime-like inputs into a date representation.
+
+    If the input is not a datetime, it returns the date directly.
     """
 
     def to_representation(self, value: Any) -> str:
@@ -76,6 +77,7 @@ class CoerceDateField(serializers.Field):
 
 class CoerceDateTimeField(serializers.Field):
     """Coerces date-like inputs into a datetime midnight PT representation.
+
     If the input is not a date, it returns the datetime directly.
     """
 
@@ -92,18 +94,14 @@ class CoerceDateTimeField(serializers.Field):
 class NullableListField(
     serializers.Field[list[Any] | None, list[Any], list[Any] | None, Any]
 ):
-    """A read-only list field that returns None when serialized if the list
-    is empty. For API V3 compatibility.
-    """
+    """A read-only list field that returns None when serialized if the list is empty. For API V3 compatibility."""
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.list_field: serializers.ListField = serializers.ListField()
 
     def to_representation(self, value: list[Any] | None) -> list[Any] | None:
-        """
-        Return "None" if the list is empty, otherwise return the list.
-        """
+        """Return "None" if the list is empty, otherwise return the list."""
         if not value:
             return None
         return self.list_field.to_representation(value)
@@ -124,11 +122,7 @@ class SuppressHighlightsField(serializers.Field):
 
 
 class NoneToListField(serializers.ListField):
-    """A custom ListField that returns an empty list when the original value is
-    None; otherwise, it returns the original value.
-    This can be removed from some fields once a People re-index is done and
-    https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
-    """
+    """A custom ListField that returns an empty list when the original value is None; otherwise, it returns the original value. This can be removed from some fields once a People re-index is done and https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved."""
 
     def get_attribute(self, instance: Any) -> list[Any]:
         value = super().get_attribute(instance)

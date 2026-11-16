@@ -66,11 +66,14 @@ def published_key(
     a test asserting on a published path is checking the layout rather than
     agreeing with whatever the code just built.
 
-    :param document: The document the file belongs to.
-    :param filed: The date the name should carry, or `None` for undated.
-    :param extension: The file's extension.
-    :param thumbs: Whether to give the thumbnail's key instead.
-    :return: The key the public bucket holds it under.
+    Args:
+        document: The document the file belongs to.
+        filed: The date the name should carry, or `None` for undated.
+        extension: The file's extension.
+        thumbs: Whether to give the thumbnail's key instead.
+
+    Returns:
+        The key the public bucket holds it under.
     """
     docket = document.docket_entry.docket
     root = "recap-thumbnails" if thumbs else "recap"
@@ -156,8 +159,11 @@ class NYCoAMergerTestCase(TestCase):
     def merge(self, case: NYCoACase) -> MergeResult:
         """Merge a case, running what waits on the merge committing.
 
-        :param case: The scraped case.
-        :return: What the merge did.
+        Args:
+            case: The scraped case.
+
+        Returns:
+            What the merge did.
         """
         with self.captureOnCommitCallbacks(execute=True):
             return NYCoADocketMerger(case, params=None).merge()
@@ -165,19 +171,22 @@ class NYCoAMergerTestCase(TestCase):
     def load(self, case: NYCoACase) -> MergeResult:
         """Merge a case and publish its files, as a load's worker does.
 
-        :param case: The scraped case.
-        :return: What the merge and the publish did together.
+        Args:
+            case: The scraped case.
+
+        Returns:
+            What the merge and the publish did together.
         """
         with self.captureOnCommitCallbacks(execute=True):
             return NYCoACourtPassLoader.merge_one(case)
 
     @staticmethod
     def publish(document: NYCoADocument) -> None:
-        """Point a document at the published copy of its file, the way an
-        earlier load would have left it.
+        """Point a document at the published copy of its file, the way an earlier load would have left it.
 
-        :param document: The document, whose filing's date has not changed
-            since.
+        Args:
+            document: The document, whose filing's date has not changed
+                since.
         """
         document.filepath_local = published_key(
             document, document.docket_entry.date_filed
@@ -190,8 +199,7 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_creates_docket(self) -> None:
-        """Does merging a case with no existing docket create one with the
-        scrape's docket-level values?"""
+        """Does merging a case with no existing docket create one with the scrape's docket-level values?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             case_name="People v Padilla-Zuniga",
@@ -228,8 +236,7 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_updates_existing_docket(self) -> None:
-        """Does a docket that already exists get updated rather than
-        duplicated?"""
+        """Does a docket that already exists get updated rather than duplicated?"""
         docket = self.existing_docket()
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
@@ -260,8 +267,7 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=0)
     def test_merge_unusable_docket_number_fails(self) -> None:
-        """Is a case whose docket number we can't normalize refused, rather
-        than merged onto a docket we can never match again?"""
+        """Is a case whose docket number we can't normalize refused, rather than merged onto a docket we can never match again?"""
         case = NYCoACaseFactory.create(docket_number="Motion No. 12")
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -271,8 +277,10 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_keeps_existing_dates(self) -> None:
-        """Court-PASS has no filing date of its own. Does a scrape leave a
-        date another source established alone?"""
+        """Court-PASS has no filing date of its own.
+
+        Does a scrape leave a date another source established alone?
+        """
         docket = self.existing_docket()
         docket.date_filed = date(2020, 5, 5)
         docket.date_argued = date(2021, 6, 6)
@@ -321,8 +329,7 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
 
 
 class NYCoADocketMetadataMergerTest(NYCoAMergerTestCase):
-    """Tests for merging the NYCoA-only docket metadata, which hangs off
-    `Docket` through a reverse one-to-one relation."""
+    """Tests for merging the NYCoA-only docket metadata, which hangs off `Docket` through a reverse one-to-one relation."""
 
     @merger_test(expected_query_count=6)
     def test_merge_creates_metadata(self) -> None:
@@ -340,6 +347,7 @@ class NYCoADocketMetadataMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         metadata = self.merged_docket(result).nycoa_metadata
         self.assertEqual(metadata.decision_date, date(2025, 4, 17))
         self.assertEqual(metadata.official_citation, "41 NY3d 1")
@@ -376,8 +384,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_creates_issue(self) -> None:
-        """Does merging a case create an issue row with its category
-        normalized and the Court's own string kept?"""
+        """Does merging a case create an issue row with its category normalized and the Court's own string kept?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -393,6 +400,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, IssueCategory.JUDGMENTS.code)
         self.assertEqual(
@@ -407,9 +415,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=11)
     def test_merge_creates_issues_sharing_a_category(self) -> None:
-        """The Court assigns a case two distinct issues under one category and
-        tells them apart only by what it says about each. Does each get its own
-        row, rather than the second colliding with the first?"""
+        """The Court assigns a case two distinct issues under one category and tells them apart only by what it says about each. Does each get its own row, rather than the second colliding with the first?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -429,6 +435,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issues = self.merged_docket(result).nycoa_metadata.issues.all()
         self.assertEqual(
             {issue.detail for issue in issues},
@@ -445,8 +452,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=17)
     def test_remerge_issues_sharing_a_category_is_idempotent(self) -> None:
-        """Re-scraping a case whose issues share a category must match both
-        rows rather than replacing one with the other."""
+        """Re-scraping a case whose issues share a category must match both rows rather than replacing one with the other."""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -471,8 +477,10 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=15)
     def test_remerge_reworded_issue_updates_it_in_place(self) -> None:
-        """The Court rewords a description it has already published. Does the
-        issue keep its row, rather than the old one being replaced?"""
+        """The Court rewords a description it has already published.
+
+        Does the issue keep its row, rather than the old one being replaced?
+        """
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -501,10 +509,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_remerge_rewords_an_issue_sharing_a_category(self) -> None:
-        """Rewording one of two issues that share a category is the one case
-        the merger cannot resolve: with the description gone, nothing says which
-        of the two the Court restated. Is it replaced rather than matched to
-        either row, leaving the issue the Court did not touch alone?"""
+        """Rewording one of two issues that share a category is the one case the merger cannot resolve: with the description gone, nothing says which of the two the Court restated. Is it replaced rather than matched to either row, leaving the issue the Court did not touch alone?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -539,8 +544,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=17)
     def test_remerge_drops_an_issue_sharing_a_category(self) -> None:
-        """A case that stated two issues under one category now states one of
-        them. Is the other pruned, and does the survivor keep its row?"""
+        """A case that stated two issues under one category now states one of them. Is the other pruned, and does the survivor keep its row?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -568,8 +572,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_unrecognized_issue_category(self) -> None:
-        """Is a category this vocabulary doesn't cover flagged rather than
-        dropped, so the raw value survives?"""
+        """Is a category this vocabulary doesn't cover flagged rather than dropped, so the raw value survives?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -587,6 +590,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, UNASSIGNED)
         self.assertEqual(issue.subcategory, UNASSIGNED)
@@ -594,8 +598,10 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=9)
     def test_merge_issue_without_subcategory(self) -> None:
-        """The Court states some issues as a bare category. Is the subcategory
-        left unknown?"""
+        """The Court states some issues as a bare category.
+
+        Is the subcategory left unknown?
+        """
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             entries=[],
@@ -606,6 +612,7 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         issue = self.merged_docket(result).nycoa_metadata.issues.get()
         self.assertEqual(issue.category, IssueCategory.CRIMES.code)
         self.assertEqual(issue.subcategory, UNKNOWN)
@@ -641,8 +648,10 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=5)
     def test_merge_no_issues_keeps_existing(self) -> None:
-        """A scrape with no issues at all is a partial scrape. Does it leave
-        the issues already recorded alone?"""
+        """A scrape with no issues at all is a partial scrape.
+
+        Does it leave the issues already recorded alone?
+        """
         docket = self.existing_docket()
         metadata = NYCoADocketMetadata.objects.create(docket=docket)
         existing = NYCoADocketIssue.objects.create(
@@ -685,6 +694,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
         self.assertTrue(result.success)
         self.assertIn("NYCoADocketEntry", result.creates)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.docket_entry_id, "e:appellant-brief:smith:1")
         self.assertEqual(merged.entry_index, 3)
@@ -698,9 +708,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=13)
     def test_merge_unrecognized_filing_type(self) -> None:
-        """Court-PASS listing a filing type this vocabulary doesn't cover is
-        the drift signal. Is it stored as unassigned while the raw value
-        survives?"""
+        """Court-PASS listing a filing type this vocabulary doesn't cover is the drift signal. Is it stored as unassigned while the raw value survives?"""
         filing = NYCoAFilingFactory.create(
             raw_filing_type="Appellant Sur-Reply Brief",
             entry_role=FilingRole.APPELLANT,
@@ -714,6 +722,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.filing_type, UNASSIGNED)
         self.assertEqual(merged.filing_type_raw, "Appellant Sur-Reply Brief")
@@ -721,8 +730,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=12)
     def test_merge_filing_reconstructed_from_document(self) -> None:
-        """Does a filing the scraper reconstructed from a document merge with
-        no date and no raw filing type?"""
+        """Does a filing the scraper reconstructed from a document merge with no date and no raw filing type?"""
         filing = NYCoAFilingFactory.create(
             docket_entry_id="d:court:51opn21:_decision:1",
             raw_filing_type="",
@@ -740,6 +748,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(
             merged.filing_type,
@@ -793,8 +802,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=15)
     def test_merge_prunes_filings_missing_from_scrape(self) -> None:
-        """Court-PASS lists a case's filings in full, so does a filing that is
-        gone from the scrape get deleted?"""
+        """Court-PASS lists a case's filings in full, so does a filing that is gone from the scrape get deleted?"""
         docket = self.existing_docket()
         stale = NYCoADocketEntry.objects.create(
             docket=docket,
@@ -816,6 +824,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             "A filing the scrape no longer reports should be pruned.",
         )
         self.assertEqual(
+            # pyrefly:ignore[missing-attribute]
             docket.nycoa_docket_entries.get().docket_entry_id,
             "e:appellant-brief:smith:1",
         )
@@ -834,16 +843,14 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(merged.party, Party.objects.get(name="Smith"))
         self.assertEqual(merged.party_name, "Smith")
 
     @merger_test(expected_query_count=22)
     def test_merge_links_filing_to_party_in_the_filing_role(self) -> None:
-        """In a family case the Court lists one person under two roles, so a
-        filing's party name finds two parties. Is the filing linked to the one
-        whose role the filing itself states, rather than to whichever was
-        written first?"""
+        """In a family case the Court lists one person under two roles, so a filing's party name finds two parties. Is the filing linked to the one whose role the filing itself states, rather than to whichever was written first?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -869,6 +876,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertEqual(
             merged.party_id,
@@ -877,9 +885,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=18)
     def test_merge_unknown_filing_party_leaves_fk_null(self) -> None:
-        """A filer who isn't a party on the docket -- one with no attorney of
-        record, or one the FILINGS table names in its own words -- has no party
-        row to point at. Is the FK left null rather than the merge failing?"""
+        """A filer who isn't a party on the docket -- one with no attorney of record, or one the FILINGS table names in its own words -- has no party row to point at. Is the FK left null rather than the merge failing?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -895,6 +901,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         result = NYCoADocketMerger(case, params=None).merge()
 
         self.assertTrue(result.success)
+        # pyrefly:ignore[missing-attribute]
         merged = self.merged_docket(result).nycoa_docket_entries.get()
         self.assertIsNone(merged.party_id)
         # The name the FILINGS table printed survives the unresolved FK.
@@ -902,8 +909,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=27)
     def test_remerge_keeps_resolved_filing_party(self) -> None:
-        """Does a later scrape that can't resolve the party keep the party a
-        previous scrape resolved?"""
+        """Does a later scrape that can't resolve the party keep the party a previous scrape resolved?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -948,8 +954,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_creates_documents(self) -> None:
-        """Does merging a filing create its documents with the values the file
-        name yielded?"""
+        """Does merging a filing create its documents with the values the file name yielded?"""
         file = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-Rec-vol3.pdf",
             content_type="application/pdf",
@@ -968,6 +973,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         self.assertTrue(result.success)
         self.assertIn("NYCoADocument", result.creates)
         merged = (
+            # pyrefly:ignore[missing-attribute]
             self.merged_docket(result)
             .nycoa_docket_entries.get()
             .documents.get()
@@ -993,8 +999,11 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_oral_argument_recording(self) -> None:
-        """Oral argument recordings are playlists, not PDFs. Does the content
-        type survive the merge so the file pass can route them?"""
+        """Oral argument recordings are playlists, not PDFs.
+
+        Does the content type survive the merge so the file pass can route
+        them?
+        """
         file = NYCoAFileFactory.create(
             file_name="SmithvJones-Webcast.asx",
             content_type="video/x-ms-asf",
@@ -1022,9 +1031,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=16)
     def test_merge_unstorable_volume(self) -> None:
-        """A volume is read out of the file name, and a name whose extension is
-        digits reads as a number too large for the column. Does the file still
-        merge, without its volume?"""
+        """A volume is read out of the file name, and a name whose extension is digits reads as a number too large for the column. Does the file still merge, without its volume?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="PeoplevHeidgen-app-Heidgen-Appdx-Vol6.1910",
@@ -1089,10 +1096,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=13)
     def test_merge_file_the_court_will_not_serve(self) -> None:
-        """A file the Court lists but declines to hand over has nothing to
-        record -- no bytes, no hash, nothing to extract -- and a row for it
-        would only be one every file sweep has to skip. Is it left out of the
-        document table while its filing is still recorded?"""
+        """A file the Court lists but declines to hand over has nothing to record -- no bytes, no hash, nothing to extract -- and a row for it would only be one every file sweep has to skip. Is it left out of the document table while its filing is still recorded?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(available=False, local_path="")
         )
@@ -1110,7 +1114,9 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     @merger_test(expected_query_count=16)
     def test_merge_keeps_the_files_the_court_does_serve(self) -> None:
         """A filing can list a file the Court serves beside one it does not.
-        Does the servable one still get a document row?"""
+
+        Does the servable one still get a document row?
+        """
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1132,12 +1138,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
 
     def test_remerge_a_corrected_file_goes_back_for_publishing(self) -> None:
-        """The Court reissues a document under the name it first used, and the
-        published name is the document's, so the correction is published on
-        top of the copy it replaces. Does a rescrape whose file hashes
-        differently point the document back at the scraper's copy, leave the
-        published one for the move to overwrite, and send the document back
-        for extraction?"""
+        """The Court reissues a document under the name it first used, and the published name is the document's, so the correction is published on top of the copy it replaces. Does a rescrape whose file hashes differently point the document back at the scraper's copy, leave the published one for the move to overwrite, and send the document back for extraction?"""
         original = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
@@ -1180,11 +1181,11 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=29)
     def test_remerge_keeps_stored_path_when_scrape_reports_none(self) -> None:
-        """Does a later scrape that did not fetch the file leave the path an
-        earlier one recorded, rather than blanking it?
+        """Does a later scrape that did not fetch the file leave the path an earlier one recorded, rather than blanking it?
 
         The Court still lists the file, which is what tells this apart from
-        the file it has stopped serving."""
+        the file it has stopped serving.
+        """
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1213,9 +1214,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     def test_remerge_at_a_new_path_sends_the_file_back_for_extraction(
         self,
     ) -> None:
-        """The scraper fetching a file again means what was extracted came from
-        a copy that has been replaced. Does the document go back in front of the
-        extraction sweep?"""
+        """The scraper fetching a file again means what was extracted came from a copy that has been replaced. Does the document go back in front of the extraction sweep?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1249,10 +1248,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     def test_remerge_of_a_published_file_keeps_the_published_path(
         self,
     ) -> None:
-        """A later scrape downloads an unchanged file again, to a key of its
-        own. Does re-merging the same file leave the document pointing at its
-        published copy, and delete the scraper's new copy, which nothing will
-        ever point at?"""
+        """A later scrape downloads an unchanged file again, to a key of its own. Does re-merging the same file leave the document pointing at its published copy, and delete the scraper's new copy, which nothing will ever point at?"""
         file = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
@@ -1279,9 +1275,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     def test_an_unvouched_file_is_not_missing_where_one_is_stored(
         self,
     ) -> None:
-        """A re-scrape whose file has no hash, or a path outside the private
-        bucket, leaves the document with the file it already has. Is that
-        file kept and nothing counted as missing?"""
+        """A re-scrape whose file has no hash, or a path outside the private bucket, leaves the document with the file it already has. Is that file kept and nothing counted as missing?"""
         for label, rescraped in (
             ("no hash", {"content_hash": ""}),
             ("outside the private bucket", {"local_path": "/tmp/brf.pdf"}),
@@ -1310,8 +1304,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=29)
     def test_remerge_at_the_same_path_leaves_extraction_alone(self) -> None:
-        """Re-scraping a file that has not moved must not throw away text
-        already extracted from it."""
+        """Re-scraping a file that has not moved must not throw away text already extracted from it."""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1342,11 +1335,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
         )
 
     def test_a_downloaded_file_with_no_hash_is_not_stored(self) -> None:
-        """The hash is how a later merge tells a corrected file from the one
-        already published, so a download the run database recorded none for
-        cannot be tracked. Does the merge store no file for it, and merge the
-        rest of the case -- its own document among it -- rather than refusing
-        the whole case over it?"""
+        """The hash is how a later merge tells a corrected file from the one already published, so a download the run database recorded none for cannot be tracked. Does the merge store no file for it, and merge the rest of the case -- its own document among it -- rather than refusing the whole case over it?"""
         unhashed = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
@@ -1377,9 +1366,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
     def test_a_file_outside_the_private_bucket_is_tallied_as_missing(
         self,
     ) -> None:
-        """A path outside the scraper's layout is a file publishing cannot
-        even look for. Is it stored as no file and counted as missing, since
-        it will not appear on a re-run?"""
+        """A path outside the scraper's layout is a file publishing cannot even look for. Is it stored as no file and counted as missing, since it will not appear on a re-run?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1394,10 +1381,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=16)
     def test_a_file_the_scraper_never_fetched_needs_no_hash(self) -> None:
-        """Only a download has a hash to record, and the Court offering a file
-        is no guarantee the scraper came away with it. Does a document whose
-        fetch produced nothing merge with no file, rather than being refused
-        for a hash it was never going to have?"""
+        """Only a download has a hash to record, and the Court offering a file is no guarantee the scraper came away with it. Does a document whose fetch produced nothing merge with no file, rather than being refused for a hash it was never going to have?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1419,10 +1403,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
     def test_remerge_deletes_the_files_of_a_document_the_court_stopped_serving(
         self,
     ) -> None:
-        """A file the Court stops serving is listed with its download button
-        disabled. Does the document go with it, published copy and thumbnail
-        and all, so that nothing is left serving a file CourtListener may no
-        longer publish?"""
+        """A file the Court stops serving is listed with its download button disabled. Does the document go with it, published copy and thumbnail and all, so that nothing is left serving a file CourtListener may no longer publish?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1465,9 +1446,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
         )
 
     def test_remerge_deletes_the_files_of_a_dropped_filing(self) -> None:
-        """A filing the scrape no longer lists is deleted outright, and its
-        documents go with it in a cascade no document merger sees. Are their
-        files still deleted?"""
+        """A filing the scrape no longer lists is deleted outright, and its documents go with it in a cascade no document merger sees. Are their files still deleted?"""
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-app-Smith-brf.pdf",
@@ -1498,8 +1477,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
     def test_an_unpublished_file_is_deleted_from_the_private_bucket(
         self,
     ) -> None:
-        """A document removed before its file was published still leaves the
-        scraper's copy behind. Is that deleted from the bucket it is in?"""
+        """A document removed before its file was published still leaves the scraper's copy behind. Is that deleted from the bucket it is in?"""
         file = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-oldbrf.pdf",
             local_path=f"{PRIVATE_PREFIX}oldbrf.pdf",
@@ -1522,9 +1500,7 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
         self.assertEqual(self.deleted, [(PRIVATE_BUCKET, file.local_path)])
 
     def test_a_private_file_another_document_still_uses_is_kept(self) -> None:
-        """The scraper names files by content, so one file listed under two
-        filings is one key. Is it kept while the other document still points
-        at it?"""
+        """The scraper names files by content, so one file listed under two filings is one key. Is it kept while the other document still points at it?"""
         shared = f"{PRIVATE_PREFIX}shared.pdf"
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
@@ -1552,12 +1528,10 @@ class NYCoAFileDeletionTest(NYCoAMergerTestCase):
 
 
 class NYCoAPublishFilesTest(NYCoAMergerTestCase):
-    """Tests for the move a load makes after each merge, from the scraper's
-    key to the one the document's primary keys name."""
+    """Tests for the move a load makes after each merge, from the scraper's key to the one the document's primary keys name."""
 
     def test_a_thumbnail_parallels_its_document(self) -> None:
-        """Is a thumbnail filed beside its document, under the thumbnail root
-        instead and keeping the extension it was handed?"""
+        """Is a thumbnail filed beside its document, under the thumbnail root instead and keeping the extension it was handed?"""
         filed = date(2024, 3, 1)
         self.merge(
             self.case_with_files(NYCoAFileFactory.create(), date_filed=filed)
@@ -1570,9 +1544,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         )
 
     def test_a_scraped_file_is_published_under_its_document(self) -> None:
-        """Is the file copied out of the private bucket to the name the docket,
-        the filing's date and the document make, the document pointed at it,
-        and the scraper's copy deleted?"""
+        """Is the file copied out of the private bucket to the name the docket, the filing's date and the document make, the document pointed at it, and the scraper's copy deleted?"""
         file = NYCoAFileFactory.create(
             file_name="SmithvJones-app-Smith-brf.pdf",
             local_path=f"{PRIVATE_PREFIX}brf.pdf",
@@ -1592,8 +1564,10 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertIn(document.pk, result.updates["NYCoADocument"])
 
     def test_the_name_keeps_the_file_s_extension(self) -> None:
-        """Court-PASS serves playlists beside PDFs. Does a playlist keep its
-        own extension when published?"""
+        """Court-PASS serves playlists beside PDFs.
+
+        Does a playlist keep its own extension when published?
+        """
         case = self.case_with_files(
             NYCoAFileFactory.create(
                 file_name="SmithvJones-Webcast.asx",
@@ -1611,8 +1585,10 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         )
 
     def test_documents_filed_the_same_day_are_named_apart(self) -> None:
-        """Two files of one filing share a docket and a date. Does each still
-        get a name of its own?"""
+        """Two files of one filing share a docket and a date.
+
+        Does each still get a name of its own?
+        """
         case = self.case_with_files(
             NYCoAFileFactory.create(file_name="brief.pdf"),
             NYCoAFileFactory.create(file_name="appendix.pdf"),
@@ -1626,9 +1602,12 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertEqual(len(paths), 2, f"Two documents share a path: {paths}")
 
     def test_a_published_file_is_not_moved_again(self) -> None:
-        """Re-loading an unchanged case has nothing to move. Is nothing copied
-        or counted, and nothing deleted but the scraper's key, which a scrape
-        that downloaded the file again would have left behind?"""
+        """Re-loading an unchanged case has nothing to move.
+
+        Is nothing copied or counted, and nothing deleted but the scraper's
+        key, which a scrape that downloaded the file again would have left
+        behind?
+        """
         file = NYCoAFileFactory.create()
         case = self.case_with_files(file)
         self.load(case)
@@ -1644,9 +1623,11 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         )
 
     def test_a_file_whose_date_changed_is_moved(self) -> None:
-        """A later scrape can date a filing an earlier one could not. Is the
-        published file moved to the name that date makes, and the old copy
-        deleted?"""
+        """A later scrape can date a filing an earlier one could not.
+
+        Is the published file moved to the name that date makes, and the old
+        copy deleted?
+        """
         file = NYCoAFileFactory.create()
         case = self.case_with_files(
             file,
@@ -1673,9 +1654,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertEqual(result.files, FileTally(moved=1))
 
     def test_a_refused_copy_leaves_the_file_to_a_later_load(self) -> None:
-        """The bucket refusing the copy says nothing about the file, which is
-        still in the private bucket. Does the document keep pointing there, so
-        re-running the load finishes the move, with nothing deleted?"""
+        """The bucket refusing the copy says nothing about the file, which is still in the private bucket. Does the document keep pointing there, so re-running the load finishes the move, with nothing deleted?"""
         self.publish_outcome = PublishOutcome.FAILED
         file = NYCoAFileFactory.create(local_path=f"{PRIVATE_PREFIX}brf.pdf")
 
@@ -1697,9 +1676,10 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertEqual(result.files, FileTally(moved=1))
 
     def test_a_missing_file_stops_being_pointed_at(self) -> None:
-        """A file the private bucket does not hold will not appear on a
-        re-run. Is the document left with no file rather than a path to
-        nothing?"""
+        """A file the private bucket does not hold will not appear on a re-run.
+
+        Is the document left with no file rather than a path to nothing?
+        """
         self.publish_outcome = PublishOutcome.MISSING
 
         result = self.load(self.case_with_files(NYCoAFileFactory.create()))
@@ -1711,9 +1691,11 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
     def test_a_file_shared_by_two_documents_is_deleted_once_both_moved(
         self,
     ) -> None:
-        """One scraped file can stand for documents under two filings. Is each
-        published under its own name, and the scraper's copy deleted only once
-        neither still needs it?"""
+        """One scraped file can stand for documents under two filings.
+
+        Is each published under its own name, and the scraper's copy deleted
+        only once neither still needs it?
+        """
         shared = f"{PRIVATE_PREFIX}shared.pdf"
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
@@ -1741,9 +1723,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
         self.assertEqual(self.deleted, [(PRIVATE_BUCKET, shared)])
 
     def test_a_document_changed_mid_move_is_left_alone(self) -> None:
-        """Another merge of the same docket can repoint a document while its
-        file is being copied. Is that write kept, and the file it was copied
-        from left for the other merge?"""
+        """Another merge of the same docket can repoint a document while its file is being copied. Is that write kept, and the file it was copied from left for the other merge?"""
         file = NYCoAFileFactory.create(local_path=f"{PRIVATE_PREFIX}brf.pdf")
         self.merge(self.case_with_files(file))
         newer = f"{PRIVATE_PREFIX}newer.pdf"
@@ -1769,8 +1749,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_creates_party_with_attorney(self) -> None:
-        """Does merging a case create its party, party type, attorney, and the
-        role linking them?"""
+        """Does merging a case create its party, party type, attorney, and the role linking them?"""
         attorney = NYCoAAttorneyFactory.create(
             name="Jane Roe",
             firm="Roe & Roe LLP",
@@ -1813,8 +1792,11 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=25)
     def test_merge_makes_the_first_attorney_listed_the_lead(self) -> None:
-        """Court-PASS states no attorney's role. Is the first attorney it lists
-        for a party stored as that party's lead, with the rest unknown?"""
+        """Court-PASS states no attorney's role.
+
+        Is the first attorney it lists for a party stored as that party's lead,
+        with the rest unknown?
+        """
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -1850,9 +1832,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_attorney_phone_with_extension(self) -> None:
-        """Court-PASS writes a direct line as `(516) 222-6200 ext: 284`, which
-        is longer than `Attorney.phone` allows. Is the number kept dialable
-        without losing the extension entirely?"""
+        """Court-PASS writes a direct line as `(516) 222-6200 ext: 284`, which is longer than `Attorney.phone` allows. Is the number kept dialable without losing the extension entirely?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -1884,9 +1864,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_attorney_phone_with_stray_whitespace(self) -> None:
-        """A scraped phone number carries whatever whitespace the page's text
-        node did. Trimming it is not shortening it, so does the number stay out
-        of the contact field?"""
+        """A scraped phone number carries whatever whitespace the page's text node did. Trimming it is not shortening it, so does the number stay out of the contact field?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -1918,8 +1896,10 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=19)
     def test_merge_keeps_role_court_pass_prints(self) -> None:
-        """The cross-state party vocabulary has no amicus value. Is the role
-        Court-PASS printed kept verbatim?"""
+        """The cross-state party vocabulary has no amicus value.
+
+        Is the role Court-PASS printed kept verbatim?
+        """
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -1939,8 +1919,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=14)
     def test_merge_party_type_falls_back_to_vocabulary(self) -> None:
-        """With no printed role, does the party type come from the normalized
-        vocabulary?"""
+        """With no printed role, does the party type come from the normalized vocabulary?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -1961,10 +1940,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=47)
     def test_remerge_one_name_under_two_roles(self) -> None:
-        """In a family case the Court lists one person twice, as the child and
-        as a party. Both are parties in their own right, and a name is all
-        `PartyMerger` matches on, so re-merging must tell them apart by role
-        rather than finding two and giving up on the docket."""
+        """In a family case the Court lists one person twice, as the child and as a party. Both are parties in their own right, and a name is all `PartyMerger` matches on, so re-merging must tell them apart by role rather than finding two and giving up on the docket."""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[
@@ -2010,10 +1986,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=49)
     def test_refusing_a_party_costs_only_that_party(self) -> None:
-        """A shared name the role cannot separate is one the party merger
-        refuses. That refusal is reported in the docket's own result, so does
-        the rest of the case still merge and stay merged -- the docket merger
-        being atomic notwithstanding?"""
+        """A shared name the role cannot separate is one the party merger refuses. That refusal is reported in the docket's own result, so does the rest of the case still merge and stay merged -- the docket merger being atomic notwithstanding?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             case_name="Matter of A. R.",
@@ -2063,7 +2036,9 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             "The docket's own fields merged and were committed.",
         )
         self.assertEqual(
-            docket.nycoa_metadata.decision_date, date(2025, 6, 12)
+            # pyrefly:ignore[missing-attribute]
+            docket.nycoa_metadata.decision_date,
+            date(2025, 6, 12),
         )
         self.assertEqual(
             NYCoADocketEntry.objects.filter(docket=docket).count(),
@@ -2085,9 +2060,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
 
     @merger_test(expected_query_count=32)
     def test_remerge_party_whose_role_changed(self) -> None:
-        """A respondent becomes a respondent-appellant when the other side
-        cross-appeals. Is that the same party under a new role, rather than a
-        second row?"""
+        """A respondent becomes a respondent-appellant when the other side cross-appeals. Is that the same party under a new role, rather than a second row?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
             parties=[

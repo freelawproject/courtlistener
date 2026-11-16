@@ -1,5 +1,4 @@
-"""
-Created on Wed Jul 20 15:20:12 2016
+"""Created on Wed Jul 20 15:20:12 2016.
 
 @author: elliott
 """

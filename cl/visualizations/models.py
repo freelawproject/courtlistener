@@ -95,7 +95,7 @@ class SCOTUSMap(AbstractDateTimeModel):
 
     @property
     def json(self):
-        """Returns the most recent version"""
+        """Returns the most recent version."""
         try:
             # Imagine that you cache a viz, then delete it from disk if that
             # happens, you will still think the viz exists (it's in the cache),
@@ -114,7 +114,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         hops_taken=0,
         max_nodes=70,
     ):
-        """Recursively build a networkx graph
+        """Recursively build a networkx graph.
 
         Process is:
          - Work backwards through the authorities for self.cluster_end and all
@@ -168,15 +168,16 @@ class SCOTUSMap(AbstractDateTimeModel):
         shortest routes and avoiding unneeded graph traversal. For example, it's
         quite possible to traverse
 
-        :param parent_authority: The starting point for the recursion. At first,
-        this will be self.cluster_end, but in recursive calls, it will be the
-        child of the current parent.
-        :param visited_nodes: A dict of nodes that have already been visited.
-        :param good_nodes: A dict of nodes that have been identified as good.
-        :param hops_taken: The number of hops taken so far, from
-        self.cluster_end
-        :param max_hops: The maximum degree of separation for the network.
-        :param max_nodes: The maximum number of nodes a network can contain.
+        Args:
+            parent_authority: The starting point for the recursion. At first,
+                this will be self.cluster_end, but in recursive calls, it will be the
+                child of the current parent.
+            visited_nodes: A dict of nodes that have already been visited.
+            good_nodes: A dict of nodes that have been identified as good.
+            hops_taken: The number of hops taken so far, from
+                self.cluster_end
+            max_hops: The maximum degree of separation for the network.
+            max_nodes: The maximum number of nodes a network can contain.
         """
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
@@ -315,7 +316,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         return reverse("view_embedded_visualization", kwargs={"pk": self.pk})
 
     def make_title(self):
-        """Make a title for the network
+        """Make a title for the network.
 
         Title tries to use the shortest possible case name from the starting
         and ending clusters plus the number of degrees.

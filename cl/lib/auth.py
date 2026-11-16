@@ -27,11 +27,14 @@ def filter_by_email(queryset: QuerySet[User], email: str) -> QuerySet[User]:
     wants stubs, confirmation wants everybody, sign-in wants neither. This
     only settles the address.
 
-    :param queryset: The users to narrow.
-    :param email: The address to match. An empty one matches nothing, rather
-    than matching every account with a blank address, which is a legal value
-    on auth_user.
-    :return: The narrowed queryset.
+    Args:
+        queryset: The users to narrow.
+        email: The address to match. An empty one matches nothing, rather
+            than matching every account with a blank address, which is a legal value
+            on auth_user.
+
+    Returns:
+        The narrowed queryset.
     """
     if not email:
         return queryset.none()
@@ -50,10 +53,13 @@ def group_required[
     [DjangoViewType[P, Request, Response]],
     DjangoViewType[P, Request, Response],
 ]:
-    """Verify user group membership
+    """Verify user group membership.
 
-    :param group_names: Array of strings
-    :return: Whether the user is in one of the groups
+    Args:
+        group_names: Array of strings
+
+    Returns:
+        Whether the user is in one of the groups
     """
 
     def in_groups(u: AbstractBaseUser | AnonymousUser) -> bool:

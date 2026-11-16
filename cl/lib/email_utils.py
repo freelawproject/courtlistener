@@ -15,16 +15,18 @@ def make_multipart_email(
 ) -> EmailMultiAlternatives:
     """Composes an email multipart message from the provided data.
 
-    :param subject: The email subject.
-    :param html_template: The html template path.
-    :param txt_template: The text template path.
-    :param to: A list of email addresses to send the email to.
-    :param context: A context dict used to render the email message.
-    :param from_email: The sender's email address, if not provided uses the
-    DEFAULT_FROM_EMAIL defined in settings.
-    :return: An EmailMultiAlternatives object.
-    """
+    Args:
+        subject: The email subject.
+        html_template: The html template path.
+        txt_template: The text template path.
+        to: A list of email addresses to send the email to.
+        context: A context dict used to render the email message.
+        from_email: The sender's email address, if not provided uses the
+            DEFAULT_FROM_EMAIL defined in settings.
 
+    Returns:
+        An EmailMultiAlternatives object.
+    """
     if from_email is None:
         from_email = settings.DEFAULT_FROM_EMAIL
 

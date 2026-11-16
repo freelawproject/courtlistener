@@ -59,6 +59,7 @@ tie_breaker_prompts = {Court.FEDERAL_APPELLATE: F_TIE_BREAKER}
 
 def get_redis_key_prefix() -> str:
     """Simple tool for getting the prefix for the redis key prefix.
+
     Useful for avoiding test collisions.
     """
     return "docket_number_cleaning"
@@ -66,7 +67,9 @@ def get_redis_key_prefix() -> str:
 
 def get_redis_key() -> str:
     """Generate a Redis key for storing docket_number_cleaning llm batches.
-    :return: A Redis key string for the llm batch.
+
+    Returns:
+        A Redis key string for the llm batch.
     """
     return f"{get_redis_key_prefix()}:llm_batch"
 
@@ -74,13 +77,13 @@ def get_redis_key() -> str:
 def update_docket_number(
     docket_id: int, docket_number: str, start_timestamp: datetime, r: Redis
 ) -> None:
-    """
-    Update the docket_number field of a Docket object & remove it from the LLM cleaning Redis set if it hasn't been modified since the start timestamp.
+    """Update the docket_number field of a Docket object & remove it from the LLM cleaning Redis set if it hasn't been modified since the start timestamp.
 
-    :param docket_id: The primary key ID of the Docket to update.
-    :param docket_number: The new docket number to set.
-    :param start_timestamp: The timestamp marking the start of the daemon job.
-    :param r: Redis client instance for interacting with Redis.
+    Args:
+        docket_id: The primary key ID of the Docket to update.
+        docket_number: The new docket number to set.
+        start_timestamp: The timestamp marking the start of the daemon job.
+        r: Redis client instance for interacting with Redis.
     """
     with transaction.atomic():
         docket = (
@@ -103,11 +106,13 @@ def update_docket_number(
 
 
 def get_clean_methods(court_type: str) -> tuple:
-    """
-    Returns cleaning methods for docket numbers based on the court type.
+    """Returns cleaning methods for docket numbers based on the court type.
 
-    :param court_type: The type of court, used to determine which cleaning methods to return.
-    :return: A tuple containing two functions for cleaning docket numbers corresponding to the given court type.
+    Args:
+        court_type: The type of court, used to determine which cleaning methods to return.
+
+    Returns:
+        A tuple containing two functions for cleaning docket numbers corresponding to the given court type.
                If the court type is not recognized, returns (None, None).
     """
     match court_type.lower():
@@ -118,12 +123,14 @@ def get_clean_methods(court_type: str) -> tuple:
 
 
 def is_generic(s: str, court_map: str) -> bool:
-    """
-    Determines if the given string `s` matches any generic pattern associated with the specified `court_map`.
+    """Determines if the given string `s` matches any generic pattern associated with the specified `court_map`.
 
-    :param s: The string to check against the generic patterns.
-    :param court_map: The key used to retrieve the list of generic patterns from `generic_patterns`.
-    :return: True if `s` matches any pattern for the given `court_map`, False otherwise.
+    Args:
+        s: The string to check against the generic patterns.
+        court_map: The key used to retrieve the list of generic patterns from `generic_patterns`.
+
+    Returns:
+        True if `s` matches any pattern for the given `court_map`, False otherwise.
     """
     patterns = generic_patterns.get(court_map, [])
     if any(re.fullmatch(p, s) for p in patterns):
@@ -132,8 +139,7 @@ def is_generic(s: str, court_map: str) -> bool:
 
 
 def prelim_clean_F(s: str) -> str:
-    """
-    Cleans and normalizes federal appellate docket numbers.
+    """Cleans and normalizes federal appellate docket numbers.
 
     Steps:
     - Normalize dash characters.
@@ -143,8 +149,11 @@ def prelim_clean_F(s: str) -> str:
     - Remove leading/trailing dashes and periods.
     - Remove common docket/case number prefixes.
 
-    :param s: The input docket number string.
-    :return: The cleaned and normalized docket number string.
+    Args:
+        s: The input docket number string.
+
+    Returns:
+        The cleaned and normalized docket number string.
     """
     s = normalize_dashes(s)
     s = s.strip()
@@ -162,11 +171,13 @@ def prelim_clean_F(s: str) -> str:
 
 
 def regex_clean_F(s: str) -> str:
-    """
-    Cleans and normalizes federal appellate docket numbers from a given string.
+    """Cleans and normalizes federal appellate docket numbers from a given string.
 
-    :param s: The input string containing raw federal appellate docket numbers.
-    :return: A semicolon-separated string of cleaned and normalized docket numbers in uppercase.
+    Args:
+        s: The input string containing raw federal appellate docket numbers.
+
+    Returns:
+        A semicolon-separated string of cleaned and normalized docket numbers in uppercase.
     """
     # All patterns to match
     patterns = generic_patterns.get(Court.FEDERAL_APPELLATE, [])
@@ -224,13 +235,15 @@ def regex_clean_F(s: str) -> str:
 def clean_docket_number_raw(
     docket_id: int, docket_number_raw: str, court_id: str
 ) -> tuple[str | None, int | None] | None:
-    """
-    Cleans a raw docket number string based on the court's specific cleaning logic and identifies those that need LLM cleaning.
+    """Cleans a raw docket number string based on the court's specific cleaning logic and identifies those that need LLM cleaning.
 
-    :param docket_id: The unique identifier for the docket.
-    :param docket_number_raw: The raw docket number string to be cleaned.
-    :param court_id: The identifier for the court, used to select cleaning logic.
-    :return: A tuple containing the cleaned docket number or the docket_id for downstream LLM processing, if applicable. Or None.
+    Args:
+        docket_id: The unique identifier for the docket.
+        docket_number_raw: The raw docket number string to be cleaned.
+        court_id: The identifier for the court, used to select cleaning logic.
+
+    Returns:
+        A tuple containing the cleaned docket number or the docket_id for downstream LLM processing, if applicable. Or None.
     """
     court_type = court_map.get(court_id)
 
@@ -260,13 +273,14 @@ def create_llm_court_batches(
     llm_batch: list[int],
     r: Redis,
 ) -> defaultdict[str | None, list[dict[int, str]]]:
-    """
-    Groups docket numbers by their associated court type for a given batch of docket_ids.
-    Remove docket_ids that no longer exist, if any, from the Redis set.
+    """Groups docket numbers by their associated court type for a given batch of docket_ids. Remove docket_ids that no longer exist, if any, from the Redis set.
 
-    :param llm_batch: A list of docket_ids to be processed.
-    :param r: Redis client instance for interacting with Redis.
-    :return: A dictionary where each key is a court mapping (as determined by `court_map`),
+    Args:
+        llm_batch: A list of docket_ids to be processed.
+        r: Redis client instance for interacting with Redis.
+
+    Returns:
+        A dictionary where each key is a court mapping (as determined by `court_map`),
               and each value is a list of dictionaries of {docket_id: docket_number_raw}.
     """
     existing_docket_ids = set()
@@ -290,13 +304,15 @@ def create_llm_court_batches(
 def extract_with_llm(
     batch: list[dict[int, str]], system_prompt: str, model_id: str
 ) -> dict[int, str] | None:
-    """
-    Extracts and cleans a batch of docket numbers using a Large Language Model (LLM).
+    """Extracts and cleans a batch of docket numbers using a Large Language Model (LLM).
 
-    :param batch: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
-    :param system_prompt: The system prompt to provide to the LLM.
-    :param model_id: The identifier for the LLM model to use.
-    :return: A dictionary where keys are unique docket_ids (int) and values are cleaned docket numbers (str).
+    Args:
+        batch: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
+        system_prompt: The system prompt to provide to the LLM.
+        model_id: The identifier for the LLM model to use.
+
+    Returns:
+        A dictionary where keys are unique docket_ids (int) and values are cleaned docket numbers (str).
     """
     try:
         llm_response = call_llm(
@@ -341,17 +357,19 @@ def process_llm_batches(
     batch_size: int,
     all_cleaned: dict[int, str],
 ) -> dict[int, str]:
-    """
-    Processes batches of records using a language model (LLM), iteratively retry with smaller batch sizes for failed extractions.
+    """Processes batches of records using a language model (LLM), iteratively retry with smaller batch sizes for failed extractions.
 
-    :param llm_batches: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
-    :param system_prompt: The system prompt to provide to the LLM.
-    :param model_id: Identifier for the LLM model to use.
-    :param retry: Current retry attempt count.
-    :param max_retries: Maximum number of allowed retries for failed batches.
-    :param batch_size: Number of records to process in each model call.
-    :param all_cleaned: Accumulator dictionary for all processed records.
-    :return: A dictionary mapping record IDs to their cleaned/extracted values, including any unprocessed records after max retries.
+    Args:
+        llm_batches: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
+        system_prompt: The system prompt to provide to the LLM.
+        model_id: Identifier for the LLM model to use.
+        retry: Current retry attempt count.
+        max_retries: Maximum number of allowed retries for failed batches.
+        batch_size: Number of records to process in each model call.
+        all_cleaned: Accumulator dictionary for all processed records.
+
+    Returns:
+        A dictionary mapping record IDs to their cleaned/extracted values, including any unprocessed records after max retries.
     """
     remaining = llm_batches
     current_retry = retry
@@ -414,18 +432,18 @@ def call_models_and_compare_results(
     start_timestamp: datetime,
     r: Redis,
 ) -> list[dict[int, str]]:
-    """
-    Calls two language models to process a batch of court docket numbers,
-    compares their results, updates docket numbers when both models agree, and collects batches
-    for further processing when they disagree.
+    """Calls two language models to process a batch of court docket numbers, compares their results, updates docket numbers when both models agree, and collects batches for further processing when they disagree.
 
-    :param court_batch: A list of dictionaries, each mapping docket IDs to raw docket numbers for a batch of court cases.
-    :param court_mapping: A key used to retrieve the appropriate system prompt for the court from the system_prompts dictionary.
-    :param model_one: The identifier for the first language model to use for processing.
-    :param model_two: The identifier for the second language model to use for processing.
-    :param start_timestamp: Timestamp marking the start of the daemon job.
-    :param r: Redis client instance for interacting with Redis.
-    :return: A list of dictionaries, each containing docket IDs and their corresponding raw docket numbers,
+    Args:
+        court_batch: A list of dictionaries, each mapping docket IDs to raw docket numbers for a batch of court cases.
+        court_mapping: A key used to retrieve the appropriate system prompt for the court from the system_prompts dictionary.
+        model_one: The identifier for the first language model to use for processing.
+        model_two: The identifier for the second language model to use for processing.
+        start_timestamp: Timestamp marking the start of the daemon job.
+        r: Redis client instance for interacting with Redis.
+
+    Returns:
+        A list of dictionaries, each containing docket IDs and their corresponding raw docket numbers,
              representing cases where the two models disagreed or returned empty results, to be processed by a larger or fallback model.
     """
     model_one_results = process_llm_batches(

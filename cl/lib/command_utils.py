@@ -27,7 +27,7 @@ class VerboseCommand(BaseCommand):
 
 
 class ScraperCommand(VerboseCommand):
-    """Base class for cl.scrapers commands that use Juriscraper
+    """Base class for cl.scrapers commands that use Juriscraper.
 
     Implements the `--courts` argument to lookup for a Site object
     """

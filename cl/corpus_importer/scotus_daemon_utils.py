@@ -54,8 +54,11 @@ def current_scotus_term_year(today: date) -> int:
     2025-07-01 and ends 2026-06-30, so both 2025-10-15 and 2026-02-01
     resolve to term year 25.
 
-    :param today: The date to compute the term year for.
-    :return: The 2-digit SCOTUS term year (e.g. ``25`` for the 2025 term).
+    Args:
+        today: The date to compute the term year for.
+
+    Returns:
+        The 2-digit SCOTUS term year (e.g. ``25`` for the 2025 term).
     """
     year = today.year if today.month >= 7 else today.year - 1
     return year % 100
@@ -68,8 +71,11 @@ def previous_term_still_probing(today: date) -> bool:
     still trickle in after the cutover. During July we probe both the new
     current term and the previous term so we don't miss stragglers.
 
-    :param today: The date to check.
-    :return: Whether previous-term probing should be active.
+    Args:
+        today: The date to check.
+
+    Returns:
+        Whether previous-term probing should be active.
     """
     return today.month == 7
 
@@ -82,11 +88,14 @@ def format_docket_number(
     Low/high sequences use ``YY-N`` form (e.g. ``"25-150"``).
     Applications use ``YYAN`` form (e.g. ``"24A1088"``).
 
-    :param term_year_2digit: The 2-digit SCOTUS term year (e.g. ``25``).
-    :param serial: The docket serial number.
-    :param sequence: The docket-number sequence (``"low"``, ``"high"``, or
-        ``"applications"``).
-    :return: The formatted docket number.
+    Args:
+        term_year_2digit: The 2-digit SCOTUS term year (e.g. ``25``).
+        serial: The docket serial number.
+        sequence: The docket-number sequence (``"low"``, ``"high"``, or
+            ``"applications"``).
+
+    Returns:
+        The formatted docket number.
     """
     if sequence == APPLICATIONS_SEQUENCE:
         return f"{term_year_2digit:02d}A{serial}"
@@ -111,9 +120,12 @@ def scotus_empty_probe_attempts_key() -> str:
 def scotus_highest_known_field(sequence: str, term_year_2digit: int) -> str:
     """Hash field name for the highest-known serial per (sequence, term).
 
-    :param sequence: The docket-number sequence (``"low"`` or ``"high"``).
-    :param term_year_2digit: The 2-digit SCOTUS term year (e.g. ``25``).
-    :return: The Redis hash field name (e.g. ``"low:25"``).
+    Args:
+        sequence: The docket-number sequence (``"low"`` or ``"high"``).
+        term_year_2digit: The 2-digit SCOTUS term year (e.g. ``25``).
+
+    Returns:
+        The Redis hash field name (e.g. ``"low:25"``).
     """
     if sequence not in SEQUENCES:
         raise ValueError(f"Unknown sequence: {sequence!r}")
@@ -125,11 +137,16 @@ def fetch_scotus_docket_json(
 ) -> tuple[str | None, int]:
     """Fetch a SCOTUS docket JSON file.
 
-    :param docket_number: A SCOTUS docket number (e.g. ``25-150``).
-    :return: ``(content_text, http_status)``. ``content_text`` is ``None`` for
+    Args:
+        docket_number: A SCOTUS docket number (e.g. ``25-150``).
+
+    Returns:
+        ``(content_text, http_status)``. ``content_text`` is ``None`` for
         404 responses or for 200 responses that don't contain valid JSON.
-    :raises HTTPError: For non-404 4xx/5xx responses. The caller relies on this
-        to trigger exponential backoff, matching the iquery probe semantics.
+
+    Raises:
+        HTTPError: For non-404 4xx/5xx responses. The caller relies on this
+            to trigger exponential backoff, matching the iquery probe semantics.
     """
     url = SCOTUS_JSON_URL_TEMPLATE.format(docket_number=docket_number)
     resp = httpx.get(
@@ -152,12 +169,12 @@ def fetch_scotus_docket_json(
 def save_scotus_raw_to_s3(file_name: str, content: str) -> None:
     """Upload a raw SCOTUS response to S3.
 
-    :param file_name: The S3 key for the upload, including extension (e.g.
-        ``"responses/dockets/scotus/25-150.json"`` for daemon JSON hits or
-        ``"responses/dockets/scotus/25-150.html"`` for SCOTUS docket pages
-        fetched via the email follow-up flow).
-    :param content: Content to be uploaded.
-    :return: None
+    Args:
+        file_name: The S3 key for the upload, including extension (e.g.
+            ``"responses/dockets/scotus/25-150.json"`` for daemon JSON hits or
+            ``"responses/dockets/scotus/25-150.html"`` for SCOTUS docket pages
+            fetched via the email follow-up flow).
+        content: Content to be uploaded.
     """
     storage = S3GlacierInstantRetrievalStorage(
         naming_strategy=get_name_by_incrementing

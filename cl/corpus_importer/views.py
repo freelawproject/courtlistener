@@ -23,8 +23,7 @@ from cl.search.models import Court
 
 @staff_member_required
 def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Show paginated judges from CA that can be updated by a researcher"""
-
+    """Show paginated judges from CA that can be updated by a researcher."""
     get_string = make_get_string(request)
 
     # Gather the judges and load the page

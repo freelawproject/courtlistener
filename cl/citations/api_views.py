@@ -131,8 +131,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     def _citation_handler(
         self, request: Request, reporter: str, volume: str, page: str
     ) -> CitationAPIResponse:
-        """
-        This method retrieves opinion clusters that match a citation string.
+        """This method retrieves opinion clusters that match a citation string.
 
         Args:
             request (Request): The HTTP object containing information
@@ -192,11 +191,8 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[str], volume: str, page: str
-    ) -> tuple[
-        QuerySet[OpinionCluster, OpinionCluster] | None, int, list[str]
-    ]:
-        """
-        Retrieves opinion clusters associated with a list of reporter slugs.
+    ) -> tuple[QuerySet[OpinionCluster] | None, int, list[str]]:
+        """Retrieves opinion clusters associated with a list of reporter slugs.
 
         This method takes a list of reporter variations (as slugs) and attempts
         to find all associated opinion clusters.
@@ -233,12 +229,10 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _format_cluster_response(
         self,
-        clusters: QuerySet[OpinionCluster, OpinionCluster],
+        clusters: QuerySet[OpinionCluster],
         cluster_count: int,
     ) -> CitationAPIResponse:
-        """
-        Enhances the provided cluster queryset and formats the data
-        for the response.
+        """Enhances the provided cluster queryset and formats the data for the response.
 
         Args:
             request (Request): The HTTP request object.
