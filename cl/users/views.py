@@ -592,32 +592,36 @@ def register(request: HttpRequest) -> HttpResponse:
                     return HttpResponseRedirect(success_url)
 
                 try:
-                    if not stub_account:
-                        # make a new user that is active, but has not confirmed
-                        # their email address
-                        user = User.objects.create_user(
-                            cd["username"], cd["email"], cd["password1"]
-                        )
-                        up = UserProfile(user=user)
-                    else:
-                        # Upgrade the stub account to make it a regular account.
-                        user = stub_account
-                        user.set_password(cd["password1"])
-                        user.username = cd["username"]
-                        user.is_active = True
-                        up = stub_account.profile
-                        up.stub_account = False
+                    # Create the user and profile together, so a failure
+                    # can't leave a user without a profile, who can't log in.
+                    with transaction.atomic():
+                        if not stub_account:
+                            # make a new user that is active, but has not
+                            # confirmed their email address
+                            user = User.objects.create_user(
+                                cd["username"], cd["email"], cd["password1"]
+                            )
+                            up = UserProfile(user=user)
+                        else:
+                            # Upgrade the stub account to make it a regular
+                            # account.
+                            user = stub_account
+                            user.set_password(cd["password1"])
+                            user.username = cd["username"]
+                            user.is_active = True
+                            up = stub_account.profile
+                            up.stub_account = False
 
-                    if cd["first_name"]:
-                        user.first_name = cd["first_name"]
-                    if cd["last_name"]:
-                        user.last_name = cd["last_name"]
-                    user.save()
+                        if cd["first_name"]:
+                            user.first_name = cd["first_name"]
+                        if cd["last_name"]:
+                            user.last_name = cd["last_name"]
+                        user.save()
 
-                    # Build and assign the activation key
-                    up.activation_key = generate_activation_key()
-                    up.key_expires = now() + timedelta(days=5)
-                    up.save()
+                        # Build and assign the activation key
+                        up.activation_key = generate_activation_key()
+                        up.key_expires = now() + timedelta(days=5)
+                        up.save()
 
                 except IntegrityError as e:
                     # Redirect to success if user already exists
