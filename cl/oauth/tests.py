@@ -273,11 +273,7 @@ class OAuthMetadataTest(APITestCase):
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
-    """Non-DCR code paths (admin, shell, direct ORM) must be held to the
-    same loopback-only policy for http:// redirect URIs that the DCR
-    serializer enforces. This exercises the pre_save signal in
-    ``cl.oauth.signals``.
-    """
+    """Non-DCR code paths (admin, shell, direct ORM) must be held to the same loopback-only policy for http:// redirect URIs that the DCR serializer enforces. This exercises the pre_save signal in ``cl.oauth.signals``."""
 
     def _make_app(self, redirect_uris: str) -> Application:
         return Application(
@@ -556,8 +552,7 @@ class AuthorizeViewCSPTest(TestCase):
 
 
 class CleanOAuthTablesCommandTest(TestCase):
-    """The command clears expired grants and tokens and leaves every
-    application alone, authorized or not."""
+    """The command clears expired grants and tokens and leaves every application alone, authorized or not."""
 
     def test_clears_expired_grants_and_keeps_applications(self):
         """Expired grants go; a never-authorized application stays."""

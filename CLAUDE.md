@@ -137,9 +137,25 @@ docker exec cl-django python manage.py test --keepdb cl.appname.tests.TestClassN
 - SHOULD use `subTest()` to reduce test methods while testing multiple cases
 - SHOULD avoid selenium tests (they're slow)
 - MUST use `time_machine` for date-dependent tests to avoid flaky failures
+- MUST add `@override_settings(WAFFLE_CACHE_PREFIX="<unique_name>")` to any test that
+  overrides a waffle flag, listed above `@override_flag`. Tests run in parallel and
+  share the waffle cache, so without a unique prefix another worker can leave the flag
+  cached in the wrong state and the test passes without checking anything.
 - SHOULD use `FactoryBoy` to make mock data.
 - MUST NOT use Django fixtures. If fixtures are found, MUST replace them with tests that
   use FactoryBoy and Fakes.
+
+## Benchmarks
+
+SHOULD write benchmarks for hot-path or performance critical code.
+
+SHOULD periodically run benchmarks when modifying covered code to avoid performance regressions.
+
+### Running Benchmarks
+
+```bash
+docker exec cl-django uv run pytest -c bench.ini
+```
 
 ## Database Migrations
 
@@ -167,6 +183,26 @@ Migration guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrat
 4. MUST use the template from `.github/PULL_REQUEST_TEMPLATE.md`
 
 ## Available Tools
+
+### Local Stack
+
+The development environment is the Docker Compose stack in `docker/courtlistener/`; the
+Getting Started guide above is the walkthrough. Start it from that directory with
+`docker compose up`; the containers are named `cl-django`, `cl-celery`, `cl-postgres`,
+`cl-redis`, `cl-es`, and so on, and tests run inside `cl-django` as shown below.
+
+In Claude Code on the web, `.claude/hooks/session_start.py` boots that stack in the
+background when the session starts. Before running tests, MUST run
+`python3 .claude/hooks/session_start.py --wait` with a 10-minute timeout; run it again if
+it says the stack is still starting. If it reports that the environment's network policy
+refused a download, MUST NOT work around it: tell the user which host to allow and carry on
+without the stack.
+
+The stack boots only when the cloud environment sets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` (a read-only Docker Hub token), because Docker Hub rate-limits anonymous
+pulls from shared cloud IPs. If the hook or `--wait` says those are missing, MUST relay its
+note to the user, MUST NOT ask the user to paste a token into chat, and MUST NOT try to boot
+the stack another way.
 
 ### Docker Commands
 

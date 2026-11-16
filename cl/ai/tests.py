@@ -904,7 +904,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_file_batches_invalid_model(self):
         """Test validation fails for unsupported Gemini model."""
-
         with self.assertRaises(CommandError) as context:
             call_command(
                 "send_gemini_file_batches",
@@ -932,7 +931,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_file_batches_invalid_prompts(self):
         """Test validation fails for invalid prompts (wrong type or non-existent)."""
-
         # Test case 1: Prompt exists but has wrong type
         with self.subTest(case="wrong_prompt_type"):
             # Create a USER prompt but pass it as system_prompt argument
@@ -993,7 +991,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test handling when S3 path has no files."""
-
         # Setup S3 mock to return empty list
         mock_s3_client = MagicMock()
         mock_boto3_client.return_value = mock_s3_client
@@ -1037,7 +1034,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test error handling when Gemini API fails."""
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=2)
 
@@ -1082,7 +1078,6 @@ class SendGeminiBatchesTest(TestCase):
         self, mock_boto3_client
     ):
         """Test error handling for S3 permission errors."""
-
         # Setup S3 mock to raise AccessDenied error
         mock_s3_client = MagicMock()
         mock_boto3_client.return_value = mock_s3_client
@@ -1129,7 +1124,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test --bucket parameter works."""
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=1)
 
@@ -1169,8 +1163,7 @@ class SendGeminiBatchesTest(TestCase):
         mock_tempfile,
         mock_remove,
     ):
-        """Test that files are split into multiple LLMRequests when
-        exceeding batch_size."""
+        """Test that files are split into multiple LLMRequests when exceeding batch_size."""
         # Setup S3 mocks with 5 files
         self._mock_s3_with_files(mock_boto3_client, num_files=5)
 
@@ -1798,12 +1791,15 @@ class DeduplicationTest(TestCase):
     ) -> LLMTask:
         """Create an LLMRequest + LLMTask with the given config.
 
-        :param s3_key: The S3 key to store in input_file.name.
-        :param status: The LLMTaskStatusChoices value.
-        :param model: Override model name (defaults to self.MODEL).
-        :param system_prompt: Override system prompt.
-        :param user_prompt: Override user prompt.
-        :returns: The created LLMTask.
+        Args:
+            s3_key: The S3 key to store in input_file.name.
+            status: The LLMTaskStatusChoices value.
+            model: Override model name (defaults to self.MODEL).
+            system_prompt: Override system prompt.
+            user_prompt: Override user prompt.
+
+        Returns:
+            The created LLMTask.
         """
         llm_request = LLMRequest.objects.create(
             name="Test Request",

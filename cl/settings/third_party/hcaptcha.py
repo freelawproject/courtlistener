@@ -1,3 +1,5 @@
+"""Settings for hCaptcha keys, using test keys while testing."""
+
 import environ
 
 from ..django import TESTING

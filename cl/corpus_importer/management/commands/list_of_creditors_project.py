@@ -1,4 +1,6 @@
 # !/usr/bin/python
+"""Query and store PACER list of creditors reports for cases listed in CSV files."""
+
 import csv
 import itertools
 import os
@@ -16,7 +18,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -24,6 +26,8 @@ CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
+    """The command's options."""
+
     base_path: str
     offset: int
     limit: int
@@ -34,25 +38,26 @@ class OptionsType(TypedDict):
 def enqueue_get_list_of_creditors(
     court_id: str, d_number_file_name: str
 ) -> bool:
-    """Get list of creditors semaphore"""
+    """Get list of creditors semaphore."""
     key = make_list_of_creditors_key(court_id, d_number_file_name)
     return create_redis_semaphore("CACHE", key, ttl=60 * 60)
 
 
 def query_and_save_creditors_data(options: OptionsType) -> None:
-    """Queries and parses claims activity for a list of courts and a specified
-     date range.
+    """Queries and parses claims activity for a list of courts and a specified date range.
 
-    :param options: The options of the command.
-    :return: None, output files are stored in disk.
+    Args:
+        options: The options of the command.
+
+    Returns:
+        None, output files are stored in disk.
     """
-
     if CLIENT_PACER_USERNAME == "" or CLIENT_PACER_PASSWORD == "":
         logger.info(
             "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
             "env vars to continue..."
         )
-        return None
+        return
 
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")
@@ -138,7 +143,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    SessionData(session.cookies, session.proxy_address),
+                    session,
                     court_id,
                     d_number_file_name,
                     docket_number,
@@ -154,9 +159,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Query list of creditors reports for the cases in CSV files."""
+
     help = "Query List of creditors and store the reports."
 
     def add_arguments(self, parser):
+        """Add the offset, limit, base path, files, and queue options."""
         parser.add_argument(
             "--offset",
             type=int,
@@ -194,5 +202,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and save the list of creditors reports."""
         super().handle(*args, **options)
         query_and_save_creditors_data(options)

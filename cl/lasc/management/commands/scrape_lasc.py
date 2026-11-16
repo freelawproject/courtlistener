@@ -1,3 +1,5 @@
+"""Scrape Los Angeles Superior Court unlimited civil cases."""
+
 import argparse
 from datetime import date, timedelta
 from glob import glob
@@ -12,10 +14,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 
 
 def date_search(options):
-    """Collects a list of cases from a date range and adds them to the db.
-
-    :return: None
-    """
+    """Collects a list of cases from a date range and adds them to the db."""
     start = options["start"]
     end = options["end"]
     logger.info("Getting cases between %s and %s, inclusive", start, end)
@@ -29,10 +28,7 @@ def date_search(options):
 
 
 def add_or_update_case(options):
-    """Adds a case to the DB by internal case id
-
-    :return: None
-    """
+    """Adds a case to the DB by internal case id."""
     if options["case"] is None:
         print(
             "--case is a required parameter when the add-case action is "
@@ -48,8 +44,6 @@ def add_directory(options):
     """Import JSON files from a directory provided at the command line.
 
     Use glob.globs' to identify JSON files to import.
-
-    :return: None
     """
     dir_glob = options["directory_glob"]
     skip_until = options["skip_until"]
@@ -88,12 +82,7 @@ def add_directory(options):
 
 
 def process_case_queue(options):
-    """
-    Work through the queue of cases that need to be added to the database,
-    and add them one by one.
-
-    :return: None
-    """
+    """Work through the queue of cases that need to be added to the database, and add them one by one."""
     case_ids = QueuedCase.objects.all().values_list(
         "internal_case_id", flat=True
     )
@@ -107,12 +96,10 @@ def process_case_queue(options):
 
 
 def process_pdf_queue(options):
-    """Download all PDFs in queue
+    """Download all PDFs in queue.
 
     Work through the queue of PDFs that need to be added to the database,
     download them and add them one by one.
-
-    :return: None
     """
     pdf_pks = (
         QueuedPDF.objects.all()
@@ -128,9 +115,19 @@ def process_pdf_queue(options):
 
 
 class Command(VerboseCommand):
+    """Run one of the LASC scraping actions."""
+
     help = "Get all content from MAP LA Unlimited Civil Cases."
 
     def valid_actions(self, s):
+        """Look up the action function named by ``s``.
+
+        ``s`` is validated in lowercase but looked up as given.
+
+        Raises:
+            argparse.ArgumentTypeError: If ``s``, lowercased, isn't a valid
+                action.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -141,6 +138,10 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        """Add the action, queue, case, directory, and date range options.
+
+        The date range defaults to the last seven days.
+        """
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -186,6 +187,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action with the command's options."""
         super().handle(*args, **options)
         options["action"](options)
 

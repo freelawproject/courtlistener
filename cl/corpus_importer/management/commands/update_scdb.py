@@ -1,6 +1,4 @@
-"""
-Process here will be to iterate over every item in the SCDB and to locate it in
-CourtListener.
+"""Process here will be to iterate over every item in the SCDB and to locate it in CourtListener.
 
 Location is done by:
  - Looking in the `scdb_id` field. During the first run of this
@@ -38,9 +36,12 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class Command(VerboseCommand):
+    """Update clusters with data from the SCDB Case Centered CSV."""
+
     help = "Import data from the SCDB Case Centered CSV."
 
     def add_arguments(self, parser):
+        """Add the debug, start row, file, and skip-human-review options."""
         parser.add_argument(
             "--debug",
             action="store_true",
@@ -68,6 +69,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Match each SCDB row to clusters and update the cluster it matches.
+
+        Rows matching no cluster are skipped, and rows matching several
+        clusters go to human review.
+
+        Raises:
+            CommandError: If human review is skipped without ``--debug``.
+        """
         super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
@@ -92,8 +101,9 @@ class Command(VerboseCommand):
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
-        """Check if the value passed in is Falsy. If so, set it to the value of
-        new_value.
+        """Check if the value passed in is Falsy.
+
+        If so, set it to the value of new_value.
 
         return ok: Whether the item was set successfully
         """
@@ -149,11 +159,11 @@ class Command(VerboseCommand):
 
     @staticmethod
     def do_citations(cluster, scdb_info):
-        """
-        Handle the citation fields.
+        """Handle the citation fields.
 
-        :param cluster: The Cluster to be changed.
-        :param scdb_info: A dict with the SCDB information.
+        Args:
+            cluster: The Cluster to be changed.
+            scdb_info: A dict with the SCDB information.
         """
         fields = {
             "usCite": ("U.S.", Citation.FEDERAL),
@@ -235,9 +245,7 @@ class Command(VerboseCommand):
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
-        """Go through each of the clusters and see if they have a matching docket
-        number. Return only those ones that do.
-        """
+        """Go through each of the clusters and see if they have a matching docket number. Return only those ones that do."""
         good_cluster_ids = []
         for cluster in clusters:
             dn = cluster.docket.docket_number
@@ -260,14 +268,15 @@ class Command(VerboseCommand):
 
     @staticmethod
     def winnow_by_case_name(clusters, d):
-        """
-        Go through the clusters that are matched and see if one matches by
-        case name.
+        """Go through the clusters that are matched and see if one matches by case name.
 
-        :param clusters: A QuerySet object of clusters.
-        :param d: The matching SCDB data
-        :return: A QuerySet object of clusters, hopefully winnowed to a single
-        result.
+        Args:
+            clusters: A QuerySet object of clusters.
+            d: The matching SCDB data
+
+        Returns:
+            A QuerySet object of clusters, hopefully winnowed to a single
+            result.
         """
         good_cluster_ids = []
         bad_words = ["v", "versus"]
@@ -287,11 +296,16 @@ class Command(VerboseCommand):
 
         if len(good_cluster_ids) == 1:
             return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
-        else:
-            # Alas: No progress made.
-            return clusters
+        # Alas: No progress made.
+        return clusters
 
     def get_human_review(self, clusters, d):
+        """Log the candidate clusters and SCDB row, then ask which cluster to update.
+
+        Returns:
+            The chosen cluster, the first cluster when skipping human review,
+            or None if the input isn't a number.
+        """
         for i, cluster in enumerate(clusters):
             logger.info(
                 "%s: Cluster %s (%.3f sim):",
@@ -320,23 +334,23 @@ class Command(VerboseCommand):
             )
             self.skipped_count += 1
             return clusters[0]
-        else:
-            choice = input(
-                f"Which item should we update? [0-{len(clusters) - 1}] "
-            )
+        choice = input(
+            f"Which item should we update? [0-{len(clusters) - 1}] "
+        )
 
-            try:
-                choice = int(choice)
-                cluster = clusters[choice]
-            except ValueError:
-                cluster = None
-            return cluster
+        try:
+            choice = int(choice)
+            cluster = clusters[choice]
+        except ValueError:
+            cluster = None
+        return cluster
 
     def iterate_scdb_and_take_actions(
         self, action_zero, action_one, action_many, start_row=0
     ):
-        """Iterates over the SCDB, looking for a single match for every item. If
-        a single match is identified it takes the action in the action_one
+        """Iterates over the SCDB, looking for a single match for every item.
+
+        If a single match is identified it takes the action in the action_one
         function using the Cluster identified and the dict of the SCDB
         information.
 

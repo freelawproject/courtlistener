@@ -1,4 +1,4 @@
-"""Command to back-scrape Florida dockets"""
+"""Command to back-scrape Florida dockets."""
 
 from datetime import date
 from pathlib import Path
@@ -33,10 +33,12 @@ def save_case_to_s3(
     throttle: CeleryThrottle,
     queue_name: str,
 ) -> str:
-    """Save a case to S3 under the given prefix
+    """Save a case to S3 under the given prefix.
 
-    :returns: The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
-    return that as well."""
+    Returns:
+        The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
+        return that as well.
+    """
     key = _make_case_key(base, court_id, case.docket_number)
     content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
     throttle.maybe_wait()
@@ -161,6 +163,8 @@ async def _backfill(
 
 
 class Command(StateBackScrapeCommand, FLScrapeCommand):
+    """Back-scrape Florida appellate dockets over a date range or from a CSV of case UUIDs."""
+
     help: str = "Back-scrape Florida dockets"
 
     checkpoint_trackers: dict[FloridaCourtID, ScraperCheckpointTracker] = {
@@ -175,7 +179,8 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
     date_range_required: ClassVar[bool] = False
 
     def add_arguments(self, parser: CommandParser):
-        super(Command, self).add_arguments(parser)
+        """Add the full-scrape, skip-parsed, and targeted UUID CSV options."""
+        super().add_arguments(parser)
 
         parser.add_argument(
             "--full-scrape",
@@ -216,6 +221,12 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
         scrape_uuids: str,
         **options,
     ):
+        """Back-scrape the cases in ``scrape_uuids``, or each court's dockets in the date range.
+
+        With ``auto_resume``, each court starts from its saved checkpoint
+        when it has one. Without ``scrape_uuids``, logs an error and does
+        nothing unless both the start and end dates are given.
+        """
         logger.info("Setting up Florida back-scrape...")
         court_ids = self.parse_court_ids(courts)
 

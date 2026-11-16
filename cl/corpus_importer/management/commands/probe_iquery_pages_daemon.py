@@ -1,3 +1,5 @@
+"""Daemon that probes PACER courts for new cases via iquery pages."""
+
 from __future__ import annotations
 
 import time
@@ -17,8 +19,11 @@ from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 def enqueue_iquery_probe(court_id: str) -> bool:
     """Get iquery forward probing semaphore.
 
-    :param court_id: The identifier for the court.
-    :return: A boolean indicating if the semaphore was successfully created.
+    Args:
+        court_id: The identifier for the court.
+
+    Returns:
+        A boolean indicating if the semaphore was successfully created.
     """
     key = make_iquery_probing_key(court_id)
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
@@ -29,9 +34,12 @@ def get_latest_pacer_case_id_for_courts(
 ) -> dict[str, int]:
     """Return the latest pacer_case_id for each given court from Redis.
 
-    :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
-    :param r: The redis connection to use.
-    :return: A dict mapping each court_id to its latest pacer_case_id.
+    Args:
+        court_ids: List of court IDs to fetch the latest pacer_case_id for.
+        r: The redis connection to use.
+
+    Returns:
+        A dict mapping each court_id to its latest pacer_case_id.
     """
     latest_case_ids = {}
     for court_id in court_ids:
@@ -44,6 +52,8 @@ def get_latest_pacer_case_id_for_courts(
 
 
 class Command(VerboseCommand):
+    """Continually queue iquery probing for each PACER court."""
+
     help = """Run the iquery pages probing daemon.
 
 The goal of this daemon is to ensure that we always have every case in PACER.
@@ -70,10 +80,12 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
 """
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the testing-iterations option."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -83,6 +95,11 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         )
 
     def handle(self, *args, **options):
+        """Queue probing for each court not already being probed or waiting.
+
+        Runs while the daemon is enabled in settings, stopping after
+        ``--testing-iterations`` iterations when that is set.
+        """
         super().handle(*args, **options)
 
         testing_iterations = options["testing_iterations"]

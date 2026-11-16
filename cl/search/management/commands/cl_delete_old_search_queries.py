@@ -1,3 +1,5 @@
+"""Delete search queries older than the privacy policy cutoff."""
+
 from datetime import timedelta
 
 from django.conf import settings
@@ -8,9 +10,12 @@ from cl.search.models import SearchQuery
 
 
 class Command(BaseCommand):
+    """Delete search queries older than the privacy policy cutoff."""
+
     help = "Deletes SearchQuery records older than the privacy cut off."
 
     def handle(self, *args, **options):
+        """Delete search queries created more than ``PRIVACY_POLICY_CUTOFF_DAYS - 1`` days ago."""
         # Do cutoff minus one so that we do not have
         # queries older than the cutoff.
         # See: https://github.com/freelawproject/courtlistener/pull/6510#pullrequestreview-3430758461

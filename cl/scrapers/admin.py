@@ -1,3 +1,5 @@
+"""Django admin configuration for scraper logs, URL hashes, and scraper status."""
+
 from django.contrib import admin
 from django.db import models
 
@@ -10,6 +12,8 @@ from cl.scrapers.models import (
 
 @admin.register(PACERFreeDocumentLog)
 class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
+    """Admin for PACER free document report logs, with editable status."""
+
     list_display = (
         "__str__",
         "court_id",
@@ -25,6 +29,8 @@ class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
 
 @admin.register(PACERFreeDocumentRow)
 class PACERFreeDocumentRowAdmin(admin.ModelAdmin):
+    """Admin for rows from PACER free document reports."""
+
     list_display = ("__str__", "court_id", "docket_number", "error_msg")
     list_filter = ("court_id",)
 
@@ -33,8 +39,7 @@ admin.site.register(UrlHash)
 
 
 class MVLatestOpinion(models.Model):
-    """
-    Model linked to materialized view for monitoring scrapers
+    """Model linked to materialized view for monitoring scrapers.
 
     The SQL for creating the view is on it's migration file.
 
@@ -57,7 +62,7 @@ class MVLatestOpinion(models.Model):
 
 @admin.register(MVLatestOpinion)
 class MVLatestOpinionAdmin(admin.ModelAdmin):
-    """Admin page to look at the latest opinion for each court
+    """Admin page to look at the latest opinion for each court.
 
     Use this to monitor silently failing scrapers
     """

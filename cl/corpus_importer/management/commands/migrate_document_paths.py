@@ -60,16 +60,17 @@ FAILED = "failed"
 class PathMigrationSpec:
     """How to migrate one model's files into the RECAP layout.
 
-    :ivar model: The model whose files are being moved.
-    :ivar file_field: The FileField holding the storage key.
-    :ivar old_prefix: Rows whose key starts with this are still to be migrated.
-    :ivar docket_id_field: `values()` lookup for the docket id. Rows sharing a
-        docket are processed on the same thread so the duplicate-key guard
-        never races against itself.
-    :ivar court_id_field: `values()` lookup for the docket's court id.
-    :ivar extra_fields: Additional `values()` lookups `build_segments` needs.
-    :ivar build_segments: Builds the filename segments that follow the bucket
-        name from a `values()` row.
+    Attributes:
+        model: The model whose files are being moved.
+        file_field: The FileField holding the storage key.
+        old_prefix: Rows whose key starts with this are still to be migrated.
+        docket_id_field: `values()` lookup for the docket id. Rows sharing a
+            docket are processed on the same thread so the duplicate-key guard
+            never races against itself.
+        court_id_field: `values()` lookup for the docket's court id.
+        extra_fields: Additional `values()` lookups `build_segments` needs.
+        build_segments: Builds the filename segments that follow the bucket
+            name from a `values()` row.
     """
 
     model: type[Model]
@@ -93,8 +94,7 @@ class PathMigrationSpec:
 
 
 def scotus_document_segments(row: dict[str, Any]) -> list[str]:
-    """Filename segments for a SCOTUSDocument row: date, document and
-    attachment numbers."""
+    """Filename segments for a SCOTUSDocument row: date, document and attachment numbers."""
     return [
         format_path_date(row["docket_entry__date_filed"]),
         *scotus_document_number_segments(
@@ -114,8 +114,7 @@ def texas_document_segments(row: dict[str, Any]) -> list[str]:
 
 
 def florida_document_segments(row: dict[str, Any]) -> list[str]:
-    """Filename segments for a FloridaDocument row: entry date converted to
-    Florida's timezone, and pk."""
+    """Filename segments for a FloridaDocument row: entry date converted to Florida's timezone, and pk."""
     return [
         format_path_date(florida_local_date(row["docket_entry__date_filed"])),
         str(row["pk"]),
@@ -251,6 +250,7 @@ class Manifest:
     """
 
     def __init__(self, path: Path) -> None:
+        """Open the manifest for appending, writing the header if it is new or empty."""
         self._lock = threading.Lock()
         write_header = not path.exists() or path.stat().st_size == 0
         self._file: TextIO = path.open("a", newline="")
@@ -280,6 +280,7 @@ class PathMigrator:
         manifest: Manifest,
         dry_run: bool,
     ) -> None:
+        """Build a migrator for one model's spec, target bucket, and manifest."""
         self.spec = spec
         self.target = target
         self.manifest = manifest
@@ -291,7 +292,8 @@ class PathMigrator:
         Copy first, update second: if the process dies in between, the row is
         still selected on the next run and the copy is repeated harmlessly.
 
-        :return: One of the outcome constants, for the summary tally.
+        Returns:
+            One of the outcome constants, for the summary tally.
         """
         spec = self.spec
         pk = row["pk"]
@@ -334,7 +336,8 @@ class PathMigrator:
     def _copy_object(self, pk: int, old_key: str, new_key: str) -> str:
         """Server-side copy old_key to new_key, verifying the result.
 
-        :return: MIGRATED on success, or the outcome explaining why not.
+        Returns:
+            MIGRATED on success, or the outcome explaining why not.
         """
         client, bucket = self.target.client, self.target.bucket
         try:
@@ -384,8 +387,7 @@ class PathMigrator:
         return MIGRATED
 
     def migrate_group(self, rows: list[dict[str, Any]]) -> Counter[str]:
-        """Migrate every row of one docket, sequentially, on the calling
-        thread."""
+        """Migrate every row of one docket, sequentially, on the calling thread."""
         tally: Counter[str] = Counter()
         for row in rows:
             tally[self.migrate_row(row)] += 1
@@ -394,9 +396,7 @@ class PathMigrator:
     def migrate_group_in_thread(
         self, rows: list[dict[str, Any]]
     ) -> Counter[str]:
-        """`migrate_group` for pool threads, which don't get Django's
-        request-cycle cleanup: the thread's DB connection is closed after
-        each group so idle pool threads don't pin connections."""
+        """`migrate_group` for pool threads, which don't get Django's request-cycle cleanup: the thread's DB connection is closed after each group so idle pool threads don't pin connections."""
         try:
             return self.migrate_group(rows)
         finally:
@@ -503,7 +503,8 @@ def check_destination_prefixes(spec_name: str) -> dict[str, int]:
     new key space isn't empty and the names could collide with foreign objects
     the database knows nothing about.
 
-    :return: Object counts keyed by prefix.
+    Returns:
+        Object counts keyed by prefix.
     """
     spec = SPECS[spec_name]
     target = get_s3_target(spec)
@@ -526,6 +527,8 @@ def check_destination_prefixes(spec_name: str) -> dict[str, int]:
 
 
 class Command(VerboseCommand):
+    """Migrate one model's document files to the RECAP storage layout."""
+
     help = (
         "Copy SCOTUS, Texas or Florida document files to the RECAP storage "
         "layout in S3 and point their rows at the new keys. Old objects are "
@@ -533,6 +536,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the model, manifest, concurrency, batching, dry-run, resume, and check options."""
         parser.add_argument(
             "--model",
             required=True,
@@ -588,6 +592,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the migration, or only count destination objects with ``--check-destination``.
+
+        Raises:
+            CommandError: If migrating without ``--manifest`` or with fewer
+                than one worker.
+        """
         super().handle(*args, **options)
         spec_name = options["model"]
 

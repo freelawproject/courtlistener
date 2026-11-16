@@ -1,6 +1,4 @@
-"""
-Mime type lookup helpers
-"""
+"""Mime type lookup helpers."""
 
 MIME_TYPES = {
     "mp3": "audio/mpeg",
@@ -38,9 +36,10 @@ DEFAULT_MIME_TYPE = "application/octet-stream"
 
 
 def lookup_mime_type(file_path: str) -> str:
-    """
-    Do a simple dictionary lookup of the mime-type for the given file.
-    :param file_path Full or relative path to the given file.
+    """Do a simple dictionary lookup of the mime-type for the given file.
+
+    Args:
+        file_path: Full or relative path to the given file.
     """
     try:
         extension = file_path.split(".")[-1]

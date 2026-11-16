@@ -1,3 +1,5 @@
+"""Run and paginate Elasticsearch queries for the search API."""
+
 import logging
 import pickle
 import time
@@ -49,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_object_list(request, cd, paginator):
-    """Perform the search engine work"""
+    """Perform the search engine work."""
     # Set the offset value
     try:
         page_number = int(request.GET.get(paginator.page_query_param, 1))
@@ -93,24 +95,26 @@ def get_object_list(request, cd, paginator):
             request.version,
         )
 
-    sl = ESList(
+    return ESList(
         request=request,
         main_query=main_query,
         offset=offset,
         page_size=page_size,
         type=cd["type"],
     )
-    return sl
 
 
 class ESList:
-    """This class implements a yielding list object that fetches items from ES
-    as they are queried.
-    """
+    """This class implements a yielding list object that fetches items from ES as they are queried."""
 
     def __init__(
         self, request, main_query, offset, page_size, type, length=None
     ):
+        """Build the list over ``main_query`` for a search type.
+
+        ``length`` is computed with a count query when first needed if not
+        given.
+        """
         super().__init__()
         self.request = request
         self.main_query = main_query
@@ -135,7 +139,7 @@ class ESList:
         # Iterate over the results returned by the query, up to the specified
         # page_size.
         total_items = min(len(self), self.page_size)
-        for item in range(0, total_items):
+        for item in range(total_items):
             try:
                 yield self._item_cache[item]
             except IndexError:
@@ -153,7 +157,7 @@ class ESList:
             start_time = time.perf_counter()
             results = self.main_query.execute()
             duration = time.perf_counter() - start_time
-        except (TransportError, ConnectionError, RequestError) as e:
+        except (TransportError, ConnectionError, RequestError):
             error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
@@ -197,25 +201,20 @@ class ESList:
                 item.step,
             )
             return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
+        # Not slicing.
+        try:
+            return self._item_cache[item]
+        except IndexError:
+            # No results!
+            return []
 
     def append(self, p_object):
-        """Lightly override the append method so we get items duplicated in
-        our cache.
-        """
+        """Lightly override the append method so we get items duplicated in our cache."""
         self._item_cache.append(p_object)
 
 
 class CursorESList:
-    """Handles the execution and postprocessing of Elasticsearch queries, as
-    well as the pagination logic for cursor-based pagination.
-    """
+    """Handles the execution and postprocessing of Elasticsearch queries, as well as the pagination logic for cursor-based pagination."""
 
     cardinality_base_document = {
         SEARCH_TYPES.RECAP: DocketDocument,
@@ -235,6 +234,7 @@ class CursorESList:
         clean_data,
         request,
     ):
+        """Build the list over the main and child document queries, with no cursor."""
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
@@ -247,6 +247,7 @@ class CursorESList:
         self.page_int = None
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
+        """Set the cursor and page size, fetching one extra result to detect more pages."""
         self.cursor = cursor
         if self.cursor is not None:
             self.reverse = self.cursor.reverse
@@ -259,6 +260,17 @@ class CursorESList:
         self.page_size = page_size + 1
 
     def perform_es_query(self):
+        """Run the page query and its cardinality count queries, and log the search.
+
+        Returns:
+            The main results, the main cardinality count response, and the
+            child cardinality count response for RECAP searches with a child
+            query, otherwise None.
+
+        Raises:
+            ElasticServerError: If Elasticsearch fails.
+            ElasticBadRequestError: If Elasticsearch can't parse the query.
+        """
         if self.search_after:
             self.main_query = self.main_query.extra(
                 search_after=self.search_after
@@ -320,7 +332,7 @@ class CursorESList:
             cardinality_count_response = responses[1]
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
-        except (TransportError, ConnectionError, RequestError) as e:
+        except (TransportError, ConnectionError, RequestError):
             error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
@@ -359,17 +371,15 @@ class CursorESList:
     def get_paginated_results(
         self,
     ) -> tuple[list[defaultdict], int, Response, Response | None, bool]:
-        """Returns the page results from the micro-cache if available or
-        executes the search query with pagination settings and processes
-        the results.
+        """Returns the page results from the micro-cache if available or executes the search query with pagination settings and processes the results.
 
-        :return: A five-tuple containing a list of defaultdicts with the results,
-        the number of hits returned by the main query, a response object
-        related to the main query's cardinality count, a response object
-        related to the child query's cardinality count, if available and a
-        boolean indicating whether this is a cached response.
+        Returns:
+            A five-tuple containing a list of defaultdicts with the results,
+            the number of hits returned by the main query, a response object
+            related to the main query's cardinality count, a response object
+            related to the child query's cardinality count, if available and a
+            boolean indicating whether this is a cached response.
         """
-
         clean_params_for_cache = self.clean_data.copy()
         # Set the default page value if the page parameter is missing.
         # Set it to 1 to generate the same hash for page 1,
@@ -437,10 +447,7 @@ class CursorESList:
     def process_results(
         self, results: Response, cached_response: bool = False
     ) -> None:
-        """Processes the raw results from ES for handling inner hits,
-        highlighting and merging of unavailable fields.
-        """
-
+        """Processes the raw results from ES for handling inner hits, highlighting and merging of unavailable fields."""
         limit_inner_hits({}, results, self.clean_data["type"])
         set_results_highlights(results, self.clean_data["type"])
         merge_unavailable_fields_on_parent_document(
@@ -477,34 +484,26 @@ class CursorESList:
     def get_search_after_sort_key(
         self, cached_response: bool
     ) -> AttrList | None:
-        """Retrieves the sort key from the last item in the current page to
-        use for the next page's search_after parameter.
-        """
+        """Retrieves the sort key from the last item in the current page to use for the next page's search_after parameter."""
         last_result_in_page = -1
         return self._get_search_after_key(last_result_in_page, cached_response)
 
     def get_reverse_search_after_sort_key(
         self, cached_response: bool
     ) -> AttrList | None:
-        """Retrieves the sort key from the last item in the current page to
-        use for the next page's search_after parameter.
-        """
+        """Retrieves the sort key from the last item in the current page to use for the next page's search_after parameter."""
         first_result_in_page = 0
         return self._get_search_after_key(
             first_result_in_page, cached_response
         )
 
     def get_api_query_sorting(self):
-        """Build the sorting settings for an ES query to work with the
-        'search_after' pagination. Two sorting keys are returned: the default
-        sorting requested by the user and a unique sorting key based on a
-        unique field across documents, acting as a tiebreaker for the default
-        sorting.
+        """Build the sorting settings for an ES query to work with the 'search_after' pagination. Two sorting keys are returned: the default sorting requested by the user and a unique sorting key based on a unique field across documents, acting as a tiebreaker for the default sorting.
 
-        :return: A tuple containing default_sorting and unique_sorting
-        settings.
+        Returns:
+            A tuple containing default_sorting and unique_sorting
+            settings.
         """
-
         # Toggle the original sorting key to handle backward pagination
         default_sorting = build_sort_results(
             self.clean_data, self.reverse, "v4"
@@ -528,13 +527,17 @@ class CursorESList:
 
 
 class ResultObject:
+    """A dict wrapper whose missing attributes read as None."""
+
     def __init__(self, initial=None):
+        """Wrap ``initial``, or an empty dict if ``initial`` is falsy."""
         self.__dict__["_data"] = initial or {}
 
     def __getattr__(self, key):
         return self._data.get(key, None)
 
     def to_dict(self):
+        """Return the wrapped dict."""
         return self._data
 
 
@@ -543,20 +546,18 @@ def limit_api_results_to_page(
     cursor: ESCursor | None,
     cached_response: bool = False,
 ) -> list[defaultdict]:
-    """In ES Cursor pagination, an additional document is returned in each
-    query response to determine whether to display the next page or previous
-    pages. Here we limit the API results to the number defined in
-    settings for a single page, according to the navigation action being
-    performed.
+    """In ES Cursor pagination, an additional document is returned in each query response to determine whether to display the next page or previous pages. Here we limit the API results to the number defined in settings for a single page, according to the navigation action being performed.
 
-    :param results: The results returned by ES.
-    :param cursor: A ESCursor instance containing the "search_after" parameter
-     and a boolean "reverse" indicating if going backwards.
-    :param cached_response: True if this comes from a cached response.
-    :return: A slice of the results list, limited to the number of items as
-    specified by the SEARCH_API_PAGE_SIZE.
+    Args:
+        results: The results returned by ES.
+        cursor: A ESCursor instance containing the "search_after" parameter
+            and a boolean "reverse" indicating if going backwards.
+        cached_response: True if this comes from a cached response.
+
+    Returns:
+        A slice of the results list, limited to the number of items as
+        specified by the SEARCH_API_PAGE_SIZE.
     """
-
     reverse = cursor.reverse if cursor else False
     if reverse and not cached_response:
         # Limit results in page starting from the last item.
