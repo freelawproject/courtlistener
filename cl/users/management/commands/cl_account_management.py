@@ -1,3 +1,5 @@
+"""Remind users to confirm their accounts and delete accounts never confirmed."""
+
 import datetime
 
 from django.contrib.sites.models import Site
@@ -12,12 +14,15 @@ from cl.users.utils import emails
 
 
 class Command(VerboseCommand):
+    """Notify users with unconfirmed accounts, or delete old unconfirmed accounts."""
+
     help = (
         "Notify users of unconfirmed accounts and delete accounts that "
         "were never confirmed"
     )
 
     def add_arguments(self, parser):
+        """Add the notify, delete, simulate, and verbose flags."""
         parser.add_argument(
             "--notify",
             action="store_true",
@@ -46,6 +51,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Delete old accounts with ``--delete``, then notify users with ``--notify``."""
         super().handle(*args, **options)
         self.options = options
         if options["delete"]:

@@ -1,3 +1,5 @@
+"""Views for court, docket, RECAP document, opinion, and citation pages."""
+
 import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
@@ -78,7 +80,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources, forms_v2
+from cl.opinion_page import forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -103,6 +105,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    is_source_hidden,
     separate_syllabus,
 )
 from cl.people_db.models import (
@@ -341,6 +344,11 @@ async def redirect_docket_recap(
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
+    """Redirect to the page of the court's docket with the PACER case ID.
+
+    Raises:
+        Http404: If there is no such docket.
+    """
     docket: Docket = await aget_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
@@ -369,14 +377,24 @@ async def fetch_docket_entries(
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
+    """Render a docket's page of entries, filtered and sorted by the request's parameters.
+
+    Shows 100 entries per page.
+    """
     sort_order_asc = True
-    if await sync_to_async(flag_is_active)(request, "use_new_design"):
-        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
-    else:
-        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
+    form_class = (
+        forms_v2.DocketEntryFilterForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else DocketEntryFilterForm
+    )
+    form = form_class(
+        request.GET,
+        request=request,
+        has_entry_numbers=source.has_entry_numbers,
+    )
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -415,6 +433,7 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
+            entry.display_text = source.entry_display_text(entry)
             entry.documents = [
                 document
                 for document in source.documents_for_entry(entry)
@@ -466,6 +485,7 @@ async def view_docket(
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
+    """Render a docket's Atom feed."""
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
@@ -550,6 +570,11 @@ async def docket_idb_data(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's FJC Integrated Database tab.
+
+    Raises:
+        Http404: If the docket has no IDB data.
+    """
     docket, context = await core_docket_data(request, docket_id)
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
@@ -593,6 +618,11 @@ async def docket_authorities(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's authorities tab.
+
+    Raises:
+        Http404: If the docket has no authorities.
+    """
     docket, context = await core_docket_data(request, docket_id)
     if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
@@ -713,11 +743,8 @@ async def recap_document_context(
     """Returns an HttpResponse for a RECAPDocument or SCOTUSDocument, depending on the docket's court. This can be either an HttpResponseRedirect or a TemplateResponse."""
     docket = await aget_object_or_404(Docket, pk=docket_id)
     source = docket.get_entry_source()
-    is_scotus = source is docket_entry_sources.SCOTUS
 
-    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
-        request, "scotus_docket_page"
-    ):
+    if await is_source_hidden(request, source):
         raise Http404("Docket not found.")
 
     # Tuples of (pk, attachment_number, description)
@@ -1343,6 +1370,7 @@ async def view_opinion_related_cases(
 
 
 async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
+    """Render the reporter volumes page with a 404 status."""
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",

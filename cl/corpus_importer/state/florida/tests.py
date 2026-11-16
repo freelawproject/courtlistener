@@ -552,6 +552,7 @@ class FloridaPartyMergerTest(TestCase):
         party = docket.parties.get()
         attorney = party.attorneys.get()
         role = Role.objects.get(party=party, attorney=attorney)
+        # pyrefly:ignore[missing-attribute]
         assert role.docket_id == docket.pk
         assert role.role == Role.ATTORNEY_LEAD
 
@@ -727,6 +728,7 @@ class FloridaPartyMergerTest(TestCase):
         assert PartyType.objects.filter(pk=other_party_type.pk).exists()
         assert Role.objects.filter(pk=other_role.pk).exists()
         other_role.refresh_from_db()
+        # pyrefly:ignore[missing-attribute]
         assert other_role.docket_id == other_docket.pk
 
     @merger_test(expected_query_count=19)
@@ -859,6 +861,7 @@ class FloridaDocketEntryMergerTest(TestCase):
         assert result.success is True
         assert "FloridaDocketEntry" in result.creates
         docket = self._merged_docket(result)
+        # pyrefly:ignore[missing-attribute]
         merged = docket.florida_docket_entries.get()
         assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
         assert merged.date_filed == entry.datetime_filed
@@ -885,9 +888,11 @@ class FloridaDocketEntryMergerTest(TestCase):
 
         assert result.success is True
         docket = self._merged_docket(result)
+        # pyrefly:ignore[missing-attribute]
         assert docket.florida_docket_entries.count() == 3
         assert {
             str(uuid)
+            # pyrefly:ignore[missing-attribute]
             for uuid in docket.florida_docket_entries.values_list(
                 "docket_entry_uuid", flat=True
             )
@@ -973,7 +978,9 @@ class FloridaDocketEntryMergerTest(TestCase):
         merged = FloridaDocketEntry.objects.get()
         self.assertEqual(merged.submitted_by_name, "Acme Corp")
         self.assertEqual(
-            merged.submitted_by_id, Party.objects.get(name="Acme Corp").pk
+            # pyrefly:ignore[missing-attribute]
+            merged.submitted_by_id,
+            Party.objects.get(name="Acme Corp").pk,
         )
 
     @merger_test(expected_query_count=17)
@@ -994,6 +1001,7 @@ class FloridaDocketEntryMergerTest(TestCase):
         self.assertTrue(result.success)
         merged = FloridaDocketEntry.objects.get()
         self.assertEqual(merged.submitted_by_name, "Broward Clerk")
+        # pyrefly:ignore[missing-attribute]
         self.assertIsNone(merged.submitted_by_id)
 
     @merger_test(expected_query_count=20)
@@ -1015,6 +1023,7 @@ class FloridaDocketEntryMergerTest(TestCase):
         )
         FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
         merged = FloridaDocketEntry.objects.get()
+        # pyrefly:ignore[missing-attribute]
         resolved_party_id = merged.submitted_by_id
         self.assertIsNotNone(resolved_party_id)
 
@@ -1025,6 +1034,7 @@ class FloridaDocketEntryMergerTest(TestCase):
 
         self.assertTrue(result.success)
         merged.refresh_from_db()
+        # pyrefly:ignore[missing-attribute]
         self.assertEqual(merged.submitted_by_id, resolved_party_id)
         self.assertEqual(merged.submitted_by_name, "")
 
@@ -1053,11 +1063,13 @@ class FloridaDocketEntryMergerTest(TestCase):
 
         result = FloridaDocketEntryMerger(
             entry,
+            # pyrefly:ignore[missing-attribute]
             manager=docket.florida_docket_entries,
             params=RelatedParams([entry], parent=docket),
         ).merge()
 
         assert result.success is True
+        # pyrefly:ignore[missing-attribute]
         merged = docket.florida_docket_entries.get()
         assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
 

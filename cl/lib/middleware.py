@@ -1,3 +1,5 @@
+"""Middleware for robots headers and serving new-design templates."""
+
 from collections.abc import Awaitable, Callable
 from inspect import iscoroutinefunction
 from typing import cast
@@ -46,6 +48,7 @@ class RobotsHeaderMiddleware:
             [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
         ],
     ):
+        """Wrap ``get_response``, running in async mode if it is a coroutine function."""
         self.get_response: Callable[
             [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
         ] = get_response
@@ -56,6 +59,7 @@ class RobotsHeaderMiddleware:
     def __call__(
         self, request: HttpRequest
     ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
+        """Pass the request through to the next handler."""
         if self.async_mode:
             return self.__acall__(request)
         response = self.get_response(request)
@@ -72,6 +76,7 @@ class RobotsHeaderMiddleware:
         request: HttpRequest,
         response: TemplateResponse,
     ) -> TemplateResponse:
+        """Add a noindex ``X-Robots-Tag`` header when the context sets ``private``."""
         if getattr(response, "context_data", None) is None:
             return response
 
@@ -117,11 +122,13 @@ class IncrementalNewTemplateMiddleware:
     def __init__(
         self, get_response: Callable[[HttpRequest], HttpResponseBase]
     ):
+        """Wrap ``get_response``."""
         self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
             get_response
         )
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        """Pass the request through to the next handler."""
         response = self.get_response(request)
         return response
 
@@ -137,6 +144,7 @@ class IncrementalNewTemplateMiddleware:
     def process_template_response(
         self, request: HttpRequest, response: HttpResponseBase
     ) -> HttpResponseBase | TemplateResponse:
+        """Swap the response's template for its v2 or WIP version when it should be served."""
         if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 

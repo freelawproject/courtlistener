@@ -1,3 +1,5 @@
+"""API views for the court index, wiki coverage data, result counts, and usage reporting."""
+
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -44,7 +46,9 @@ from cl.stats.constants import StatMetric
 logger = logging.getLogger(__name__)
 
 
-async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
+async def get_cached_court_counts(
+    courts_queryset: QuerySet[Court],
+) -> dict[str, int]:
     """Fetch court counts from cache or ES if not available.
 
     Returns:
@@ -69,7 +73,7 @@ async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
     return court_counts or {}
 
 
-async def make_court_variable() -> QuerySet:
+async def make_court_variable() -> QuerySet[Court]:
     """Create a list of court objects with an added attribute for the count of associated opinions.
 
     Returns:
@@ -163,6 +167,7 @@ async def get_result_count(request, version, day_count):
 
 
 async def deprecated_api(request, v):
+    """Respond with 410 Gone and a message to upgrade to the newest API version."""
     return JsonResponse(
         {
             "meta": {
@@ -529,6 +534,7 @@ class ApiUsageViewSet(ViewSet):
         return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
+        """Report the user's current throttle usage, recent usage, and membership."""
         # IsAuthenticated permission class rules out AnonymousUser at runtime.
         user = cast(User, request.user)
         return Response(

@@ -1,3 +1,5 @@
+"""Views for managing, disabling, and enabling search and docket alerts."""
+
 from http import HTTPStatus
 
 from asgiref.sync import sync_to_async
@@ -6,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
@@ -13,7 +16,12 @@ from django.http import (
     HttpResponseNotFound,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_list_or_404, get_object_or_404, render
+from django.shortcuts import (
+    aget_object_or_404,
+    get_list_or_404,
+    get_object_or_404,
+    render,
+)
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -28,7 +36,11 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_3_per_m,
 )
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.opinion_page.utils import make_docket_title, user_has_alert
+from cl.opinion_page.utils import (
+    is_source_hidden,
+    make_docket_title,
+    user_has_alert,
+)
 from cl.search.models import Docket
 from cl.users.models import UserProfile
 
@@ -43,6 +55,11 @@ def edit_alert_redirect(request, pk):
 
 @login_required
 def delete_alert(request, pk):
+    """Delete one of the user's search alerts and redirect.
+
+    Redirects to the alert's search results if ``redirect_to_search_page``
+    is posted, otherwise to the user's alert list.
+    """
     try:
         pk = int(pk)
     except ValueError:
@@ -66,6 +83,7 @@ def delete_alert(request, pk):
 
 @login_required
 def delete_alert_confirm(request, pk):
+    """Render the confirmation page for deleting a search alert."""
     return render(
         request,
         "delete_confirm.html",
@@ -191,6 +209,11 @@ def disable_alert_list(request: HttpRequest):
 
 @ratelimit_deny_list
 def enable_alert(request, secret_key):
+    """Set a search alert's rate from the ``rate`` query parameter.
+
+    The alert is found by its secret key. The rendered page reports whether
+    the rate was missing or unknown.
+    """
     alert = get_object_or_404(Alert, secret_key=secret_key)
     rate = request.GET.get("rate")
     if not rate:
@@ -341,8 +364,22 @@ def _toggle_docket_alert_legacy(
         )
 
 
-async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Allow users to create docket alerts based on case and court ID."""
+async def new_docket_alert(
+    request: AuthenticatedHttpRequest, docket_id: int | None = None
+) -> HttpResponse:
+    """Allow users to create docket alerts for a docket.
+
+    The docket is found by its ID, or by its PACER case and court IDs, which
+    is how the RECAP extension links here. Dockets of a source that hasn't
+    launched (e.g. SCOTUS or Texas behind their launch flags) are a 404,
+    like their docket pages.
+    """
+    if docket_id is not None:
+        docket = await aget_object_or_404(Docket, pk=docket_id)
+        if await is_source_hidden(request, docket.get_entry_source()):
+            raise Http404("Docket not found.")
+        return await render_new_docket_alert(request, docket)
+
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
     if not pacer_case_id or not court_id:
@@ -376,13 +413,24 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             pacer_case_id=pacer_case_id, court_id=court_id
         ).aearliest("date_created")
 
+    return await render_new_docket_alert(request, docket)
+
+
+async def render_new_docket_alert(
+    request: AuthenticatedHttpRequest, docket: Docket
+) -> TemplateResponse:
+    """Render the new docket alert page for a docket."""
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
     # docket_alerts_button.html gates the alerts button on the docket
-    # having a page at its source, mirroring the docket page toolbar.
-    docket_source_url = await sync_to_async(
-        docket.get_entry_source().docket_url
-    )(docket)
+    # having a page at its source, mirroring the docket page toolbar, which
+    # also hides it for sources that don't send docket alerts.
+    source = docket.get_entry_source()
+    docket_source_url = (
+        await sync_to_async(source.docket_url)(docket)
+        if source.supports_docket_alerts
+        else None
+    )
     return TemplateResponse(
         request,
         "docket_alert_new.html",

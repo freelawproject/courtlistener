@@ -1,3 +1,5 @@
+"""Template tag for rendering a honeypot form field."""
+
 from django import template
 from django.conf import settings
 

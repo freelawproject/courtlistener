@@ -2,7 +2,8 @@
   <div class="row filter-box">
     <!-- Search -->
     <div class="col-xs-12 col-md-2">
-      {% if docket_entries %}
+      {# Hidden for sources whose entries aren't in the search index. #}
+      {% if docket_entries and docket_source.supports_entry_search %}
         <div class="row" id="main-query-box">
           <div id="search-container" class="col-xs-12 text-center">
             <label class="sr-only" for="de-filter-search">Search</label>
@@ -45,18 +46,20 @@
             {{ form.filed_before }}
           </div>
         </div>
-        <!-- Document group -->
-        <div class="tight-input col-xs-6 col-sm-4 col-md-3">
-          <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
-            <label for="id_entry_gte" class="control-label">Documents</label>
-            {{ form.entry_gte }}
+        <!-- Document group: the form drops these fields for sources without entry numbers -->
+        {% if "entry_gte" in form.fields %}
+          <div class="tight-input col-xs-6 col-sm-4 col-md-3">
+            <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+              <label for="id_entry_gte" class="control-label">Documents</label>
+              {{ form.entry_gte }}
+            </div>
+            <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+              <label for="id_entry_lte"
+                     class="control-label">to</label>
+              {{ form.entry_lte }}
+            </div>
           </div>
-          <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
-            <label for="id_entry_lte"
-                   class="control-label">to</label>
-            {{ form.entry_lte }}
-          </div>
-        </div>
+        {% endif %}
         <!-- sort ordering -->
         <div class="tight-input col-xs-6 col-sm-3 col-md-2">
           <div id="sort-buttons"

@@ -1,3 +1,5 @@
+"""URL routes for corpus importer cleanup tools."""
+
 from django.urls import path
 
 from cl.corpus_importer.views import ca_judges

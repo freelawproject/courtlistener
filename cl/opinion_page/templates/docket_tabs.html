@@ -104,6 +104,7 @@
              data-edit-url="{% url "tag_list" request.user %}"
              data-is-page-owner=""
         ></div>
+        {% if docket_source.supports_docket_alerts %}
         <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}
           <a class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -115,7 +116,7 @@
               <a href="{% url "docket_feed" docket.pk %}" rel="nofollow"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
-              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+              <a href="{% if docket.pacer_case_id %}{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}{% else %}{% url "new_docket_alert_by_id" docket.pk %}{% endif %}"
                 rel="nofollow"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
             </li>
             <li>
@@ -123,6 +124,7 @@
             </li>
           </ul>
         </div>
+        {% endif %}
         {% include "includes/docket_source_button/index.html" with docket=docket docket_source=docket_source %}
       </div>
     {% endif %}

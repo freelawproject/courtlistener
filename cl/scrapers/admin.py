@@ -1,3 +1,5 @@
+"""Django admin configuration for scraper logs, URL hashes, and scraper status."""
+
 from django.contrib import admin
 from django.db import models
 
@@ -10,6 +12,8 @@ from cl.scrapers.models import (
 
 @admin.register(PACERFreeDocumentLog)
 class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
+    """Admin for PACER free document report logs, with editable status."""
+
     list_display = (
         "__str__",
         "court_id",
@@ -25,6 +29,8 @@ class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
 
 @admin.register(PACERFreeDocumentRow)
 class PACERFreeDocumentRowAdmin(admin.ModelAdmin):
+    """Admin for rows from PACER free document reports."""
+
     list_display = ("__str__", "court_id", "docket_number", "error_msg")
     list_filter = ("court_id",)
 

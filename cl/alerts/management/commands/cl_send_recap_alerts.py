@@ -1,3 +1,5 @@
+"""Send and schedule RECAP search alerts using the RECAP sweep index."""
+
 import copy
 import datetime
 import time
@@ -45,6 +47,7 @@ from cl.search.documents import (
     ESRECAPSweepDocument,
     RECAPSweepDocument,
 )
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
@@ -226,13 +229,19 @@ def index_daily_recap_documents(
         query_date_local_midnight_utc.isoformat().replace("+00:00", "Z")
     )
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
-    # Temporary: search alerts don't support SCOTUS content yet.
-    exclude_scotus = [{"term": {"court_id.raw": "scotus"}}]
+    # Sources outside the sweep trigger alerts only through the percolator.
+    excluded_courts = sorted(
+        court_id
+        for source in ALL_ES_SOURCES
+        if not source.in_alerts_sweep
+        for court_id in source.court_ids
+    )
+    exclude_percolator_only = [{"terms": {"court_id.raw": excluded_courts}}]
     # Re Index API query.
     query = (
         {
             "bool": {
-                "must_not": exclude_scotus,
+                "must_not": exclude_percolator_only,
                 "should": [
                     # Dockets added/modified today
                     {
@@ -300,7 +309,7 @@ def index_daily_recap_documents(
         if not only_rd
         else {
             "bool": {
-                "must_not": exclude_scotus,
+                "must_not": exclude_percolator_only,
                 "should": [
                     # RECAPDocuments with parents added/modified today
                     {
@@ -501,6 +510,12 @@ def filter_rd_alert_hits(
 def query_alerts(
     search_params: QueryDict,
 ) -> tuple[Response | None, Response | None, Response | None]:
+    """Run an alert's query against the RECAP sweep indices.
+
+    Returns:
+        The three responses from ``do_es_sweep_alert_query``, or three
+        ``None`` values if the query is invalid or Elasticsearch fails.
+    """
     try:
         search_query = RECAPSweepDocument.search()
         child_search_query = ESRECAPSweepDocument.search()
@@ -861,6 +876,7 @@ class Command(VerboseCommand):
     help = "Send RECAP Search Alerts."
 
     def add_arguments(self, parser):
+        """Add the testing-mode flag and query date option."""
         parser.add_argument(
             "--testing-mode",
             action="store_true",
@@ -874,6 +890,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Re-index the period's RECAP content, then send and schedule alerts.
+
+        The period defaults to the day before today, or starts at midnight of
+        ``--query-date`` if it is given.
+        """
         super().handle(*args, **options)
         testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")

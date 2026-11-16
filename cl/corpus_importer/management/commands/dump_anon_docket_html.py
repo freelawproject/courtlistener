@@ -1,3 +1,5 @@
+"""Write anonymized copies of uploaded PACER docket HTML to disk."""
+
 import os
 from pathlib import Path
 
@@ -30,6 +32,7 @@ def _write_anon_item_to_disk(pacer_file: PacerHtmlFiles) -> None:
 
 
 def make_html(options: dict[str, int]) -> None:
+    """Anonymize the uploaded docket HTML files in parallel, skipping the first ``offset``."""
     offset = options["offset"]
     pacer_files = PacerHtmlFiles.objects.filter(
         upload_type=UPLOAD_TYPE.DOCKET
@@ -52,9 +55,12 @@ def make_html(options: dict[str, int]) -> None:
 
 
 class Command(VerboseCommand):
+    """Anonymize uploaded docket HTML files into a separate directory."""
+
     help = "Convert all HTML dockets to anonymized ones in a separate dir"
 
     def add_arguments(self, parser):
+        """Add the process count and offset options."""
         parser.add_argument(
             "--processes",
             default=1,
@@ -70,5 +76,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Anonymize the docket HTML files."""
         super().handle(*args, **options)
         make_html(options)

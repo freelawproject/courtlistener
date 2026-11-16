@@ -1,3 +1,5 @@
+"""Download Northern District of Illinois bankruptcy dockets, petitions, and final documents for the Kessler project."""
+
 import argparse
 import csv
 import os
@@ -127,9 +129,12 @@ def get_final_docs(options):
 
 
 class Command(VerboseCommand):
+    """Download dockets, petitions, or final documents for the cases in a CSV."""
+
     help = "Look up dockets from a spreadsheet for a client and download them."
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, file, and task options."""
         parser.add_argument(
             "--queue",
             default="batch0",
@@ -163,6 +168,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "all_dockets":

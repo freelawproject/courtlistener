@@ -1,3 +1,5 @@
+"""Seal RECAP documents on a docket."""
+
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -6,9 +8,12 @@ from cl.search.models import RECAPDocument
 
 
 class Command(VerboseCommand):
+    """Seal a docket's RECAP documents after confirmation."""
+
     help = "Seal RECAPDocuments by deleting files, removing from Internet Archive, and marking as sealed."
 
     def add_arguments(self, parser) -> None:
+        """Add the docket ID, entry number, and document ID options."""
         parser.add_argument(
             "--docket-id",
             type=int,
@@ -30,6 +35,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """List the matching documents and seal them if the user confirms.
+
+        Logs any items that couldn't be removed from the Internet Archive.
+        """
         super().handle(*args, **options)
 
         docket_id: int = options["docket_id"]

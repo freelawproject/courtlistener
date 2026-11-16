@@ -66,6 +66,8 @@ stemmer = Stemmer("english")
 
 @dataclass
 class ComputedParentheticalGroup:
+    """A cluster of similar parentheticals, with its representative and score."""
+
     # So named to avoid collision with the database model named ParentheticalGroup
     parentheticals: list[Parenthetical]
     representative: Parenthetical

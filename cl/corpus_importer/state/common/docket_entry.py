@@ -15,11 +15,14 @@ from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
 from juriscraper.state.docket import Document as ScrapeDocument
 
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Fn,
     ManyStrategy,
     Merger,
     OneToManyRelation,
+    Params,
     RelatedParams,
+    Scrape,
+    WithStrategy,
     overwrite,
 )
 from cl.search.state.shared import (
@@ -29,23 +32,10 @@ from cl.search.state.shared import (
 )
 
 
-def _entry_type(entry: ScrapeDocketEntry[Any], params: Any) -> int:
-    """Map Juriscraper's `DocketEntryType` enum to CL's integer mirror."""
-    return cast(int, getattr(DocketEntryType, entry.entry_type.name))
-
-
-def _entry_date_filed(entry: ScrapeDocketEntry[Any], params: Any) -> date:
-    return entry.date_filed
-
-
 def _entry_attachments[DocType: ScrapeDocument](
     entry: ScrapeDocketEntry[DocType], params: Any
 ) -> Sequence[DocType]:
     return entry.attachments
-
-
-def _document_url(document: ScrapeDocument, params: Any) -> str:
-    return document.url
 
 
 class DocumentMerger[
@@ -53,7 +43,13 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = Attribute(_document_url, strategy=overwrite)
+    """Base merger for a scraped state document.
+
+    When a document's URL changes, its stored file and OCR status are reset
+    so it is downloaded again.
+    """
+
+    url: str = WithStrategy(Scrape(ScrapeDocument).url, overwrite)
 
     @override
     def needs_update(self) -> bool:
@@ -94,9 +90,14 @@ def AttachmentRelation(
     transform: Callable[[Any, Any], Any] = _entry_attachments,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
+    """Declare a docket entry's attachments as a one-to-many relation.
+
+    Defaults to merging the scraped entry's attachments and appending them
+    to the entry's existing documents.
+    """
     return OneToManyRelation(
         merger,
-        transform,
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
     )
 
@@ -106,6 +107,15 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = Attribute(_entry_date_filed, strategy=overwrite)
-    entry_type: int = Attribute(_entry_type, strategy=overwrite)
+    """Base merger for a scraped state docket entry and its attachments."""
+
+    date_filed: date = WithStrategy(
+        Scrape(ScrapeDocketEntry).date_filed, overwrite
+    )
+    entry_type: int = WithStrategy(
+        Fn(getattr)(
+            DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
+        ),
+        overwrite,
+    )
     documents: list[Any] = AttachmentRelation()

@@ -1,3 +1,5 @@
+"""Signal handlers that keep Elasticsearch documents in sync with their models."""
+
 from collections.abc import Callable, Iterable
 from functools import partial
 
@@ -46,6 +48,7 @@ from cl.search.es_docket_sources import (
 from cl.search.models import (
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     ParentheticalGroup,
@@ -365,18 +368,40 @@ def update_es_documents(
                     if fields_to_update:
                         # Update main document in ES, including fields to be
                         # extracted from a related instance.
-                        transaction.on_commit(
-                            partial(
-                                update_es_document.delay,
-                                es_document.__name__,
-                                fields_to_update,
-                                (
-                                    compose_app_label(main_object),
-                                    main_object.pk,
-                                ),
-                                (compose_app_label(instance), instance.pk),
-                                fields_map,
+                        update_args = (
+                            es_document.__name__,
+                            fields_to_update,
+                            (
+                                compose_app_label(main_object),
+                                main_object.pk,
+                            ),
+                            # Same "app_label.ClassName" as compose_app_label,
+                            # which only accepts ES model types.
+                            (instance._meta.label, instance.pk),
+                            fields_map,
+                        )
+                        # RECAP documents are never percolated on docket entry
+                        # changes, since the RECAPDocument itself is the
+                        # percolated unit, so skip the percolation chain.
+                        is_recap_entry = isinstance(instance, DocketEntry)
+                        if (
+                            type(main_object) not in SOURCE_BY_MODEL
+                            or is_recap_entry
+                        ):
+                            transaction.on_commit(
+                                partial(update_es_document.delay, *update_args)
                             )
+                            continue
+                        # A docket-source document updated from a related
+                        # instance (e.g. its SCOTUS docket entry) can trigger
+                        # alerts; should_percolate_update in
+                        # update_es_document decides.
+                        transaction.on_commit(
+                            chain(
+                                update_es_document.si(*update_args),
+                                send_or_schedule_search_alerts.s(),
+                                percolator_response_processing.s(),
+                            ).apply_async
                         )
 
 
@@ -498,6 +523,7 @@ def update_reverse_related_documents(
                         (compose_app_label(main_object), main_object.pk),
                         related_instance,
                         fields_map_to_pass,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),
@@ -751,6 +777,7 @@ class ESSignalProcessor:
         es_document: type[ESDocumentType],
         documents_model_mapping: DocumentModelMapping,
     ):
+        """Build the processor and connect its signal handlers."""
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -758,6 +785,7 @@ class ESSignalProcessor:
         self.setup()
 
     def setup(self):
+        """Connect the save, delete, many-to-many, and reverse relation handlers for the mapped models."""
         models_save = list(self.documents_model_mapping["save"].keys())
         models_delete = list(self.documents_model_mapping["delete"].keys())
         models_m2m = list(self.documents_model_mapping["m2m"].keys())

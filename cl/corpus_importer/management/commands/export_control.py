@@ -1,3 +1,5 @@
+"""Download and export dockets for the TCIL export control project."""
+
 import argparse
 import csv
 import os
@@ -125,10 +127,13 @@ def idb_row_transform(row):
 
 
 class Command(VerboseCommand):
+    """Run one of the export control project's download or export tasks."""
+
     help = "Look up dockets from a spreadsheet for a client and download them."
     tasks = ("fdd_export", "idb_sample", "bulk_export")
 
     def add_arguments(self, parser):
+        """Add the queue, offset, task, limit, CSV file, and output directory options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -170,6 +175,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task.
+
+        Raises:
+            NotImplementedError: If the task is unknown.
+        """
         super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "fdd_export":

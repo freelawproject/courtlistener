@@ -1,3 +1,5 @@
+"""Celery tasks for processing RECAP uploads, recap.email notifications, and PACER fetches."""
+
 import asyncio
 import concurrent.futures
 import hashlib
@@ -38,7 +40,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
-from juriscraper.pacer.email import DocketType
+from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
@@ -2956,6 +2958,7 @@ async def fetch_docket_base(
 
 @app.task
 def mark_fq_successful(fq_pk):
+    """Mark a PACER fetch request as successfully completed."""
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     msg = "Successfully completed fetch and save."
     async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -3325,6 +3328,8 @@ def get_and_copy_recap_attachment_docs(
 
 @dataclass
 class DocketUpdatedData:
+    """A docket and the entries and documents merged into it."""
+
     docket: Docket
     des_returned: list
     rds_updated: list
@@ -3335,7 +3340,7 @@ class DocketUpdatedData:
 def open_and_validate_email_notification(
     self: Task,
     epq: EmailProcessingQueue,
-) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
+) -> tuple[NotificationEmailData | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's a valid NEF or NDA.
 
     Args:
@@ -3365,7 +3370,7 @@ def open_and_validate_email_notification(
     report._parse_text(body)
     data = report.data
     if (
-        data == {}
+        not data
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
         or (
@@ -3915,6 +3920,7 @@ def process_recap_email(
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
+    """Queue processing of a recap.email notification, then extraction of its documents."""
     return chain(
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
