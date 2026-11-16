@@ -72,13 +72,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/ai/management/commands/check_gemini_batch_status.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name`",
-      "severity": "error"
-    },
-    {
       "column": 30,
       "path": "cl/alerts/api_serializers.py",
       "name": "missing-attribute",

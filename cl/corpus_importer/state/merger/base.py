@@ -142,7 +142,7 @@ class MergerSpecRegistry[Scrape, Params]:
             case RelatedMerger():
                 self.related[spec._name] = spec
             case _:
-                logger.error(f"Unknown merger spec type: {spec!r}")
+                logger.error("Unknown merger spec type: %r", spec)
                 return
         self._transformers[spec._name] = spec.transform
 
@@ -393,7 +393,7 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
         valid = self.validate(scrape)
         if not valid:
             logger.error(
-                f"Merger {self.__class__.__name__} received invalid input."
+                "Merger %s received invalid input.", self.__class__.__name__
             )
             result = MergeResult.failed(self.model.__name__)
 

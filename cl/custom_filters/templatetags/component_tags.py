@@ -88,10 +88,12 @@ def _warn_about_unusable_scripts(request: HttpRequest) -> None:
     for path_stub in getattr(request, "_extensionless_scripts", ()):
         for problem in _script_problems(path_stub):
             logger.warning(
-                f"require_script: {problem}. Requiring '{path_stub}' without "
+                "require_script: %s. Requiring '%s' without "
                 "an extension needs a .js for DEBUG and a .min.js for "
                 "production — commit both, or require the script with its "
-                "'.js' extension."
+                "'.js' extension.",
+                problem,
+                path_stub,
             )
 
 
