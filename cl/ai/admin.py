@@ -1,3 +1,5 @@
+"""Django admin configuration for LLM prompts, requests, and tasks."""
+
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
@@ -7,6 +9,8 @@ from cl.ai.models import LLMRequest, LLMTask, Prompt
 
 @admin.register(Prompt)
 class PromptAdmin(admin.ModelAdmin):
+    """Admin for LLM prompts."""
+
     list_display = (
         "prompt_details_link",
         "is_active",
@@ -20,6 +24,7 @@ class PromptAdmin(admin.ModelAdmin):
 
     @admin.display(description="Prompt", ordering="id")
     def prompt_details_link(self, obj):
+        """Display the prompt as its string form."""
         return str(obj)
 
 
@@ -52,6 +57,8 @@ class LLMTaskInline(admin.TabularInline):
 
 @admin.register(LLMRequest)
 class LLMRequestAdmin(admin.ModelAdmin):
+    """Admin for LLM requests, showing their tasks inline."""
+
     list_display = (
         "request_details_link",
         "is_batch",
@@ -72,11 +79,14 @@ class LLMRequestAdmin(admin.ModelAdmin):
 
     @admin.display(description="Request", ordering="id")
     def request_details_link(self, obj):
+        """Display the request as its string form."""
         return str(obj)
 
 
 @admin.register(LLMTask)
 class LLMTaskAdmin(admin.ModelAdmin):
+    """Admin for LLM tasks, linking each to the object it targets."""
+
     list_display = (
         "task_details_link",
         "status",
@@ -102,10 +112,12 @@ class LLMTaskAdmin(admin.ModelAdmin):
 
     @admin.display(description="Task", ordering="id")
     def task_details_link(self, obj):
+        """Display the task as its string form."""
         return str(obj)
 
     @admin.display(description="Provider", ordering="request__provider")
     def get_provider(self, obj):
+        """Display the provider of the task's request, if it has one."""
         if obj.request:
             return obj.request.get_provider_display()
         return None

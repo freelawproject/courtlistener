@@ -1,3 +1,5 @@
+"""Shared factory_boy helpers."""
+
 import copy
 from typing import Any
 
@@ -49,6 +51,14 @@ class RelatedFactoryVariableList(RelatedFactoryList):
     def call(
         self, instance: Any, step: BuildStep, context: PostGenerationContext
     ) -> list[Any]:
+        """Create ``size`` related objects, or one per item of ``data``.
+
+        Each ``data`` dict overrides the factory's parameters for its object.
+
+        Raises:
+            TypeError: If both ``size`` and ``data`` are given with different
+                lengths.
+        """
         size = context.extra.pop("size", None)
         data = context.extra.pop("data", [])
         if size and data:

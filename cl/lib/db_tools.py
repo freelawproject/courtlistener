@@ -1,3 +1,5 @@
+"""Helpers for raw database cursors and connections."""
+
 from datetime import UTC, datetime
 
 from django.db import connection, connections

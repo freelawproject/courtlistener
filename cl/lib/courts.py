@@ -1,3 +1,5 @@
+"""Helpers for looking up courts and their minimal data."""
+
 import logging
 from dataclasses import dataclass
 
@@ -22,6 +24,8 @@ def get_cache_key_for_court_list() -> str:
 
 @dataclass
 class MinimalCourtData:
+    """A court's ID, short name, usage, and parent court."""
+
     pk: str
     short_name: str
     in_use: bool

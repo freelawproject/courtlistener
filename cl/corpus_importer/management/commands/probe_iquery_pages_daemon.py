@@ -1,3 +1,5 @@
+"""Daemon that probes PACER courts for new cases via iquery pages."""
+
 from __future__ import annotations
 
 import time
@@ -50,6 +52,8 @@ def get_latest_pacer_case_id_for_courts(
 
 
 class Command(VerboseCommand):
+    """Continually queue iquery probing for each PACER court."""
+
     help = """Run the iquery pages probing daemon.
 
 The goal of this daemon is to ensure that we always have every case in PACER.
@@ -76,10 +80,12 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
 """
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the testing-iterations option."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -89,6 +95,11 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         )
 
     def handle(self, *args, **options):
+        """Queue probing for each court not already being probed or waiting.
+
+        Runs while the daemon is enabled in settings, stopping after
+        ``--testing-iterations`` iterations when that is set.
+        """
         super().handle(*args, **options)
 
         testing_iterations = options["testing_iterations"]

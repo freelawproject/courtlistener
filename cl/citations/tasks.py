@@ -1,3 +1,5 @@
+"""Celery tasks for finding and storing citations and parentheticals."""
+
 import logging
 from http.client import ResponseNotReady
 

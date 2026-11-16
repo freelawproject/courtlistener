@@ -1,3 +1,5 @@
+"""Celery tasks for account emails, Neon and Zoho syncing, and webhook notifications."""
+
 import logging
 from collections.abc import Sequence
 from http import HTTPStatus

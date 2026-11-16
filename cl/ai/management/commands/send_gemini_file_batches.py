@@ -512,9 +512,12 @@ def filter_already_processed(
 
 
 class Command(VerboseCommand):
+    """Submit Gemini batch requests for files stored in S3."""
+
     help = "Create and submit Google Gemini batch requests for files stored in S3."
 
     def add_arguments(self, parser):
+        """Add the S3 path, model, prompt, and batching options."""
         parser.add_argument(
             "--path",
             type=str,
@@ -576,6 +579,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Split the S3 files into batches and submit a request for each."""
         super().handle(*args, **options)
         logger.info("Starting new Gemini batch request process...")
 

@@ -1,3 +1,5 @@
+"""Podcast feeds of oral argument audio."""
+
 from django.shortcuts import get_object_or_404
 from django.templatetags.static import static
 from django.utils.timezone import is_naive
@@ -12,6 +14,8 @@ from cl.search.models import SEARCH_TYPES, Court
 
 
 class JurisdictionPodcast(JurisdictionFeed):
+    """Podcast of the 20 most recently argued oral arguments in a court."""
+
     feed_type = iTunesPodcastsFeedGenerator
     iTunes_name = "Free Law Project"
     iTunes_email = "feeds@courtlistener.com"
@@ -20,10 +24,12 @@ class JurisdictionPodcast(JurisdictionFeed):
     item_enclosure_mime_type = "audio/mpeg"
 
     def title(self, obj):
+        """Title the feed as the oral arguments for the court."""
         _, court = obj
         return f"Oral Arguments for the {court.full_name}"
 
     def description(self, obj):
+        """Describe the podcast."""
         return (
             "A chronological podcast of oral arguments with improved "
             "files and meta data. Hosted by Free Law Project through "
@@ -33,6 +39,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     subtitle = description
 
     def get_object(self, request, court):
+        """Get the request and the court, or raise 404 if the court doesn't exist."""
         return request, get_object_or_404(Court, pk=court)
 
     def items(self, obj):
@@ -53,6 +60,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         )
 
     def feed_extra_kwargs(self, obj):
+        """Add the iTunes name, email, explicit flag, and image URL to the feed."""
         extra_args = {
             "iTunes_name": self.iTunes_name,
             "iTunes_email": self.iTunes_email,
@@ -66,6 +74,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         return extra_args
 
     def item_extra_kwargs(self, item):
+        """Add the court as author, the duration, and the explicit flag to an item."""
         return {
             "author": get_item(item)["court"],
             "duration": str(item["duration"]),
@@ -73,13 +82,16 @@ class JurisdictionPodcast(JurisdictionFeed):
         }
 
     def item_enclosure_url(self, item):
+        """Link to the item's audio file in storage."""
         path = get_item(item)["local_path"]
         return f"https://storage.courtlistener.com/{path}"
 
     def item_enclosure_length(self, item):
+        """Get the size of the item's MP3 file."""
         return get_item(item)["file_size_mp3"]
 
     def item_pubdate(self, item):
+        """Get the item's argument date, localized to the court's timezone if naive."""
         pub_date = get_item(item)["dateArgued"]
         if not pub_date:
             return None
@@ -92,23 +104,30 @@ class JurisdictionPodcast(JurisdictionFeed):
     description_template = None
 
     def item_description(self, item):
+        """Describe the item with its case name."""
         return get_item(item)["caseName"]
 
     def item_categories(self, item):
+        """Give items no categories."""
         return None
 
 
 class AllJurisdictionsPodcast(JurisdictionPodcast):
+    """Podcast of the 20 most recently argued oral arguments in any court."""
+
     def title(self, obj):
+        """Title the feed as covering all oral arguments."""
         return (
             "CourtListener.com: Podcast of All Oral Arguments available in "
             "the Federal Circuit Courts (High Volume)"
         )
 
     def get_object(self, request):
+        """Use the request as the feed's object."""
         return request
 
     def items(self, obj):
+        """Get the 20 most recently argued oral arguments that have audio."""
         cd = {
             "q": "*",
             "order_by": "dateArgued desc",
@@ -124,6 +143,8 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
 
 
 class SearchPodcast(JurisdictionPodcast):
+    """Podcast of the 20 most recently argued oral arguments matching a search."""
+
     def _get_search_summary(self, request):
         """Build a human-readable search summary from GET params.
 
@@ -150,11 +171,13 @@ class SearchPodcast(JurisdictionPodcast):
         return summary
 
     def title(self, obj):
+        """Title the feed, including a summary of the search when there is one."""
         if summary := self._get_search_summary(obj):
             return f"{summary} — CourtListener Oral Arguments"
         return "CourtListener.com Custom Oral Argument Podcast"
 
     def description(self, obj):
+        """Describe the feed, including a summary of the search when there is one."""
         if summary := self._get_search_summary(obj):
             return (
                 f"Oral arguments matching: {summary}. "
@@ -168,12 +191,18 @@ class SearchPodcast(JurisdictionPodcast):
         )
 
     def subtitle(self, obj):
+        """Use the description as the subtitle."""
         return self.description(obj)
 
     def get_object(self, request, court):
+        """Use the request as the feed's object."""
         return request
 
     def items(self, obj):
+        """Get the 20 most recently argued oral arguments with audio that match the search.
+
+        An invalid search returns no items.
+        """
         search_form = SearchForm(obj.GET)
         if not search_form.is_valid():
             return []

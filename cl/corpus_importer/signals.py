@@ -1,3 +1,5 @@
+"""Signal handlers that track the latest PACER case IDs and schedule iquery sweeps."""
+
 from functools import partial
 
 from django.conf import settings

@@ -1,3 +1,5 @@
+"""Signal handlers for prayer availability and orphaned notes."""
+
 from datetime import timedelta
 
 from django.db.models import Model

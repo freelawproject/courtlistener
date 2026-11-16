@@ -1,3 +1,5 @@
+"""Re-index RECAP documents sealed since a date."""
+
 from collections.abc import Iterable
 from datetime import datetime
 
@@ -24,13 +26,17 @@ def compose_redis_key() -> str:
 
 
 class Command(VerboseCommand):
+    """Queue re-indexing of sealed RECAP documents modified since a date."""
+
     help = "Re-index RECAPDocuments sealed from a date."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the queue, chunk size, resume, testing, and start date options."""
         parser.add_argument(
             "--queue",
             type=str,
@@ -65,6 +71,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue re-indexing of sealed documents modified on or after the start date."""
         super().handle(*args, **options)
         self.options = options
         auto_resume = options["auto_resume"]

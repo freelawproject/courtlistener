@@ -1,3 +1,5 @@
+"""Factories for search models and for scraped SCOTUS and embedding data."""
+
 import logging
 import string
 
@@ -53,6 +55,11 @@ cnt = CaseNameTweaker()
 
 
 class CourtFactory(DjangoModelFactory):
+    """Make a court in use, or get the existing court with the same ID.
+
+    Creation retries with a new position if saving raises an IntegrityError.
+    """
+
     class Meta:
         model = Court
         django_get_or_create = ("id",)
@@ -84,6 +91,8 @@ class CourtFactory(DjangoModelFactory):
 
 
 class DocketFactory(DjangoModelFactory):
+    """Make a docket in a new court, appealed from another new court."""
+
     class Meta:
         model = Docket
         skip_postgeneration_save = True
@@ -135,6 +144,8 @@ class DocketFactory(DjangoModelFactory):
 
 
 class ParentheticalFactory(DjangoModelFactory):
+    """Make a parenthetical that its described opinion also describes."""
+
     class Meta:
         model = Parenthetical
 
@@ -144,6 +155,8 @@ class ParentheticalFactory(DjangoModelFactory):
 
 
 class ParentheticalGroupFactory(DjangoModelFactory):
+    """Make a parenthetical group with a random score and size."""
+
     class Meta:
         model = ParentheticalGroup
 
@@ -152,6 +165,8 @@ class ParentheticalGroupFactory(DjangoModelFactory):
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):
+    """Make a parenthetical with a new opinion as both describing and described opinion."""
+
     describing_opinion = SubFactory(
         "cl.search.factories.OpinionWithParentsFactory",
     )
@@ -159,6 +174,8 @@ class ParentheticalWithParentsFactory(ParentheticalFactory):
 
 
 class OpinionFactory(DjangoModelFactory):
+    """Make an opinion by a new author, without a cluster."""
+
     class Meta:
         model = Opinion
 
@@ -172,6 +189,8 @@ class OpinionFactory(DjangoModelFactory):
 
 
 class OpinionWithChildrenFactory(OpinionFactory):
+    """Make an opinion with a parenthetical describing it."""
+
     parentheticals = RelatedFactory(
         ParentheticalFactory,
         factory_related_name="described_opinion",
@@ -179,6 +198,8 @@ class OpinionWithChildrenFactory(OpinionFactory):
 
 
 class OpinionWithParentsFactory(OpinionFactory):
+    """Make an opinion in a new cluster with a docket."""
+
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
     )
@@ -198,6 +219,8 @@ class OpinionContentFactory(DjangoModelFactory):
 
 
 class OpinionClusterFactory(DjangoModelFactory):
+    """Make an opinion cluster without a docket or opinions."""
+
     class Meta:
         model = OpinionCluster
 
@@ -215,6 +238,8 @@ class OpinionClusterFactory(DjangoModelFactory):
 
 
 class OpinionClusterWithChildrenFactory(OpinionClusterFactory):
+    """Make an opinion cluster with an opinion that has a parenthetical."""
+
     sub_opinions = RelatedFactory(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
@@ -235,6 +260,8 @@ class OpinionClusterWithParentsFactory(OpinionClusterFactory):
 class OpinionClusterWithChildrenAndParentsFactory(
     OpinionClusterWithChildrenFactory, OpinionClusterWithParentsFactory
 ):
+    """Make a published opinion cluster with a docket and an opinion."""
+
     precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
@@ -255,6 +282,8 @@ class OpinionClusterWithMultipleOpinionsFactory(
 
 
 class CitationWithParentsFactory(DjangoModelFactory):
+    """Make a U.S. citation for a new published cluster with a docket and an opinion."""
+
     class Meta:
         model = Citation
 
@@ -266,6 +295,8 @@ class CitationWithParentsFactory(DjangoModelFactory):
 
 
 class DocketEntryFactory(DjangoModelFactory):
+    """Make a docket entry on a new docket."""
+
     class Meta:
         model = DocketEntry
 
@@ -274,6 +305,12 @@ class DocketEntryFactory(DjangoModelFactory):
 
 
 class RECAPDocumentFactory(DjangoModelFactory):
+    """Make a PACER document on a new docket entry.
+
+    Without a document number, the document takes its entry's number, and
+    an entry without a number is numbered after the docket's highest entry.
+    """
+
     class Meta:
         model = RECAPDocument
 
@@ -317,6 +354,8 @@ class RECAPDocumentFactory(DjangoModelFactory):
 
 
 class RECAPAttachmentFactory(RECAPDocumentFactory):
+    """Make an attachment numbered after its entry's highest attachment, if not given."""
+
     document_type = RECAPDocument.ATTACHMENT
 
     @classmethod
@@ -334,6 +373,11 @@ class RECAPAttachmentFactory(RECAPDocumentFactory):
 
 
 class DocketEntryForDocketFactory(DjangoModelFactory):
+    """Make a docket entry on the docket given by ``parent_id``.
+
+    Nothing is created if ``parent_id`` isn't given.
+    """
+
     class Meta:
         model = DocketEntry
 
@@ -357,6 +401,8 @@ class DocketEntryReuseParentsFactory(DocketEntryFactory):
 
 
 class DocketWithChildrenFactory(DocketFactory):
+    """Make a docket with a cluster that has an opinion."""
+
     clusters = RelatedFactory(
         OpinionClusterWithChildrenFactory,
         factory_related_name="docket",
@@ -374,6 +420,8 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
 
 
 class BankruptcyInformationFactory(DjangoModelFactory):
+    """Make bankruptcy information with a chapter and trustee name."""
+
     class Meta:
         model = BankruptcyInformation
 
@@ -382,6 +430,8 @@ class BankruptcyInformationFactory(DjangoModelFactory):
 
 
 class SCOTUSDocketEntryFactory(DjangoModelFactory):
+    """Make a SCOTUS docket entry on a new docket."""
+
     class Meta:
         model = SCOTUSDocketEntry
 
@@ -393,6 +443,8 @@ class SCOTUSDocketEntryFactory(DjangoModelFactory):
 
 
 class SCOTUSDocumentFactory(DjangoModelFactory):
+    """Make a SCOTUS document on a new entry, numbered like its entry if not given."""
+
     class Meta:
         model = SCOTUSDocument
 
@@ -415,6 +467,8 @@ class SCOTUSDocumentFactory(DjangoModelFactory):
 
 
 class ScotusDocketMetadataFactory(DjangoModelFactory):
+    """Make SCOTUS metadata for a new non-capital docket."""
+
     class Meta:
         model = ScotusDocketMetadata
 
@@ -435,6 +489,8 @@ class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
 
 
 class EmbeddingDataFactory(DictFactory):
+    """Make a dict for one text chunk and its constant-valued embedding."""
+
     chunk_number = Faker("pyint", min_value=0, max_value=100)
     chunk = Faker("text", max_nb_chars=500)
     embedding = LazyFunction(
@@ -448,17 +504,23 @@ class EmbeddingDataFactory(DictFactory):
 
 
 class EmbeddingsDataFactory(DictFactory):
+    """Make a dict of a random ID and its chunk embeddings."""
+
     id = Faker("pyint", min_value=1, max_value=100)
     embeddings = List([SubFactory(EmbeddingDataFactory)])
 
 
 class SCOTUSAttachmentDataFactory(DictFactory):
+    """Make a dict of scraped SCOTUS attachment data."""
+
     document_url = Faker("url")
     description = Faker("text", max_nb_chars=20)
     document_number = Faker("pyint", min_value=1, max_value=1000)
 
 
 class SCOTUSDocketEntryDataFactory(DictFactory):
+    """Make a dict of scraped SCOTUS docket entry data."""
+
     attachments = List([SubFactory(SCOTUSAttachmentDataFactory)])
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=20)
@@ -492,6 +554,8 @@ class SCOTUSPartyDataFactory(DictFactory):
 
 
 class ScotusDocketDataFactory(DictFactory):
+    """Make a dict of scraped SCOTUS docket data."""
+
     capital_case = Faker("boolean")
     case_name = Faker("case_name")
     date_filed = Faker("date_object")
@@ -509,6 +573,8 @@ class ScotusDocketDataFactory(DictFactory):
 
 
 class CaseTransferFactory(DjangoModelFactory):
+    """Make a case transfer between new dockets in new courts."""
+
     origin_court = SubFactory(CourtFactory)
     origin_docket_number = LazyAttribute(
         lambda ct: ct.origin_docket.docket_number if ct.origin_docket else None
@@ -539,6 +605,8 @@ class CaseTransferFactory(DjangoModelFactory):
 
 
 class TrialCourtDataFactory(DjangoModelFactory):
+    """Make trial court data for a new docket, with a new judge and court."""
+
     docket = SubFactory(DocketFactory)
     docket_number_trial = Faker("federal_district_docket_number")
     docket_number_raw_trial = SelfAttribute("docket_number_trial")

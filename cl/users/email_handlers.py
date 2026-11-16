@@ -1,3 +1,5 @@
+"""Handle email bounces and complaints, and store and filter outgoing emails."""
+
 import logging
 import random
 from collections.abc import Sequence

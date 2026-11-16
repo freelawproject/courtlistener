@@ -1,3 +1,5 @@
+"""Settings for donations and free-tier alert limits."""
+
 import environ
 
 env = environ.FileAwareEnv()

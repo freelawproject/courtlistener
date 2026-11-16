@@ -1,3 +1,5 @@
+"""Warn about and disable docket alerts on long-terminated dockets."""
+
 from argparse import RawTextHelpFormatter
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -120,6 +122,8 @@ async def send_old_alert_warning_email_and_webhook(user, report) -> int:
 
 
 class Command(VerboseCommand):
+    """Email users about old docket alerts and disable very old ones."""
+
     help = """Check for old docket alerts and email or disable them.
 
 Alerts are sent weekly, therefore we have to capture things in date ranges.
@@ -141,11 +145,13 @@ The schedule is thus:
 """
 
     def create_parser(self, *args, **kwargs):
+        """Create a parser that keeps the help text's formatting."""
         parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
     def add_arguments(self, parser):
+        """Add the ``--delete-old-alerts`` and ``--send-alerts`` flags."""
         parser.add_argument(
             "--delete-old-alerts",
             action="store_true",
@@ -160,6 +166,11 @@ The schedule is thus:
         )
 
     def handle(self, *args, **options):
+        """Build a report for each user with terminated docket alerts.
+
+        Very old alerts are only disabled with ``--delete-old-alerts``, and
+        emails and webhooks are only sent with ``--send-alerts``.
+        """
         super().handle(*args, **options)
 
         # Needs to be user-oriented so that we only send one email per person.
