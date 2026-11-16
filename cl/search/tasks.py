@@ -606,7 +606,7 @@ def update_es_document(
         storage = AWSMediaStorage()
         embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
-            logging.error(
+            logger.error(
                 "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )

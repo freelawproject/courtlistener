@@ -627,7 +627,8 @@ async def update_docket_appellate_metadata(d, docket_data):
             cl_id = map_pacer_to_cl_id(court_id)
         else:
             logger.error(
-                f"unexpected court_id type expected str, found {type(court_id).__name__}"
+                "unexpected court_id type expected str, found %s",
+                type(court_id).__name__,
             )
             cl_id = court_id
         if (
@@ -715,7 +716,7 @@ def get_order_of_docket(
         try:
             current_num = int(de["document_number"])
             nxt_num = int(nxt["document_number"])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             # One or the other can't be cast to an int. Continue until we have
             # two consecutive ints we can compare.
             continue
@@ -915,7 +916,7 @@ def resolve_docket_entry_in_memory(
     # We need to cast it for the lookup to match.
     try:
         entry_number = int(docket_entry["document_number"])
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     candidates = des_by_entry_number.get(entry_number, [])
     pacer_seq_no = docket_entry.get("pacer_seq_no")
@@ -927,7 +928,7 @@ def resolve_docket_entry_in_memory(
         return candidates[0] if len(candidates) == 1 else None
     try:
         seq = int(pacer_seq_no)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     seq_matches = [de for de in candidates if de.pacer_sequence_number == seq]
     if len(seq_matches) == 1:
@@ -1260,7 +1261,7 @@ async def add_docket_entries(
                 if entry_data.get("document_number"):
                     try:
                         entry_numbers.add(int(entry_data["document_number"]))
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         continue
             if entry_numbers and d.pk:
                 existing_de_ids = []
@@ -1359,7 +1360,7 @@ async def add_docket_entries(
             # appears again in this upload.
             try:
                 des_by_entry_number[int(de.entry_number)].append(de)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
 
         # Then make the RECAPDocument object. Try to find it. If we do, update

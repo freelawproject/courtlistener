@@ -670,10 +670,9 @@ def register(request: HttpRequest) -> HttpResponse:
 
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
-                        logger.error(
+                        logger.exception(
                             "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
                             str(e),
-                            exc_info=True,
                         )
 
                         form.add_error(

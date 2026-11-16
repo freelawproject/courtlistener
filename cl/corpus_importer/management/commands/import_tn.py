@@ -21,6 +21,8 @@ from cl.scrapers.tasks import extract_opinion_content
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion
 
+logger = logging.getLogger(__name__)
+
 
 def make_item(case):
     """Make an import item for our save everything function.
@@ -88,11 +90,11 @@ def import_tn_corpus(
     if log:
         logging.getLogger().setLevel(logging.INFO)
 
-    logging.info("Starting import")
+    logger.info("Starting import")
     tn_corpus = sorted(json.load(file), key=lambda x: x["label"])
     if not ready:
         case = [x for x in tn_corpus if x["label"] == skip_until][0]
-        logging.info(
+        logger.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
     courts = {
@@ -105,7 +107,7 @@ def import_tn_corpus(
             ready = True
         if not ready:
             continue
-        logging.info(
+        logger.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
         pdf_path = glob(f"{os.path.dirname(file.name)}/{case['label']}/*.pdf")[
@@ -118,7 +120,7 @@ def import_tn_corpus(
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
             op = ops[0]
-            logging.warning(
+            logger.warning(
                 "Document already in database. See: %s at %s",
                 op.get_absolute_url(),
                 op.cluster.case_name,
@@ -144,7 +146,7 @@ def import_tn_corpus(
             opinions[0].pk,
             ocr_available=ocr_available,
         )
-        logging.info(
+        logger.info(
             "Successfully added Tennessee object cluster: %s", cluster.id
         )
 

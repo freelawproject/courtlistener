@@ -412,11 +412,11 @@ async def download_recap_item(
             )
         r.raise_for_status()
     except TimeoutException:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
     except HTTPError as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
     except OSError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             tmp.write(r.content)

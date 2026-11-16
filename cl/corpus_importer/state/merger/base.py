@@ -177,7 +177,7 @@ class MergerSpecRegistry[Scrape, Params]:
             case ManyToManyMerger():
                 self.many_to_many[spec._name] = spec
             case _:
-                logger.error(f"Unknown merger spec type: {spec!r}")
+                logger.error("Unknown merger spec type: %r", spec)
                 return
         self._transformers[spec._name] = spec.transform
 
@@ -294,7 +294,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         """
         if not self.validator(scrape):
             logger.error(
-                f"Merger {self.__class__.__name__} received invalid input."
+                "Merger %s received invalid input.", self.__class__.__name__
             )
             return MergerState.Failed(
                 None,
