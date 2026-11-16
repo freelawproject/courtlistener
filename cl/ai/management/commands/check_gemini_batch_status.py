@@ -139,7 +139,9 @@ def process_succeeded_request(
                     )
                 except (TypeError, ValueError) as e:
                     logger.error(
-                        f"Could not serialize JSON for task {task.llm_key}: {e}"
+                        "Could not serialize JSON for task %s: %r",
+                        task.llm_key,
+                        e,
                     )
                     task.response_file.save(
                         f"{task.llm_key}_result.txt",
@@ -209,7 +211,8 @@ def handle_request(
 
         if job.state not in COMPLETED_STATES:
             logger.info(
-                f"  - Job state is '{job.state.name}'. Skipping for now."
+                "  - Job state is %r. Skipping for now.",
+                job.state.name,  # pyrefly:ignore[missing-attribute] I think the `ValueError` below is catching this, but this should be fixed later - Morgan
             )
             return
 
@@ -220,13 +223,13 @@ def handle_request(
             process_succeeded_request(wrapper, request, job)
         else:
             logger.info(
-                f"  - Job ended with non-success state: {job.state.name}"
+                "  - Job ended with non-success state: %r", job.state.name
             )
             process_failed_request(request, job.state.name)
 
     except ValueError as e:
         logger.warning(
-            f"ValueError downloading results for request {request.pk}: {e}"
+            "ValueError downloading results for request %r: %r", request.pk, e
         )
     except (
         ServerError,
@@ -256,7 +259,8 @@ def handle_request(
             sentry_sdk.capture_exception(e)
     except Exception as e:
         logger.exception(
-            f"Unexpected error in check_gemini_batch_status for request {request.pk}"
+            "Unexpected error in check_gemini_batch_status for request %r",
+            request.pk,
         )
         sentry_sdk.capture_exception(e)
         process_failed_request(request, "UNEXPECTED_ERROR")
@@ -289,7 +293,7 @@ class Command(VerboseCommand):
             provider=LLMProvider.GEMINI,
         )
         pending_count = pending_requests.count()
-        logger.info(f"Found {pending_count} pending batch requests to check.")
+        logger.info("Found %d pending batch requests to check.", pending_count)
 
         if pending_count == 0:
             return
@@ -297,7 +301,9 @@ class Command(VerboseCommand):
         wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
         for request in pending_requests:
             logger.info(
-                f"Checking status for request: {request.pk} ({request.batch_id})"
+                "Checking status for request: %d (%r)",
+                request.pk,
+                request.batch_id,
             )
             handle_request(wrapper, request)
 

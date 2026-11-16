@@ -1460,7 +1460,7 @@ class SNSWebhookTest(TestCase):
 
         mock_logger.exception.assert_called_once()
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged when a unexpected bounceSubType event is received."""
         # Trigger a content_rejected event
@@ -1708,7 +1708,7 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned when an unexpected hard bounceSubType event is received. Also checks that if an email address is previously banned avoid creating a new ban object for that email address."""
         # Trigger a suppressed_asset event
@@ -3043,7 +3043,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
         """This test checks if a warning is logged when trying to enqueue a message but the stored message doesn't exist anymore because it was deleted."""
         # Create a backoff event message ID:

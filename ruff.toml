@@ -16,7 +16,11 @@ lint.select = [
   # Pyflakes warnings
   "W",
   # pydocstyle
-  "D"
+  "D",
+  # flake8-logging
+  "LOG",
+  # flake8-logging-format
+  "G",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

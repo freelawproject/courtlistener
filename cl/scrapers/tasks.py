@@ -955,8 +955,9 @@ def get_scotus_captcha_solution(
         else:
             if attempt > 0:
                 logger.warning(
-                    f"Generated valid CAPTCHA solution in %d attempts.\nErrors: {error_messages}",
+                    "Generated valid CAPTCHA solution in %d attempts.\nErrors: %s",
                     attempt + 1,
+                    error_messages,
                 )
             return solution, captcha_id
         time.sleep(wait)

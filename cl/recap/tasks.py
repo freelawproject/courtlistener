@@ -415,7 +415,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
             # Sometimes we don't have the case ID from PACER. Try to make this
             # work anyway.
             rd = await RECAPDocument.objects.aget(pacer_doc_id=pq.pacer_doc_id)
-    except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
+    except RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned:
         # Try again but this time using Docket and Docket Entry to get
         # the RECAPDocument instance. If not found, we create a new one.
         retries = 5
@@ -584,7 +584,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
     if not pq.debug:
         try:
             await rd.asave()
-        except (IntegrityError, ValidationError):
+        except IntegrityError, ValidationError:
             msg = "Failed to save RECAPDocument (unique_together constraint or doc type issue)"
             await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             await sync_to_async(rd.filepath_local.delete)(save=False)
@@ -765,7 +765,7 @@ async def process_recap_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1113,7 +1113,7 @@ async def process_recap_claims_register(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1220,7 +1220,7 @@ async def process_recap_docket_history_report(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1334,7 +1334,7 @@ async def process_case_query_page(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1463,7 +1463,7 @@ async def process_recap_appellate_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1589,7 +1589,7 @@ async def process_recap_acms_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1711,7 +1711,7 @@ async def process_recap_acms_appellate_attachment(
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -2150,7 +2150,7 @@ def fetch_pacer_doc_by_rd_base(
                 magic_number,
                 de_seq_num=de_seq_num,
             )
-    except (httpx.RequestError, httpx.HTTPError):
+    except httpx.RequestError, httpx.HTTPError:
         msg = "Failed to get PDF from network."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
@@ -4268,7 +4268,7 @@ def check_pdf_redactions(rd_pk: int) -> None:
     try:
         redaction_response = async_to_sync(check_redactions_service)(rd)
     except Exception:
-        logger.error("Redaction check failed for RD %s", rd_pk, exc_info=True)
+        logger.exception("Redaction check failed for RD %s", rd_pk)
         raise
 
     if not redaction_response.is_success:
