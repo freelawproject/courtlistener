@@ -154,7 +154,10 @@ class ZohoModule(ZohoBase):
             return response_object.get_data()
 
         if isinstance(response_object, APIException):
-            raise Exception(ZohoModule._format_api_exception(response_object))
+            # An API failure, not a type error.
+            raise Exception(  # noqa: TRY004
+                ZohoModule._format_api_exception(response_object)
+            )
 
         raise Exception("Unexpected response type received from the Zoho API.")
 
@@ -171,7 +174,10 @@ class ZohoModule(ZohoBase):
         downstream `KeyError("id")` swallow it.
         """
         if isinstance(action_result, APIException):
-            raise Exception(ZohoModule._format_api_exception(action_result))
+            # An API failure, not a type error.
+            raise Exception(  # noqa: TRY004
+                ZohoModule._format_api_exception(action_result)
+            )
         return int(cast(dict[str, Any], action_result.get_details())["id"])
 
     @staticmethod

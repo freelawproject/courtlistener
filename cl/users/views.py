@@ -662,7 +662,7 @@ def register(request: HttpRequest) -> HttpResponse:
                         up.key_expires = now() + timedelta(days=5)
                         up.save()
 
-                except IntegrityError as e:
+                except IntegrityError:
                     # Redirect to success if user already exists
                     try:
                         User.objects.get(username=cd["username"])
@@ -671,8 +671,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
                         logger.exception(
-                            "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
-                            str(e),
+                            "Unexpected IntegrityError during registration: user does not exist after IntegrityError."
                         )
 
                         form.add_error(

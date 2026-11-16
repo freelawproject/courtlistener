@@ -79,7 +79,6 @@ class CourtFactory(DjangoModelFactory):
             try:
                 obj = model_class(*args, **kwargs)
                 obj.save()
-                return obj
             except IntegrityError as exp:
                 logger.info("Unexpected exp=%s, type(exp)=%s", exp, type(exp))
                 kwargs["position"] = Faker(
@@ -88,6 +87,8 @@ class CourtFactory(DjangoModelFactory):
                 count = count + 1
                 if count > 3:
                     raise
+            else:
+                return obj
 
 
 class DocketFactory(DjangoModelFactory):

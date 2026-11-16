@@ -161,14 +161,14 @@ def get_date(text: str, year: int) -> datetime.date | None:
         date_found = date_parsed.date()
         if date_found.month == 12 and date_found.day == 25:
             raise ChristmasError("Christmas error.")
-
-        if int(date_found.year) == year:
-            return date_found
-        return None
     except (ParserError, ChristmasError):
         return None
     except TypeError:
         # Dateutil sometimes goes sideways
+        return None
+    else:
+        if int(date_found.year) == year:
+            return date_found
         return None
 
 

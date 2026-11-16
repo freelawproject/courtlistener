@@ -167,9 +167,10 @@ class UserProfile(models.Model):
         """
         try:
             membership = self.user.membership
-            return membership.is_active
         except ObjectDoesNotExist:
             return False
+        else:
+            return membership.is_active
 
     @property
     def is_eligible_for_rt_search_alerts(self) -> bool:

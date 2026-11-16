@@ -547,10 +547,8 @@ class LoggingMixin:
             try:
                 results = self._log_request(request)
                 self._handle_events(results, request.user, request.version)
-            except Exception as e:
-                logger.exception(
-                    "Unable to log API response timing info: %s", e
-                )
+            except Exception:
+                logger.exception("Unable to log API response timing info")
         return response
 
     def _get_response_ms(self) -> int:

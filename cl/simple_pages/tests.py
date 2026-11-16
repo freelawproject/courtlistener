@@ -431,9 +431,10 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         legacy = v2_template.removeprefix("v2_")
         try:
             get_template(legacy)
-            return legacy
         except TemplateDoesNotExist:
             return None
+        else:
+            return legacy
 
     @staticmethod
     def _get_wip_fallback(wip_template: str) -> str | None:
@@ -446,9 +447,10 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         for candidate in (f"v2_{name}", name):
             try:
                 get_template(candidate)
-                return candidate
             except TemplateDoesNotExist:
                 continue
+            else:
+                return candidate
         return None
 
     def _iter_wip_pages(self) -> Iterator[tuple[dict[str, Any], str]]:

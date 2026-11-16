@@ -31,6 +31,8 @@ lint.select = [
   "PTH",
   # pygrep-hooks
   "PGH",
+  # tryceratops
+  "TRY",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules
@@ -47,6 +49,12 @@ lint.ignore = [
   "D106",
   # overload-with-docstring
   "D418",
+  # raise-vanilla-class
+  "TRY002",
+  # raise-vanilla-args
+  "TRY003",
+  # raise-within-try
+  "TRY301",
 ]
 
 [lint.pydocstyle]

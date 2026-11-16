@@ -177,11 +177,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 failed_ids.append(opinion.id)
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
-                logger.exception(
-                    "Opinion failed: '%s' with %s",
-                    opinion.id,
-                    str(e),
-                )
+                logger.exception("Opinion failed: '%s'", opinion.id)
 
                 # do not retry the whole loop on an unknown exception
                 remaining_ids = [o.id for o in opinions[index + 1 :]]

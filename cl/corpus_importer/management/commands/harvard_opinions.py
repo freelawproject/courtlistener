@@ -157,10 +157,11 @@ def check_for_match(new_case: str, possibilities: list[str]) -> bool:
         match = difflib.get_close_matches(
             new_case, possibilities, n=1, cutoff=0.7
         )[0]
-        return True if match else False
     except IndexError:
         # No good matches.
         return False
+    else:
+        return True if match else False
 
 
 def map_opinion_type(harvard_opinion_type: str) -> str:

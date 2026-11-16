@@ -137,11 +137,10 @@ def process_succeeded_request(
                             ).encode("utf-8")
                         ),
                     )
-                except (TypeError, ValueError) as e:
+                except (TypeError, ValueError):
                     logger.exception(
-                        "Could not serialize JSON for task %s: %r",
+                        "Could not serialize JSON for task %s",
                         task.llm_key,
-                        e,
                     )
                     task.response_file.save(
                         f"{task.llm_key}_result.txt",

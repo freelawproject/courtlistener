@@ -289,11 +289,10 @@ class Command(CommandUtils, BaseCommand):
                 reporter_slug,
             )
 
-        except ClientError as e:
+        except ClientError:
             logger.exception(
-                "Error fetching volume directories for %s: %s",
+                "Error fetching volume directories for %s",
                 reporter_slug,
-                str(e),
             )
 
         return sorted(volume_directories)
@@ -335,10 +334,8 @@ class Command(CommandUtils, BaseCommand):
                 page,
             )
 
-        except Exception as e:
-            logger.exception(
-                "Error processing case %s: %s", str(case_meta["id"]), str(e)
-            )
+        except Exception:
+            logger.exception("Error processing case %s", str(case_meta["id"]))
 
         return None
 
@@ -376,15 +373,15 @@ class Command(CommandUtils, BaseCommand):
                     self.updated_after,
                 )
 
-            return cases
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Error fetching CasesMetadata.json for %s volume %s: %s",
+                "Error fetching CasesMetadata.json for %s volume %s",
                 reporter_slug,
                 volume,
-                str(e),
             )
             return []
+        else:
+            return cases
 
     def fetch_reporters_metadata(self) -> list[dict[str, Any]]:
         """Fetch ReportersMetadata.json from R2.
@@ -397,10 +394,8 @@ class Command(CommandUtils, BaseCommand):
                 Bucket=self.bucket_name, Key="ReportersMetadata.json"
             )
             return json.loads(response["Body"].read().decode("utf-8"))
-        except Exception as e:
-            logger.exception(
-                "Error fetching ReportersMetadata.json: %s", str(e)
-            )
+        except Exception:
+            logger.exception("Error fetching ReportersMetadata.json")
             return []
 
     def is_valid_case_metadata(self, case_meta: dict[str, Any]) -> bool:

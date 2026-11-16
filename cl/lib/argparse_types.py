@@ -33,9 +33,10 @@ def valid_date_time(s: str) -> datetime:
         d = parser.parse(s)
         if is_naive(d):
             d = make_aware(d, UTC)
-        return d
     except ValueError:
         raise argparse.ArgumentTypeError(f"Unable to parse date/time, {s}")
+    else:
+        return d
 
 
 def readable_dir(prospective_dir: str) -> str:

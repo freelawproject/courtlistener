@@ -507,36 +507,33 @@ class JKentScrapeLoader[
         """
         try:
             payload = json.loads(row[self.payload_column])
-        except (json.JSONDecodeError, TypeError) as error:
+        except (json.JSONDecodeError, TypeError):
             logger.exception(
-                "%s of %s: could not decode %s: %s",
+                "%s of %s: could not decode %s",
                 self._identify(None, number),
                 self.database.name,
                 self.payload_column,
-                error,
             )
             return RowOutcome.INVALID
         try:
             normalized = self.normalize(payload, row)
-        except UnusableScrape as error:
+        except UnusableScrape:
             logger.exception(
-                "%s of %s: refusing to merge it: %s",
+                "%s of %s: refusing to merge it",
                 self._identify(payload, number),
                 self.database.name,
-                error,
             )
             return RowOutcome.REFUSED
         if normalized is None:
             return RowOutcome.INVALID
         try:
             return self.scrape_model.model_validate(normalized)
-        except ValidationError as error:
+        except ValidationError:
             logger.exception(
-                "%s of %s: does not fit %s: %s",
+                "%s of %s: does not fit %s",
                 self._identify(normalized, number),
                 self.database.name,
                 self.scrape_model.__name__,
-                error,
             )
             return RowOutcome.INVALID
 

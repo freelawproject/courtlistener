@@ -446,7 +446,7 @@ def get_and_save_free_document_report(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.exception("%s at %s (%s to %s).", exc, court_id, start, end)
+            logger.exception("Failed at %s (%s to %s).", court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         logger.info(
             "%s at %s (%s to %s). Retrying.", exc, court_id, start, end
@@ -1255,11 +1255,12 @@ async def get_pacer_case_id_and_title_base(
             office_number=office_number,
             docket_number_letters=docket_number_letters,
         )
+    except ParsingException:
+        return None
+    else:
         if result is not None:
             result["pass_through"] = pass_through
         return result
-    except ParsingException:
-        return None
 
 
 @app.task(
@@ -1925,7 +1926,7 @@ def get_docket_by_pacer_case_id(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.exception("%s Aborting chain.", exc)
+            logger.exception("Aborting chain.")
             self.request.chain = None
             return None
         logger.info("%s Retrying.", exc)
@@ -2259,7 +2260,7 @@ def get_bankr_claims_registry(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
-            logger.exception("%s Max retries completed. Aborting chain.", exc)
+            logger.exception("Max retries completed. Aborting chain.")
             return data
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
@@ -3022,7 +3023,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         )
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
-            logger.exception("%s Aborting.", exc)
+            logger.exception("Aborting.")
             return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
@@ -5484,11 +5485,10 @@ def texas_ingest_docket_task(
         docket_data = parser.data
         if not is_texas_docket(docket_data):
             raise ValueError("Docket parser failed to produce a valid Docket")
-    except Exception as e:
+    except Exception:
         logger.exception(
-            "Encountered error parsing Texas docket at URL %s: %s",
+            "Encountered error parsing Texas docket at URL %s",
             meta.case_url,
-            str(e),
         )
         task.request.chain = None
         return MergeResult.failed("Docket")
@@ -5820,13 +5820,12 @@ def merge_state_scrape_row(
 
     try:
         label, result, files = loader_class.merge_payload(payload)
-    except ValidationError as error:
+    except ValidationError:
         logger.exception(
-            "Row %s of the %s run no longer validates for %s: %s",
+            "Row %s of the %s run no longer validates for %s",
             row,
             loader,
             loader_class.__name__,
-            error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
         ledger.errored(row)
@@ -5845,22 +5844,20 @@ def merge_state_scrape_row(
                 countdown=STATE_SCRAPE_MERGE_BACKOFF * 2**self.request.retries,
             )
         logger.exception(
-            "Merge of row %s of the %s run failed %s times; giving up: %s",
+            "Merge of row %s of the %s run failed %s times; giving up",
             row,
             loader,
             self.max_retries + 1,
-            error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
         ledger.errored(row)
         return
     except Exception as error:
         logger.exception(
-            "Merge of row %s of the %s run raised %s: %s",
+            "Merge of row %s of the %s run raised %s",
             row,
             loader,
             type(error).__name__,
-            error,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
         ledger.errored(row)

@@ -2452,8 +2452,6 @@ def fetch_es_results(
             and search_type == SEARCH_TYPES.PARENTHETICAL
         ):
             main_response = main_response.aggregations.groups.buckets
-        error = False
-        return main_response, query_time, error, parent_total, child_total
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
             "Error loading search page with request: %s", dict(clean_params)
@@ -2465,7 +2463,10 @@ def fetch_es_results(
         if "Failed to parse query" in str(e):
             logger.warning("Failed to parse query: %s", e)
         else:
-            logger.exception("Multi-search API Error: %s", e)
+            logger.exception("Multi-search API Error")
+    else:
+        error = False
+        return main_response, query_time, error, parent_total, child_total
     return [], 0, error, None, None
 
 

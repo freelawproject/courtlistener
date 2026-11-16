@@ -256,9 +256,10 @@ class JurisdictionFeed(Feed):
         """Link to the item's file in storage, or None if that fails."""
         try:
             path = get_item(item)["local_path"]
-            return f"https://storage.courtlistener.com/{path}"
         except Exception:
             return None
+        else:
+            return f"https://storage.courtlistener.com/{path}"
 
     def item_enclosure_mime_type(self, item):
         """Get the MIME type of the item's file, or None if that fails."""

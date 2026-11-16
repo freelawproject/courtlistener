@@ -163,7 +163,7 @@ class ESList:
             if "Failed to parse query" in str(e):
                 error_to_raise = ElasticBadRequestError
             else:
-                logger.exception("Multi-search API Error: %s", e)
+                logger.exception("Multi-search API Error")
                 error_to_raise = ElasticServerError
 
         # Record search duration metric (v3 API doesn't support semantic search)
@@ -338,7 +338,7 @@ class CursorESList:
             if "Failed to parse query" in str(e):
                 error_to_raise = ElasticBadRequestError
             else:
-                logger.exception("Multi-search API Error: %s", e)
+                logger.exception("Multi-search API Error")
                 error_to_raise = ElasticServerError
 
         # Record search duration metric

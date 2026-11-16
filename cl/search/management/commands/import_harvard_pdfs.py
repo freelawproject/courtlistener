@@ -260,17 +260,15 @@ class Command(BaseCommand):
                 "Cluster id: %s doesn't exist.",
                 entry.get("cl_cluster_id", "Unknown"),
             )
-        except KeyError as e:
+        except KeyError:
             logger.exception(
-                "Missing key in entry: %s. Entry: %s",
-                e,
+                "Missing key in entry: %s",
                 json.dumps(entry, indent=2),
             )
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Error processing CAP ID %s: %s",
+                "Error processing CAP ID %s",
                 entry.get("cap_case_id", "Unknown"),
-                str(e),
             )
 
         # No files downloaded
@@ -304,10 +302,8 @@ class Command(BaseCommand):
                     result = future.result()
                     if result is not None:
                         total_downloaded += result
-                except Exception as e:
-                    logger.exception(
-                        "Error processing entry %s: %s", entry, str(e)
-                    )
+                except Exception:
+                    logger.exception("Error processing entry %s", entry)
 
         total_time = time.time() - start_time
         logger.info(
@@ -363,11 +359,8 @@ class Command(BaseCommand):
                 logger.debug("Downloaded PDF to temporary file: %s", temp_path)
                 logger.debug("Read PDF content, length: %s", len(pdf_content))
                 return pdf_content
-        except Exception as e:
-            logger.exception(
-                "Error fetching PDF from CAP: %s",
-                str(e),
-            )
+        except Exception:
+            logger.exception("Error fetching PDF from CAP")
             return None
         finally:
             if temp_path:
@@ -399,12 +392,8 @@ class Command(BaseCommand):
                 "Cluster updated. filepath_pdf_harvard: %s",
                 cluster.filepath_pdf_harvard,
             )
-        except Exception as e:
-            logger.exception(
-                "Error saving PDF for cluster %s: %s",
-                cluster.id,
-                str(e),
-            )
+        except Exception:
+            logger.exception("Error saving PDF for cluster %s", cluster.id)
 
 
 if __name__ == "__main__":

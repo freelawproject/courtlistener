@@ -388,7 +388,8 @@ class FakeCaseQueryReport:
         str values; anything else fails the same way it does in production.
         """
         if not isinstance(pacer_case_id, str):
-            raise AttributeError(
+            # The real report fails with an AttributeError here, so tests must too.
+            raise AttributeError(  # noqa: TRY004
                 f"'{type(pacer_case_id).__name__}' object has no attribute 'read'"
             )
         # test_patterns are keyed by int case IDs.

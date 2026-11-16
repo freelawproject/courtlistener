@@ -232,11 +232,10 @@ class VersionBasedPagination(PageNumberPagination):
         # Try to parse as date
         try:
             datetime.datetime.fromisoformat(position)
-            return "date"
         except ValueError:
-            pass
-
-        return "unknown"
+            return "unknown"
+        else:
+            return "date"
 
     @staticmethod
     def generate_all_cursor_fields(cursor_fields: list[str]) -> list[str]:

@@ -763,7 +763,7 @@ async def process_recap_docket(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1111,7 +1111,7 @@ async def process_recap_claims_register(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1218,7 +1218,7 @@ async def process_recap_docket_history_report(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1332,7 +1332,7 @@ async def process_case_query_page(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1461,7 +1461,7 @@ async def process_recap_appellate_docket(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1587,7 +1587,7 @@ async def process_recap_acms_docket(pk):
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1709,7 +1709,7 @@ async def process_recap_acms_appellate_attachment(
                     text,
                 )
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Failed to parse processing queue item %s", pq)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -4030,10 +4030,9 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                     for h in response.history
                 ]
                 logger.exception(
-                    "Texas docket parse failed for EPQ %s after inline retry: %s | "
+                    "Texas docket parse failed for EPQ %s after inline retry | "
                     "url=%s status=%s len=%s redirects=%s preview=%r",
                     epq.pk,
-                    parse_exc,
                     response.url,
                     response.status_code,
                     len(response.text),
