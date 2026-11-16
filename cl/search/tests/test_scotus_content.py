@@ -1258,7 +1258,8 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
 
     def test_placeholder_can_be_saved_in_forms(self) -> None:
         """Model forms, like the admin's, accept a placeholder's blank url,
-        so staff can save it and the entry it's an inline of."""
+        so staff can save it and the entry it's an inline of.
+        """
         self._merge(attachments=[])
         placeholder = SCOTUSDocument.objects.get(
             docket_entry__docket=self.docket
