@@ -149,6 +149,7 @@ from cl.search.api_views import (
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
+    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -161,6 +162,7 @@ from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Citation,
     ClusterRedirection,
     Court,
     Docket,
@@ -366,7 +368,7 @@ class JurisdictionsV2TemplateTest(TestCase):
     }
 )
 class WikiDataRssFeedTests(TestCase):
-    """Test the markdown fragments rendered by the wiki-data endpoint."""
+    """Test the payload rendered by the wiki-data endpoint."""
 
     @classmethod
     def setUpTestData(cls):
@@ -470,6 +472,32 @@ class WikiDataRssFeedTests(TestCase):
         self.assertNotIn(
             "D. Full Feed", data["podcasts"]["oral_argument_courts"]
         )
+
+    def test_citation_count_uses_estimate(self) -> None:
+        """Is citation_count read from Postgres's estimate, not COUNT(*)?
+
+        An exact count of the citations table outlasts the request timeout
+        in production, and the payload is only cached once it's built, so
+        an exact count leaves the endpoint timing out on every request.
+        """
+        CitationWithParentsFactory.create_batch(3)
+        table = Citation._meta.db_table
+        with connection.cursor() as cursor:
+            # The estimate is only populated once the table is analyzed.
+            cursor.execute(f"ANALYZE {connection.ops.quote_name(table)}")
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            json.loads(r.content)["citation_count"], Citation.objects.count()
+        )
+        citation_counts = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if "COUNT(" in q["sql"] and f'"{table}"' in q["sql"]
+        ]
+        self.assertEqual(citation_counts, [])
 
     async def test_bust_cache_param(self) -> None:
         """Does ?bust_cache rebuild the cached response for staff only?
