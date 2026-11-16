@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Query bankruptcy claims activity reports and export them to CSV."""
 
 import glob
 import json
@@ -255,9 +256,12 @@ def make_csv_file() -> None:
 
 
 class Command(VerboseCommand):
+    """Query claims activity for bankruptcy courts and write the results to a CSV."""
+
     help = "Query claims activity and parse them."
 
     def add_arguments(self, parser):
+        """Add the courts and date range options."""
         parser.add_argument(
             "--courts",
             help="A list of bankruptcy courts.",
@@ -279,6 +283,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and parse claims activity for the courts and dates, then make the CSV."""
         date_start = options["date_start"]
         date_end = options["date_end"]
         query_and_parse_claims_activity(

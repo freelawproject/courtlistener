@@ -1,3 +1,5 @@
+"""Upload PDFs, oral arguments, and RECAP data to the Internet Archive."""
+
 import argparse
 import time
 
@@ -15,6 +17,7 @@ from cl.search.models import Docket, RECAPDocument
 
 
 def upload_non_free_pdfs_to_internet_archive(options):
+    """Upload PDFs that aren't free on PACER to the Internet Archive."""
     upload_pdfs_to_internet_archive(options, do_non_free=True)
 
 
@@ -146,6 +149,7 @@ def upload_recap_data(options):
 
 
 def do_routine_uploads(options):
+    """Upload free PDFs, non-free PDFs, and oral arguments to the Internet Archive."""
     logger.info("Uploading free opinions to Internet Archive.")
     upload_pdfs_to_internet_archive(options)
     logger.info("Uploading non-free PDFs to Internet Archive.")
@@ -155,9 +159,16 @@ def do_routine_uploads(options):
 
 
 class Command(VerboseCommand):
+    """Run one of the Internet Archive upload actions."""
+
     help = "Get all the free content from PACER. There are three modes."
 
     def valid_actions(self, s):
+        """Parse an action name into its function.
+
+        Raises:
+            argparse.ArgumentTypeError: If the action is unknown.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -168,6 +179,7 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        """Add the action, queue, and database options."""
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -189,6 +201,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action."""
         super().handle(*args, **options)
         options["action"](options)
 

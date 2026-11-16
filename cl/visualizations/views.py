@@ -1,3 +1,5 @@
+"""Views for embedded visualizations and redirects from deprecated visualization pages."""
+
 from http import HTTPStatus
 
 from django.conf import settings
@@ -21,6 +23,7 @@ class VisualizationDeprecationRedirectView(RedirectView):
     permanent = True
 
     def get_redirect_url(self, *args, **kwargs) -> str:
+        """Redirect to the visualization deprecation notice in the wiki."""
         return WIKI_VIZ_URL
 
 

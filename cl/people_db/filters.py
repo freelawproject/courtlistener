@@ -1,3 +1,5 @@
+"""REST API filters for judges, parties, and attorneys."""
+
 import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
 
@@ -29,6 +31,8 @@ from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 
 class SourceFilter(NoEmptyFilterSet):
+    """Filter sources by ID, modification date, and person."""
+
     class Meta:
         model = Source
         fields = {
@@ -39,6 +43,8 @@ class SourceFilter(NoEmptyFilterSet):
 
 
 class ABARatingFilter(NoEmptyFilterSet):
+    """Filter ABA ratings by ID, dates, year, rating, and person."""
+
     class Meta:
         model = ABARating
         fields = {
@@ -52,6 +58,8 @@ class ABARatingFilter(NoEmptyFilterSet):
 
 
 class PoliticalAffiliationFilter(NoEmptyFilterSet):
+    """Filter political affiliations by ID, dates, party, source, and person."""
+
     class Meta:
         model = PoliticalAffiliation
         fields = {
@@ -67,6 +75,8 @@ class PoliticalAffiliationFilter(NoEmptyFilterSet):
 
 
 class SchoolFilter(NoEmptyFilterSet):
+    """Filter schools by their fields and their education records."""
+
     educations = filters.RelatedFilter(
         "cl.people_db.filters.EducationFilter",
         queryset=Education.objects.all(),
@@ -84,6 +94,8 @@ class SchoolFilter(NoEmptyFilterSet):
 
 
 class EducationFilter(NoEmptyFilterSet):
+    """Filter education records by their fields, school, and person."""
+
     school = filters.RelatedFilter(SchoolFilter, queryset=School.objects.all())
     person = filters.RelatedFilter(
         "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
@@ -103,6 +115,8 @@ class EducationFilter(NoEmptyFilterSet):
 
 
 class RetentionEventFilter(NoEmptyFilterSet):
+    """Filter retention events by their fields."""
+
     class Meta:
         model = RetentionEvent
         fields = {
@@ -120,6 +134,8 @@ class RetentionEventFilter(NoEmptyFilterSet):
 
 
 class PositionFilter(NoEmptyFilterSet):
+    """Filter positions by their fields, court, and retention events."""
+
     court = filters.RelatedFilter(CourtFilter, queryset=Court.objects.all())
     retention_events = filters.RelatedFilter(
         RetentionEventFilter, queryset=RetentionEvent.objects.all()
@@ -159,6 +175,8 @@ class PositionFilter(NoEmptyFilterSet):
 
 
 class PersonFilter(NoEmptyFilterSet):
+    """Filter people by their fields, race, related records, and opinions."""
+
     educations = filters.RelatedFilter(
         EducationFilter,
         queryset=Education.objects.all(),
@@ -207,6 +225,7 @@ class PersonFilter(NoEmptyFilterSet):
         name: str,
         value: str,
     ) -> QuerySet:
+        """Filter people to those with any of the given races."""
         return queryset.filter(race__race__in=value)
 
     class Meta:
@@ -233,6 +252,13 @@ class PersonFilter(NoEmptyFilterSet):
 
 
 class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
+    """Filter parties by their fields, dockets, and attorneys.
+
+    ``filter_nested_results`` limits the nested roles to those matching the
+    docket and attorney filters, and the nested party types to those
+    matching the docket filters.
+    """
+
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="dockets",
@@ -308,6 +334,12 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
 
 
 class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
+    """Filter attorneys by their fields, dockets, and parties represented.
+
+    ``filter_nested_results`` limits the nested roles to those matching the
+    docket and party filters.
+    """
+
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",

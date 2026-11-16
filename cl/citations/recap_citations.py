@@ -1,3 +1,5 @@
+"""Find and store the citations in RECAP documents."""
+
 from django.db import transaction
 from eyecite import get_citations
 from eyecite.models import CitationBase

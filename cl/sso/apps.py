@@ -1,3 +1,5 @@
+"""Django app configuration for single sign-on."""
+
 from django.apps import AppConfig
 
 

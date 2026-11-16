@@ -1,3 +1,5 @@
+"""Re-index the citation fields of opinion and cluster search documents."""
+
 import time
 from collections.abc import Callable
 
@@ -15,6 +17,8 @@ from cl.search.tasks import (
 
 
 class Command(VerboseCommand):
+    """Update cluster citation counts or opinion cites in Elasticsearch for an ID range."""
+
     help = """Update OpinionClusterDocument.citeCount and OpinionDocument.cites
 
     Useful to re index these fields after Elastic got unsynced from the DB when
@@ -22,6 +26,7 @@ class Command(VerboseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the target field, ID range, and batch size options."""
         parser.add_argument(
             "--reindex-target",
             choices=["citeCount", "cites"],
@@ -47,6 +52,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Re-index the target field for objects in the ID range.
+
+        The range includes ``--start-id`` and excludes ``--end-id``. Only
+        clusters with citations or opinions that cite others are re-indexed.
+
+        Raises:
+            ValueError: If the start or end ID is missing.
+        """
         reindex_target = options["reindex_target"]
         start_id = options["start_id"]
         end_id = options["end_id"]

@@ -2,7 +2,7 @@
 name = "cl"
 version = "1"
 description = "A free and powerful system for awareness and research of the American judicial system."
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.15,<3.16"
 readme = "README.md"
 authors = [
   { name = "Mike Lissner", email = "mike@free.law" },
@@ -14,7 +14,7 @@ classifiers = [
   "Operating System :: OS Independent",
   "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.15",
   "Intended Audience :: Developers",
   "Intended Audience :: Legal Industry",
 ]

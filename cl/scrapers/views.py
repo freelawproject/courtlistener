@@ -1,3 +1,5 @@
+"""API endpoints that receive state court and SCOTUS update emails for processing."""
+
 from dataclasses import dataclass
 
 from celery import Task
@@ -43,6 +45,8 @@ STATE_SITE_TASK_MAP: dict[str, dict[str, EmailProcessingTask]] = {
 
 
 class StateEmailProcessingQueueSerializer(ModelSerializer):
+    """Serializer for a state court update email queued for processing."""
+
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
     )
@@ -64,6 +68,11 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
         )
 
     def validate(self, attrs):
+        """Validate that the mail and receipt have the keys needed to process the email.
+
+        Raises:
+            ValidationError: If a required key is missing or ``"undefined"``.
+        """
         mail = attrs["mail"]
         receipt = attrs["receipt"]
 
@@ -94,12 +103,15 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Create the queue item without the mail and receipt."""
         validated_data.pop("mail", None)
         validated_data.pop("receipt", None)
         return super().create(validated_data)
 
 
 class StateEmailEndpoint(LoggingMixin, ModelViewSet):
+    """API endpoint that queues state court update emails for processing."""
+
     permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = StateEmailProcessingQueueSerializer
@@ -109,18 +121,24 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
 
     def get_message_id_from_request_data(self):
+        """Get the email's message ID from the request's mail, if present."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("mail", {}).get("message_id")
 
     def get_destination_emails_from_request_data(self):
+        """Get the email's recipients from the request's receipt, if present."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("receipt", {}).get("recipients")
 
     def create(self, request, *args, **kwargs):
+        """Queue the email for the state and site in the URL.
+
+        Responds with 400 if the state and site have no processing task.
+        """
         state = kwargs["state"]
         site = kwargs["site"]
         if (
@@ -139,6 +157,7 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
         )
 
     def perform_create(self, serializer, **kwargs):
+        """Save the email as uploaded by the site's email user and queue its processing task."""
         state = kwargs["state"]
         site = kwargs["site"]
         processing_task_info = STATE_SITE_TASK_MAP[state][site]
@@ -156,6 +175,8 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
 class SCOTUSEmailProcessingQueueSerializer(
     StateEmailProcessingQueueSerializer
 ):
+    """Serializer for a SCOTUS update email queued for processing."""
+
     court = serializers.PrimaryKeyRelatedField(
         queryset=Court.objects.filter(pk="scotus"),
         required=True,
@@ -163,6 +184,8 @@ class SCOTUSEmailProcessingQueueSerializer(
 
 
 class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
+    """API endpoint that queues SCOTUS update emails for processing."""
+
     permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = SCOTUSEmailProcessingQueueSerializer
@@ -172,18 +195,21 @@ class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
 
     def get_message_id_from_request_data(self):
+        """Get the email's message ID from the request's mail, if present."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("mail", {}).get("message_id")
 
     def get_destination_emails_from_request_data(self):
+        """Get the email's recipients from the request's receipt, if present."""
         data = self.request.data
         if not isinstance(data, dict):
             return None
         return data.get("receipt", {}).get("recipients")
 
     def perform_create(self, serializer):
+        """Save the email as uploaded by the ``recap-email`` user and queue its processing."""
         scotus_email_user = User.objects.get(username="recap-email")
         epq = serializer.save(
             message_id=self.get_message_id_from_request_data(),

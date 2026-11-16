@@ -1,3 +1,5 @@
+"""Template tag for inlining SVG files."""
+
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find

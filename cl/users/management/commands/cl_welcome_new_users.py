@@ -1,3 +1,5 @@
+"""Send a welcome email to the users who signed up in the last day."""
+
 import sys
 from datetime import datetime, timedelta
 
@@ -11,7 +13,7 @@ from django.utils.timezone import make_aware
 from cl.lib.command_utils import VerboseCommand, logger
 
 
-def get_welcome_recipients(time_now: datetime) -> QuerySet:
+def get_welcome_recipients(time_now: datetime) -> QuerySet[User]:
     """Get users that signed up in the last 24 hours to send a welcome email.
 
     Args:
@@ -38,6 +40,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the simulate flag."""
         parser.add_argument(
             "--simulate",
             action="store_true",
@@ -46,6 +49,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Email the users who joined in the last day, if there are any."""
         super().handle(*args, **options)
         self.options = options
         time_now = datetime.now()

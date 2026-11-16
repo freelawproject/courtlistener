@@ -1,3 +1,5 @@
+"""Tags from the Georgia State University collaboration."""
+
 TAG_NAME = "yDVxdAsAKSixdsoM"
 TAG_NAME_OPINIONS = f"{TAG_NAME}-opinions"
 

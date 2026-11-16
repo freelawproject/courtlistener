@@ -1,3 +1,6 @@
+"""Exceptions shared across CourtListener apps."""
+
+
 class ScrapeFailed(Exception):
     """Raised when a scraper fails for some reason."""
 

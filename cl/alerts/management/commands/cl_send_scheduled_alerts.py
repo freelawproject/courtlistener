@@ -1,3 +1,5 @@
+"""Send search alerts whose hits were scheduled for a given rate."""
+
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -25,6 +27,13 @@ DELETE_BATCH_SIZE = 5_000
 
 
 def json_date_parser(dct):
+    """Convert a dict's ISO-format string values to datetimes in place.
+
+    Strings that aren't ISO dates are left unchanged.
+
+    Returns:
+        The same dict.
+    """
     for key, value in dct.items():
         if isinstance(value, str):
             try:
@@ -226,6 +235,11 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 
 def send_scheduled_alerts(rate: str) -> None:
+    """Send the scheduled alerts for a rate.
+
+    Raises:
+        InvalidDateError: If monthly alerts are run after the 28th.
+    """
     if rate == Alert.MONTHLY:
         if date.today().day > 28:
             raise InvalidDateError(
@@ -293,9 +307,12 @@ def delete_old_scheduled_alerts() -> int:
 
 
 class Command(VerboseCommand):
+    """Send scheduled search alerts for one rate."""
+
     help = "Send scheduled Search Alerts."
 
     def add_arguments(self, parser):
+        """Add the required rate option."""
         parser.add_argument(
             "--rate",
             required=True,
@@ -304,5 +321,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Send the scheduled alerts for the given rate."""
         super().handle(*args, **options)
         send_scheduled_alerts(options["rate"])

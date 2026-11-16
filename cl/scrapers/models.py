@@ -1,3 +1,5 @@
+"""Models for scraper state: URL hashes, PACER free document logs, and scraper accounts."""
+
 from datetime import date
 
 from django.db import models
@@ -31,6 +33,8 @@ class UrlHash(models.Model):
 
 
 class PACERFreeDocumentLog(models.Model):
+    """A log of scraping one court's PACER free document report for a date."""
+
     SCRAPE_SUCCESSFUL = 1
     SCRAPE_IN_PROGRESS = 2
     SCRAPE_FAILED = 3
@@ -108,10 +112,14 @@ class PACERMobilePageData(AbstractDateTimeModel):
 
 
 class Scraper(models.IntegerChoices):
+    """Sites we hold scraper accounts for."""
+
     TAMES = 1, "TAMES CaseMail"
 
 
 class AccountSubscription(AbstractDateTimeModel):
+    """An account on a scraped site, with its subscription dates."""
+
     scraper = models.IntegerField(
         help_text="The scraper/site the account is for.",
         choices=Scraper.choices,

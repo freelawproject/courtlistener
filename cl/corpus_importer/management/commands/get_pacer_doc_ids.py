@@ -1,3 +1,5 @@
+"""Get the missing PACER document IDs of RECAP documents."""
+
 import os
 from typing import Any
 
@@ -51,9 +53,12 @@ async def get_pacer_doc_ids(options: dict[str, Any]) -> None:
 
 
 class Command(VerboseCommand):
+    """Queue tasks to get the missing PACER document IDs of RECAP documents."""
+
     help = "Get pacer_doc_id values for any item that's missing them."
 
     def add_arguments(self, parser):
+        """Add the queue, count, and starting pk options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -74,5 +79,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue the PACER document ID lookups."""
         super().handle(*args, **options)
         async_to_sync(get_pacer_doc_ids)(options)

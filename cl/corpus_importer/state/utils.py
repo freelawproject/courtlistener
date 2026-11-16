@@ -1,7 +1,9 @@
+"""Results of merging scraped state data, with the files each merge handled."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Final, cast
+from typing import Any, Final
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +65,7 @@ NO_FILES: Final = FileTally()
 
 
 @dataclass
-class MergeResult[T = int]:
+class MergeResult:
     """Stores data about the result of an attempted merge operation.
 
     Attributes:
@@ -76,17 +78,15 @@ class MergeResult[T = int]:
             `FileTally`.
     """
 
-    creates: dict[str, set[T]] = field(default_factory=dict)
-    updates: dict[str, set[T]] = field(default_factory=dict)
-    failures: dict[str, list[T | None]] = field(default_factory=dict)
+    creates: dict[str, set[Any]] = field(default_factory=dict)
+    updates: dict[str, set[Any]] = field(default_factory=dict)
+    failures: dict[str, list[Any | None]] = field(default_factory=dict)
     files: FileTally = NO_FILES
 
     @staticmethod
-    def union[S, U](
-        a: MergeResult[S], b: MergeResult[U]
-    ) -> MergeResult[S | U]:
+    def union[S, U](a: MergeResult, b: MergeResult) -> MergeResult:
         """Creates a new MergeResult object storing the combined results of two objects."""
-        return MergeResult[S | U](
+        return MergeResult(
             creates={
                 k: a.creates.get(k, set()) | b.creates.get(k, set())
                 for k in a.creates.keys() | b.creates.keys()
@@ -102,25 +102,26 @@ class MergeResult[T = int]:
             files=a.files | b.files,
         )
 
-    def __or__[U](self, other: MergeResult[U]) -> MergeResult[T | U]:
-        return MergeResult.union(
-            cast(MergeResult[T | U], self), cast(MergeResult[T | U], other)
-        )
+    def __or__(self, other: MergeResult) -> MergeResult:
+        return MergeResult.union(self, other)
 
     @property
     def success(self) -> bool:
+        """Whether the merge recorded no failures."""
         return not self.failures
 
     @property
     def update(self) -> bool:
+        """Whether the merge updated anything."""
         return bool(self.updates)
 
     @property
     def create(self) -> bool:
+        """Whether the merge created anything."""
         return bool(self.creates)
 
     @staticmethod
-    def created[S](model: str, pk: S) -> MergeResult[S]:
+    def created(model: str, pk: Any) -> MergeResult:
         """Shorthand for the result of a successful create operation.
 
         Args:
@@ -133,7 +134,7 @@ class MergeResult[T = int]:
         return MergeResult(creates={model: {pk}})
 
     @staticmethod
-    def updated[S](model: str, pk: S) -> MergeResult[S]:
+    def updated(model: str, pk: Any) -> MergeResult:
         """Shorthand for the result of a successful update operation.
 
         Args:
@@ -146,7 +147,7 @@ class MergeResult[T = int]:
         return MergeResult(updates={model: {pk}})
 
     @staticmethod
-    def failed[S](model: str, pk: S | None = None) -> MergeResult[S]:
+    def failed(model: str, pk: Any | None = None) -> MergeResult:
         """Shorthand for the result of a failed merge operation.
 
         Args:
