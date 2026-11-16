@@ -2975,6 +2975,12 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             source=Docket.SCRAPER,
             pacer_case_id=None,
         )
+        cls.texas_docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+            docket_number="26-0999",
+        )
 
     @async_to_sync
     async def setUp(self) -> None:
@@ -3008,12 +3014,13 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         self.assertInHTML("Get Docket Alerts", r.content.decode())
 
     async def test_docket_found_by_id(self) -> None:
-        """A RECAP docket can also be found by its ID."""
+        """A RECAP docket can also be found by its ID, with its alerts button."""
         r = await self.async_client.get(
             reverse("new_docket_alert_by_id", args=[self.recap_docket.pk])
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertInHTML("Get Docket Alerts", r.content.decode())
+        self.assertIn('data-enable-message="Get Alerts"', r.content.decode())
 
     async def test_unknown_docket_id(self) -> None:
         """An unknown docket ID is a 404, like its docket page."""
@@ -3043,6 +3050,24 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             ):
                 r = self.client.get(url)
                 self.assertEqual(r.status_code, status)
+
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag_and_offers_no_alerts"
+    )
+    def test_texas_docket_needs_its_flag_and_offers_no_alerts(self) -> None:
+        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown without the alerts button, since Texas doesn't send docket alerts yet?"""
+        # Sync, since override_flag queries the DB when it's entered.
+        self.client.login(username="pandora", password="password")
+        url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
+        with override_flag("texas_docket_page", active=False):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        with override_flag("texas_docket_page", active=True):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            self.assertNotIn(
+                'data-enable-message="Get Alerts"', r.content.decode()
+            )
 
     @override_settings(
         WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_share_link_on_the_docket_page"
