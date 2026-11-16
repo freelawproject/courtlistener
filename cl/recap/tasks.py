@@ -237,7 +237,6 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     Args:
         fq: The PacerFetchQueue item to process
     """
-    result = None
     match fq.request_type:
         case REQUEST_TYPE.DOCKET:
             court_id = get_court_id_from_fetch_queue(fq)
@@ -264,8 +263,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
                 f"Unsupported request_type: {fq.request_type}"
             )
 
-    result = c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
-    return result
+    return c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
 
 
 async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
@@ -2010,7 +2008,7 @@ def create_or_merge_from_idb_chunk(idb_chunk):
             logger.info(msg, idb_row)
             create_new_docket_from_idb(idb_row)
             continue
-        elif count == 1:
+        if count == 1:
             d = ds[0]
             msg = "Merging Docket %s with IDB row: %s"
             logger.info(msg, d, idb_row)
@@ -2370,10 +2368,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
-            self.request.chain = None
-            return []
+        async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return []
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting attachment page"
         if self.request.retries == self.max_retries:
@@ -2994,12 +2991,11 @@ def get_recap_email_recipients(
         List of recap.email addresses
     """
     # Select only @recap.email addresses
-    recap_email_recipients = [
+    return [
         recap_email.lower()
         for recap_email in email_recipients
         if "@recap.email" in recap_email
     ]
-    return recap_email_recipients
 
 
 async def get_attachment_page_by_url(
@@ -3362,9 +3358,8 @@ def open_and_validate_email_notification(
                 epq, msg, PROCESSING_STATUS.FAILED, "status_message"
             )
             return None, ""
-        else:
-            # Do a retry. Hopefully the file will be in place soon.
-            raise self.retry(exc=exc)
+        # Do a retry. Hopefully the file will be in place soon.
+        raise self.retry(exc=exc)
 
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
@@ -3971,8 +3966,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             )
             self.request.chain = None
             return
-        else:
-            raise self.retry(exc=exc)
+        raise self.retry(exc=exc)
 
     texas_email_parser = TamesEmail()
     texas_email_parser._parse_text(body)
@@ -4177,8 +4171,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             )
             self.request.chain = None
             return
-        else:
-            raise self.retry(exc=exc)
+        raise self.retry(exc=exc)
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)

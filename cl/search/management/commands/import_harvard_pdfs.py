@@ -166,13 +166,12 @@ class Command(BaseCommand):
                     reporters,
                 )
                 return
-            else:
-                reporter_item_index = reporters.index(self.start_from_reporter)
-                if reporter_item_index:
-                    # Update reporters and reporters files list
-                    reporters = reporters[reporter_item_index:]
-                    reporters_files = reporters_files[reporter_item_index:]
-                    self.start_from_reporter = None
+            reporter_item_index = reporters.index(self.start_from_reporter)
+            if reporter_item_index:
+                # Update reporters and reporters files list
+                reporters = reporters[reporter_item_index:]
+                reporters_files = reporters_files[reporter_item_index:]
+                self.start_from_reporter = None
 
         for filename in reporters_files:
             if filename.endswith(".json"):

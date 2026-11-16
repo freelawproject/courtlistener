@@ -117,7 +117,7 @@ def resolve_fullcase_citation(
                     # return the first item by ordering key
                     # pyrefly:ignore[bad-return] This method is defined to always return a query set with at least one result
                     return clusters[0].ordered_opinions.first()
-                elif _count >= 2:
+                if _count >= 2:
                     # set an attribute to differentiate 0-match and
                     # more-than-one-match citations
                     setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
@@ -177,10 +177,9 @@ def resolve_shortcase_citation(
         return candidates[0]
 
     # Otherwise, try to refine further using the antecedent guess
-    else:
-        return filter_by_matching_antecedent(
-            candidates, short_citation.metadata.antecedent_guess
-        )
+    return filter_by_matching_antecedent(
+        candidates, short_citation.metadata.antecedent_guess
+    )
 
 
 def resolve_supra_citation(

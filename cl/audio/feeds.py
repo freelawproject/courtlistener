@@ -109,7 +109,7 @@ class JurisdictionPodcast(JurisdictionFeed):
 
     def item_categories(self, item):
         """Give items no categories."""
-        return None
+        return
 
 
 class AllJurisdictionsPodcast(JurisdictionPodcast):

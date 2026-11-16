@@ -181,11 +181,10 @@ async def doc_page_count_service(doc: AbstractPDF) -> Response:
         Response object
     """
     try:
-        response = await microservice(
+        return await microservice(
             service="page-count",
             item=doc,
         )
-        return response
     except ClientError as error:
         if error.response["Error"]["Code"] == "NoSuchKey":
             raise NoSuchKey("Key not found: The specified key does not exist.")

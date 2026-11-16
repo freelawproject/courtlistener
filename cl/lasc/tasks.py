@@ -429,11 +429,9 @@ async def fetch_date_range_base(start: date, end: date) -> None:
         )
         if not await case_object.aexists():
             await QueuedCase.objects.acreate(
-                **{
-                    "internal_case_id": internal_case_id,
-                    "judge_code": case["judge_code"],
-                    "case_type_code": case["case_type_code"],
-                }
+                internal_case_id=internal_case_id,
+                judge_code=case["judge_code"],
+                case_type_code=case["case_type_code"],
             )
             cases_added_cnt += 1
             logger.info(

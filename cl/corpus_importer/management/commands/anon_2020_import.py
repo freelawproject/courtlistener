@@ -300,7 +300,7 @@ def attempt_cluster_lookup(
         cite_count = cites.count()
         if cite_count == 1:
             return cites[0].cluster_id
-        elif cite_count > 1:
+        if cite_count > 1:
             new_docket_number = clean_docket_number(new_docket_number)
             for cite in cites:
                 found_dn = clean_docket_number(
@@ -347,8 +347,7 @@ def do_docket_number(data: dict[str, Any]) -> str:
             length=5000,
             ellipsis="...",
         )
-    else:
-        return ""
+    return ""
 
 
 def find_court_id(court_str: str) -> str:

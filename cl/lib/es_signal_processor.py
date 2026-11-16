@@ -163,8 +163,7 @@ def updated_fields(
         return []
 
     # Check each tracked field to see if it has changed
-    changed_fields = check_fields_that_changed(instance, tracked_set)
-    return changed_fields
+    return check_fields_that_changed(instance, tracked_set)
 
 
 def get_fields_to_update(

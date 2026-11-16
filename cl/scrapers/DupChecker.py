@@ -64,9 +64,8 @@ class DupChecker(dict):
         if not created and url_hash.sha1 == hash:
             # it wasn't created, and it has the same SHA --> not changed.
             return False, url_hash
-        else:
-            # It's a known URL or it's a changed hash.
-            return True, url_hash
+        # It's a known URL or it's a changed hash.
+        return True, url_hash
 
     def abort_by_url_hash(self, url, hash):
         """Checks whether we should abort due to a hash of the site data being unchanged since the last time a URL was visited.
@@ -80,13 +79,11 @@ class DupChecker(dict):
             if not changed:
                 logger.info(f"Unchanged hash at: {url}")
                 return True
-            else:
-                logger.info(f"Identified changed hash at: {url}")
-                return False
-        else:
-            # If it's a full crawl, we don't care about the hash. We continue
-            # no matter what.
+            logger.info(f"Identified changed hash at: {url}")
             return False
+        # If it's a full crawl, we don't care about the hash. We continue
+        # no matter what.
+        return False
 
     def press_on(
         self,
@@ -156,7 +153,7 @@ class DupChecker(dict):
 
                 message = "Next case occurs prior to when we found a duplicate. Court is up to date."
                 raise ConsecutiveDuplicatesError(message, logger=logger)
-            elif self.dup_count >= self.dup_threshold:
+            if self.dup_count >= self.dup_threshold:
                 message = f"Found {self.dup_count} duplicates in a row. Court is up to date."
                 raise ConsecutiveDuplicatesError(message, logger=logger)
 

@@ -130,7 +130,7 @@ def compute_estimated_remaining_time(
         task_status.start_time_millis / 1000.0
     )
     time_now = datetime.datetime.now()
-    estimated_time_remaining = max(
+    return max(
         datetime.timedelta(
             seconds=(
                 (time_now - start_time).total_seconds() / task_status.created
@@ -139,8 +139,6 @@ def compute_estimated_remaining_time(
         ).total_seconds(),
         initial_wait,
     )
-
-    return estimated_time_remaining
 
 
 def retrieve_task_info(

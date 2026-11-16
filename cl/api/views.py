@@ -379,7 +379,7 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     }
     prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
-    data = {
+    return {
         "court_count": court_count,
         "citation_count": citation_count,
         "alerts_sent_count": alerts_sent_count,
@@ -424,7 +424,6 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
             ),
         },
     }
-    return data
 
 
 async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:

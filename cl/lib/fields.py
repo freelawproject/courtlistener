@@ -26,8 +26,7 @@ class CharNullField(models.CharField):
         """Gets value right out of the db and changes it if its ``None``."""
         if value is None:
             return ""
-        else:
-            return value
+        return value
 
     def to_python(self, value: Any) -> models.CharField | str:
         """Gets value right out of the db or an instance, and changes it if its ``None``."""
@@ -46,9 +45,8 @@ class CharNullField(models.CharField):
         if value == "":
             # If Django tries to save an empty string, send the db None (NULL).
             return None
-        else:
-            # Otherwise, just pass the value.
-            return value
+        # Otherwise, just pass the value.
+        return value
 
 
 class PercolatorField(fields.DEDField, Percolator):
@@ -60,8 +58,6 @@ class PercolatorField(fields.DEDField, Percolator):
     method.
     """
 
-    pass
-
 
 class JoinField(fields.DEDField, Join):
     """Subclass of DEDField and Join field.
@@ -71,5 +67,3 @@ class JoinField(fields.DEDField, Join):
     like "prepare," which allows the field to be populated using the prepare
     method.
     """
-
-    pass

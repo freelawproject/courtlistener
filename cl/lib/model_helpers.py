@@ -201,10 +201,9 @@ def is_texas_court(court_id: str) -> bool:
     return (
         court_id == "tex"
         or court_id == "texcrimapp"
-        or court_id.startswith("txctapp")
-        or court_id.startswith("texdistct")
-        or court_id.startswith("texcrimdistct")
-        or court_id.startswith("texctyct")
+        or court_id.startswith(
+            ("txctapp", "texdistct", "texcrimdistct", "texctyct")
+        )
     )
 
 

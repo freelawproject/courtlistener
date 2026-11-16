@@ -101,11 +101,9 @@ def get_dockets(options):
                 session_data=session,
                 docket_pk=d.pk,
                 tag_names=[BUCKWALD_TAG],
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=False,
             ).set(queue=q),
         ).apply_async()
 
