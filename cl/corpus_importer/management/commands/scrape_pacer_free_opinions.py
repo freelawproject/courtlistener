@@ -1,3 +1,5 @@
+"""Scrape PACER's free opinion reports and the documents they list."""
+
 import argparse
 import datetime
 import inspect
@@ -665,9 +667,16 @@ def do_everything(courts, date_start, date_end, queue, day_span=1):
 
 
 class Command(VerboseCommand):
+    """Run one of the free PACER content actions."""
+
     help = "Get all the free content from PACER."
 
     def valid_actions(self, s: str) -> Callable:
+        """Parse an action name into its function.
+
+        Raises:
+            argparse.ArgumentTypeError: If the action is unknown.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -716,6 +725,7 @@ class Command(VerboseCommand):
         }
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the action, queue, court, date range, day span, and stale-days options."""
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -776,6 +786,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Call the chosen action with the options it accepts.
+
+        No action is called if the date range is invalid.
+        """
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):

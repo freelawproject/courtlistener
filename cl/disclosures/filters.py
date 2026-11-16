@@ -1,3 +1,5 @@
+"""REST API filters for financial disclosures and their parts."""
+
 from rest_framework_filters import filters
 
 from cl.api.utils import (
@@ -29,6 +31,8 @@ disclosure_fields = {
 
 
 class AgreementFilter(NoEmptyFilterSet):
+    """Filter disclosed agreements by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         "cl.disclosures.filters.FinancialDisclosureFilter",
         queryset=FinancialDisclosure.objects.all(),
@@ -47,6 +51,8 @@ class AgreementFilter(NoEmptyFilterSet):
 
 
 class DebtFilter(NoEmptyFilterSet):
+    """Filter disclosed debts by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         "cl.disclosures.filters.FinancialDisclosureFilter",
         queryset=FinancialDisclosure.objects.all(),
@@ -66,6 +72,8 @@ class DebtFilter(NoEmptyFilterSet):
 
 
 class FinancialDisclosureFilter(NoEmptyFilterSet):
+    """Filter financial disclosures by their person, parts, and fields."""
+
     agreements = filters.RelatedFilter(
         AgreementFilter,
         queryset=Agreement.objects.all(),
@@ -116,6 +124,8 @@ class FinancialDisclosureFilter(NoEmptyFilterSet):
 
 
 class GiftFilter(NoEmptyFilterSet):
+    """Filter disclosed gifts by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -135,6 +145,8 @@ class GiftFilter(NoEmptyFilterSet):
 
 
 class InvestmentFilter(NoEmptyFilterSet):
+    """Filter disclosed investments by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -156,6 +168,8 @@ class InvestmentFilter(NoEmptyFilterSet):
 
 
 class NonInvestmentIncomeFilter(NoEmptyFilterSet):
+    """Filter disclosed non-investment income by its disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -175,6 +189,8 @@ class NonInvestmentIncomeFilter(NoEmptyFilterSet):
 
 
 class PositionFilter(NoEmptyFilterSet):
+    """Filter disclosed positions by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -193,6 +209,8 @@ class PositionFilter(NoEmptyFilterSet):
 
 
 class ReimbursementFilter(NoEmptyFilterSet):
+    """Filter disclosed reimbursements by their disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -214,6 +232,8 @@ class ReimbursementFilter(NoEmptyFilterSet):
 
 
 class SpouseIncomeFilter(NoEmptyFilterSet):
+    """Filter disclosed spouse income by its disclosure and fields."""
+
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),

@@ -1,3 +1,5 @@
+"""REST API serializer fields and a base serializer for Elasticsearch documents."""
+
 import copy
 import datetime
 from collections import OrderedDict
@@ -23,12 +25,22 @@ class TimeStampField(serializers.Field):
     def __init__(
         self, default_timezone: timezone | None = None, **kwargs: Any
     ) -> None:
+        """Build the field, optionally with a timezone to render values in."""
         self.timezone: timezone | None = None
         if default_timezone is not None:
             self.timezone = default_timezone
         super().__init__(**kwargs)
 
     def to_representation(self, value: Any) -> str:
+        """Render a datetime or datetime string.
+
+        Without a timezone, naive datetimes are treated as UTC and rendered
+        in the local timezone.
+
+        Raises:
+            serializers.ValidationError: If the value is neither a datetime
+                nor a string.
+        """
         if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(
@@ -55,6 +67,7 @@ class DateOrDateTimeField(serializers.Field):
     """Handles both datetime and date objects."""
 
     def to_representation(self, value: Any) -> str | Any:
+        """Render datetimes and dates, returning other values unchanged."""
         if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
         elif isinstance(value, datetime.date):
@@ -70,6 +83,7 @@ class CoerceDateField(serializers.Field):
     """
 
     def to_representation(self, value: Any) -> str:
+        """Render the value as a date."""
         if isinstance(value, datetime.datetime):
             return serializers.DateField().to_representation(value.date())
         return serializers.DateField().to_representation(value)
@@ -82,6 +96,7 @@ class CoerceDateTimeField(serializers.Field):
     """
 
     def to_representation(self, value: Any) -> str:
+        """Render the value's date as a datetime at midnight Pacific Time."""
         if isinstance(value, datetime.date):
             return serializers.DateTimeField().to_representation(
                 fixed_midnight_pt(value)
@@ -97,6 +112,7 @@ class NullableListField(
     """A read-only list field that returns None when serialized if the list is empty. For API V3 compatibility."""
 
     def __init__(self, **kwargs: Any) -> None:
+        """Build the field with a list field for rendering items."""
         super().__init__(**kwargs)
         self.list_field: serializers.ListField = serializers.ListField()
 
@@ -111,6 +127,7 @@ class HighlightedField(serializers.Field):
     """Handles highlighted text fields."""
 
     def to_representation(self, value: Any) -> Any:
+        """Render the highlighted string or list."""
         return render_string_or_list(value)
 
 
@@ -118,6 +135,7 @@ class SuppressHighlightsField(serializers.Field):
     """Suppress highlights from text fields."""
 
     def to_representation(self, value: Any) -> str:
+        """Render the string or list with HTML tags stripped."""
         return strip_tags(render_string_or_list(value))
 
 
@@ -125,6 +143,7 @@ class NoneToListField(serializers.ListField):
     """A custom ListField that returns an empty list when the original value is None; otherwise, it returns the original value. This can be removed from some fields once a People re-index is done and https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved."""
 
     def get_attribute(self, instance: Any) -> list[Any]:
+        """Get the attribute, or an empty list if it is None."""
         value = super().get_attribute(instance)
         # Convert None to empty list explicitly here.
         if value is None:
@@ -136,9 +155,19 @@ class DocumentSerializer(serializers.Serializer):
     """A dynamic DocumentSerializer class."""
 
     def update(self, instance: Any, validated_data: Any) -> Never:
+        """Not supported.
+
+        Raises:
+            NotImplementedError: Always.
+        """
         raise NotImplementedError
 
     def create(self, validated_data: Any) -> Never:
+        """Not supported.
+
+        Raises:
+            NotImplementedError: Always.
+        """
         raise NotImplementedError
 
     _field_mapping = {
@@ -159,6 +188,12 @@ class DocumentSerializer(serializers.Serializer):
     def __init__(
         self, instance: Any = None, data: Any = empty, **kwargs: Any
     ) -> None:
+        """Build the serializer.
+
+        Raises:
+            ImproperlyConfigured: If ``Meta`` is missing or its ``document``
+                is a class that isn't a Document subclass.
+        """
         super().__init__(instance, data, **kwargs)
 
         if not hasattr(self, "Meta"):

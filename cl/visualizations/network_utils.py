@@ -1,3 +1,6 @@
+"""Helpers for building the citation networks of visualizations."""
+
+
 def reverse_endpoints_if_needed(start, end):
     """Make sure start date < end date, and flip if needed.
 

@@ -1,3 +1,5 @@
+"""Celery tasks for extracting content from scraped documents and processing scraped data."""
+
 import logging
 import random
 import re

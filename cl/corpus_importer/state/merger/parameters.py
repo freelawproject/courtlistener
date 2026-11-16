@@ -1,3 +1,5 @@
+"""Parameters that mergers pass to the mergers of related objects."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

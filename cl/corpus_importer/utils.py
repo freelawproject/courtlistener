@@ -1,3 +1,5 @@
+"""Shared helpers for importing and merging dockets, opinions, and PACER data."""
+
 from __future__ import annotations
 
 import itertools
@@ -113,6 +115,7 @@ class OpinionMatchingException(Exception):
     """An exception for wrong matching opinions."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -120,6 +123,7 @@ class AuthorException(Exception):
     """Error found in author merger."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -127,6 +131,7 @@ class JudgeException(Exception):
     """An exception for wrong judges."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -134,6 +139,7 @@ class OpinionTypeException(Exception):
     """An exception for incorrect opinion types."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -141,6 +147,7 @@ class DocketSourceException(Exception):
     """An exception for wrong docket source."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -148,6 +155,7 @@ class DateException(Exception):
     """Error found in date merger."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -155,6 +163,7 @@ class EmptyOpinionException(Exception):
     """An exception for opinions that raise a ZeroDivisionError Exception due empty opinion tag or empty opinion content in cl."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -1393,6 +1402,7 @@ class CycleChecker:
     """
 
     def __init__(self) -> None:
+        """Start on the first iteration with no courts seen."""
         self.court_counts: defaultdict = defaultdict(int)
         self.current_iteration: int = 1
         self.count_prev_iteration_courts: int = 0

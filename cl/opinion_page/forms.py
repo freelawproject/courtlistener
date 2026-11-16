@@ -1,3 +1,5 @@
+"""Forms for citation lookups, docket entry filtering, and court opinion uploads."""
+
 import logging
 from collections.abc import MutableMapping
 from datetime import datetime
@@ -39,6 +41,8 @@ from cl.search.models import (
 
 
 class CitationRedirectorForm(forms.Form):
+    """Form for looking up a citation by reporter, with optional volume and page, or by text."""
+
     volume = forms.CharField(
         widget=forms.TextInput(
             attrs={"class": "form-control input-lg", "placeholder": "Volume"}
@@ -123,6 +127,7 @@ class DocketEntryFilterForm(forms.Form):
         request: HttpRequest | None = None,
         **kwargs: Any,
     ) -> None:
+        """Build the form, keeping the request for the user's default ordering."""
         self.request = request
         super().__init__(*args, **kwargs)
 
@@ -141,6 +146,7 @@ class DocketEntryFilterForm(forms.Form):
         )
 
     def clean_order_by(self) -> str:
+        """Use the given order, or descending if unset and the user prefers it."""
         data = self.cleaned_data["order_by"]
         if data:
             return data
@@ -209,6 +215,7 @@ class BaseCourtUploadForm(forms.Form):
     def __init__(
         self, *args: Any, pk: str | None = None, **kwargs: Any
     ) -> None:
+        """Build the form for the court with ID ``pk``."""
         self.pk = pk
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
@@ -585,6 +592,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
     """Form for Supreme Judicial Court of Maine (me) Upload Portal."""
 
     def get_judges_qs(self) -> QuerySet[Person]:
+        """Get the court's active chief, associate, and retired active justices, by seniority."""
         return (
             Person.objects.filter(
                 (
@@ -616,6 +624,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
         )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with citation, argument date, and panel fields."""
         super().__init__(*args, **kwargs)
 
         # Add required fields for specific court
@@ -652,6 +661,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form and validate the neutral citation."""
         super().clean()
         self.validate_neutral_citation()
         return self.cleaned_data
@@ -661,6 +671,7 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
     """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl) Upload Portal."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author and citation fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -685,6 +696,7 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form and validate the neutral citation."""
         super().clean()
         self.validate_neutral_citation()
         return self.cleaned_data
@@ -707,6 +719,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, panelist, and citation fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -733,6 +746,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
         )
 
     def verify_unique_judges(self) -> None:
+        """Add an error to the author field if a judge was selected more than once."""
         judges = [
             self.cleaned_data["lead_author"],
             self.cleaned_data["second_judge"],
@@ -748,6 +762,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
             )
 
     def make_panel(self) -> None:
+        """Set the panel to the selected author and panelists."""
         self.cleaned_data["panel"] = list(
             filter(
                 None,
@@ -760,6 +775,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form, then check that the judges are unique and the neutral citation is valid."""
         super().clean()
         # Special validation for compartmental
         self.verify_unique_judges()
@@ -788,6 +804,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, judges, author string, and download URL fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.add_judges_field(required=False)
@@ -835,6 +852,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, judges, author string, and download URL fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()

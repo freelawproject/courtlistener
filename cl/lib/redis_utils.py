@@ -1,3 +1,5 @@
+"""Helpers for Redis connections, keys, semaphores, and locks."""
+
 import time
 import uuid
 
@@ -63,6 +65,7 @@ def delete_redis_semaphore(r: str | Redis, key: str) -> None:
 
 
 def make_update_pacer_case_id_key(court_id: str) -> str:
+    """Make the key for updating a court's PACER case IDs."""
     return f"update.pacer_case_id:{court_id}"
 
 

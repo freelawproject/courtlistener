@@ -1,3 +1,5 @@
+"""Re-enqueue recent audio that is missing standardization or transcription."""
+
 import argparse
 from datetime import timedelta
 from typing import cast
@@ -160,6 +162,8 @@ def run_reenqueue_cycle(
 
 
 class Command(VerboseCommand):
+    """Run one re-enqueue cycle for pending audio."""
+
     help = (
         "Re-enqueue audios that are missing standardization (no duration) "
         "or missing transcription (stt_status=STT_NEEDED). The dispatch "
@@ -168,6 +172,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the age window, limit, stage-skipping, and dry-run options."""
         parser.add_argument(
             "--older-than-hours",
             type=int,
@@ -214,6 +219,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Run a re-enqueue cycle with the given options."""
         super().handle(*args, **options)
         # OptionsType is too loose for the function signature, but argparse
         # has already coerced these via type=int / action="store_true".

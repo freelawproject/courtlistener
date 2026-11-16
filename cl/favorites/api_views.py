@@ -1,3 +1,5 @@
+"""REST API viewsets for tags, prayers, and event counters."""
+
 from http import HTTPStatus
 
 from django.db import transaction
@@ -24,6 +26,8 @@ from cl.lib.bot_detector import is_bot
 
 
 class UserTagViewSet(ModelViewSet):
+    """API endpoint for tags, readable when published and writable by their owner."""
+
     # get_queryset() below returns every published tag (not just the
     # requester's own) so that reads work, but that same queryset backs
     # update/destroy's get_object() lookup. Without an object-level
@@ -56,6 +60,7 @@ class UserTagViewSet(ModelViewSet):
     ]
 
     def get_queryset(self):
+        """Get published tags and, for authenticated users, their own tags."""
         q = Q(published=True)
         if self.request.user.is_authenticated:
             q |= Q(user=self.request.user)
@@ -63,6 +68,8 @@ class UserTagViewSet(ModelViewSet):
 
 
 class DocketTagViewSet(ModelViewSet):
+    """API endpoint for tags applied to dockets."""
+
     permission_classes = [IsAuthenticated, IsTagOwner, V3APIPermission]
     throttle_classes = [TagRateThrottle]
     serializer_class = DocketTagSerializer
@@ -74,6 +81,7 @@ class DocketTagViewSet(ModelViewSet):
     cursor_ordering_fields = ["id"]
 
     def get_queryset(self):
+        """Get docket tags whose tag is the user's own or published."""
         return DocketTag.objects.filter(
             Q(tag__user=self.request.user) | Q(tag__published=True)
         )
@@ -103,6 +111,8 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
 
 
 class EventCounterViewset(CreateModelMixin, GenericViewSet):
+    """API endpoint that increments counters for view events."""
+
     serializer_class = EventCountSerializer
     permission_classes = (permissions.AllowAny,)
     authentication_classes = []

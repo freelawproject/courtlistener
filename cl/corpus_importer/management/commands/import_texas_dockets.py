@@ -1,3 +1,5 @@
+"""Import Texas dockets from S3 using an inventory CSV."""
+
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -14,6 +16,8 @@ from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
+    """Download and merge the Texas dockets listed in an S3 inventory."""
+
     help = "Import Texas dockets from S3 using an inventory CSV."
 
     compose_redis_key = "texas_docket_import:log"
@@ -22,6 +26,14 @@ class Command(CorpusImporterCommand):
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable[tuple[tuple[str, str], tuple[str, str]]]:
+        """Pair each docket metadata file in the inventory with its HTML file.
+
+        Only ``_meta.json`` files outside search result scrapes are used.
+
+        Yields:
+            The (bucket, key) of the docket's HTML file and of its metadata
+            file.
+        """
         meta_rows = filter(
             # Filter only for meta files which are not duplicates (don't end in "_X") and not for search result scrapes
             lambda r: (
@@ -43,12 +55,15 @@ class Command(CorpusImporterCommand):
 
     @staticmethod
     def download_task() -> Task:
+        """The task that downloads a Texas docket."""
         return texas_corpus_download_task
 
     @staticmethod
     def merge_task() -> Task:
+        """The task that ingests a Texas docket."""
         return texas_ingest_docket_task
 
     def handle(self, *args, **options):
+        """Import the dockets, then fill in the missing dockets of case transfers."""
         super().handle(*args, **options)
         CaseTransfer.fill_null_dockets()

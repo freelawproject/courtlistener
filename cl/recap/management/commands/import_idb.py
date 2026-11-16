@@ -1,3 +1,5 @@
+"""Import an FJC Integrated Database tab-separated file."""
+
 import re
 import sys
 from datetime import date
@@ -24,6 +26,14 @@ from cl.search.models import Court
 def create_or_update_row(
     values: dict[str, str],
 ) -> FjcIntegratedDatabase | None:
+    """Create an IDB row from ``values``, or update the one it matches.
+
+    Rows are matched on district, docket number, origin, and filing date,
+    narrowed by defendant if that matches several rows.
+
+    Returns:
+        The created or updated row, or None if several rows still match.
+    """
     fjc_filters = [
         {
             "district": values["district"],
@@ -62,6 +72,8 @@ def create_or_update_row(
 
 
 class Command(VerboseCommand, CommandUtils):
+    """Import an FJC Integrated Database file into the database."""
+
     help = (
         "Import a tab-separated file as produced by FJC for their IDB. "
         "Do not check for duplicates."
@@ -69,6 +81,7 @@ class Command(VerboseCommand, CommandUtils):
     BAD_CHARS = re.compile("[\u0000\u001e]")
 
     def add_arguments(self, parser):
+        """Add the input file, file type, and start line options."""
         parser.add_argument(
             "--input-file",
             help="The IDB file to import",
@@ -90,6 +103,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty field data."""
         super().__init__(*args, **kwargs)
         self.field_mappings = {}
         self.int_fields = []
@@ -101,6 +115,11 @@ class Command(VerboseCommand, CommandUtils):
 
     @staticmethod
     def ensure_filetype_ok(filetype: int) -> None:
+        """Check that the file type is a known IDB dataset source.
+
+        Raises:
+            CommandError: If the file type isn't a dataset source.
+        """
         allowed_types = [d[0] for d in DATASET_SOURCES]
         if filetype not in allowed_types:
             raise CommandError(
@@ -181,6 +200,15 @@ class Command(VerboseCommand, CommandUtils):
         return row_dict
 
     def handle(self, *args, **options):
+        """Import each line of the file from the start line on.
+
+        Criminal 2017 rows not sourced from CM/ECF are skipped.
+
+        Raises:
+            CommandError: If the file or file type is invalid.
+            NotImplementedError: If the file type isn't a supported civil or
+                criminal dataset.
+        """
         super().handle(*args, **options)
 
         self.ensure_file_ok(options["input_file"])

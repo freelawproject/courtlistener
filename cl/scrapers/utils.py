@@ -1,3 +1,5 @@
+"""Helpers for saving scraped opinions, dockets, citations, and responses."""
+
 import json
 import re
 from datetime import date, datetime
@@ -178,6 +180,7 @@ def get_extension(content: bytes) -> str:
 
 
 def signal_handler(signal, frame):
+    """Log that a signal was caught and set the module's ``die_now`` flag."""
     # Trigger this with CTRL+4
     logger.info("**************")
     logger.info("Signal caught. Finishing the current court, then exiting...")

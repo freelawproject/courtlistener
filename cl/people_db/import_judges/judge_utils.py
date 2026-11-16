@@ -108,6 +108,13 @@ def get_school(schoolname, testing=False):
 
 
 def get_degree_level(degstr):
+    """Map a degree string to its degree level code.
+
+    Returns:
+        The degree level code, falling back to matching the degree's
+        prefix, or an empty string if the degree is empty or matches
+        nothing.
+    """
     if not degstr or degstr == "":
         return ""
     degdict = {
@@ -185,6 +192,11 @@ def get_degree_level(degstr):
 
 
 def get_party(partystr):
+    """Map a political party name to its party code.
+
+    Raises:
+        KeyError: If the party name is unknown.
+    """
     partydict = dict(
         [
             (v, k)
@@ -205,10 +217,16 @@ def get_party(partystr):
 
 
 def get_appointer(appointstr):
+    """Return the appointer string unchanged."""
     return appointstr
 
 
 def get_suffix(suffstr):
+    """Map a name suffix to its suffix code.
+
+    As written, any non-empty suffix maps to an empty string, and an empty
+    suffix is looked up in the suffix map, raising ``KeyError``.
+    """
     suffdict = {
         "Jr": "jr",
         "Jr.": "jr",
@@ -226,6 +244,11 @@ def get_suffix(suffstr):
 
 
 def get_races(str_race):
+    """Map a slash-separated race string to a list of race codes.
+
+    Raises:
+        KeyError: If any race is unknown.
+    """
     racedict = {
         "White": "w",
         "Black": "b",
@@ -254,6 +277,11 @@ def get_races(str_race):
 
 
 def get_aba(abastr):
+    """Map an ABA rating name to its rating code, or None if the rating is empty.
+
+    Raises:
+        KeyError: If the rating name is unknown.
+    """
     abadict = dict(
         [
             (v, k)
@@ -273,10 +301,16 @@ def get_aba(abastr):
 
 
 def get_select(state, year):
+    """Return ``"P"`` as the selection method, regardless of state and year."""
     return "P"
 
 
 def get_gender(gender_str):
+    """Map a gender name to its gender code.
+
+    Raises:
+        KeyError: If the gender name is unknown.
+    """
     gender_dict = {
         "Female": "f",
         "Male": "m",

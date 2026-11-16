@@ -1,3 +1,5 @@
+"""Signal handlers that keep search indices, caches, and related records in sync with search models."""
+
 import logging
 
 from django.conf import settings
@@ -757,6 +759,11 @@ def warn_new_court_needs_courthouse(
 def handle_docket_number_raw_cleaning(
     sender, instance: Docket, created=False, update_fields=None, **kwargs
 ):
+    """Clean a saved non-RECAP docket's raw docket number when it is new or changed.
+
+    Only runs when docket number cleaning is enabled, and skips saves whose
+    ``update_fields`` don't include ``docket_number_raw``.
+    """
     if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
         # Only perform cleaning if enabled
         return
