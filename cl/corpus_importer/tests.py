@@ -15,6 +15,7 @@ import responses
 import time_machine
 from celery.exceptions import Retry
 from django.conf import settings
+from django.core import mail
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
@@ -2374,6 +2375,13 @@ class TexasMergerTest(TestCase):
             "cl.corpus_importer.tasks.download_document_in_stream"
         )
         self.download_document_mock = self.download_document_patch.start()
+        # merge_texas_docket queues a docket alert for new entries. Its
+        # semaphore lives in Redis, which parallel test workers share, so
+        # keep these tests off it.
+        self.enqueue_alert_patch = patch(
+            "cl.corpus_importer.tasks.enqueue_docket_alert", return_value=False
+        )
+        self.enqueue_alert_mock = self.enqueue_alert_patch.start()
 
     @classmethod
     def setUpTestData(cls):
@@ -2399,6 +2407,7 @@ class TexasMergerTest(TestCase):
         self.download_task_patch.stop()
         self.extract_document_patch.stop()
         self.download_document_patch.stop()
+        self.enqueue_alert_patch.stop()
 
     def get_random_docket_entry_dict(self, **kwargs):
         return fake.random_element(
@@ -3988,6 +3997,91 @@ class TexasMergerTest(TestCase):
         assert docket_sc.cause == docket_data["case_type"]
         assert docket_sc.appeal_from_id == "txctapp1"
         assert docket_sc.appeal_from_str == self.texas_coa1.full_name
+
+    @patch("cl.corpus_importer.tasks.send_alert_and_webhook")
+    def test_new_entries_queue_a_docket_alert(
+        self, mock_send: mock.MagicMock
+    ) -> None:
+        """Does a merge that creates entries queue one docket alert for the docket, from when the entries started merging?"""
+        self.enqueue_alert_mock.return_value = True
+        before = now()
+        docket_dict = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value
+        )
+
+        result = merge_texas_docket(docket_dict)
+
+        self.assertTrue(result.creates.get("TexasDocketEntry"))
+        docket_pk = next(iter(result.creates["Docket"]))
+        self.enqueue_alert_mock.assert_called_once_with(docket_pk)
+        mock_send.delay.assert_called_once()
+        sent_pk, since = mock_send.delay.call_args.args
+        self.assertEqual(sent_pk, docket_pk)
+        self.assertGreaterEqual(since, before)
+
+    def test_subscriber_gets_an_email_for_new_entries(self) -> None:
+        """End to end: does a subscriber of a Texas docket get an alert email listing the entries a TAMES merge just created?"""
+        self.enqueue_alert_mock.return_value = True
+        docket_dict = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            case_events=[
+                TexasCaseEventDictFactory(
+                    type="Notice filed", date=date(2025, 1, 2)
+                )
+            ],
+            appellate_briefs=[],
+        )
+        merge_texas_docket(docket_dict)
+        docket = Docket.objects.get(
+            court_id="tex", docket_number=docket_dict["docket_number"]
+        )
+        DocketAlert.objects.create(
+            docket=docket, user=UserProfileWithParentsFactory().user
+        )
+        mail.outbox.clear()
+        # TAMES lists events in date order, so the new one comes last.
+        docket_dict["case_events"].append(
+            TexasCaseEventDictFactory(
+                type="Brief on the merits filed", date=date(2025, 2, 3)
+            )
+        )
+
+        merge_texas_docket(docket_dict)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Brief on the merits filed", mail.outbox[0].body)
+        self.assertNotIn("Notice filed", mail.outbox[0].body)
+
+    @patch("cl.corpus_importer.tasks.send_alert_and_webhook")
+    def test_merge_without_new_entries_sends_no_alert(
+        self, mock_send: mock.MagicMock
+    ) -> None:
+        """Does merging the same docket again, which only finds existing entries, leave the alert alone?"""
+        docket_dict = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value
+        )
+        merge_texas_docket(docket_dict)
+        self.enqueue_alert_mock.reset_mock()
+
+        result = merge_texas_docket(docket_dict)
+
+        self.assertFalse(result.creates.get("TexasDocketEntry"))
+        self.enqueue_alert_mock.assert_not_called()
+        mock_send.delay.assert_not_called()
+
+    @patch("cl.corpus_importer.tasks.send_alert_and_webhook")
+    def test_alert_already_queued_is_not_sent_twice(
+        self, mock_send: mock.MagicMock
+    ) -> None:
+        """When the docket's alert semaphore is already taken, is the alert left to the task that took it?"""
+        self.enqueue_alert_mock.return_value = False
+        merge_texas_docket(
+            TexasFinalCourtDocketDictFactory(
+                court_id=CourtID.SUPREME_COURT.value
+            )
+        )
+        self.enqueue_alert_mock.assert_called_once()
+        mock_send.delay.assert_not_called()
 
     def test_merge_texas_docket_appeal_from_missing_court(self):
         docket_dict = TexasFinalCourtDocketDictFactory.create(
