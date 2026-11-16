@@ -17,11 +17,13 @@ from oauth2_provider.models import (
     get_access_token_model,
     get_application_model,
     get_grant_model,
+    get_refresh_token_model,
     set_token_value,
 )
 from rest_framework.authtoken.models import Token
 
 from cl.oauth.factories import ApplicationFactory
+from cl.oauth.validators import supported_scopes
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import parse_csp
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -29,6 +31,7 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 Application = get_application_model()
 Grant = get_grant_model()
 AccessToken = get_access_token_model()
+RefreshToken = get_refresh_token_model()
 
 
 class OAuthMetadataTest(APITestCase):
@@ -188,6 +191,98 @@ class PKCEMethodEnforcementTest(TestCase):
                 self.assertIn("error=invalid_request", r["Location"])
                 self.assertNotIn("code=", r["Location"])
                 self.assertEqual(Grant.objects.count(), 0)
+
+
+class LegacyDcrFullScopeTest(TestCase):
+    """Legacy DCR applications are granted every supported scope, whatever they request.
+
+    These applications keep asking for the scopes they first connected with,
+    so the override applies both when a user authorizes them and on every
+    refresh. Manually registered applications get what they ask for.
+    """
+
+    REDIRECT_URI = "https://mcp.example.com/callback"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # A profile, because widened tokens carry ``openid`` and so an ID
+        # token whose claims read it.
+        cls.user = UserProfileWithParentsFactory().user
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+        )
+
+    def _authorize(self, app: Application) -> set[str]:
+        """Approve ``app`` asking only for ``api`` and return the granted scopes."""
+        self.client.force_login(self.user)
+        verifier = "a" * 64
+        params = {
+            "response_type": "code",
+            "client_id": app.client_id,
+            "redirect_uri": self.REDIRECT_URI,
+            "scope": "api",
+            "state": "xyz",
+            "code_challenge": s256_challenge(verifier),
+            "code_challenge_method": "S256",
+        }
+        url = reverse("oauth2_provider:authorize")
+        consent = self.client.get(url, params)
+        self.assertEqual(consent.status_code, 200, consent.content)
+        r = self.client.post(url, {**params, "allow": "Authorize"})
+        self.assertIn("code=", r["Location"])
+        return set(Grant.objects.get(application=app).scope.split())
+
+    def _refresh(self, app: Application) -> set[str]:
+        """Refresh an ``api``-only token for ``app``, asking for ``api``, and return the new scopes."""
+        access = AccessToken(
+            user=self.user,
+            application=app,
+            scope="api",
+            expires=now() + timedelta(hours=1),
+        )
+        set_token_value(access, f"at-{app.pk}")
+        access.save()
+        refresh = RefreshToken(
+            user=self.user, application=app, access_token=access
+        )
+        set_token_value(refresh, f"rt-{app.pk}")
+        refresh.save()
+        r = self.client.post(
+            reverse("oauth2_provider:token"),
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": f"rt-{app.pk}",
+                "client_id": app.client_id,
+                "scope": "api",
+            },
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        return set(r.json()["scope"].split())
+
+    def test_authorization_grants_every_scope(self) -> None:
+        """Authorizing a legacy DCR application grants every supported scope."""
+        self.assertIn("wiki", supported_scopes())
+        for app, expected in (
+            (self.dcr_app, set(supported_scopes())),
+            (self.manual_app, {"api"}),
+        ):
+            with self.subTest(source=app.registration_source):
+                self.assertEqual(self._authorize(app), expected)
+
+    def test_refresh_grants_every_scope(self) -> None:
+        """Refreshing a legacy DCR application's token widens it to every supported scope."""
+        for app, expected in (
+            (self.dcr_app, set(supported_scopes())),
+            (self.manual_app, {"api"}),
+        ):
+            with self.subTest(source=app.registration_source):
+                self.assertEqual(self._refresh(app), expected)
 
 
 class AudienceBoundTokenTest(APITestCase):
