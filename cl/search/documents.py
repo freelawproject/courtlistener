@@ -2193,7 +2193,7 @@ class OpinionBaseDocument(Document):
     def prepare_dateFiled(self, instance):
         """Get the cluster's filing date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.date_filed, str):
             datetime_object = datetime.strptime(
@@ -2206,7 +2206,7 @@ class OpinionBaseDocument(Document):
     def prepare_dateArgued(self, instance):
         """Get the docket's argument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_argued, str):
             datetime_object = datetime.strptime(
@@ -2219,7 +2219,7 @@ class OpinionBaseDocument(Document):
     def prepare_dateReargued(self, instance):
         """Get the docket's reargument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargued, str):
             datetime_object = datetime.strptime(
@@ -2232,7 +2232,7 @@ class OpinionBaseDocument(Document):
     def prepare_dateReargumentDenied(self, instance):
         """Get the docket's reargument denial date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargument_denied, str):
             datetime_object = datetime.strptime(
@@ -2452,7 +2452,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     def prepare_dateFiled(self, instance):
         """Get the cluster's filing date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.cluster.date_filed, str):
             datetime_object = datetime.strptime(
@@ -2465,7 +2465,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     def prepare_dateArgued(self, instance):
         """Get the docket's argument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_argued, str):
             datetime_object = datetime.strptime(
@@ -2478,7 +2478,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     def prepare_dateReargued(self, instance):
         """Get the docket's reargument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargued, str):
             datetime_object = datetime.strptime(
@@ -2491,7 +2491,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     def prepare_dateReargumentDenied(self, instance):
         """Get the docket's reargument denial date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargument_denied, str):
             datetime_object = datetime.strptime(

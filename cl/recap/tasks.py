@@ -1848,7 +1848,7 @@ def process_recap_appellate_case_query_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1861,7 +1861,7 @@ def process_recap_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1874,7 +1874,7 @@ def process_recap_appellate_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task
@@ -2036,7 +2036,7 @@ def update_docket_from_hidden_api(data):
             or None if looking up the item failed.
     """
     if data is None:
-        return None
+        return
 
     d = Docket.objects.get(pk=data["pass_through"])
 
@@ -2107,7 +2107,7 @@ def fetch_pacer_doc_by_rd_base(
         msg = "PDF already marked as 'is_available'. Doing nothing."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
         self.request.chain = None
-        return
+        return None
 
     if not pacer_doc_id:
         msg = (
@@ -2121,14 +2121,14 @@ def fetch_pacer_doc_by_rd_base(
             fq, msg, PROCESSING_STATUS.INVALID_CONTENT
         )
         self.request.chain = None
-        return
+        return None
 
     session_data = async_to_sync(get_pacer_cookie_from_cache)(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
@@ -2154,7 +2154,7 @@ def fetch_pacer_doc_by_rd_base(
         msg = "Failed to get PDF from network."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
     except PacerLoginException as exc:
         msg = f"PacerLoginException while getting document for rd: {rd.pk}."
         if self.request.retries == self.max_retries:
@@ -2185,7 +2185,7 @@ def fetch_pacer_doc_by_rd_base(
     if success is False:
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     subdocket_pqs_to_replicate = []
@@ -2267,7 +2267,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
         fq = PacerFetchQueue.objects.get(pk=fq_pk)
         msg = "Successfully completed fetch and save."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-    return None
+    return
 
 
 @app.task(
@@ -3084,12 +3084,12 @@ async def save_pacer_doc_from_pq(
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-        return
+        return None
 
     if pq.status == PROCESSING_STATUS.FAILED or not pq.filepath_local:
         await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
         await mark_fq_status(fq, pq.error_message, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     pdf_bytes = await read_file_bytes(pq.filepath_local)
 
@@ -3111,7 +3111,7 @@ async def save_pacer_doc_from_pq(
 
     if success is False:
         await mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     msg = "Successfully completed fetch and save."
     await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -3970,7 +3970,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         else:
             raise self.retry(exc=exc)
 
@@ -3986,7 +3986,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
@@ -4001,7 +4001,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         case _:
             docket_parser = TexasCourtOfAppealsScraper(
                 court_id=email_data["court_id"]
@@ -4059,7 +4059,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     try:
         result = merge_texas_docket(docket_data, download_attachments=True)
@@ -4071,7 +4071,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     else:
         changed_documents = list(
             result.creates.get("TexasDocument", set())
@@ -4089,7 +4089,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
 
-    return None
+    return
 
 
 def fetch_and_archive_scotus_docket_followup(
@@ -4176,7 +4176,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         else:
             raise self.retry(exc=exc)
 
@@ -4203,7 +4203,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     if email_type == SCOTUSEmailType.CONFIRMATION.value:
         if data == SCOTUSConfirmationResult.Success.value:
@@ -4214,7 +4214,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
 
         async_to_sync(mark_pq_status)(
             epq,
@@ -4223,7 +4223,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     try:
         d, _, doc_pks = merge_scotus_docket(data)
     except Exception as e:
@@ -4243,7 +4243,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
         status = PROCESSING_STATUS.SUCCESSFUL
         async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
-    return None
+    return
 
 
 @app.task(

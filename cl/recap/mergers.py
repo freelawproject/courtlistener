@@ -2675,7 +2675,7 @@ async def process_orphan_documents(
     if not await sync_to_async(switch_is_active)(
         PROCESS_ORPHAN_DOCUMENTS_SWITCH
     ):
-        return None
+        return
 
     pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
     if docket_date:
@@ -2762,4 +2762,4 @@ def process_case_query_report(
         # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(report_text.encode()),
     )
-    return None
+    return
