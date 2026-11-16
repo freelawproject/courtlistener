@@ -2348,6 +2348,17 @@ class TexasDocketEntrySourceTest(TestCase):
             with self.subTest(source=name):
                 self.assertEqual(source.supports_docket_alerts, expected)
 
+    def test_only_indexed_sources_opt_into_entry_search(self) -> None:
+        """Do RECAP and SCOTUS, whose entries are in the search index, opt into "Search this docket", while Texas keeps the default of no search box?"""
+        cases = {
+            "RECAP": (docket_entry_sources.RECAP, True),
+            "SCOTUS": (docket_entry_sources.SCOTUS, True),
+            "TEXAS": (docket_entry_sources.TEXAS, False),
+        }
+        for name, (source, expected) in cases.items():
+            with self.subTest(source=name):
+                self.assertEqual(source.supports_entry_search, expected)
+
     def test_entries_and_documents_load_in_two_queries(self) -> None:
         """Do the docket page's entries and their documents take two queries, however many entries there are?"""
         docket = DocketFactory(court=CourtFactory(id="tex"))
@@ -2590,6 +2601,31 @@ class TexasDocketPageTest(TestCase):
                     content = self.client.get(self.url).content.decode()
                     self.assertEqual("Get Alerts" in content, shows_menu)
                     self.assertEqual("Share Alert Link" in content, shows_menu)
+
+    def test_search_box_follows_supports_entry_search(self) -> None:
+        """Is "Search this docket" hidden for Texas, whose entries aren't in the search index, and shown again once its source supports entry search, in both stacks?"""
+        searchable = replace(
+            docket_entry_sources.TEXAS, supports_entry_search=True
+        )
+        cases = (
+            ("texas", docket_entry_sources.TEXAS, False),
+            ("texas indexed", searchable, True),
+        )
+        for name, source, shows_search in cases:
+            for new_design in (False, True):
+                with (
+                    self.subTest(source=name, new_design=new_design),
+                    mock.patch.dict(
+                        docket_entry_sources.BY_COURT_ID, {"tex": source}
+                    ),
+                    override_flag("texas_docket_page", active=True),
+                    override_flag("use_new_design", active=new_design),
+                ):
+                    content = self.client.get(self.url).content.decode()
+                    self.assertEqual(
+                        'placeholder="Search this docket"' in content,
+                        shows_search,
+                    )
 
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
         """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""

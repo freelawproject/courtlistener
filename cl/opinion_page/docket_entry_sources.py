@@ -271,6 +271,12 @@ class DocketEntrySource:
     source that builds it from scraped fields MUST escape them, e.g. with
     ``format_html``, as ``_texas_entry_display_text`` does.
 
+    ``supports_entry_search`` says whether the source's entries are in the
+    search index that "Search this docket" queries. When False, both stacks
+    hide that box, since it could never find anything. Like
+    ``supports_docket_alerts``, it defaults to False so a new source only
+    shows the box once it's indexed.
+
     ``exports_entries_without_documents`` says whether the CSV export gives
     an entry with no documents its own row, with empty document columns.
     Without it, the export only writes one row per document, which suits
@@ -329,6 +335,7 @@ class DocketEntrySource:
     launch_flag: str | None = None
     has_entry_numbers: bool = True
     supports_docket_alerts: bool = False
+    supports_entry_search: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
     exports_entries_without_documents: bool = False
@@ -556,6 +563,7 @@ RECAP: DocketEntrySource = DocketEntrySource(
     get_document_for_render=_get_recap_document_for_render,
     initial_document_buttons=_recap_initial_document_buttons,
     supports_docket_alerts=True,
+    supports_entry_search=True,
 )
 
 
@@ -747,6 +755,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     admin_document_label="SCOTUS Document",
     launch_flag="scotus_docket_page",
     supports_docket_alerts=True,
+    supports_entry_search=True,
 )
 
 
