@@ -6,7 +6,7 @@ The input is the standard Juriscraper docket format described in
 
 import logging
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from functools import partial
@@ -15,7 +15,6 @@ from typing import Any, ClassVar, cast, override
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import models, transaction
-from django.db.models import Model, QuerySet
 from django.db.models.fields.files import FieldFile
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     CourtVocabulary,
@@ -40,14 +39,15 @@ from cl.corpus_importer.state.merger import (
     Fn,
     ManyStrategy,
     Merger,
+    MergerConfig,
+    MergerState,
     OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
     Scrape,
     WithStrategy,
-    overwrite,
+    overwrite_if_present,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAAttorney,
     NYCoACase,
@@ -69,7 +69,7 @@ from cl.corpus_importer.state.new_york.utils import (
     mirrored_code,
 )
 from cl.corpus_importer.state.storage import delete_file
-from cl.corpus_importer.state.utils import NO_FILES, FileTally, MergeResult
+from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket
@@ -167,6 +167,19 @@ def _stated(reading: CourtVocabulary | Unclassified) -> str:
     return "" if isinstance(reading, Unclassified) else reading.value
 
 
+def is_publishable(file: NYCoAFile) -> bool:
+    """Whether the scrape vouches for a file it reports having downloaded.
+
+    The file has to be in the private bucket, which is the only place
+    publishing looks, and has to carry the hash a later merge tells a
+    corrected file from the published one by.
+
+    :param file: A file whose `local_path` the scrape filled in.
+    :return: Whether the file may be stored for publishing.
+    """
+    return is_scraped(file.local_path) and bool(file.content_hash)
+
+
 class NYCoADocumentMerger[ParamType](
     Merger[NYCoAFile, RelatedParams[ParamType], NYCoADocument]
 ):
@@ -185,29 +198,20 @@ class NYCoADocumentMerger[ParamType](
     for it.
     """
 
-    model: ClassVar[type[Model]] = NYCoADocument
-    key: ClassVar[Iterable[str]] = ["file_name"]
+    config: ClassVar[MergerConfig[NYCoADocument]] = MergerConfig(
+        model=NYCoADocument, key=("file_name",)
+    )
 
-    file_name: str = WithStrategy(Scrape(NYCoAFile).file_name, overwrite)
-    content_type: str = WithStrategy(Scrape(NYCoAFile).content_type, overwrite)
-    doc_role: str = WithStrategy(
-        Fn(_stated)(Scrape(NYCoAFile).doc_role), overwrite
+    file_name: str = Scrape(NYCoAFile).file_name
+    content_type: str = Scrape(NYCoAFile).content_type
+    doc_role: str = Fn(_stated)(Scrape(NYCoAFile).doc_role)
+    doc_party: str = Scrape(NYCoAFile).doc_party
+    doc_type: str = Fn(_stated)(Scrape(NYCoAFile).doc_type)
+    volume: int | None = Fn(_storable_number)(
+        Scrape(NYCoAFile).volume, "volume", Scrape(NYCoAFile)
     )
-    doc_party: str = WithStrategy(Scrape(NYCoAFile).doc_party, overwrite)
-    doc_type: str = WithStrategy(
-        Fn(_stated)(Scrape(NYCoAFile).doc_type), overwrite
-    )
-    volume: int | None = WithStrategy(
-        Fn(_storable_number)(
-            Scrape(NYCoAFile).volume, "volume", Scrape(NYCoAFile)
-        ),
-        overwrite,
-    )
-    part: int | None = WithStrategy(
-        Fn(_storable_number)(
-            Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
-        ),
-        overwrite,
+    part: int | None = Fn(_storable_number)(
+        Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
     )
     filepath_local: str = WithStrategy(
         Scrape(NYCoAFile).local_path, _keep_stored_file
@@ -220,50 +224,64 @@ class NYCoADocumentMerger[ParamType](
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult, NYCoADocument | None]:
-        """Settle which path to store for the file, then write the document.
+    def create(
+        self,
+        state: MergerState.Create[
+            NYCoAFile, RelatedParams[ParamType], NYCoADocument
+        ],
+    ) -> MergerState.CreateOutput[
+        NYCoAFile, RelatedParams[ParamType], NYCoADocument
+    ]:
+        """Settle which path to store for the file, then write the document."""
+        self._accept_file(state.scrape, None)
+        return super().create(state)
 
-        Returns:
-            The merge result, carrying any file the scrape reported that
-            can never be published, and the merged document.
-        """
-        files = self._accept_file()
-        result, document = super().merge_one()
-        return result | MergeResult(files=files), document
+    @override
+    def update(
+        self,
+        state: MergerState.Update[
+            NYCoAFile, RelatedParams[ParamType], NYCoADocument
+        ],
+    ) -> MergerState.UpdateOutput[
+        NYCoAFile, RelatedParams[ParamType], NYCoADocument
+    ]:
+        """Settle which path to store for the file, then write the document."""
+        self._accept_file(state.scrape, state.instance)
+        return super().update(state)
 
     def _scrub_fileinfo(self) -> None:
         """Remove info relevant to file."""
-        self.transformed["filepath_local"] = ""
-        self.transformed["sha256"] = ""
-        self.transformed["file_size"] = None
+        self.filepath_local = ""
+        self.sha256 = ""
+        self.file_size = None
 
-    def _accept_file(self) -> FileTally:
+    def _accept_file(
+        self, scrape: NYCoAFile, existing: NYCoADocument | None
+    ) -> None:
         """Decide what the document's `filepath_local` should hold.
 
         Normally that is the scraper's key in the private bucket, which the
         loader publishes after the merge. Two exceptions: a file this document
         has already published is kept where it is, and the scraper's copy of it
         is deleted once the merge commits, since nothing will ever point at it;
-        and a file the scrape cannot vouch for is not stored at all.
+        and a file the scrape cannot vouch for is not stored at all, which
+        leaves the document with whatever file it already has.
 
-        Returns:
-            `FileTally(missing=1)` for a file that will never be
-            published, and nothing otherwise. A file the scrape cannot vouch
-            for is not missing where the document already has one, since the
-            merge keeps that path and the loader publishes it if need be.
+        Args:
+            scrape: The file Court-PASS listed.
+            existing: The document being merged into, if there is one.
         """
-        private_key = self.scrape.local_path
+        private_key = scrape.local_path
         if not private_key:
-            return NO_FILES
-        existing = self.existing
+            return
         stored = (existing.filepath_local.name or "") if existing else ""
         if (
             existing is not None
-            and self.scrape.content_hash
-            and existing.sha256 == self.scrape.content_hash
+            and scrape.content_hash
+            and existing.sha256 == scrape.content_hash
             and is_published(stored)
         ):
-            self.transformed["filepath_local"] = stored
+            self.filepath_local = stored
             if is_scraped(private_key):
                 transaction.on_commit(
                     partial(
@@ -272,37 +290,27 @@ class NYCoADocumentMerger[ParamType](
                         private_key,
                     )
                 )
-            return NO_FILES
-        if not is_scraped(private_key):
-            logger.error(
-                "Court-PASS names %s a file at %s, which is not in the private "
-                "bucket; not publishing it.",
-                self.scrape.file_name,
-                private_key,
-            )
-            self._scrub_fileinfo()
-            return NO_FILES if stored else FileTally(missing=1)
-        if not self.scrape.content_hash:
-            logger.error(
-                "Court-PASS file %s was downloaded to %s with no hash "
-                "recorded.",
-                self.scrape.file_name,
-                private_key,
-            )
-            self._scrub_fileinfo()
-            return NO_FILES if stored else FileTally(missing=1)
-        return NO_FILES
+            return
+        if is_publishable(scrape):
+            return
+        logger.error(
+            "Court-PASS file %s was downloaded to %s, which is not in the "
+            "private bucket or has no hash recorded; not publishing it.",
+            scrape.file_name,
+            private_key,
+        )
+        self._scrub_fileinfo()
 
     @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Send a document whose file has moved back for extraction."""
         updated = super().pre_update(updated_fields)
-        if (existing := self.existing) is None:
+        if not isinstance(self.state, MergerState.Update):
             return updated
         if "filepath_local" not in updated_fields + updated:
             return updated
-        existing.page_count = None
-        existing.ocr_status = None
+        self.state.instance.page_count = None
+        self.state.instance.ocr_status = None
         updated += ["page_count", "ocr_status"]
         return updated
 
@@ -372,45 +380,30 @@ class NYCoADocketEntryMerger[ParamType](
     vocabulary is normalized instead.
     """
 
-    model: ClassVar[type[Model]] = NYCoADocketEntry
-    key: ClassVar[Iterable[str]] = ["docket_entry_id"]
+    config: ClassVar[MergerConfig[NYCoADocketEntry]] = MergerConfig(
+        model=NYCoADocketEntry, key=("docket_entry_id",)
+    )
 
     # Court-PASS only dates the filings its FILINGS table lists.
-    date_filed: date | None = WithStrategy(
-        Scrape(NYCoDocketEntry).date_filed, overwrite
+    date_filed: date | None = Scrape(NYCoDocketEntry).date_filed
+    date_due: date | None = Scrape(NYCoDocketEntry).date_due
+    docket_entry_id: str = Scrape(NYCoDocketEntry).docket_entry_id
+    entry_index: int | None = Scrape(NYCoDocketEntry).entry_index
+    filing_type: int = Fn(mirrored_code)(
+        FilingType, Scrape(NYCoDocketEntry).entry_filing_type
     )
-    date_due: date | None = WithStrategy(
-        Scrape(NYCoDocketEntry).date_due, overwrite
+    filing_type_raw: str = Scrape(NYCoDocketEntry).raw_filing_type
+    filing_role: int = Fn(mirrored_code)(
+        FilingRole, Scrape(NYCoDocketEntry).entry_role
     )
-    docket_entry_id: str = WithStrategy(
-        Scrape(NYCoDocketEntry).docket_entry_id, overwrite
-    )
-    entry_index: int | None = WithStrategy(
-        Scrape(NYCoDocketEntry).entry_index, overwrite
-    )
-    filing_type: int = WithStrategy(
-        Fn(mirrored_code)(
-            FilingType, Scrape(NYCoDocketEntry).entry_filing_type
-        ),
-        overwrite,
-    )
-    filing_type_raw: str = WithStrategy(
-        Scrape(NYCoDocketEntry).raw_filing_type, overwrite
-    )
-    filing_role: int = WithStrategy(
-        Fn(mirrored_code)(FilingRole, Scrape(NYCoDocketEntry).entry_role),
-        overwrite,
-    )
-    filing_doctype: int = WithStrategy(
-        Fn(mirrored_code)(
-            FilingDocType, Scrape(NYCoDocketEntry).entry_doctype
-        ),
-        overwrite,
+    filing_doctype: int = Fn(mirrored_code)(
+        FilingDocType, Scrape(NYCoDocketEntry).entry_doctype
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    party_id: int | None = Fn(_entry_party_id)(
-        Scrape(NYCoDocketEntry), Ancestor(Docket)
+    party_id: int | None = WithStrategy(
+        Fn(_entry_party_id)(Scrape(NYCoDocketEntry), Ancestor(Docket)),
+        overwrite_if_present,
     )
     # The name Court-PASS printed, kept whether or not `party_id` resolved --
     # on a filing by a party with no attorney of record it is the only record
@@ -428,31 +421,37 @@ class NYCoADocketEntryMerger[ParamType](
     )
 
     @override
-    def merge_one(self) -> tuple[MergeResult, NYCoADocketEntry | None]:
-        """Merge the filing, then drop any document it no longer serves a file for.
+    def update(
+        self,
+        state: MergerState.Update[
+            NYCoDocketEntry, RelatedParams[ParamType], NYCoADocketEntry
+        ],
+    ) -> MergerState.UpdateOutput[
+        NYCoDocketEntry, RelatedParams[ParamType], NYCoADocketEntry
+    ]:
+        """Drop any document the filing no longer serves a file for, then merge the filing."""
+        self._drop_unserved_documents(state.scrape, state.instance)
+        return super().update(state)
 
-        Returns:
-            The merge result and the merged filing, unchanged.
-        """
-        result, entry = super().merge_one()
-        self._drop_unserved_documents(entry)
-        return result, entry
-
-    def _drop_unserved_documents(self, entry: NYCoADocketEntry | None) -> None:
+    @staticmethod
+    def _drop_unserved_documents(
+        scrape: NYCoDocketEntry, entry: NYCoADocketEntry
+    ) -> None:
         """Delete the documents of a filing Court-PASS now serves no file for.
 
         This exists to handle the special case of all documents being retracted.
 
         Args:
-            entry: The merged filing, or `None` if the merge produced none.
+            scrape: The filing as Court-PASS lists it.
+            entry: The stored filing.
         """
-        if self.existing is None or entry is None:
+        if not scrape.attachments:
             return
-        if not self.scrape.attachments:
+        if any(file.available for file in scrape.attachments):
             return
-        if any(file.available for file in self.scrape.attachments):
-            return
-        _ = entry.documents.all().delete()
+        # Not through `entry.documents`: the documents the entry was loaded
+        # with are missing fields the deletion signals read.
+        _ = NYCoADocument.objects.filter(docket_entry=entry).delete()
 
 
 class ScrapedAttorney(NYCoAAttorney):
@@ -489,16 +488,12 @@ def _attorney_phone(attorney: NYCoAAttorney) -> str:
 
 
 class NYCoAAttorneyMerger(
-    AttorneyMerger[ScrapedAttorney, RelatedParams[None]]
+    AttorneyMerger[ScrapedAttorney, RelatedParams[RelatedParams[None]]]
 ):
     """Merger for an attorney on a Court-PASS docket."""
 
-    contact_raw: str = WithStrategy(
-        Fn(_attorney_contact_raw)(Scrape(ScrapedAttorney)), overwrite
-    )
-    phone: str = WithStrategy(
-        Fn(_attorney_phone)(Scrape(ScrapedAttorney)), overwrite
-    )
+    contact_raw: str = Fn(_attorney_contact_raw)(Scrape(ScrapedAttorney))
+    phone: str = Fn(_attorney_phone)(Scrape(ScrapedAttorney))
 
 
 def _attorney_role(attorney: ScrapedAttorney) -> int:
@@ -562,26 +557,28 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     """Merger for a party on a Court-PASS docket.
 
     Identity is `PartyMerger`'s -- the name, within the docket -- with the role
-    breaking a tie; see `resolve_query`.
+    breaking a tie; see `resolve`.
     """
 
-    attorneys: list[Attorney] = AttorneyRelation(
+    attorneys: Sequence[Attorney] = AttorneyRelation(
         attorney=NYCoAAttorneyMerger,
         role=NYCoARoleMerger,
         transform=_party_attorneys,
     )
 
     @override
-    def query(self) -> QuerySet[Party]:
-        """The docket's parties by date created.
-
-        Returns:
-            `PartyMerger`'s candidates, oldest first.
-        """
-        return super().query().order_by("date_created")
-
-    @override
-    def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
+    def resolve(
+        self,
+        state: MergerState.Resolve[
+            NYCoAParty,
+            RelatedParams[None],
+            Party,
+        ],
+    ) -> MergerState.ResolveOutput[
+        NYCoAParty,
+        RelatedParams[None],
+        Party,
+    ]:
         """Pick which of the docket's parties this scraped one is.
 
         A name is not unique on a Court-PASS docket. We make a best effort here
@@ -589,33 +586,36 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
         we can't disambiguate.
 
         Args:
-            qs: The candidates `PartyMerger.query` found. The framework caps
-                this at two rows; a third party sharing one name would need a later
-                scrape to settle, which is why the ambiguous case is refused rather
-                than guessed.
+            state: Carries the candidates `PartyMerger.lookup` found. A
+                name no role settles is refused rather than guessed.
 
         Returns:
-            Whether to continue, and the row to merge into.
+            The state to continue in: creating, updating the row to
+            merge into, or failed.
         """
-        candidates = list(qs)
-        if len(candidates) < 2:
-            return True, candidates[0] if candidates else None
+        candidates = list(state.candidates)
+        if len(candidates) == 0:
+            return state.create()
+        if len(candidates) == 1:
+            return state.update(candidates[0])
 
-        docket = cast(Docket, self.params.parent)
-        role = _party_type_name(self.scrape)
+        docket = cast(Docket, state.params.parent)
+        role = _party_type_name(state.scrape)
         for candidate in candidates:
             if candidate.party_types.filter(
                 docket=docket, name__iexact=role
             ).exists():
-                return True, candidate
+                return state.update(candidate)
         logger.error(
             "Docket %s lists %s under several roles and none is %s; refusing "
             "to guess which party this is.",
             docket.docket_number,
-            self.scrape.name,
+            state.scrape.name,
             role,
         )
-        return False, None
+        return state.failed(
+            "Ambiguous party", MergeResult.failed(Party.__name__)
+        )
 
 
 @dataclass(frozen=True)
@@ -648,23 +648,31 @@ class NYCoAIssueMerger[ParamType](
     has already published updates the issue in place rather than replacing the
     row. The Court does assign a case two issues under one category pair,
     though, and then the description is the only thing separating them, so for
-    those it joins the identity; see `query`.
+    those it joins the identity; see `lookup`.
     """
 
-    model: ClassVar[type[Model]] = NYCoADocketIssue
-    key: ClassVar[Iterable[str]] = ["category", "subcategory"]
+    config: ClassVar[MergerConfig[NYCoADocketIssue]] = MergerConfig(
+        model=NYCoADocketIssue, key=("category", "subcategory")
+    )
 
-    category: int = WithStrategy(Scrape(ScrapedIssue).category, overwrite)
-    subcategory: int = WithStrategy(
-        Scrape(ScrapedIssue).subcategory, overwrite
-    )
-    category_raw: str = WithStrategy(
-        Scrape(ScrapedIssue).issue.category_raw, overwrite
-    )
-    detail: str = WithStrategy(Scrape(ScrapedIssue).issue.detail, overwrite)
+    category: int = Scrape(ScrapedIssue).category
+    subcategory: int = Scrape(ScrapedIssue).subcategory
+    category_raw: str = Scrape(ScrapedIssue).issue.category_raw
+    detail: str = Scrape(ScrapedIssue).issue.detail
 
     @override
-    def query(self) -> QuerySet[NYCoADocketIssue]:
+    def lookup(
+        self,
+        state: MergerState.Lookup[
+            ScrapedIssue,
+            RelatedParams[ParamType],
+            NYCoADocketIssue,
+        ],
+    ) -> MergerState.LookupOutput[
+        ScrapedIssue,
+        RelatedParams[ParamType],
+        NYCoADocketIssue,
+    ]:
         """The issues already stored on this case under the same category pair.
 
         Narrows to the description as well when the scrape states another issue
@@ -674,21 +682,30 @@ class NYCoAIssueMerger[ParamType](
         merger has to as well.
 
         Returns:
-            The candidate rows, oldest first, so that `resolve_query` is
+            The candidate rows, oldest first, so that `resolve` is
             deterministic.
         """
-        candidates = self.manager.filter(
-            category=self.transformed["category"],
-            subcategory=self.transformed["subcategory"],
+        candidates = self.stored.filter(
+            category=self.category,
+            subcategory=self.subcategory,
         )
-        if not self.scrape.alone_in_category:
-            candidates = candidates.filter(detail=self.transformed["detail"])
-        return candidates.order_by("pk")
+        if not state.scrape.alone_in_category:
+            candidates = candidates.filter(detail=self.detail)
+        return state.resolve(candidates.order_by("pk"))
 
     @override
-    def resolve_query(
-        self, qs: QuerySet[NYCoADocketIssue]
-    ) -> tuple[bool, NYCoADocketIssue | None]:
+    def resolve(
+        self,
+        state: MergerState.Resolve[
+            ScrapedIssue,
+            RelatedParams[ParamType],
+            NYCoADocketIssue,
+        ],
+    ) -> MergerState.ResolveOutput[
+        ScrapedIssue,
+        RelatedParams[ParamType],
+        NYCoADocketIssue,
+    ]:
         """Pick which of the stored issues this scraped one is.
 
         Several rows can share a category pair -- an earlier scrape stated two
@@ -699,25 +716,26 @@ class NYCoAIssueMerger[ParamType](
         relation prunes the rest.
 
         Args:
-            qs: The candidates `query` found. The framework caps this at two
-                rows, which is enough here: the choice only has to come out the same
-                on every scrape, and a third row under one pair would have to be
-                pruned by a later scrape rather than this one.
+            state: Carries the candidates `lookup` found.
 
         Returns:
-            Whether to continue, and the row to merge into.
+            The state to continue in: creating, or updating the row to
+            merge into.
         """
-        candidates = list(qs)
+        candidates = list(state.candidates)
+
         if not candidates:
-            return True, None
-        detail = self.transformed["detail"]
-        return True, next(
-            (
-                candidate
-                for candidate in candidates
-                if candidate.detail == detail
-            ),
-            candidates[0],
+            return state.create()
+        detail = self.detail
+        return state.update(
+            next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate.detail == detail
+                ),
+                candidates[0],
+            )
         )
 
 
@@ -761,24 +779,20 @@ class NYCoADocketMetadataMerger(
     the parent and matches on it, and this merger must not declare it.
     """
 
-    model: ClassVar[type[Model]] = NYCoADocketMetadata
+    config: ClassVar[MergerConfig[NYCoADocketMetadata]] = MergerConfig(
+        model=NYCoADocketMetadata
+    )
 
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
         NYCoAIssueMerger,
-        cast(AttributeMerger, Fn(_case_issues)(Scrape(NYCoACase))),
+        Fn(_case_issues)(Scrape(NYCoACase)),
         strategy=ManyStrategy.REPLACE,
     )
-    decision_date: date | None = WithStrategy(
-        Scrape(NYCoACase).decision_date, overwrite
-    )
-    official_citation: str = WithStrategy(
-        Scrape(NYCoACase).official_citation, overwrite
-    )
-    lower_court_citation: str = WithStrategy(
-        Scrape(NYCoACase).lower_court_citation, overwrite
-    )
+    decision_date: date | None = Scrape(NYCoACase).decision_date
+    official_citation: str = Scrape(NYCoACase).official_citation
+    lower_court_citation: str = Scrape(NYCoACase).lower_court_citation
 
 
 def _date_last_filing(case: NYCoACase) -> date | None:
@@ -815,21 +829,19 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     it raise.
     """
 
-    model: ClassVar[type[Model]] = Docket
-
-    atomic = True
-
-    court_id: str = WithStrategy(Constant(NYCOA_COURT_ID), overwrite)
-    docket_number_core: str = WithStrategy(
-        Fn(make_docket_number_core)(Scrape(NYCoACase).docket_number), overwrite
+    court_id: str = Constant(NYCOA_COURT_ID)
+    docket_number_core: str = Fn(make_docket_number_core)(
+        Scrape(NYCoACase).docket_number
     )
-    date_filed: date | None = Scrape(NYCoACase).date_filed
-    date_argued: date | None = Scrape(NYCoACase).argument_date
-    date_last_filing: date | None = WithStrategy(
-        Fn(_date_last_filing)(Scrape(NYCoACase)), overwrite
+    date_filed: date | None = WithStrategy(
+        Scrape(NYCoACase).date_filed, overwrite_if_present
     )
+    date_argued: date | None = WithStrategy(
+        Scrape(NYCoACase).argument_date, overwrite_if_present
+    )
+    date_last_filing: date | None = Fn(_date_last_filing)(Scrape(NYCoACase))
 
-    parties: list[Party] = PartyRelation(
+    parties: Sequence[Party] = PartyRelation(
         NYCoAPartyMerger, party_type=NYCoAPartyTypeMerger
     )
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
@@ -838,99 +850,65 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     # The NYCoA metadata is spread across the case's own fields rather than
     # nested under a key of its own, so the metadata merger takes the case.
     nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
-        NYCoADocketMetadataMerger, cast(AttributeMerger, Scrape(NYCoACase))
+        NYCoADocketMetadataMerger, Scrape(NYCoACase)
     )
 
+    stored_files: Mapping[int, tuple[str, str]] = {}
+    """The file and thumbnail each of the docket's documents pointed at before
+    the merge, keyed by the document's primary key. The loader deletes the
+    files of whichever of them the merge removed."""
+
     @override
-    def merge_one(self) -> tuple[MergeResult, Docket | None]:
-        """Merge the case, then delete the files of the documents it removed.
-
-        Returns:
-            The merge result and the merged docket, unchanged.
-        """
-        stored = self._stored_files()
-        result, docket = super().merge_one()
-        self._delete_removed(stored)
-        return result, docket
-
-    def _stored_files(self) -> dict[int, tuple[str, str]]:
-        """The files each of this docket's documents points at, before the merge runs.
-
-        Returns:
-            Each document's file and thumbnail keyed by its primary key,
-            or nothing for a docket being created.
-        """
-        if (docket := self.existing) is None:
-            return {}
-        return {
+    def update(
+        self,
+        state: MergerState.Update[NYCoACase, None, Docket],
+    ) -> MergerState.UpdateOutput[NYCoACase, None, Docket]:
+        """Note the files the docket's documents point at, then merge the case."""
+        self.stored_files = {
             pk: (path or "", thumbnail or "")
             for pk, path, thumbnail in NYCoADocument.objects.filter(
-                docket_entry__docket=docket
+                docket_entry__docket=state.instance
             ).values_list("pk", "filepath_local", "thumbnail")
         }
-
-    @staticmethod
-    def _delete_removed(stored: dict[int, tuple[str, str]]) -> None:
-        """Delete the files of the documents the merge removed, once it commits.
-
-        Published files are named by primary key, so no surviving document
-        can share one. A file still in the private bucket can be: the scraper
-        names files by content, so one file listed under two filings is one
-        key. Any key another document still points at is left alone.
-
-        Args:
-            stored: What `_stored_files` found before the merge.
-        """
-        if not stored:
-            return
-        kept = set(
-            NYCoADocument.objects.filter(pk__in=stored).values_list(
-                "pk", flat=True
-            )
-        )
-        removed = [stored[pk] for pk in stored.keys() - kept]
-        paths = {path for path, _ in removed if path}
-        referenced = set(
-            NYCoADocument.objects.filter(filepath_local__in=paths).values_list(
-                "filepath_local", flat=True
-            )
-        )
-        public = settings.AWS_STORAGE_BUCKET_NAME
-        for path, thumbnail in removed:
-            if path and path not in referenced:
-                bucket = (
-                    settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
-                    if is_scraped(path)
-                    else public
-                )
-                transaction.on_commit(partial(delete_file, bucket, path))
-            if thumbnail:
-                transaction.on_commit(partial(delete_file, public, thumbnail))
+        return super().update(state)
 
     @override
-    def query(self) -> QuerySet[Docket]:
+    def lookup(
+        self,
+        state: MergerState.Lookup[
+            NYCoACase,
+            None,
+            Docket,
+        ],
+    ) -> MergerState.LookupOutput[
+        NYCoACase,
+        None,
+        Docket,
+    ]:
         """The docket this case is, if CourtListener already has it.
 
         Returns:
             The candidate docket, of which the function returns at most
             one.
         """
-        return async_to_sync(find_docket_object_query)(
-            court_id=NYCOA_COURT_ID,
-            pacer_case_id=None,
-            docket_number=self.scrape.docket_number,
-            docket_number_core=make_docket_number_core(
-                self.scrape.docket_number
+        return state.resolve(
+            async_to_sync(find_docket_object_query)(
+                court_id=NYCOA_COURT_ID,
+                pacer_case_id=None,
+                docket_number=state.scrape.docket_number,
+                docket_number_core=make_docket_number_core(
+                    state.scrape.docket_number
+                ),
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                skip_dn_core_confirmation=True,
+                cheap_count=False,
             ),
-            federal_defendant_number=None,
-            federal_dn_judge_initials_assigned=None,
-            federal_dn_judge_initials_referred=None,
-            skip_dn_core_confirmation=True,
-            cheap_count=False,
         )
 
     @staticmethod
-    def validate(scrape: NYCoACase) -> bool:
+    def validator(scrape: NYCoACase) -> bool:
         """Whether this scrape can be merged at all.
 
         Args:
