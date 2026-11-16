@@ -10,6 +10,6 @@ View Docket on TAMES: {{ docket.texas_docket_url }}{% endif %}{% endautoescape %
 {{ de.description|wordwrap:80 }}{% endif %}{% if de.disposition %}
 Disposition: {{ de.disposition|wordwrap:80 }}{% endif %}{% if de.remarks %}
 Remarks: {{ de.remarks|wordwrap:80 }}{% endif %}{% for doc in de.texasdocument_set.all %}
-{{ doc.description|default:"Document" }}: {% if doc.filepath_local %}{{ doc.filepath_local.url }}{% elif doc.url|http_url %}{{ doc.url|http_url }}{% endif %}{% endfor %}
+{{ doc.description|default:"Document" }}{% if doc.filepath_local %}: {{ doc.filepath_local.url }}{% elif doc.url|http_url %}: {{ doc.url|http_url }}{% endif %}{% endfor %}
 
 {% endfor %}{% endautoescape %}{% endblock %}

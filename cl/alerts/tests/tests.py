@@ -1390,6 +1390,21 @@ class DocketAlertTexasTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Notice of appearance", mail.outbox[0].body)
 
+    def test_document_without_a_link_is_named_without_one(self) -> None:
+        """Is a document with neither a stored file nor a usable URL listed by name, with no dangling link, in both parts?"""
+        TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(docket=self.docket),
+            description="Sealed exhibit",
+            url="javascript:alert(1)",
+        )
+        send_alert_and_webhook(self.docket.pk, self.before)
+        message = mail.outbox[0]
+        html = message.alternatives[0][0]
+        self.assertIn("Sealed exhibit\n", message.body)
+        self.assertNotIn("Sealed exhibit:", message.body)
+        self.assertNotIn("javascript:", message.body)
+        self.assertNotIn("javascript:", html)
+
     def test_multiple_new_entries_go_in_one_email(self) -> None:
         """Does a single alert email bundle every entry created since `since`?"""
         for n, entry_type in enumerate(("First event", "Second event"), 1):
