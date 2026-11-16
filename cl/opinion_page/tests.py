@@ -4427,6 +4427,40 @@ class DocketEntryFileDownload(TestCase):
             second[header.index("texasdocketentry_disposition")], "Granted"
         )
 
+    def test_csv_export_keeps_texas_entries_without_documents(self) -> None:
+        """Most TAMES entries have no attachment: does each still get a row, with empty document columns, next to the entries that have documents?"""
+        texas_docket = DocketFactory(
+            court=CourtFactory(id="tex", jurisdiction="S"),
+            source=Docket.SCRAPER,
+        )
+        notice = TexasDocketEntryFactory(
+            docket=texas_docket,
+            sequence_number="2026-10-01.001",
+            entry_type="Notice of appearance",
+        )
+        brief = TexasDocketEntryFactory(
+            docket=texas_docket, sequence_number="2026-10-02.001"
+        )
+        document = TexasDocumentFactory(docket_entry=brief)
+
+        header, *rows = csv.reader(
+            io.StringIO(generate_docket_entries_csv_data([notice, brief]))
+        )
+
+        self.assertEqual(
+            [row[0] for row in rows], [str(notice.pk), str(brief.pk)]
+        )
+        notice_row, brief_row = rows
+        self.assertEqual(len(notice_row), len(header))
+        self.assertEqual(
+            notice_row[header.index("texasdocketentry_entry_type")],
+            "Notice of appearance",
+        )
+        self.assertEqual(notice_row[header.index("texasdocument_id")], "")
+        self.assertEqual(
+            brief_row[header.index("texasdocument_id")], str(document.pk)
+        )
+
 
 class DocketFeedTest(TestCase):
     """Does the docket RSS feed render the right content for RECAP and SCOTUS?"""

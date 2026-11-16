@@ -1079,16 +1079,24 @@ def generate_docket_entries_csv_data(
     # Each docket source keeps its documents under its own related name.
     source = docket_entries[0].docket.get_entry_source()
     columns = docket_entries[0].get_csv_columns(get_column_name=True)
+    document_columns: list[str] = []
     # The first entry may have no documents, so take the document columns
     # from the first document found.
     for docket_entry in docket_entries:
         if documents := list(source.documents_for_entry(docket_entry)):
-            columns += documents[0].get_csv_columns(get_column_name=True)
+            document_columns = documents[0].get_csv_columns(
+                get_column_name=True
+            )
             break
-    csvwriter.writerow(columns)
+    csvwriter.writerow(columns + document_columns)
 
     for docket_entry in docket_entries:
-        for document in source.documents_for_entry(docket_entry):
+        documents = list(source.documents_for_entry(docket_entry))
+        if not documents and source.exports_entries_without_documents:
+            csvwriter.writerow(
+                docket_entry.to_csv_row() + [""] * len(document_columns)
+            )
+        for document in documents:
             csvwriter.writerow(
                 docket_entry.to_csv_row() + document.to_csv_row()
             )

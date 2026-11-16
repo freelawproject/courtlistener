@@ -271,6 +271,12 @@ class DocketEntrySource:
     source that builds it from scraped fields MUST escape them, e.g. with
     ``format_html``, as ``_texas_entry_display_text`` does.
 
+    ``exports_entries_without_documents`` says whether the CSV export gives
+    an entry with no documents its own row, with empty document columns.
+    Without it, the export only writes one row per document, which suits
+    sources whose entries always have one, like RECAP and SCOTUS (with its
+    placeholders), but would drop most Texas entries.
+
     ``document_display_description`` does the same for each document's
     description, which ``attach_display_fields`` puts on
     ``document.display_description``. The legacy stack renders it unescaped
@@ -325,6 +331,7 @@ class DocketEntrySource:
     supports_docket_alerts: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
+    exports_entries_without_documents: bool = False
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -988,6 +995,7 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
+    exports_entries_without_documents=True,
     metadata_sections=_texas_metadata_sections,
 )
 
