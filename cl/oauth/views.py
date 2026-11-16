@@ -23,6 +23,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cl.oauth.validators import supported_scopes
+
 # What the metadata advertises. Client-credentials, password, and
 # device-code grants are intentionally left out: MCP clients are
 # confidential or public user-agent apps using authorization-code + PKCE.
@@ -77,12 +79,6 @@ class OAuthMetadataView(APIView):
     def get(self, request: Request) -> Response:
         """Return the server's OAuth metadata."""
         base = request.build_absolute_uri("/").rstrip("/")
-        oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
-        scopes_supported = [
-            scope
-            for scope in settings.OAUTH2_PROVIDER["SCOPES"]
-            if oidc_enabled or scope not in settings.OIDC_SCOPES
-        ]
         return Response(
             {
                 "issuer": base,
@@ -107,7 +103,7 @@ class OAuthMetadataView(APIView):
                         "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS"
                     )
                 ),
-                "scopes_supported": scopes_supported,
+                "scopes_supported": supported_scopes(),
                 "service_documentation": f"{settings.WIKI_API_BASE_URL}/rest/v4/overview",
             }
         )
