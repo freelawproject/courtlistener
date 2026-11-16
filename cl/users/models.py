@@ -1,3 +1,5 @@
+"""Models for user profiles, bar memberships, email flags, and stored emails."""
+
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -27,6 +29,8 @@ donation_exclusion_codes = [
 
 
 class BarMembership(models.Model):
+    """A state bar membership, identified by its state."""
+
     barMembership = USStateField(
         "the two letter state abbreviation of a bar membership"
     )
@@ -41,6 +45,8 @@ class BarMembership(models.Model):
 
 @pghistory.track()
 class UserProfile(models.Model):
+    """A user's settings and details beyond Django's user model."""
+
     user = models.OneToOneField(
         User,
         related_name="profile",
@@ -156,7 +162,8 @@ class UserProfile(models.Model):
     def is_member(self) -> bool:
         """Does the user have an active membership?
 
-        :return bool: True if so, False if not.
+        Returns:
+            bool: True if so, False if not.
         """
         try:
             membership = self.user.membership
@@ -166,12 +173,11 @@ class UserProfile(models.Model):
 
     @property
     def is_eligible_for_rt_search_alerts(self) -> bool:
-        """
-        Determine whether the user is eligible to receive real-time search
-        alerts.
+        """Determine whether the user is eligible to receive real-time search alerts.
 
-        :return bool: True if the user is either an active member or has the
-        unlimited docket alerts flag enabled.
+        Returns:
+            bool: True if the user is either an active member or has the
+            unlimited docket alerts flag enabled.
         """
         return self.is_member or self.unlimited_docket_alerts
 
@@ -179,7 +185,8 @@ class UserProfile(models.Model):
     def email_grants_unlimited_docket_alerts(self) -> bool:
         """Does the user's email grant them unlimited docket alerts?
 
-        :return: True if their email is on the list; else False.
+        Returns:
+            True if their email is on the list; else False.
         """
         # Don't check if the email is confirmed. They can't log in if so.
         domain = self.user.email.split("@")[1]
@@ -197,9 +204,12 @@ class UserProfile(models.Model):
          - They are under the free threshold, which the RECAP bonus raises
            when `recap_installed` is True
 
-        :param recap_installed: Whether the user has the RECAP extension, as
-        far as the caller can tell. The value is not verified here.
-        :return: True if they can make another alert; else False.
+        Args:
+            recap_installed: Whether the user has the RECAP extension, as
+                far as the caller can tell. The value is not verified here.
+
+        Returns:
+            True if they can make another alert; else False.
         """
         limit = settings.MAX_FREE_DOCKET_ALERTS
         if recap_installed:
@@ -218,11 +228,11 @@ class UserProfile(models.Model):
 
     @property
     def recent_api_usage(self) -> dict[str, int]:
-        """Get stats about API usage for the user for the past 14 days
+        """Get stats about API usage for the user for the past 14 days.
 
-        :return: A dict of date-count pairs indicating the amount of times the
-        user has hit the API per day.
-        :rtype: collections.OrderedDict
+        Returns:
+            collections.OrderedDict: A dict of date-count pairs indicating the amount of times the
+            user has hit the API per day.
         """
         start = datetime.today() - timedelta(days=14)
         end = datetime.today()
@@ -250,14 +260,14 @@ class UserProfile(models.Model):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class UserProfileBarMembership(UserProfile.barmembership.through):
-    """A model class to track user profile barmembership m2m relation"""
+    """A model class to track user profile barmembership m2m relation."""
 
     class Meta:
         proxy = True
 
 
 class EMAIL_NOTIFICATIONS:
-    """SES Email Notifications Subtypes"""
+    """SES Email Notifications Subtypes."""
 
     UNDETERMINED = 0
     GENERAL = 1
@@ -288,7 +298,7 @@ class EMAIL_NOTIFICATIONS:
 
 
 class FLAG_TYPES:
-    """EmailFlag Flag Types"""
+    """EmailFlag Flag Types."""
 
     BAN = 0
     BACKOFF = 1
@@ -357,7 +367,8 @@ class EmailFlag(AbstractDateTimeModel):
     def under_waiting_period(self) -> bool:
         """Does the backoff event is under waiting period?
 
-        :return bool: True if so, False if not.
+        Returns:
+            bool: True if so, False if not.
         """
         if now() < self.next_retry_date:
             return True
@@ -435,9 +446,9 @@ class EmailSent(AbstractDateTimeModel):
     ) -> EmailMessage | EmailMultiAlternatives:
         """Composes an email multipart message from the data stored.
 
-        :return email: Return an EmailMessage or EmailMultiAlternatives message
+        Returns:
+            email: Return an EmailMessage or EmailMultiAlternatives message
         """
-
         # Get the required fields to compose the email multipart message
         keys_to_use = ("subject", "from_email", "reply_to", "headers", "to")
         msg_dict = {k: v for k, v in self.__dict__.items() if k in keys_to_use}
@@ -467,7 +478,7 @@ class EmailSent(AbstractDateTimeModel):
 
 
 class STATUS_TYPES:
-    """FailedEmail Status Types"""
+    """FailedEmail Status Types."""
 
     WAITING = 0
     ENQUEUED = 1
@@ -528,6 +539,14 @@ class FailedEmail(AbstractDateTimeModel):
 def generate_recap_email(
     user_profile: UserProfile, append: int | None = None
 ) -> str:
+    """Make a unique ``@recap.email`` address from the user's username.
+
+    Non-alphanumeric runs become dots, and a number is appended if the
+    address is taken.
+
+    Raises:
+        FieldError: If no free address is found after 100 attempts.
+    """
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""
@@ -554,7 +573,7 @@ def generate_recap_email(
     ),
 )
 class UserProxy(User):
-    """A proxy model class to track auth user model"""
+    """A proxy model class to track auth user model."""
 
     class Meta:
         proxy = True
@@ -562,7 +581,7 @@ class UserProxy(User):
 
 @pghistory.track()
 class GroupProxy(Group):
-    """A proxy model class to track auth group model"""
+    """A proxy model class to track auth group model."""
 
     class Meta:
         proxy = True
@@ -570,7 +589,7 @@ class GroupProxy(Group):
 
 @pghistory.track()
 class PermissionProxy(Permission):
-    """A proxy model class to track auth permission model"""
+    """A proxy model class to track auth permission model."""
 
     class Meta:
         proxy = True
@@ -580,7 +599,7 @@ class PermissionProxy(Permission):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class GroupPermissions(Group.permissions.through):
-    """A proxy model class to track group permissions m2m relation"""
+    """A proxy model class to track group permissions m2m relation."""
 
     class Meta:
         proxy = True
@@ -590,7 +609,7 @@ class GroupPermissions(Group.permissions.through):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class UserGroups(User.groups.through):
-    """A proxy model class to track user groups m2m relation"""
+    """A proxy model class to track user groups m2m relation."""
 
     class Meta:
         proxy = True
@@ -600,7 +619,7 @@ class UserGroups(User.groups.through):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class UserPermissions(User.user_permissions.through):
-    """A proxy model class to track user permissions m2m relation"""
+    """A proxy model class to track user permissions m2m relation."""
 
     class Meta:
         proxy = True

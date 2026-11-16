@@ -1,3 +1,5 @@
+"""Django admin configuration for SCOTUS network visualizations."""
+
 from django.contrib import admin
 
 from cl.visualizations.models import JSONVersion, SCOTUSMap
@@ -5,6 +7,8 @@ from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 @admin.register(JSONVersion)
 class JSONVersionAdmin(admin.ModelAdmin):
+    """Admin for visualization JSON versions."""
+
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -13,12 +17,16 @@ class JSONVersionAdmin(admin.ModelAdmin):
 
 
 class JSONVersionInline(admin.StackedInline):
+    """Inline for editing a visualization's JSON versions."""
+
     model = JSONVersion
     extra = 1
 
 
 @admin.register(SCOTUSMap)
 class SCOTUSMapAdmin(admin.ModelAdmin):
+    """Admin for SCOTUS network visualizations, with their JSON versions inline."""
+
     inlines = (JSONVersionInline,)
     raw_id_fields = (
         "clusters",

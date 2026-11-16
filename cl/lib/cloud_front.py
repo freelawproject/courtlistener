@@ -1,3 +1,5 @@
+"""Invalidate paths in the CloudFront cache."""
+
 import time
 
 import boto3
@@ -5,11 +7,14 @@ from django.conf import settings
 
 
 def invalidate_cloudfront(paths: str | list[str]) -> str:
-    """Delete an item from the CloudFront cache
+    """Delete an item from the CloudFront cache.
 
-    :param paths: An list of paths or a single path. Terminal asterisks are OK.
-    Leading slashes are a must.
-    :return The invalidation ID for the invalidation request.
+    Args:
+        paths: An list of paths or a single path. Terminal asterisks are OK.
+            Leading slashes are a must.
+
+    Returns:
+        The invalidation ID for the invalidation request.
     """
     # Normalize input
     if isinstance(paths, str):

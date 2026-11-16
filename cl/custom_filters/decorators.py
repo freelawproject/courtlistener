@@ -1,3 +1,5 @@
+"""Decorators for checking a view's honeypot field."""
+
 from collections.abc import Callable
 from functools import wraps
 from typing import overload
@@ -11,8 +13,8 @@ from cl.lib.types import DjangoViewType
 
 
 def honeypot_equals(val):
-    """
-    Default verifier used if HONEYPOT_VERIFIER is not specified.
+    """Default verifier used if HONEYPOT_VERIFIER is not specified.
+
     Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
     """
     expected = getattr(settings, "HONEYPOT_VALUE", "")
@@ -22,8 +24,7 @@ def honeypot_equals(val):
 
 
 def verify_honeypot_value(request, field_name):
-    """
-    Verify that request.POST[field_name] is a valid honeypot.
+    """Verify that request.POST[field_name] is a valid honeypot.
 
     Ensures that the field exists and passes verification according to
     HONEYPOT_VERIFIER.
@@ -74,8 +75,7 @@ def check_honeypot[
         DjangoViewType[P, Request, HttpResponse],
     ]
 ):
-    """
-    Check request.POST for valid honeypot field.
+    """Check request.POST for valid honeypot field.
 
     Takes an optional field_name that defaults to HONEYPOT_FIELD_NAME if
     not specified.

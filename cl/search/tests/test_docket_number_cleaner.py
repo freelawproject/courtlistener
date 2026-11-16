@@ -324,10 +324,7 @@ class TestExtractWithLLM(TestCase):
     def test_extract_with_llm_handles_validation_error(
         self, mock_logger, mock_call_llm
     ):
-        """Test that extract_with_llm catches Pydantic ValidationError from call_llm and handles it correctly
-        by logging and returning without an exception
-        """
-
+        """Test that extract_with_llm catches Pydantic ValidationError from call_llm and handles it correctly by logging and returning without an exception."""
         mock_call_llm.side_effect = ValidationError.from_exception_data(
             "Invalid data", line_errors=[]
         )

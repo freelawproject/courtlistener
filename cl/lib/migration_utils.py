@@ -1,3 +1,5 @@
+"""Helpers for data migrations."""
+
 from collections.abc import Iterable
 
 from django.apps.registry import Apps
@@ -27,11 +29,11 @@ def load_migration_fixture(
 
     https://stackoverflow.com/a/39743581/64911
 
-    :param apps: Apps at the state of the migration.
-    :param schema_editor: The schema at the time of the migration.
-    :param fixture: A path to the fixture to be loaded.
-    :param app_label: The app label the fixture should be loaded into.
-    :return: None
+    Args:
+        apps: Apps at the state of the migration.
+        schema_editor: The schema at the time of the migration.
+        fixture: A path to the fixture to be loaded.
+        app_label: The app label the fixture should be loaded into.
     """
     # Save the old _get_model_from_node() function. django-stubs omit this
     # private method.
@@ -69,6 +71,7 @@ def make_new_user(
     email: str,
     permission_codenames: Iterable[str],
 ) -> None:
+    """Create a user with an unusable password, a confirmed profile, and the given permissions."""
     User = apps.get_model(
         "auth",
         "User",

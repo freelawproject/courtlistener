@@ -1,3 +1,5 @@
+"""Exceptions for invalid search queries and Elasticsearch errors."""
+
 from enum import Enum
 from http import HTTPStatus
 
@@ -7,40 +9,43 @@ from rest_framework.exceptions import APIException
 
 
 class QueryType(Enum):
+    """The part of a search where a syntax error was found."""
+
     QUERY_STRING = "QUERY_STRING"
     FILTER = "FILTER"
 
 
 class SyntaxQueryError(SerializationError):
+    """Base error for a search with invalid syntax."""
+
     QUERY_STRING = QueryType.QUERY_STRING
     FILTER = QueryType.QUERY_STRING.FILTER
 
     def __init__(self, error_type):
+        """Record the kind of error in the search."""
         self.error_type = error_type
 
 
 class UnbalancedParenthesesQuery(SyntaxQueryError):
-    """Data passed in has unbalanced parentheses"""
+    """Data passed in has unbalanced parentheses."""
 
     message = "The query contains unbalanced parentheses."
 
 
 class UnbalancedQuotesQuery(SyntaxQueryError):
-    """Data passed in has unbalanced quotes"""
+    """Data passed in has unbalanced quotes."""
 
     message = "The query contains unbalanced quotes."
 
 
 class BadProximityQuery(SyntaxQueryError):
-    """Data passed in has contains a not supported search proximity token"""
+    """Data passed in has contains a not supported search proximity token."""
 
     message = "The query contains an unrecognized proximity token."
 
 
 class ElasticServerError(APIException):
-    """Exception for handling internal server errors specifically related to
-    Elasticsearch requests.
-    """
+    """Exception for handling internal server errors specifically related to Elasticsearch requests."""
 
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
     default_detail = (
@@ -60,7 +65,7 @@ class ElasticBadRequestError(APIException):
 
 
 class DisallowedWildcardPattern(SyntaxQueryError):
-    """Query contains a disallowed wildcard pattern"""
+    """Query contains a disallowed wildcard pattern."""
 
     message = "The query contains a disallowed wildcard pattern."
 

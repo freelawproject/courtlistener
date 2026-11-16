@@ -1,3 +1,5 @@
+"""Signal handlers for SES bounces and complaints, and for new users, profiles, and webhooks."""
+
 import json
 import logging
 import random
@@ -31,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 class SESEventType(StrEnum):
+    """The SES notification event types that are handled."""
+
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -38,10 +42,12 @@ class SESEventType(StrEnum):
 def get_message_id(mail_obj: dict) -> str:
     """Returns the unique message_id from the SES notification header.
 
-    :param mail_obj: The notification mail object to extract the message_id
-    :return message_id: The unique message_id
-    """
+    Args:
+        mail_obj: The notification mail object to extract the message_id
 
+    Returns:
+        message_id: The unique message_id
+    """
     headers = mail_obj["headers"]
     for header in headers:
         if header["name"] == "X-CL-ID":
@@ -53,14 +59,13 @@ def get_message_id(mail_obj: dict) -> str:
 def store_bounce_or_complaint_obj(
     bounce_obj: dict[str, Any], email_recipient: str, obj_type: SESEventType
 ) -> None:
-    """
-    Store the SES bounce/complaint payload to S3 as JSON.
+    """Store the SES bounce/complaint payload to S3 as JSON.
 
-    :param bounce_obj: The bounce payload to store.
-    :param email_recipient: The email address the event belongs to.
-    :param obj_type: The type of the bounce/complaint.
+    Args:
+        bounce_obj: The bounce payload to store.
+        email_recipient: The email address the event belongs to.
+        obj_type: The type of the bounce/complaint.
     """
-
     match obj_type:
         case SESEventType.COMPLAINT:
             dir_name = "complaints"
@@ -70,12 +75,12 @@ def store_bounce_or_complaint_obj(
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
             assert_never(obj_type)
-            return None
+            return
 
     if random.random() >= storing_rate or not email_recipient:
         # Ignore events that exceed the random sampling rate or have no
         # email recipient.
-        return None
+        return
 
     try:
         storage = S3PrivateUUIDStorage()
@@ -92,15 +97,12 @@ def store_bounce_or_complaint_obj(
             obj_type.value,
             email_recipient,
         )
-        return None
+        return
 
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
-    """Receiver function to handle bounce notifications sent by Amazon SES via
-    handle_event_webhook
-    """
-
+    """Receiver function to handle bounce notifications sent by Amazon SES via handle_event_webhook."""
     message_id = get_message_id(mail_obj)
     normalized_recipients = []
     if bounce_obj:
@@ -145,10 +147,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
 def complaint_handler(
     sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
 ):
-    """Receiver function to handle complaint notifications sent by
-    Amazon SES via handle_event_webhook
-    """
-
+    """Receiver function to handle complaint notifications sent by Amazon SES via handle_event_webhook."""
     if complaint_obj:
         complained_recipients = complaint_obj["complainedRecipients"]
         recipient_emails = [
@@ -170,6 +169,7 @@ def complaint_handler(
     dispatch_uid="create_auth_token",
 )
 def create_auth_token(sender, instance=None, created=False, **kwargs):
+    """Create an API token for each new user and count the new account."""
     if created:
         Token.objects.create(user=instance)
         accounts_created_total.inc()
@@ -181,6 +181,7 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
     dispatch_uid="create_superuser_profile_object",
 )
 def superuser_creation(sender, instance, created, **kwargs):
+    """Create a confirmed profile for each new superuser."""
     # Create a profile whenever createsuperuser is run
     if created and instance.is_superuser:
         UserProfile.objects.create(
@@ -193,6 +194,7 @@ def superuser_creation(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
 def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+    """Give each new profile a unique ``@recap.email`` address."""
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()
@@ -202,8 +204,9 @@ def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
 def webhook_created_or_updated(
     sender, instance=None, created=False, update_fields=None, **kwargs
 ) -> None:
-    """Notify admins when a new webhook is created or updated. Avoid sending
-    the notification when the webhook failure_count is updated.
+    """Notify admins when a new webhook is created or updated.
+
+    Avoid sending the notification when the webhook failure_count is updated.
     """
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)

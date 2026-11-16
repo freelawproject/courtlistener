@@ -145,6 +145,18 @@ docker exec cl-django python manage.py test --keepdb cl.appname.tests.TestClassN
 - MUST NOT use Django fixtures. If fixtures are found, MUST replace them with tests that
   use FactoryBoy and Fakes.
 
+## Benchmarks
+
+SHOULD write benchmarks for hot-path or performance critical code.
+
+SHOULD periodically run benchmarks when modifying covered code to avoid performance regressions.
+
+### Running Benchmarks
+
+```bash
+docker exec cl-django uv run pytest -c bench.ini
+```
+
 ## Database Migrations
 
 When creating code that modifies Django models, MUST strictly follow the Database

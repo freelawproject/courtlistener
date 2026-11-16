@@ -1,3 +1,5 @@
+"""Generate a crosswalk between CAP cases and CourtListener clusters."""
+
 import json
 import logging
 import os
@@ -38,9 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 class Command(CommandUtils, BaseCommand):
+    """Match CAP case metadata to CourtListener clusters and save the crosswalk files."""
+
     help = "Generate a comprehensive crosswalk between CAP and CourtListener cases using only CasesMetadata.json"
 
     def add_arguments(self, parser):
+        """Add the reporter, volume, dry-run, verbosity, output, start, and updated-after options."""
         parser.add_argument(
             "--reporter", type=str, help="Process only this reporter"
         )
@@ -73,6 +78,11 @@ class Command(CommandUtils, BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Generate the crosswalk and print statistics, creating the output directory if needed.
+
+        Raises:
+            ValueError: If ``--updated-after`` isn't a valid date.
+        """
         if options["verbose"]:
             logger.setLevel(logging.DEBUG)
 
@@ -114,8 +124,8 @@ class Command(CommandUtils, BaseCommand):
     def setup_s3_client(self, mock_client: Any | None = None) -> None:
         """Set up S3 client for accessing CAP data in R2.
 
-        :param mock_client: Optional mock client for testing.
-        :return: None
+        Args:
+            mock_client: Optional mock client for testing.
         """
         if mock_client:
             self.s3_client = mock_client
@@ -131,9 +141,9 @@ class Command(CommandUtils, BaseCommand):
     def generate_complete_crosswalk(self) -> None:
         """Generate a complete crosswalk for all reporters or a specific reporter.
 
-        :return: No return, generates and saves the crosswalk file
+        Returns:
+            No return, generates and saves the crosswalk file
         """
-
         reporters = self.fetch_reporters_metadata()
 
         if self.single_reporter:
@@ -172,9 +182,9 @@ class Command(CommandUtils, BaseCommand):
     ) -> None:
         """Generate crosswalk for a specific reporter.
 
-        :param reporter: Dictionary containing reporter metadata.
-        :param index: Index of the reporter being processed.
-        :return: None
+        Args:
+            reporter: Dictionary containing reporter metadata.
+            index: Index of the reporter being processed.
         """
         crosswalk = []
         reporter_name = reporter["short_name"]
@@ -248,8 +258,11 @@ class Command(CommandUtils, BaseCommand):
     def fetch_volumes_for_reporter(self, reporter_slug: str) -> list[str]:
         """Fetch volume directories for a given reporter from R2 using a paginator.
 
-        :param reporter_slug: The slug of the reporter.
-        :return: A list of volume directory names.
+        Args:
+            reporter_slug: The slug of the reporter.
+
+        Returns:
+            A list of volume directory names.
         """
         volume_directories = []
 
@@ -291,10 +304,13 @@ class Command(CommandUtils, BaseCommand):
     ) -> OpinionCluster | None:
         """Find a matching case in CourtListener database using the filepath_json_harvard field.
 
-        :param case_meta: Case metadata dictionary from CAP.
-        :param reporter_slug: The slug of the reporter.
-        :param volume: The volume number.
-        :return: An OpinionCluster object if a match is found, otherwise None.
+        Args:
+            case_meta: Case metadata dictionary from CAP.
+            reporter_slug: The slug of the reporter.
+            volume: The volume number.
+
+        Returns:
+            An OpinionCluster object if a match is found, otherwise None.
         """
         try:
             cap_case_id = str(case_meta["id"])
@@ -333,9 +349,12 @@ class Command(CommandUtils, BaseCommand):
     ) -> list[dict[str, Any]]:
         """Fetch CasesMetadata.json for a specific reporter and volume from R2.
 
-        :param reporter_slug: The slug of the reporter.
-        :param volume: The volume number.
-        :return: A list of case metadata dictionaries.
+        Args:
+            reporter_slug: The slug of the reporter.
+            volume: The volume number.
+
+        Returns:
+            A list of case metadata dictionaries.
         """
         key = f"{reporter_slug}/{volume}/CasesMetadata.json"
         try:
@@ -372,7 +391,8 @@ class Command(CommandUtils, BaseCommand):
     def fetch_reporters_metadata(self) -> list[dict[str, Any]]:
         """Fetch ReportersMetadata.json from R2.
 
-        :return: A list of reporter metadata dictionaries.
+        Returns:
+            A list of reporter metadata dictionaries.
         """
         try:
             response = self.s3_client.get_object(
@@ -386,8 +406,11 @@ class Command(CommandUtils, BaseCommand):
     def is_valid_case_metadata(self, case_meta: dict[str, Any]) -> bool:
         """Check if case metadata contains all required fields.
 
-        :param case_meta: Case metadata dictionary.
-        :return: True if metadata is valid, False otherwise.
+        Args:
+            case_meta: Case metadata dictionary.
+
+        Returns:
+            True if metadata is valid, False otherwise.
         """
         required_fields = [
             "id",
@@ -402,10 +425,7 @@ class Command(CommandUtils, BaseCommand):
         )
 
     def print_statistics(self) -> None:
-        """Print statistics about the crosswalk generation process.
-
-        :return: None
-        """
+        """Print statistics about the crosswalk generation process."""
         self.stdout.write(
             self.style.SUCCESS(
                 f"Total cases processed from R2: {self.total_cases_processed}"
@@ -431,10 +451,10 @@ class Command(CommandUtils, BaseCommand):
     ) -> None:
         """Save the generated crosswalk to a JSON file.
 
-        :param crosswalk: List of crosswalk entries.
-        :param reporter_name: Name of the reporter.
-        :param index: Index of the reporter being processed.
-        :return: None
+        Args:
+            crosswalk: List of crosswalk entries.
+            reporter_name: Name of the reporter.
+            index: Index of the reporter being processed.
         """
         filename = f"{reporter_name.replace(' ', '_').replace('.', '_')}.json"
         filepath = os.path.join(self.output_dir, filename)

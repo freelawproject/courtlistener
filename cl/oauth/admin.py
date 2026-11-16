@@ -1,3 +1,5 @@
+"""Admin registrations for OAuth models."""
+
 from django.contrib import admin
 from oauth2_provider.admin import ApplicationAdmin
 from oauth2_provider.models import get_application_model

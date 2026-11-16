@@ -1,3 +1,5 @@
+"""Nightly iquery crawl of dockets and pray-and-pay availability checks."""
+
 import random
 import re
 from datetime import datetime, timedelta
@@ -22,8 +24,11 @@ from cl.search.models import Court, Docket, RECAPDocument
 def get_docket_ids_missing_info(num_to_get: int) -> set[int]:
     """Retrieve a set of docket IDs for RECAP dockets where date_filed is null.
 
-    :param num_to_get: Number of docket IDs to retrieve.
-    :return: A set of docket IDs matching the query.
+    Args:
+        num_to_get: Number of docket IDs to retrieve.
+
+    Returns:
+        A set of docket IDs matching the query.
     """
     return set(
         Docket.objects.filter(
@@ -41,12 +46,11 @@ def get_docket_ids_missing_info(num_to_get: int) -> set[int]:
 
 
 def get_docket_ids_docket_alerts() -> set[int]:
-    """Retrieve a set of docket IDs for active subscription docket alerts
-    related to non-terminated dockets.
+    """Retrieve a set of docket IDs for active subscription docket alerts related to non-terminated dockets.
 
-    :return: A set of docket IDs matching the query.
+    Returns:
+        A set of docket IDs matching the query.
     """
-
     return set(
         DocketAlert.objects.filter(
             alert_type=DocketAlert.SUBSCRIPTION, docket__date_terminated=None
@@ -58,10 +62,10 @@ def get_docket_ids_docket_alerts() -> set[int]:
 
 
 def get_docket_ids_week_ago_no_case_name() -> set[int]:
-    """Retrieve a set of RECAP docket IDs created or modified within the
-    last week with an empty case name.
+    """Retrieve a set of RECAP docket IDs created or modified within the last week with an empty case name.
 
-    :return: A set of docket IDs matching the criteria.
+    Returns:
+        A set of docket IDs matching the criteria.
     """
     one_week_ago = datetime.today() - timedelta(days=7)
     return set(
@@ -81,15 +85,15 @@ def get_docket_ids_week_ago_no_case_name() -> set[int]:
 
 
 def get_recap_documents_pray_and_pay() -> QuerySet[RECAPDocument]:
-    """
-    Retrieve a set of RECAP documents that should be checked for availability
-    on PACER as part of the Pray and Pay project
+    """Retrieve a set of RECAP documents that should be checked for availability on PACER as part of the Pray and Pay project.
+
     - This is focused on transcripts that have likely had their embargo lifted
     after the three-month period.
     - In the future, depending on outcomes, we can entertain implementing
     exponential backoff, but I don't think it's necessary right now.
 
-    :return: A set of documents matching the criteria.
+    Returns:
+        A set of documents matching the criteria.
     """
     cutoff_date = timezone.now() - timedelta(days=91)
 
@@ -104,9 +108,10 @@ def get_recap_documents_pray_and_pay() -> QuerySet[RECAPDocument]:
 
 
 def get_docket_ids() -> set[int]:
-    """Get docket IDs to update via iquery
+    """Get docket IDs to update via iquery.
 
-    :return: docket IDs for which we should crawl iquery
+    Returns:
+        docket IDs for which we should crawl iquery
     """
     docket_ids = set()
     if hasattr(settings, "PLAUSIBLE_API_TOKEN"):
@@ -181,9 +186,12 @@ def get_docket_ids() -> set[int]:
 
 
 class Command(VerboseCommand):
+    """Queue iquery crawls of dockets and availability checks of prayed-for documents."""
+
     help = "Scrape PACER iquery report"
 
     def add_arguments(self, parser):
+        """Add the queue, old-terminated, and missing date filed options."""
         parser.add_argument(
             "--queue",
             default="iquery",
@@ -205,6 +213,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue iquery crawls for the selected dockets, then check prayed-for documents.
+
+        Dockets without a PACER case ID or outside district and bankruptcy
+        courts are skipped, as are long-terminated, long-quiet dockets that
+        have a filing date and case name unless ``--include-old-terminated``
+        is set. Prayed-for documents without a PACER document ID are only
+        marked as checked.
+        """
         super().handle(*args, **options)
         do_missing_date_filed = options["do_missing_date_filed"]
         if do_missing_date_filed:

@@ -1,5 +1,3 @@
-"""
-Models and logic unique to Texas dockets.
-"""
+"""Models and logic unique to Texas dockets."""
 
 __all__ = ["models"]

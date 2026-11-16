@@ -1,3 +1,5 @@
+"""Admin email templates for changed and stale PACER RSS feeds."""
+
 from django.conf import settings
 
 from cl.lib.types import EmailType

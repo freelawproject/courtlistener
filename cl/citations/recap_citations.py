@@ -1,3 +1,5 @@
+"""Find and store the citations in RECAP documents."""
+
 from django.db import transaction
 from eyecite import get_citations
 from eyecite.models import CitationBase
@@ -19,14 +21,11 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def store_recap_citations(document: RECAPDocument) -> None:
+    """Identify citations from federal filings to opinions.
+
+    Args:
+        document: A search.RECAPDocument object.
     """
-    Identify citations from federal filings to opinions.
-
-    :param document: A search.RECAPDocument object.
-
-    :return: None
-    """
-
     chunks = make_get_citations_kwargs(document)
     citations = []
     for chunk in chunks:

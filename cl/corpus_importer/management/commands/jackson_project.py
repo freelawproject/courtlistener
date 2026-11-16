@@ -1,3 +1,5 @@
+"""Download the PACER dockets of Judge Ketanji Jackson's D.D.C. cases."""
+
 import os
 
 from asgiref.sync import async_to_sync
@@ -7,7 +9,7 @@ from django.conf import settings
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.search.models import Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -40,9 +42,7 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                session_data=SessionData(
-                    session.cookies, session.proxy_address
-                ),
+                session_data=session,
                 docket_pk=d.pk,
                 tag_names=[JACKSON_TAG],
                 **{
@@ -55,9 +55,12 @@ def get_dockets(options):
 
 
 class Command(VerboseCommand):
+    """Queue PACER docket downloads for Judge Jackson's cases."""
+
     help = """Get all relevant cases by a Judge Ketanji Jackson"""
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, and limit options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -79,6 +82,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue the docket downloads."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         # Get dockets for all of the relevant cases
         get_dockets(options)

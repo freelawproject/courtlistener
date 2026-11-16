@@ -1,3 +1,5 @@
+"""Template context processors for settings, tips, and email ban status."""
+
 import random
 from typing import Never, TypedDict, cast
 
@@ -111,6 +113,7 @@ info_tips = (
 
 
 def inject_random_tip(request: HttpRequest) -> dict[str, str]:
+    """Add a random tip to the context as ``TIP``."""
     return {"TIP": random.choice(info_tips)}
 
 
@@ -147,8 +150,11 @@ def inject_email_ban_status(
 ) -> _EmailBanStatus | dict[Never, Never]:
     """This function injects the status of the user's email address.
 
-    :param request: Contains the user for checking if their email is valid.
-    return dict: The message and date for the user's email status.
+    Args:
+        request: Contains the user for checking if their email is valid.
+
+    Returns:
+        dict: The message and date for the user's email status.
     """
     user = request.user
     if user.is_authenticated:

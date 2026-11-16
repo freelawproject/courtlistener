@@ -1,3 +1,5 @@
+"""Queue tasks to generate opinion text embeddings and save them to S3."""
+
 from celery import chain
 from django.conf import settings
 
@@ -13,19 +15,25 @@ from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
 def compose_redis_key() -> str:
     """Compose a Redis key based on the search type for embedding log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return f"{SEARCH_TYPES.OPINION}_inception_embedding:log"
 
 
 class Command(VerboseCommand):
+    """Queue embedding generation for opinions in batches limited by token count."""
+
     help = "Gets text embeddings for opinions and stores them in S3."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
         self.throttle = None
 
     def add_arguments(self, parser):
+        """Add the database, token, start, resume, count, queue, throttle, device, and opinion ID options."""
         parser.add_argument(
             "--database",
             type=str,
@@ -100,11 +108,12 @@ class Command(VerboseCommand):
     ) -> None:
         """Send a batch of items for embedding creation and saving to S3.
 
-        :param batch: A list of Opinion IDs representing the batch to process.
-        :param embedding_queue: The name of the queue to process the embedding task.
-        :param upload_queue: The name of the queue to process the saving task.
-        :param database: The database to be used during processing.
-        :return: None.
+        Args:
+            batch: A list of Opinion IDs representing the batch to process.
+            embedding_queue: The name of the queue to process the embedding task.
+            upload_queue: The name of the queue to process the saving task.
+            database: The database to be used during processing.
+            device: The device to run the embedding model on.
         """
         self.throttle.maybe_wait()
         chain(
@@ -115,6 +124,13 @@ class Command(VerboseCommand):
         ).apply_async()
 
     def handle(self, *args, **options):
+        """Queue embedding of the selected opinions in batches under the token limit.
+
+        Opinions that aren't versions of another opinion are selected by ID
+        or from ``--start-id``. Opinions shorter than ``MIN_OPINION_SIZE``
+        tokens are skipped, and opinions over the token limit are logged and
+        skipped.
+        """
         embedding_queue = options["embedding_queue"]
         upload_queue = options["upload_queue"]
         database = options["database"]

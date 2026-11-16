@@ -1,3 +1,5 @@
+"""Htmx viewsets for managing a user's webhooks and viewing their events."""
+
 from http import HTTPStatus
 
 from django.core.paginator import Paginator
@@ -23,10 +25,7 @@ from cl.users.forms import WebhookForm
 
 
 class WebhooksViewSet(ModelViewSet):
-    """
-    A set of actions to handle the listing, creation, deleting, and updating
-    of webhooks for htmx.
-    """
+    """A set of actions to handle the listing, creation, deleting, and updating of webhooks for htmx."""
 
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
@@ -34,14 +33,12 @@ class WebhooksViewSet(ModelViewSet):
     throttle_classes = []
 
     def get_queryset(self):
-        """
-        Return a list of all the webhooks
-        for the currently authenticated user.
-        """
+        """Return a list of all the webhooks for the currently authenticated user."""
         user = self.request.user
         return Webhook.objects.filter(user=user).order_by("date_created")
 
     def list(self, request, *args, **kwargs):
+        """Render the user's webhooks."""
         webhooks = self.get_queryset()
         return Response(
             {"webhooks": webhooks},
@@ -49,6 +46,7 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
+        """Delete a webhook and trigger a refresh of the webhook list."""
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
@@ -57,6 +55,7 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def retrieve(self, request, *args, **kwargs):
+        """Render the update form for a webhook."""
         instance = self.get_object()
         update = True
         form = WebhookForm(update, request.user, instance=instance)
@@ -66,6 +65,11 @@ class WebhooksViewSet(ModelViewSet):
         )
 
     def create(self, request, *args, **kwargs):
+        """Create a webhook for the user.
+
+        On success, responds with 201 and triggers a refresh of the webhook
+        list. Otherwise, re-renders the create form with its errors.
+        """
         update = False
         webhook = Webhook()
         form = WebhookForm(
@@ -86,6 +90,11 @@ class WebhooksViewSet(ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
+        """Update a webhook.
+
+        On success, responds with 200 and triggers a refresh of the webhook
+        list. Otherwise, re-renders the update form with its errors.
+        """
         instance = self.get_object()
         update = True
         form = WebhookForm(
@@ -107,6 +116,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def render_form(self, request, *args, **kwargs):
+        """Render an empty webhook create form."""
         webhook = Webhook()
         update = False
         form = WebhookForm(update, request.user, instance=webhook)
@@ -117,10 +127,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=True, methods=["get", "post"])
     def test_webhook(self, request, *args, **kwargs):
-        """Render the webhook test template on GET and send the test webhook
-        event on POST.
-        """
-
+        """Render the webhook test template on GET and send the test webhook event on POST."""
         webhook = self.get_object()
         event_type = webhook.event_type
         version = webhook.version
@@ -238,10 +245,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def get_available_versions(self, request, *args, **kwargs):
-        """Render the webhook version field containing available versions for
-        the select event type.
-        """
-
+        """Render the webhook version field containing available versions for the select event type."""
         event_type = request.GET.get("event_type")
         htmx_template = "includes/webhooks_htmx/webhook-version-select.html"
         context = {"version_choices": []}
@@ -270,9 +274,7 @@ class WebhooksViewSet(ModelViewSet):
 
 
 class WebhookEventViewSet(ModelViewSet):
-    """
-    A set of actions to handle listing and filtering webhooks events for htmx.
-    """
+    """A set of actions to handle listing and filtering webhooks events for htmx."""
 
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [TemplateHTMLRenderer]
@@ -281,16 +283,14 @@ class WebhookEventViewSet(ModelViewSet):
     throttle_classes = []
 
     def get_queryset(self):
-        """
-        Returns a list of all webhook events for the currently authenticated
-        user.
-        """
+        """Returns a list of all webhook events for the currently authenticated user."""
         user = self.request.user
         return WebhookEvent.objects.filter(webhook__user=user).order_by(
             "-date_created"
         )
 
     def list(self, request, *args, **kwargs):
+        """Render a page of 20 of the user's filtered webhook events."""
         webhook_events = self.filter_queryset(self.get_queryset())
         page_number = self.request.query_params.get("page")
         paginator = Paginator(webhook_events, 20)

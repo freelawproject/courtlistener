@@ -1,3 +1,5 @@
+"""Helpers for building opinion cluster and docket pages."""
+
 import csv
 import logging
 import traceback
@@ -5,7 +7,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from io import StringIO
 from typing import Any, NotRequired, TypedDict, cast
-from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -25,6 +26,7 @@ from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
 from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
+from zoneinfo import ZoneInfo
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -70,10 +72,7 @@ def _person_item(
     person_str: str,
     search_param: str = "assigned_to",
 ) -> MetadataItem | None:
-    """Build a metadata item for a person field with both a FK and a string
-    fallback. Returns a linked item when the person FK is set, a nofollow
-    search-link item when only the string is set, or None when both are empty.
-    """
+    """Build a metadata item for a person field with both a FK and a string fallback. Returns a linked item when the person FK is set, a nofollow search-link item when only the string is set, or None when both are empty."""
     if person:
         return {
             "label": label,
@@ -768,11 +767,35 @@ def build_docket_tabs(
     return tabs
 
 
+def separate_syllabus(cluster: OpinionCluster) -> bool:
+    """Whether the opinion page should show the syllabus after the headmatter.
+
+    The page shows a cluster's headmatter instead of its other front matter,
+    since Harvard's headmatter already holds the syllabus. Other sources,
+    such as Centralia's structured extraction, store the cover in headmatter
+    and the syllabus on its own, so it has to be shown as well.
+
+    :param cluster: The cluster shown on the page.
+    :return: True when the cluster has headmatter and a syllabus, and does
+    not come from Harvard.
+    """
+    return bool(
+        cluster.headmatter
+        and cluster.syllabus
+        and not cluster.filepath_json_harvard
+    )
+
+
 async def get_case_title(cluster: OpinionCluster) -> str:
+    """Title a cluster with its case name, truncated to 100 characters, and its citations."""
     return f"{trunc(best_case_name(cluster), 100)}, {await cluster.acitation_string()}"
 
 
 def make_docket_title(docket: Docket) -> str:
+    """Title a docket with its case name, truncated to 100 characters, and its docket number.
+
+    Blank parts are left out.
+    """
     title = ", ".join(
         [
             s
@@ -789,10 +812,7 @@ def make_docket_title(docket: Docket) -> str:
 async def _common_metadata_sections(
     docket: Docket, og_info: OriginatingCourtInformation | None
 ) -> list[MetadataSection]:
-    """Build the metadata sections that apply across every docket source,
-    not just one. build_originating_court_metadata() already returns []
-    when there's nothing to show.
-    """
+    """Build the metadata sections that apply across every docket source, not just one. build_originating_court_metadata() already returns [] when there's nothing to show."""
     return [
         {
             "items": await sync_to_async(build_originating_court_metadata)(
@@ -804,6 +824,8 @@ async def _common_metadata_sections(
 
 
 class CoreDocketDataDict(TypedDict):
+    """Template context shared by every tab view of a docket."""
+
     docket: Docket
     title: str
     note_form: NoteForm
@@ -912,6 +934,7 @@ async def core_docket_data(
 
 
 async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
+    """Check if the user is subscribed to the docket's alerts."""
     has_alert = False
     if user.is_authenticated:
         has_alert = await DocketAlert.objects.filter(
@@ -925,25 +948,31 @@ def generate_docket_entries_csv_data(
 ) -> str:
     """Get str representing in memory file from docket_entries.
 
-    :param docket_entries: List of DocketEntry that implements CSVExportMixin.
-    :returns str with csv in memory content
+    Args:
+        docket_entries: List of DocketEntry that implements CSVExportMixin.
+
+    Returns:
+        str with csv in memory content
     """
     output: StringIO = StringIO()
     csvwriter = csv.writer(output, quotechar='"', quoting=csv.QUOTE_ALL)
     columns = []
 
+    # Each docket source keeps its documents under its own related name.
+    source = docket_entries[0].docket.get_entry_source()
     columns = docket_entries[0].get_csv_columns(get_column_name=True)
-    columns += (
-        docket_entries[0]
-        .recap_documents.first()
-        .get_csv_columns(get_column_name=True)
-    )
+    # The first entry may have no documents, so take the document columns
+    # from the first document found.
+    for docket_entry in docket_entries:
+        if documents := list(source.documents_for_entry(docket_entry)):
+            columns += documents[0].get_csv_columns(get_column_name=True)
+            break
     csvwriter.writerow(columns)
 
     for docket_entry in docket_entries:
-        for recap_doc in docket_entry.recap_documents.all():
+        for document in source.documents_for_entry(docket_entry):
             csvwriter.writerow(
-                docket_entry.to_csv_row() + recap_doc.to_csv_row()
+                docket_entry.to_csv_row() + document.to_csv_row()
             )
 
     csv_content: str = output.getvalue()
@@ -954,14 +983,16 @@ def generate_docket_entries_csv_data(
 async def build_cites_clusters_query(
     cluster_search: Search, sub_opinion_pks: list[str]
 ) -> Search:
-    """Build the ES cites clusters query to find clusters citing specific
-    sub-opinions.
+    """Build the ES cites clusters query to find clusters citing specific sub-opinions.
 
-    :param cluster_search: The Elasticsearch DSL Search object
-    :param sub_opinion_pks: A list of ids of sub-opinions to search for in
-    the 'cites' field.
-    :return: The ES DSL Search object representing the query to find clusters
-    citing the specified sub-opinions.
+    Args:
+        cluster_search: The Elasticsearch DSL Search object
+        sub_opinion_pks: A list of ids of sub-opinions to search for in
+            the 'cites' field.
+
+    Returns:
+        The ES DSL Search object representing the query to find clusters
+        citing the specified sub-opinions.
     """
     cites_query = Q(
         "bool",
@@ -997,10 +1028,13 @@ async def build_related_clusters_query(
 ) -> Search:
     """Build the ES related clusters query based on sub-opinion IDs.
 
-    :param cluster_search: The Elasticsearch DSL Search object
-    :param sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
-    :return: The ES DSL Search object representing the query to find the
-    related clusters.
+    Args:
+        cluster_search: The Elasticsearch DSL Search object
+        sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
+
+    Returns:
+        The ES DSL Search object representing the query to find the
+        related clusters.
     """
     mlt_query = await build_more_like_this_query(sub_opinion_pks)
     parent_filters = await sync_to_async(build_join_es_filters)(
@@ -1038,6 +1072,8 @@ async def build_related_clusters_query(
 
 @dataclass
 class RelatedCitingResults:
+    """Clusters citing a cluster, with the search parameters used to find them."""
+
     related_clusters: list[OpinionClusterDocument] = field(
         default_factory=list
     )
@@ -1050,6 +1086,8 @@ class RelatedCitingResults:
 
 @dataclass
 class RelatedClusterResults:
+    """Clusters related to a cluster, with the search parameters used to find them."""
+
     related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
@@ -1062,11 +1100,14 @@ async def es_get_related_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> RelatedClusterResults:
-    """Elastic Related Clusters Search or Cache
+    """Elastic Related Clusters Search or Cache.
 
-    :param cluster:The cluster to use
-    :param request:The user request
-    :return:Related Cluster Data
+    Args:
+        cluster: The cluster to use
+        request: The user request
+
+    Returns:
+        Related Cluster Data
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     mlt_cache_key = await sync_to_async(make_s3_cache_key)(
@@ -1173,11 +1214,14 @@ async def es_get_cited_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> RelatedCitingResults:
-    """Elastic cited by cluster search or cache
+    """Elastic cited by cluster search or cache.
 
-    :param cluster:The cluster to check
-    :param request:The user request
-    :return:The cited by data
+    Args:
+        cluster: The cluster to check
+        request: The user request
+
+    Returns:
+        The cited by data
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     cache_citing_key = await sync_to_async(make_s3_cache_key)(
@@ -1260,11 +1304,14 @@ async def es_get_cited_clusters_with_cache(
 async def es_cited_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
-    """Elastic quick cited by count query
+    """Elastic quick cited by count query.
 
-    :param cluster_id: The cluster id to search with
-    :param sub_opinion_pks: The subopinion ids of the cluster
-    :return: Opinion Cited Count
+    Args:
+        cluster_id: The cluster id to search with
+        sub_opinion_pks: The subopinion ids of the cluster
+
+    Returns:
+        Opinion Cited Count
     """
     cache = await sync_to_async(get_s3_cache)("db_cache")
     cache_cited_by_key = await sync_to_async(make_s3_cache_key)(
@@ -1303,13 +1350,15 @@ async def es_cited_case_count(
 async def es_related_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
-    """Elastic quick related cases count
+    """Elastic quick related cases count.
 
-    :param cluster_id: The cluster id of the object
-    :param sub_opinion_pks: The sub opinion ids of the cluster
-    :return: The count of related cases in elastic
+    Args:
+        cluster_id: The cluster id of the object
+        sub_opinion_pks: The sub opinion ids of the cluster
+
+    Returns:
+        The count of related cases in elastic
     """
-
     if not sub_opinion_pks:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0

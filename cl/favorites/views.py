@@ -1,3 +1,5 @@
+"""Views for notes, tags, and prayers."""
+
 from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -41,10 +43,13 @@ from cl.users.models import UserProfile
 def get_note(request: HttpRequest) -> Note | None:
     """Look up the requesting user's Note for the object named in POST data.
 
-    :param request: The request, expected to carry ``content_type`` (a
-        ContentType pk) and ``object_id`` in POST data, identifying the
-        noted object.
-    :return: The user's Note for that object, a blank unsaved Note if the
+    Args:
+        request: The request, expected to carry ``content_type`` (a
+            ContentType pk) and ``object_id`` in POST data, identifying the
+            noted object.
+
+    Returns:
+        The user's Note for that object, a blank unsaved Note if the
         object is valid but has no Note yet, or None if content_type/
         object_id are missing, invalid, or don't resolve to a model in
         NOTEABLE_MODELS.
@@ -108,7 +113,7 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def delete_note(request: HttpRequest) -> HttpResponse:
-    """Delete a user's note
+    """Delete a user's note.
 
     Deletes a note for a user using an ajax call and post data.
     """
@@ -141,6 +146,12 @@ def delete_note(request: HttpRequest) -> HttpResponse:
 
 
 async def view_tag(request, username, tag_name):
+    """Show a user's tag and its dockets.
+
+    Raises:
+        Http404: If the tag doesn't exist, or is unpublished and the viewer
+            isn't its owner.
+    """
     tag = await aget_object_or_404(
         UserTag, name=tag_name, user__username=username
     )
@@ -174,9 +185,7 @@ async def view_tag(request, username, tag_name):
 
 
 async def view_tags(request, username):
-    """Show the user their tags if they're looking at their own, or show the
-    public tags of somebody else.
-    """
+    """Show the user their tags if they're looking at their own, or show the public tags of somebody else."""
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
     return TemplateResponse(
@@ -192,7 +201,6 @@ async def view_tags(request, username):
 
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
-
     top_prayers = await get_top_prayers()
 
     page = request.GET.get("page", 1)
@@ -240,6 +248,11 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 async def create_prayer_view(
     request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
+    """Create the user's prayer for a document.
+
+    htmx requests get an updated prayer button. Other requests get a plain
+    response, or a server error if the user has reached their daily limit.
+    """
     user = request.user
     is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
@@ -311,6 +324,11 @@ async def create_prayer_view(
 async def delete_prayer_view(
     request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
+    """Delete the user's waiting prayer for a document.
+
+    htmx requests get an updated prayer button. Other requests get a plain
+    response.
+    """
     user = request.user
     recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
@@ -354,6 +372,11 @@ async def delete_prayer_view(
 async def user_prayers_view(
     request: HttpRequest, username: str
 ) -> HttpResponse:
+    """Show a user's waiting prayers, paginated, with their prayer stats.
+
+    Visitors other than the user are redirected to the top prayers unless
+    the user's prayers are public.
+    """
     queryset = User.objects.prefetch_related("profile")
     requested_user = await aget_object_or_404(queryset, username=username)
     is_page_owner = await request.auser() == requested_user
@@ -403,6 +426,10 @@ async def user_prayers_view(
 async def user_prayers_view_granted(
     request: HttpRequest, username: str
 ) -> HttpResponse:
+    """Show a user's granted prayers, paginated, with their prayer stats.
+
+    Visitors other than the user are redirected to the top prayers.
+    """
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
@@ -451,7 +478,7 @@ async def user_prayers_view_granted(
 def toggle_prayer_public(
     request: HttpRequest,
 ) -> HttpResponse:
-    """Toggle the user's setting to make pending prayers public"""
+    """Toggle the user's setting to make pending prayers public."""
     user = request.user
     next_toggle_status = not bool(request.POST.get("current_toggle_status"))
     UserProfile.objects.filter(user=user).update(

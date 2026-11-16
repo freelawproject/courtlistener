@@ -1,3 +1,5 @@
+"""Factories for financial disclosures and their parts."""
+
 from factory import Faker, RelatedFactory, SubFactory, post_generation
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
@@ -17,6 +19,8 @@ from cl.search.factories import CourtFactory
 
 
 class InvestmentFactory(DjangoModelFactory):
+    """Make an investment without a disclosure."""
+
     class Meta:
         model = Investment
 
@@ -25,6 +29,8 @@ class InvestmentFactory(DjangoModelFactory):
 
 
 class GiftFactory(DjangoModelFactory):
+    """Make a gift without a disclosure."""
+
     class Meta:
         model = Gift
 
@@ -33,6 +39,8 @@ class GiftFactory(DjangoModelFactory):
 
 
 class ReimbursementFactory(DjangoModelFactory):
+    """Make a reimbursement without a disclosure."""
+
     class Meta:
         model = Reimbursement
 
@@ -41,26 +49,36 @@ class ReimbursementFactory(DjangoModelFactory):
 
 
 class DebtFactory(DjangoModelFactory):
+    """Make a debt without a disclosure."""
+
     class Meta:
         model = Debt
 
 
 class NonInvestmentIncomeFactory(DjangoModelFactory):
+    """Make a non-investment income without a disclosure."""
+
     class Meta:
         model = NonInvestmentIncome
 
 
 class SpousalIncomeFactory(DjangoModelFactory):
+    """Make a spouse income without a disclosure."""
+
     class Meta:
         model = SpouseIncome
 
 
 class FinancialDisclosurePositionFactory(DjangoModelFactory):
+    """Make a disclosed position without a disclosure."""
+
     class Meta:
         model = Position
 
 
 class FinancialDisclosureFactory(DjangoModelFactory):
+    """Make a financial disclosure with a random year."""
+
     class Meta:
         model = FinancialDisclosure
 
@@ -80,6 +98,7 @@ class PersonWithDisclosuresFactory(PersonFactory):
 
     @post_generation
     def disclosures(self, create, extracted, **kwargs):
+        """Create extracted 2022 and 2023 disclosures with three investments each."""
         if not create:
             return
         # Create two years of disclosures with investments

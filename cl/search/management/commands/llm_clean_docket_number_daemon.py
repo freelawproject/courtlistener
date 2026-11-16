@@ -1,3 +1,5 @@
+"""Daemon that queues LLM cleaning of docket numbers batched in Redis."""
+
 import time
 from datetime import datetime
 
@@ -16,13 +18,17 @@ from cl.search.tasks import clean_docket_number_by_court
 
 
 class Command(VerboseCommand):
+    """Periodically queue LLM cleaning tasks for the dockets batched in Redis."""
+
     help = """Run the docket number cleaning daemon."""
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
         self.throttle = None
 
     def add_arguments(self, parser):
+        """Add the testing iterations, queue, and throttle options."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -50,13 +56,13 @@ class Command(VerboseCommand):
         court_mapping: str,
         start_timestamp: datetime,
     ) -> None:
-        """
-        Processes a batch of court data for LLM cleaning by using one Celery task per court_mapping.
+        """Processes a batch of court data for LLM cleaning by using one Celery task per court_mapping.
 
-        :param celery_queue: The name of the Celery queue to use for task dispatch.
-        :param court_batch: A batch of court records with docket IDs and numbers.
-        :param court_mapping: Identifier for the court mapping.
-        :param start_timestamp: Timestamp marking the start of the daemon job.
+        Args:
+            celery_queue: The name of the Celery queue to use for task dispatch.
+            court_batch: A batch of court records with docket IDs and numbers.
+            court_mapping: Identifier for the court mapping.
+            start_timestamp: Timestamp marking the start of the daemon job.
         """
         self.throttle.maybe_wait()
         clean_docket_number_by_court.apply_async(
@@ -65,6 +71,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue a cleaning task per court mapping for the batched dockets, repeatedly.
+
+        Runs while docket number cleaning is enabled in settings, stopping
+        after ``--testing-iterations`` iterations when that is set.
+        """
         super().handle(*args, **options)
 
         celery_queue = options["celery_queue"]

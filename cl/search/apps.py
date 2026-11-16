@@ -1,3 +1,5 @@
+"""Django app configuration for search, including dev index creation."""
+
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.management import call_command
@@ -10,9 +12,16 @@ from cl.lib.decorators import retry
 
 
 class SearchConfig(AppConfig):
+    """App config for search."""
+
     name = "cl.search"
 
     def ready(self):
+        """Connect the search signal handlers.
+
+        In development, outside of tests, also create the search indices
+        after migrations run.
+        """
         # Implicitly connect a signal handlers decorated with @receiver.
         from cl.search import signals  # noqa: F401
 
@@ -25,11 +34,10 @@ class SearchConfig(AppConfig):
 
 @retry((ConnectionError, ConnectionTimeout), tries=5, delay=5)
 def check_and_create_es_index(es_document) -> None:
-    """Check Elasticsearch cluster availability and create the index if it
-    doesn't exist.
+    """Check Elasticsearch cluster availability and create the index if it doesn't exist.
 
-    :param es_document: The Elasticsearch document type.
-    :return: None
+    Args:
+        es_document: The Elasticsearch document type.
     """
     model_label = f"{es_document.django.model._meta.app_label}.{es_document.django.model.__name__}"
     es = connections.get_connection()
@@ -43,13 +51,7 @@ def check_and_create_es_index(es_document) -> None:
 
 
 def create_search_indices(sender, **kwargs):
-    """Runs the Elasticsearch index creation process for a predefined set of
-    document models. Iterates through a list of Elasticsearch document models,
-    and for each, it checks if the corresponding index exists in the ES cluster.
-    If an index does not exist, it attempts to create it.
-
-    :return: None
-    """
+    """Runs the Elasticsearch index creation process for a predefined set of document models. Iterates through a list of Elasticsearch document models, and for each, it checks if the corresponding index exists in the ES cluster. If an index does not exist, it attempts to create it."""
     from cl.search.documents import (
         AudioDocument,
         AudioPercolator,

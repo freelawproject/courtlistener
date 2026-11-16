@@ -1,3 +1,5 @@
+"""Send a welcome email to the users who signed up in the last day."""
+
 import sys
 from datetime import datetime, timedelta
 
@@ -11,14 +13,15 @@ from django.utils.timezone import make_aware
 from cl.lib.command_utils import VerboseCommand, logger
 
 
-def get_welcome_recipients(time_now: datetime) -> QuerySet:
-    """Get users that signed up in the last 24 hours
-    to send a welcome email.
+def get_welcome_recipients(time_now: datetime) -> QuerySet[User]:
+    """Get users that signed up in the last 24 hours to send a welcome email.
 
-    :param time_now: The current time to compute the query datetime.
-    :return: Users that signed up in the last 24 hours.
+    Args:
+        time_now: The current time to compute the query datetime.
+
+    Returns:
+        Users that signed up in the last 24 hours.
     """
-
     # Not passing a timezone in make_aware will use the default timezone
     # defined on settings.TIME_ZONE
     yesterday = make_aware(time_now) - timedelta(days=1)
@@ -29,10 +32,7 @@ def get_welcome_recipients(time_now: datetime) -> QuerySet:
 
 
 class Command(VerboseCommand):
-    """Note that this entire command can be replaced with scheduled celery
-    tasks. Instead of running this once daily, you just schedule a task for
-    later when somebody signs up.
-    """
+    """Note that this entire command can be replaced with scheduled celery tasks. Instead of running this once daily, you just schedule a task for later when somebody signs up."""
 
     help = (
         "Sends a welcome email to the people who signed up in the last "
@@ -40,6 +40,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the simulate flag."""
         parser.add_argument(
             "--simulate",
             action="store_true",
@@ -48,6 +49,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Email the users who joined in the last day, if there are any."""
         super().handle(*args, **options)
         self.options = options
         time_now = datetime.now()

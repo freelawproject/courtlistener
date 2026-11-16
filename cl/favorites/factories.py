@@ -1,3 +1,5 @@
+"""Factories for notes, tags, and prayers."""
+
 from django.contrib.contenttypes.models import ContentType
 from factory import Faker, LazyAttribute, SelfAttribute, SubFactory
 from factory.django import DjangoModelFactory
@@ -11,9 +13,10 @@ from cl.users.factories import UserWithChildProfileFactory
 
 
 class NoteFactory(DjangoModelFactory):
-    """Builds a Note on an OpinionCluster by default. Pass content_object=
-    to attach it to any other saved noteable object instead (see
-    NOTEABLE_MODELS in cl/favorites/utils.py).
+    """Builds a Note on an OpinionCluster by default.
+
+    Pass content_object= to attach it to any other saved noteable object
+    instead (see NOTEABLE_MODELS in cl/favorites/utils.py).
     """
 
     class Meta:
@@ -31,11 +34,15 @@ class NoteFactory(DjangoModelFactory):
 
 
 class UserTagFactory(DjangoModelFactory):
+    """Make a tag with no field defaults."""
+
     class Meta:
         model = UserTag
 
 
 class PrayerFactory(DjangoModelFactory):
+    """Make a waiting or granted prayer by a new user for a new RECAP document."""
+
     class Meta:
         model = Prayer
 

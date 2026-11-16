@@ -1,3 +1,5 @@
+"""Base classes for management commands."""
+
 import logging
 import os
 from argparse import ArgumentParser
@@ -11,7 +13,13 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class VerboseCommand(BaseCommand):
+    """Command whose log level follows its ``--verbosity`` option."""
+
     def handle(self, *args: Any, **options: Any) -> None:
+        """Set the log level from the verbosity.
+
+        Verbosity above 1 also sets Juriscraper's logger to debug.
+        """
         verbosity = options.get("verbosity")
         if not verbosity:
             logger.setLevel(logging.WARN)
@@ -27,7 +35,7 @@ class VerboseCommand(BaseCommand):
 
 
 class ScraperCommand(VerboseCommand):
-    """Base class for cl.scrapers commands that use Juriscraper
+    """Base class for cl.scrapers commands that use Juriscraper.
 
     Implements the `--courts` argument to lookup for a Site object
     """
@@ -37,6 +45,7 @@ class ScraperCommand(VerboseCommand):
     juriscraper_module_type: ClassVar[str] = ""
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        """Add the required ``--courts`` option."""
         parser.add_argument(
             "--courts",
             dest="court_id",

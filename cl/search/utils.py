@@ -1,3 +1,5 @@
+"""Helpers for gathering homepage statistics."""
+
 from datetime import UTC, datetime, timedelta
 
 from cache_memoize import cache_memoize
@@ -39,9 +41,7 @@ def get_redis_stat_sum(
 
 @cache_memoize(5 * 60)
 def get_v2_homepage_stats():
-    """
-    Get all stats displayed in the new homepage and return them as a dict.
-    """
+    """Get all stats displayed in the new homepage and return them as a dict."""
     make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis (new system)
@@ -70,9 +70,7 @@ def get_v2_homepage_stats():
 
 @cache_memoize(5 * 60)
 def get_homepage_stats():
-    """Get any stats that are displayed on the homepage and return them as a
-    dict
-    """
+    """Get any stats that are displayed on the homepage and return them as a dict."""
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis

@@ -1,3 +1,5 @@
+"""Create S3 manifest files listing database records for batch processing."""
+
 import csv
 import io
 import random
@@ -50,8 +52,7 @@ ROLE_ARN = "arn:aws:iam::968642441645:role/bulk-customer-data-batch"
 
 
 def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
-    """
-    Retrieves the total number of records for a specific data type.
+    """Retrieves the total number of records for a specific data type.
 
     Args:
         type (str): The type of data to count. Must be one of the valid values
@@ -131,9 +132,7 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
 def get_custom_query(
     type: str, last_pk: str | None, options: dict[str, Any]
 ) -> tuple[str, list[Any]]:
-    """
-    Generates a custom SQL query based on the provided type and optional last
-    pk.
+    """Generates a custom SQL query based on the provided type and optional last pk.
 
     Args:
         type (str): Type of data to retrieve.
@@ -228,9 +227,7 @@ def upload_manifest(
     options: dict[str, Any],
     batch_counter: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    """
-    Generates a CSV manifest file containing S3 object keys derived from record
-    ID batches and uploads it to the specified S3 bucket.
+    """Generates a CSV manifest file containing S3 object keys derived from record ID batches and uploads it to the specified S3 bucket.
 
     The S3 object keys within the manifest are constructed based on the
     provided`record_ids`. When certain conditions are met, the individual
@@ -310,9 +307,7 @@ def upload_manifest(
 def export_records_in_batches(
     r: Redis, record_type: str, options: dict[str, Any]
 ) -> None:
-    """
-    Sequentially exports records of a specific type from the database in batches,
-    uploads manifests of the exported data, and tracks the progress using Redis.
+    """Sequentially exports records of a specific type from the database in batches, uploads manifests of the exported data, and tracks the progress using Redis.
 
     Args:
         r: An instance of the Redis client used for caching and progress
@@ -330,7 +325,6 @@ def export_records_in_batches(
             - 'random_sample_percentage' (float): If set (between 0 and 100), the
               export will retrieve a random sample of records.
     """
-
     last_pk = r.hget(f"{record_type}_import_status", "last_pk")
     if last_pk:
         logger.info(
@@ -418,10 +412,7 @@ def export_records_in_batches(
 def get_records_modified_since(
     model: type[AbstractDateTimeModel], field_name: str, timestamp: datetime
 ) -> list[tuple[int]]:
-    """
-    Retrieves a list of tuples containing the values of a specified field
-    for all instances of a given model that have been created or modified
-    on or after a given timestamp.
+    """Retrieves a list of tuples containing the values of a specified field for all instances of a given model that have been created or modified on or after a given timestamp.
 
     Args:
         model: The Django model class to query (must inherit from
@@ -448,9 +439,7 @@ def get_records_modified_since(
 def get_monthly_record_ids_by_type(
     record_type: str, timestamp: datetime, all_records: bool = False
 ) -> list[tuple[int]]:
-    """
-    Retrieves a list of unique IDs for records of a specific type that were
-    created or modified after a given timestamp.
+    """Retrieves a list of unique IDs for records of a specific type that were created or modified after a given timestamp.
 
     The function handles different record types by querying the main model
     and any relevant nested/related models that might have been updated.
@@ -545,8 +534,7 @@ def get_monthly_record_ids_by_type(
 def upload_list_of_records_for_users(
     record_type: str, bucket_name: str, record_ids: list[tuple[int]]
 ):
-    """
-    Uploads a CSV file containing record IDs and corresponding S3 keys.
+    """Uploads a CSV file containing record IDs and corresponding S3 keys.
 
     This CSV file serves as a manifest for users to easily retrieve the new or
     updated records. Each row in the CSV provides the original record ID and
@@ -602,18 +590,18 @@ def upload_list_of_records_for_users(
 
 
 def get_account_id() -> str:
-    """
-    Retrieves the AWS account ID of the current execution role.
+    """Retrieves the AWS account ID of the current execution role.
 
-    :return: The AWS account ID.
+    Returns:
+        The AWS account ID.
     """
     sts_client = boto3.client("sts")
     return sts_client.get_caller_identity().get("Account")
 
 
 def get_lambda_arns(region_name: str = "us-west-2") -> dict[str, str]:
-    """
-    Retrieves a dictionary of AWS Lambda function names and their ARNs.
+    """Retrieves a dictionary of AWS Lambda function names and their ARNs.
+
     Args:
         region_name (str): The AWS region (e.g., 'us-east-1', 'eu-west-2')
             from which to retrieve Lambda function information.
@@ -639,9 +627,7 @@ def create_and_execute_batch_job(
     manifest_arn: str,
     manifest_etag: str,
 ) -> None:
-    """
-    Creates and executes an S3 Batch Operations job to process records of a
-    specific type.
+    """Creates and executes an S3 Batch Operations job to process records of a specific type.
 
     This function dynamically selects the appropriate AWS Lambda function based
     on the `record_type` and then creates an S3 Batch Operations job. The job
@@ -707,8 +693,7 @@ def create_and_execute_batch_job(
 def compute_monthly_export(
     record_type: str, timestamp: datetime, options: dict[str, Any]
 ):
-    """
-    Computes and uploads a monthly export manifest for a specified record type.
+    """Computes and uploads a monthly export manifest for a specified record type.
 
     The function determines the filename based on the record type and the
     month of the provided timestamp, retrieves the relevant record IDs, and
@@ -745,6 +730,8 @@ def compute_monthly_export(
 
 
 class Command(VerboseCommand):
+    """Export the IDs of one record type to manifest files in S3."""
+
     help = (
         "Retrieves data records from the database and creates manifest files"
         "listing those records in Amazon S3. These manifest files can then"
@@ -753,6 +740,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: CommandParser):
+        """Add the record type, S3, batching, sampling, and export mode options."""
         parser.add_argument(
             "--record-type",
             type=str,
@@ -835,6 +823,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Export the records, then save the export's timestamp for 45 days.
+
+        A monthly export only includes changes since the last saved
+        timestamp, and does nothing if there is none.
+        """
         r = get_redis_interface("CACHE")
 
         record_type = options["record_type"]

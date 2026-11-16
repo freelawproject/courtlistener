@@ -1,3 +1,5 @@
+"""Models for people and their careers, and for parties and attorneys on dockets."""
+
 import pghistory
 from django.db import models
 from django.urls import reverse
@@ -55,6 +57,8 @@ DATE_GRANULARITIES = (
 
 @pghistory.track()
 class Person(AbstractDateTimeModel):
+    """A person, such as a judge or president, and their biographical details."""
+
     RELIGIONS = (
         ("ca", "Catholic"),
         ("pr", "Protestant"),
@@ -234,9 +238,11 @@ class Person(AbstractDateTimeModel):
         verbose_name_plural = "people"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the person's page."""
         return reverse("view_person", args=[self.pk, self.slug])
 
     def save(self, update_fields=None, *args, **kwargs):
+        """Validate and save the person, regenerating their slug from their full name."""
         self.slug = slugify(trunc(self.name_full, 158))
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
@@ -244,6 +250,7 @@ class Person(AbstractDateTimeModel):
         super().save(update_fields=update_fields, *args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate the partial birth and death dates, the alias, and the full name."""
         validate_partial_date(self, ["dob", "dod"])
         validate_is_not_alias(self, ["is_alias_of"])
         validate_has_full_name(self)
@@ -251,6 +258,7 @@ class Person(AbstractDateTimeModel):
 
     @property
     def name_full(self):
+        """The person's first, middle, and last names and suffix."""
         return " ".join(
             v
             for v in [
@@ -264,19 +272,19 @@ class Person(AbstractDateTimeModel):
 
     @property
     def name_full_reverse(self):
+        """The person's name as "last, first middle, suffix"."""
         return "{name_last}, {name_first} {name_middle}, {suffix}".format(
             suffix=self.get_name_suffix_display(), **self.__dict__
         ).strip(", ")
 
     @property
     def is_alias(self) -> bool:
+        """Whether the person is an alias of another person."""
         return self.is_alias_of is not None
 
     @property
     def is_judge(self) -> bool:
-        """Examine the positions a person has had and identify if they were ever
-        a judge.
-        """
+        """Examine the positions a person has had and identify if they were ever a judge."""
         return any(
             position.is_judicial_position for position in self.positions.all()
         )
@@ -284,6 +292,8 @@ class Person(AbstractDateTimeModel):
 
 @pghistory.track()
 class School(AbstractDateTimeModel):
+    """A school, or an alias of another school."""
+
     is_alias_of = models.ForeignKey(
         "self",
         help_text="Any alternate names that a school may have",
@@ -312,13 +322,16 @@ class School(AbstractDateTimeModel):
 
     @property
     def is_alias(self):
+        """Whether the school is an alias of another school."""
         return True if self.is_alias_of is not None else False
 
     def save(self, *args, **kwargs):
+        """Validate and save the school."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate that the school isn't an alias of an alias."""
         # An alias cannot be an alias.
         validate_is_not_alias(self, ["is_alias_of"])
         super().clean_fields(*args, **kwargs)
@@ -894,7 +907,7 @@ class Position(AbstractDateTimeModel):
 
     @property
     def vote_string(self):
-        """Make a human-friendly string from the vote information"""
+        """Make a human-friendly string from the vote information."""
         s = ""
 
         # Do vote type first
@@ -959,10 +972,12 @@ class Position(AbstractDateTimeModel):
         return self.appointed_positions.all().order_by("-date_start")
 
     def save(self, *args, **kwargs):
+        """Validate and save the position."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate the position's dates, related people and school, votes, nomination, and supervisor."""
         validate_partial_date(self, ["start", "termination"])
         validate_is_not_alias(
             self, ["person", "supervisor", "predecessor", "school"]
@@ -983,6 +998,8 @@ class Position(AbstractDateTimeModel):
 
 @pghistory.track()
 class RetentionEvent(AbstractDateTimeModel):
+    """An event, such as a reappointment or election, that retained a position."""
+
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
         ("reapp_leg", "Legislative Reappointment"),
@@ -1044,10 +1061,12 @@ class RetentionEvent(AbstractDateTimeModel):
     )
 
     def save(self, *args, **kwargs):
+        """Validate and save the retention event."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate that vote counts and vote percentages are each given in pairs."""
         validate_all_or_none(self, ["votes_yes", "votes_no"])
         validate_all_or_none(self, ["votes_yes_percent", "votes_no_percent"])
         super().clean_fields(*args, **kwargs)
@@ -1055,6 +1074,8 @@ class RetentionEvent(AbstractDateTimeModel):
 
 @pghistory.track()
 class Education(AbstractDateTimeModel):
+    """A degree a person earned from a school."""
+
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
         ("ma", "Master's (e.g. M.A.)"),
@@ -1107,10 +1128,12 @@ class Education(AbstractDateTimeModel):
         return f"{self.pk}: Degree in {self.degree_detail} from {self.school.name} in the year {self.degree_year}"
 
     def save(self, *args, **kwargs):
+        """Validate and save the education record."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate that the person and school aren't aliases."""
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, ["person", "school"])
         super().clean_fields(*args, **kwargs)
@@ -1118,6 +1141,8 @@ class Education(AbstractDateTimeModel):
 
 @pghistory.track()
 class Race(models.Model):
+    """A race that people can be associated with."""
+
     RACES = (
         ("w", "White"),
         ("b", "Black or African American"),
@@ -1143,7 +1168,7 @@ class Race(models.Model):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class PersonRace(Person.race.through):
-    """A model class to track person race m2m relation"""
+    """A model class to track person race m2m relation."""
 
     class Meta:
         proxy = True
@@ -1151,6 +1176,8 @@ class PersonRace(Person.race.through):
 
 @pghistory.track()
 class PoliticalAffiliation(AbstractDateTimeModel):
+    """A person's affiliation with a political party over a period of time."""
+
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
         ("a", "Appointer"),
@@ -1211,10 +1238,12 @@ class PoliticalAffiliation(AbstractDateTimeModel):
     es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
+        """Validate and save the political affiliation."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate the partial dates and that the person isn't an alias."""
         validate_partial_date(self, ["start", "end"])
         validate_is_not_alias(self, ["person"])
         super().clean_fields(*args, **kwargs)
@@ -1222,6 +1251,8 @@ class PoliticalAffiliation(AbstractDateTimeModel):
 
 @pghistory.track()
 class Source(AbstractDateTimeModel):
+    """Where data about a person was gathered."""
+
     person = models.ForeignKey(
         Person,
         related_name="sources",
@@ -1248,6 +1279,8 @@ class Source(AbstractDateTimeModel):
 
 @pghistory.track()
 class ABARating(AbstractDateTimeModel):
+    """A rating of a person by the American Bar Association."""
+
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),
         ("wq", "Well Qualified"),
@@ -1278,17 +1311,20 @@ class ABARating(AbstractDateTimeModel):
         verbose_name_plural = "American Bar Association Ratings"
 
     def save(self, *args, **kwargs):
+        """Validate and save the rating."""
         self.full_clean()
         super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
+        """Validate that the person isn't an alias."""
         validate_is_not_alias(self, ["person"])
         super().clean_fields(*args, **kwargs)
 
 
 class PartyType(models.Model):
-    """Links together the parties and the docket. Probably a poorly named
-    model.
+    """Links together the parties and the docket.
+
+    Probably a poorly named model.
 
     (It made sense at the time.)
     """
@@ -1352,9 +1388,7 @@ class PartyType(models.Model):
 
 
 class CriminalCount(models.Model):
-    """The criminal counts associated with a PartyType object (i.e., associated
-    with a party in a docket.
-    """
+    """The criminal counts associated with a PartyType object (i.e., associated with a party in a docket."""
 
     PENDING = 1
     TERMINATED = 2
@@ -1386,7 +1420,7 @@ class CriminalCount(models.Model):
 
     @staticmethod
     def normalize_status(status_str: str):
-        """Convert a status string into one of COUNT_STATUSES"""
+        """Convert a status string into one of COUNT_STATUSES."""
         if status_str == "pending":
             return CriminalCount.PENDING
         elif status_str == "terminated":
@@ -1394,9 +1428,7 @@ class CriminalCount(models.Model):
 
 
 class CriminalComplaint(models.Model):
-    """The criminal complaints associated with a PartyType object (i.e.,
-    associated with a party in a docket.
-    """
+    """The criminal complaints associated with a PartyType object (i.e., associated with a party in a docket."""
 
     party_type = models.ForeignKey(
         PartyType,
@@ -1415,6 +1447,8 @@ class CriminalComplaint(models.Model):
 
 
 class Party(AbstractDateTimeModel):
+    """A party to cases, with the attorneys representing it."""
+
     attorneys = models.ManyToManyField(
         "Attorney",
         help_text="The attorneys involved with the party.",
@@ -1444,7 +1478,7 @@ class Party(AbstractDateTimeModel):
 
 
 class Role(models.Model):
-    """Links together the party, the attorney, and the docket"""
+    """Links together the party, the attorney, and the docket."""
 
     ATTORNEY_TO_BE_NOTICED = 1
     ATTORNEY_LEAD = 2
@@ -1516,6 +1550,8 @@ class Role(models.Model):
 
 
 class Attorney(AbstractDateTimeModel):
+    """An attorney, with the organizations they are affiliated with."""
+
     organizations = models.ManyToManyField(
         "AttorneyOrganization",
         help_text="The organizations that the attorney is affiliated with",
@@ -1585,6 +1621,8 @@ class AttorneyOrganizationAssociation(models.Model):
 
 
 class AttorneyOrganization(AbstractDateTimeModel):
+    """An organization, such as a law firm, that attorneys are affiliated with."""
+
     lookup_key = models.TextField(
         help_text="A trimmed version of the address for duplicate matching.",
         db_index=True,

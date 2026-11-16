@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Automated frontend checks for CourtListener PR reviews.
+r"""Automated frontend checks for CourtListener PR reviews.
 
 Runs checks on changed template and CSS files to enforce frontend
 conventions, and checks that changes to vendored JS are recorded in that
 directory's README. Called by the frontend-lint GitHub Actions workflow.
 
-Input file must be in git --name-status format (STATUS\\tPATH per line).
+Input file must be in git --name-status format (STATUS\tPATH per line).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import argparse
 import fnmatch
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -83,6 +84,48 @@ def _parse_line_skips(lines: list[str]) -> dict[int, set[str]]:
 
 
 # ---------------------------------------------------------------------------
+# <c-code> blocks
+# ---------------------------------------------------------------------------
+
+# A check over the lines of one file, returning (line number, message) pairs.
+type FileCheck = Callable[[list[str]], list[tuple[int, str]]]
+
+_code_block_re = re.compile(
+    r"(<c-code\b[^>]*(?<!/)>)(.*?)(</c-code>)", re.DOTALL
+)
+_checks_inside_code_blocks: set[FileCheck] = set()
+
+
+def also_checks_inside_code_blocks(check: FileCheck) -> FileCheck:
+    """Hand a check the file as written, ``<c-code>`` blocks included.
+
+    A check normally receives the file with the content of every
+    ``<c-code>`` block emptied, because a block shows markup as text.
+    Django tags inside a block still run, so a check that looks only
+    for template tags takes this decorator. A check that also matches
+    markup must not, even when it looks for a tag as well:
+    ``check_xdata_without_require_script`` matches ``x-data``
+    attributes, so decorating it would report the examples inside
+    blocks again.
+    """
+    _checks_inside_code_blocks.add(check)
+    return check
+
+
+def _blank_code_blocks(lines: list[str]) -> list[str]:
+    """Return ``lines`` with the content of every ``<c-code>`` block emptied.
+
+    The opening and closing tags stay and the line count is preserved, so
+    findings on the rest of the file keep their line numbers.
+    """
+    content = _code_block_re.sub(
+        lambda m: m.group(1) + "\n" * m.group(2).count("\n") + m.group(3),
+        "\n".join(lines),
+    )
+    return content.split("\n")
+
+
+# ---------------------------------------------------------------------------
 # File classification helpers
 # ---------------------------------------------------------------------------
 
@@ -95,10 +138,12 @@ REDESIGN_PREFIXES = (V2_PREFIX, WIP_PREFIX)
 
 
 def is_v2_template(path: str) -> bool:
+    """A v2_ template."""
     return f"templates/{V2_PREFIX}" in path and path.endswith(".html")
 
 
 def is_wip_template(path: str) -> bool:
+    """A wip_ template."""
     return f"templates/{WIP_PREFIX}" in path and path.endswith(".html")
 
 
@@ -118,10 +163,12 @@ def is_v2_partial(path: str) -> bool:
 
 
 def is_cotton_component(path: str) -> bool:
+    """A Django Cotton component template."""
     return "templates/cotton/" in path and path.endswith(".html")
 
 
 def is_legacy_template(path: str) -> bool:
+    """A legacy-stack template: not v2_, wip_, Cotton, or new_base.html."""
     if not path.endswith(".html"):
         return False
     if "templates/" not in path:
@@ -134,6 +181,7 @@ def is_legacy_template(path: str) -> bool:
 
 
 def is_input_css(path: str) -> bool:
+    """The Tailwind input stylesheet."""
     return path == "cl/assets/tailwind/input.css"
 
 
@@ -664,6 +712,7 @@ def check_hardcoded_ids(lines: list[str]) -> list[tuple[int, str]]:
     return results
 
 
+@also_checks_inside_code_blocks
 def check_include_in_v2(lines: list[str]) -> list[tuple[int, str]]:
     """Flag {% include %} in v2_ templates."""
     results = []
@@ -794,6 +843,8 @@ def check_raw_css(lines: list[str]) -> list[tuple[int, str]]:
 
 @dataclass
 class Finding:
+    """A single check result at a line of a file."""
+
     file: str
     line: int
     check: str
@@ -844,19 +895,25 @@ CSS_CHECKS = [
 def _apply_checks(
     checks: list[tuple],
     lines: list[str],
+    raw_lines: list[str],
     filepath: str,
     findings: list[Finding],
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings.
 
-    Honors file-level and same-line skip directives for SKIPPABLE_CHECKS.
+    ``lines`` has the content of ``<c-code>`` blocks emptied and is what a
+    check normally sees; ``raw_lines`` is the file as written, handed only
+    to checks marked with ``also_checks_inside_code_blocks``. Honors
+    file-level and same-line skip directives for SKIPPABLE_CHECKS, read
+    from ``raw_lines`` so a directive inside a block still counts.
     """
-    skip_checks = _parse_skip_checks(lines)
-    line_skips = _parse_line_skips(lines)
+    skip_checks = _parse_skip_checks(raw_lines)
+    line_skips = _parse_line_skips(raw_lines)
     for fn, severity in checks:
         if fn.__name__ in skip_checks:
             continue
-        for line_no, msg in fn(lines):
+        check_lines = raw_lines if fn in _checks_inside_code_blocks else lines
+        for line_no, msg in fn(check_lines):
             if fn.__name__ in line_skips.get(line_no, ()):
                 continue
             findings.append(
@@ -895,18 +952,19 @@ def run_checks(
             continue
 
         try:
-            lines = abs_path.read_text(encoding="utf-8").splitlines()
+            raw_lines = abs_path.read_text(encoding="utf-8").splitlines()
         except (OSError, UnicodeDecodeError):
             continue
+        lines = _blank_code_blocks(raw_lines)
 
         if filepath.endswith(".html"):
-            _apply_checks(HTML_CHECKS, lines, filepath, findings)
+            _apply_checks(HTML_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_redesign_template(filepath):
-            _apply_checks(V2_CHECKS, lines, filepath, findings)
+            _apply_checks(V2_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_redesign_template(filepath) and not is_v2_partial(filepath):
-            _apply_checks(V2_PAGE_CHECKS, lines, filepath, findings)
+            _apply_checks(V2_PAGE_CHECKS, lines, raw_lines, filepath, findings)
 
             # Renames count too: promoting a page from wip_ to v2_ is one,
             # and it has to move the page between the two registries.
@@ -929,7 +987,7 @@ def run_checks(
                 )
 
         if is_cotton_component(filepath):
-            _apply_checks(COTTON_CHECKS, lines, filepath, findings)
+            _apply_checks(COTTON_CHECKS, lines, raw_lines, filepath, findings)
 
             status = file_statuses.get(filepath, "")
             if (
@@ -947,10 +1005,10 @@ def run_checks(
                 )
 
         if is_legacy_template(filepath):
-            _apply_checks(LEGACY_CHECKS, lines, filepath, findings)
+            _apply_checks(LEGACY_CHECKS, lines, raw_lines, filepath, findings)
 
         if is_input_css(filepath):
-            _apply_checks(CSS_CHECKS, lines, filepath, findings)
+            _apply_checks(CSS_CHECKS, lines, raw_lines, filepath, findings)
 
     # Check sync notices: for each v2_/wip_ template in the PR, make sure
     # the legacy counterpart (if it exists on disk) has the sync notice.
@@ -1054,8 +1112,7 @@ def run_checks(
 
 
 def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
-    """Fail when upstream files in a vendored JS directory change but that
-    directory's README doesn't.
+    """Fail when upstream files in a vendored JS directory change but that directory's README doesn't.
 
     ``diff_paths`` is every path in the diff, including the old side of a
     rename, so moving a file into or out of a directory counts for both.
@@ -1201,10 +1258,10 @@ def format_summary_markdown(findings: list[Finding]) -> str:
             "Links in redesign templates need Tailwind styling classes. Common fixes:"
         )
         lines.append(
-            '- Add classes directly: `<a class="text-primary-600 hover:underline" ...>`'
+            '- Add classes directly: `<a class="links" ...>`, or `links-external` for external links'
         )
         lines.append(
-            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:text-primary-600 [&_a]:hover:underline">`'
+            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:links">`'
         )
         lines.append("")
 
@@ -1217,6 +1274,11 @@ def format_summary_markdown(findings: list[Finding]) -> str:
 
 
 def main() -> int:
+    """Run the checks on the changed files and report findings.
+
+    Returns:
+        1 if any check failed with an error, otherwise 0.
+    """
     parser = argparse.ArgumentParser(
         description="Frontend checks for CourtListener templates"
     )

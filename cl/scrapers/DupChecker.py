@@ -1,3 +1,5 @@
+"""Detect when a scraper is revisiting content it has already seen."""
+
 from juriscraper.AbstractSite import logger
 
 from cl.scrapers.exceptions import (
@@ -9,6 +11,8 @@ from cl.search.models import Court
 
 
 class DupChecker(dict):
+    """Track duplicates found while scraping a court to decide when to stop."""
+
     def __init__(
         self,
         court: Court,
@@ -17,6 +21,15 @@ class DupChecker(dict):
         *args,
         **kwargs,
     ):
+        """Build a checker for ``court`` with no duplicates counted yet.
+
+        Args:
+            court: The court being scraped.
+            full_crawl: If True, unchanged site hashes don't abort the crawl.
+            dup_threshold: How many duplicates in a row are tolerated.
+            *args: Passed to ``dict``.
+            **kwargs: Passed to ``dict``.
+        """
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
@@ -26,18 +39,17 @@ class DupChecker(dict):
         super().__init__(*args, **kwargs)
 
     def _increment(self, current_date):
-        """Increments the dup_count and sets the correct date for the latest
-        dup.
-        """
+        """Increments the dup_count and sets the correct date for the latest dup."""
         self.last_found_date = current_date
         self.dup_count += 1
 
     def reset(self):
-        """Resets the dup counter and date"""
+        """Resets the dup counter and date."""
         self.dup_count = 0
         self.last_found_date = None
 
     def update_site_hash(self, hash):
+        """Save ``hash`` as the current URL hash's SHA1."""
         self.url_hash.sha1 = hash
         self.url_hash.save()
 
@@ -57,8 +69,7 @@ class DupChecker(dict):
             return True, url_hash
 
     def abort_by_url_hash(self, url, hash):
-        """Checks whether we should abort due to a hash of the site data being
-        unchanged since the last time a URL was visited.
+        """Checks whether we should abort due to a hash of the site data being unchanged since the last time a URL was visited.
 
         Returns True if we should abort the crawl. Else, returns False. Creates
         the item in the database if it doesn't already exist, assigning it to
@@ -85,8 +96,7 @@ class DupChecker(dict):
         lookup_value,
         lookup_by="sha1",
     ):
-        """Checks if a we have an `object_type` with identical content in the CL
-        corpus by looking up `lookup_value` in the `lookup_by` field.
+        """Checks if a we have an `object_type` with identical content in the CL corpus by looking up `lookup_value` in the `lookup_by` field.
 
         If the item is not a duplicate, we will return None, and the caller
         will proceed normally

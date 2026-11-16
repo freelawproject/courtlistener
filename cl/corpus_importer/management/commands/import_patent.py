@@ -1,3 +1,5 @@
+"""Download patent dockets from TXWD and DED for a client."""
+
 import os
 import time
 
@@ -12,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -25,10 +27,9 @@ PATENT_TAGS = ["wdtx_ded_patent"]
 def get_dockets(options: dict) -> None:
     """Get Patent litigation from the past 10 years.
 
-    :param options: Options for scraping
-    :return: None
+    Args:
+        options: Options for scraping
     """
-
     start = options["skip_until"]
     stop = options["limit"]
     # Add code to simplify the logic for iterating.
@@ -40,10 +41,9 @@ def get_dockets(options: dict) -> None:
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]
     START_DATE = "2012-01-01"
@@ -112,9 +112,12 @@ def get_dockets(options: dict) -> None:
 
 
 class Command(VerboseCommand):
+    """Download the patent dockets."""
+
     help = """Get all patent dockets since 2012 in TXWD and DED"""
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, and limit options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -135,6 +138,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Download the dockets with the client's PACER credentials.
+
+        Raises:
+            AssertionError: If FLP's PACER credentials are configured.
+        """
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if PACER_USERNAME == "mlissner.flp":
             raise AssertionError(

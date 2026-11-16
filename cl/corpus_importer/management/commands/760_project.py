@@ -1,3 +1,5 @@
+"""Download dockets and attachment pages for the 760 project."""
+
 import argparse
 import csv
 import os
@@ -14,7 +16,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -24,18 +26,15 @@ TAG = "QAV5K6HU93A67WS6-760"
 
 
 def get_dockets(options):
-    """Download the dockets described in the CSV according to the `tasks`
-    option.
-    """
+    """Download the dockets described in the CSV according to the `tasks` option."""
     f = options["file"]
     reader = csv.DictReader(f)
     q = options["queue"]
     task = options["task"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -91,6 +90,7 @@ def get_dockets(options):
 
 
 def get_att_pages(options):
+    """Get the attachment pages of the project's district and bankruptcy documents."""
     rd_pks = RECAPDocument.objects.filter(
         tags__name=TAG,
         docket_entry__docket__court__jurisdiction__in=[
@@ -107,6 +107,8 @@ def get_att_pages(options):
 
 
 class Command(VerboseCommand):
+    """Run one of the 760 project's download tasks."""
+
     help = "Look up dockets from a spreadsheet for a client and download them."
 
     allowed_tasks = [
@@ -116,6 +118,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, task, and CSV file options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -149,6 +152,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task.
+
+        Raises:
+            argparse.ArgumentError: If a docket task is run without a file.
+        """
         super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] in ["district", "appellate"]:

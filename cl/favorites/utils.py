@@ -1,3 +1,5 @@
+"""Helpers for notes, prayers, and prayer statistics and emails."""
+
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -50,8 +52,11 @@ NOTEABLE_MODELS: dict[type[models.Model], str] = {
 def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     """Return the Notes attached to a given object, across all users.
 
-    :param obj: A noteable model instance (see NOTEABLE_MODELS).
-    :return: A queryset of matching Note rows.
+    Args:
+        obj: A noteable model instance (see NOTEABLE_MODELS).
+
+    Returns:
+        A queryset of matching Note rows.
     """
     content_type = ContentType.objects.get_for_model(type(obj))
     return Note.objects.filter(content_type=content_type, object_id=obj.pk)
@@ -69,10 +74,10 @@ def repoint_notes(
     version's Note is left pointed at version_object, to be cleaned up by
     delete_orphaned_notes when it's deleted.
 
-    :param main_object: The noteable object absorbing version_object's
-        Notes.
-    :param version_object: The noteable object about to be deleted.
-    :return: None
+    Args:
+        main_object: The noteable object absorbing version_object's
+            Notes.
+        version_object: The noteable object about to be deleted.
     """
     existing_user_ids = get_notes_for(main_object).values_list(
         "user_id", flat=True
@@ -90,13 +95,15 @@ def get_note_for_target(
     object_id: int | str,
     user: AnonymousUser | User,
 ) -> Note | None:
-    """Return the given user's Note for a noted object, identified by its
-    model class and pk, if any.
+    """Return the given user's Note for a noted object, identified by its model class and pk, if any.
 
-    :param model_class: The model class object_id belongs to.
-    :param object_id: The pk of the noted object.
-    :param user: The user requesting their Note, possibly anonymous.
-    :return: The user's Note for the object, or None if anonymous or not
+    Args:
+        model_class: The model class object_id belongs to.
+        object_id: The pk of the noted object.
+        user: The user requesting their Note, possibly anonymous.
+
+    Returns:
+        The user's Note for the object, or None if anonymous or not
         found.
     """
     if not user.is_authenticated:
@@ -137,6 +144,11 @@ async def create_prayer(
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
+    """Delete a user's waiting prayer for a document.
+
+    Returns:
+        Whether a prayer was deleted.
+    """
     deleted, _ = await Prayer.objects.filter(
         user=user, recap_document=recap_document, status=Prayer.WAITING
     ).adelete()
@@ -149,11 +161,13 @@ async def get_prayer_counts_in_bulk(
 ) -> dict[int, int]:
     """Retrieve the count of prayers with a status of "WAITING" for a list of recap documents.
 
-    :param recap_documents: A list of RECAPDocument instances to filter prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are the
-    count of "WAITING" prayers for each document.
-    """
+    Args:
+        recap_documents: A list of RECAPDocument instances to filter prayers.
 
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are the
+        count of "WAITING" prayers for each document.
+    """
     prayer_counts = (
         Prayer.objects.filter(
             recap_document__in=recap_documents, status=Prayer.WAITING
@@ -172,10 +186,13 @@ async def get_existing_prayers_in_bulk(
 ) -> dict[int, bool]:
     """Check if prayers exist for a user and a list of recap documents.
 
-    :param user: The user for whom to check prayer existence.
-    :param recap_documents: A list of RECAPDocument instances to check prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are True
-     if a prayer exists for the user and RD.
+    Args:
+        user: The user for whom to check prayer existence.
+        recap_documents: A list of RECAPDocument instances to check prayers.
+
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are True
+        if a prayer exists for the user and RD.
     """
     existing_prayers = Prayer.objects.filter(
         user=user, recap_document__in=recap_documents
@@ -184,13 +201,14 @@ async def get_existing_prayers_in_bulk(
 
 
 async def get_top_prayers() -> QuerySet[RECAPDocument]:
-    """Retrieve the most desired documents that have open prayers. It first
-    ranks by the number of requests and then by the number of views the particular
-    docket has received.
+    """Retrieve the most desired documents that have open prayers.
 
-    :return: A queryset of RECAPDocuments in descending order of preference.
+    It first ranks by the number of requests and then by the number of views
+    the particular docket has received.
+
+    Returns:
+        A queryset of RECAPDocuments in descending order of preference.
     """
-
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
@@ -261,6 +279,11 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
+    """Get the documents a user prayed for, most recent prayer first.
+
+    Optionally only includes prayers with the given status. Each document
+    is annotated with its prayer's status and creation date.
+    """
     filters = Q(prayers__user=user)
     if status is not None:
         filters &= Q(prayers__status=status)
@@ -308,8 +331,7 @@ async def get_user_prayers(
 
 
 async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
-    """
-    Computes the total cost of a given queryset of Prayer objects.
+    """Computes the total cost of a given queryset of Prayer objects.
 
     Args:
         queryset: A QuerySet of Prayer objects.
@@ -340,6 +362,12 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
+    """Grant a document's waiting prayers and notify the users of all its granted prayers.
+
+    Queues each user's enabled pray-and-pay webhooks, clears the document's
+    availability record, and emails the users. Does nothing if no prayers
+    were waiting.
+    """
     # Update prayers to GRANTED status and check if any were updated
     updated_count = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
@@ -412,6 +440,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
 @dataclass
 class PrayerStats:
+    """Counts and total cost of a set of prayers."""
+
     prayer_count: int
     total_cost: str
     distinct_count: int | None = None
@@ -419,6 +449,7 @@ class PrayerStats:
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
+    """Get the count and total cost of a user's granted prayers, cached for a minute."""
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
@@ -449,6 +480,11 @@ async def get_lifetime_prayer_stats(
 ) -> (
     PrayerStats
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+    """Get stats for all prayers with a status, cached for a minute.
+
+    Includes the number of prayers, distinct documents, distinct users, and
+    the total cost.
+    """
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
@@ -483,6 +519,10 @@ async def get_lifetime_prayer_stats(
 
 
 def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
+    """Email a user that the document they prayed for can't be bought.
+
+    Does nothing if the user has no waiting prayer for the document.
+    """
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")
