@@ -409,7 +409,6 @@ def clone_opinion(
             print(
                 ">> Can't download file, check that your API keys are set and not expired to save the file."
             )
-            pass
 
     action = "Created" if created else "Updated"
     print(f"({action}) Opinion id: {op.pk}")

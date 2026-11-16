@@ -68,11 +68,9 @@ def get_dockets(options):
                 court_id="ilnb",
                 cookies_data=session_data,
                 tag_names=[TAG],
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=True,
             ).set(queue=q),
         ).apply_async()
 

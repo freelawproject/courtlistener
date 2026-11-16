@@ -63,13 +63,11 @@ def get_dockets(options):
                 court_id="nywb",
                 session_data=session_data,
                 tag_names=[TAG],
-                **{
-                    "doc_num_start": 1,
-                    "doc_num_end": 1,
-                    "show_parties_and_counsel": False,
-                    "show_terminated_parties": False,
-                    "show_list_of_member_cases": False,
-                },
+                doc_num_start=1,
+                doc_num_end=1,
+                show_parties_and_counsel=False,
+                show_terminated_parties=False,
+                show_list_of_member_cases=False,
             ).set(queue=q),
         ).apply_async()
 

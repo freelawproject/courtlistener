@@ -814,7 +814,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-        await sync_to_async(view)(request, **{"version": f"{api_version}"})
+        await sync_to_async(view)(request, version=f"{api_version}")
 
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(

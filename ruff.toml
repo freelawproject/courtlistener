@@ -21,6 +21,8 @@ lint.select = [
   "LOG",
   # flake8-logging-format
   "G",
+  # flake8-pie
+  "PIE",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

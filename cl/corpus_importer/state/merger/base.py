@@ -480,7 +480,6 @@ class Merger[Scrape, Params, M: Model](metaclass=MergerMeta):
 
     def after(self) -> None:
         """Run extra processes after the merge operation completes or fails."""
-        ...
 
     def query(self) -> QuerySet[M]:
         """Constructs a queryset to find an existing object in the DB, using the natural key defined by `cls.key`.

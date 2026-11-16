@@ -998,7 +998,7 @@ async def build_cites_clusters_query(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
@@ -1326,7 +1326,7 @@ async def es_cited_case_count(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)

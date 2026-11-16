@@ -52,7 +52,7 @@ class InvalidDocumentError(Exception):
 
 # Used to nuke null and control characters.
 null_map: dict[int, None] = dict.fromkeys(
-    list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
+    list(range(10)) + list(range(11, 13)) + list(range(14, 32))
 )
 
 VALID_CASE_NAME_SEPARATORS = [" v ", " v. ", " vs. ", " vs "]

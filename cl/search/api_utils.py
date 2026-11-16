@@ -140,7 +140,7 @@ class ESList:
         # Iterate over the results returned by the query, up to the specified
         # page_size.
         total_items = min(len(self), self.page_size)
-        for item in range(0, total_items):
+        for item in range(total_items):
             try:
                 yield self._item_cache[item]
             except IndexError:

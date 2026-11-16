@@ -1140,7 +1140,7 @@ class ESCommonSearchTest(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
             ("¶242", "¶242"),
         )
         for q, a in q_a:
-            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
+            print(f"Does {q} --> {a} ? ")
             self.assertEqual(cleanup_main_query(q), a)
 
     def test_built_in_search_connectors(self, court_cache_key_mock) -> None:

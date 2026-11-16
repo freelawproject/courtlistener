@@ -60,8 +60,6 @@ class PercolatorField(fields.DEDField, Percolator):
     method.
     """
 
-    pass
-
 
 class JoinField(fields.DEDField, Join):
     """Subclass of DEDField and Join field.
@@ -71,5 +69,3 @@ class JoinField(fields.DEDField, Join):
     like "prepare," which allows the field to be populated using the prepare
     method.
     """
-
-    pass

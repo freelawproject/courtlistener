@@ -271,11 +271,9 @@ def get_dockets(options, items, tags: list[str], sample_size=0):
                 court_id=row.district_id,
                 session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=True,
             ).set(queue=q),
         ).apply_async()
 
