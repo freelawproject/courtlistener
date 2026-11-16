@@ -1,3 +1,5 @@
+"""Mergers for scraped Florida appellate dockets."""
+
 import logging
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -82,6 +84,8 @@ logger = logging.getLogger(__name__)
 class FloridaRoleMerger(
     RoleMerger[FloridaPartyRepresentative, RelatedParams[None]]
 ):
+    """Role merger that marks a party's primary representative as lead attorney."""
+
     role: int = Fn(lambda v: Role.ATTORNEY_LEAD if v else Role.UNKNOWN)(
         Scrape(FloridaPartyRepresentative).primary_flag
     )
@@ -90,6 +94,8 @@ class FloridaRoleMerger(
 class FloridaPartyTypeMerger(
     PartyTypeMerger[FloridaParty, RelatedParams[None]]
 ):
+    """Party type merger that records whether a Florida party is pro se."""
+
     pro_se: int = Fn(
         lambda v: PartyType.PRO_SE_YES if v else PartyType.PRO_SE_NO
     )(Scrape(FloridaParty).pro_se_flag)
@@ -150,6 +156,12 @@ class FloridaDocumentMerger(
         FloridaDocument,
     ]
 ):
+    """Merger for a scraped Florida attachment into a ``FloridaDocument``.
+
+    Documents are matched by link UUID, falling back to a uniquely named
+    document whose link UUID is no longer in the scrape.
+    """
+
     config: ClassVar[MergerConfig[FloridaDocument]] = MergerConfig(
         model=FloridaDocument, key=("link_uuid",)
     )
@@ -330,6 +342,12 @@ class FloridaDocketEntryMerger(
         FloridaDocketEntry,
     ]
 ):
+    """Merger for a scraped Florida docket entry and its attachments.
+
+    Entries are matched by UUID, and their attachments replace the entry's
+    stored documents.
+    """
+
     config: ClassVar[MergerConfig[FloridaDocketEntry]] = MergerConfig(
         model=FloridaDocketEntry, key=("docket_entry_uuid",)
     )
@@ -392,6 +410,8 @@ class FloridaOriginatingCourtInformationMerger(
         OriginatingCourtInformation,
     ]
 ):
+    """Merger for a Florida originating case's docket number."""
+
     config: ClassVar[MergerConfig[OriginatingCourtInformation]] = MergerConfig(
         model=OriginatingCourtInformation
     )
@@ -412,6 +432,7 @@ class FloridaOriginatingCourtInformationMerger(
         RelatedParams[list[ScrapeFloridaDocketEntry]],
         OriginatingCourtInformation,
     ]:
+        """Match no existing rows, so a new row is always created."""
         return state.create()
 
 
@@ -434,6 +455,8 @@ def _originating_case(
 class FloridaCaseTransferMerger(
     CaseTransferMerger[DocketTransfer, RelatedParams[None]]
 ):
+    """Case transfer merger that maps the Florida origin court to its CourtListener ID."""
+
     origin_court_id: str | None = Constant(FLORIDA_TRANSFER_COURT_ID_MAP).get(
         Scrape(DocketTransfer).court_id
     )
@@ -476,6 +499,12 @@ def _florida_transfers(
 class FloridaDocketMerger(
     DocketMerger[FloridaCase, list[ScrapeFloridaDocketEntry]]
 ):
+    """Merger for a scraped Florida case into a ``Docket``.
+
+    Also merges the case's parties, docket entries, inbound transfers, and,
+    for Supreme Court cases, originating court information.
+    """
+
     config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
     court_id: str = Constant(FLORIDA_COURT_ID_MAP)[
@@ -564,6 +593,7 @@ class FloridaDocketMerger(
 
     @staticmethod
     def validator(scrape: FloridaCase) -> bool:
+        """Check that the case's court is a known Florida court, logging an error if not."""
         if scrape.court_id not in FLORIDA_COURT_ID_MAP:
             logger.error("Unknown court id: %s", scrape.court_id)
             return False

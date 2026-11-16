@@ -1,3 +1,5 @@
+"""Helpers for saving scraped opinions, dockets, citations, and responses."""
+
 import json
 import re
 from datetime import date, datetime
@@ -178,6 +180,7 @@ def get_extension(content: bytes) -> str:
 
 
 def signal_handler(signal, frame):
+    """Log that a signal was caught and set the module's ``die_now`` flag."""
     # Trigger this with CTRL+4
     logger.info("**************")
     logger.info("Signal caught. Finishing the current court, then exiting...")
@@ -215,7 +218,7 @@ def get_existing_docket(
     """
     # Avoid lookups by blank docket number
     if not docket_number.strip():
-        return
+        return None
 
     # delete semicolons only for the lookup, for back compatibility
     # with juriscraper string formatting
@@ -543,7 +546,7 @@ def update_or_create_originating_court_information(
         lower_court_judge: will go into OCI.assigned_to_str
     """
     if not (lower_court_judge or lower_court_number):
-        return
+        return None
 
     if existing_oci := docket.originating_court_information:
         update = False
@@ -561,7 +564,7 @@ def update_or_create_originating_court_information(
             existing_oci.save()
 
         # If the docket already had a OriginatingCourtInformation, just return
-        return
+        return None
 
     return OriginatingCourtInformation(
         docket_number=lower_court_number or "",

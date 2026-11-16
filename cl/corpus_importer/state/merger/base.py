@@ -1,3 +1,5 @@
+"""Declarative mergers that write scraped data into Django models."""
+
 from __future__ import annotations
 
 import logging
@@ -9,7 +11,6 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from functools import cache, cached_property
-from graphlib import CycleError, TopologicalSorter
 from itertools import chain
 from typing import (
     Any,
@@ -25,6 +26,7 @@ from django.db.models import (
     QuerySet,
 )
 from django.db.models.manager import Manager
+from graphlib import CycleError, TopologicalSorter
 
 from cl.corpus_importer.state.utils import MergeResult
 
@@ -74,7 +76,7 @@ type AnyRelatedMerger[Scrape, Params] = (
 
 @dataclass(kw_only=True)
 class MergerSpecRegistry[Scrape, Params]:
-    """The specifications declared on a merger."""
+    """A merger's specifications, by field name, grouped by kind."""
 
     attr: dict[str, AttributeMerger[Scrape, Params, Any]] = field(
         default_factory=dict
@@ -164,7 +166,7 @@ class MergerSpecRegistry[Scrape, Params]:
         return errors
 
     def register(self, spec: MergerSpecification[Scrape, Params, Any]):
-        """Add a spec under the name it was declared with."""
+        """Add a specification under its name, by kind; unknown kinds are logged."""
         match spec:
             case AttributeMerger():
                 self.attr[spec._name] = spec
@@ -180,7 +182,7 @@ class MergerSpecRegistry[Scrape, Params]:
         self._transformers[spec._name] = spec.transform
 
     def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
-        """Compute the value of every registered spec for a scrape."""
+        """Get every specification's transformed value, by field name."""
         return {k: v(scrape, params) for k, v in self._transformers.items()}
 
 
@@ -561,6 +563,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def create(
         self, state: MergerState.Create[Scrape, Params, M]
     ) -> MergerState.CreateOutput[Scrape, Params, M]:
+        """Create the object from the transformed attributes, merging its forward one-to-one relations first."""
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.config.registry.one_to_one.items():

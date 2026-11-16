@@ -3440,7 +3440,7 @@ class TasksTest(TestCase):
             """
             if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
                 raise OperationalError()
-            return None
+            return
 
         mock_store.side_effect = side_effect
 

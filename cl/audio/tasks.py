@@ -1,3 +1,5 @@
+"""Celery tasks for archiving, downsizing, and transcribing oral argument audio."""
+
 from contextlib import ExitStack
 from math import ceil
 
@@ -38,6 +40,11 @@ from cl.lib.recap_utils import get_bucket_name
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
 def upload_audio_to_ia(self, af_pk: int) -> None:
+    """Upload an audio file's original file to the Internet Archive.
+
+    On success, the archive URL is saved on the audio and its failure count
+    is cleared. On failure, its failure count is incremented.
+    """
     af = Audio.objects.get(pk=af_pk)
     d = af.docket
     file_name = make_af_filename(

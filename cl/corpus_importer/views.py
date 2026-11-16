@@ -1,3 +1,5 @@
+"""Views for corpus importer cleanup tools."""
+
 from asgiref.sync import async_to_sync
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator

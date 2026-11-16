@@ -1,3 +1,5 @@
+"""Import SCOTUS dockets from S3 using an inventory CSV."""
+
 import csv
 import time
 
@@ -26,9 +28,12 @@ def compose_redis_key() -> str:
 
 
 class Command(VerboseCommand):
+    """Queue the download and ingestion of the SCOTUS dockets in an S3 inventory."""
+
     help = "Import SCOTUS dockets from S3 using an inventory CSV."
 
     def add_arguments(self, parser):
+        """Add the inventory, queue, throttling, delay, and resume options."""
         parser.add_argument(
             "--inventory-file",
             required=True,
@@ -77,6 +82,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue a download-then-ingest chain for each inventory row.
+
+        Starts at ``--start-row``, or at the last logged row with
+        ``--auto-resume``. Progress is logged every 100 rows.
+        """
         super().handle(*args, **options)
 
         retrieval_queue = options["retrieval_queue"]

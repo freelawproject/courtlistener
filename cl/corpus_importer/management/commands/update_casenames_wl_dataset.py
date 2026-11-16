@@ -1,3 +1,5 @@
+"""Update case names and citations from a Westlaw dataset CSV."""
+
 import logging
 import re
 import time
@@ -426,12 +428,15 @@ def process_csv(
 
 
 class Command(BaseCommand):
+    """Match CSV case details to existing records and update them."""
+
     help = (
         "Match and compare case details from a CSV file with existing "
         "records in the database."
     )
 
     def add_arguments(self, parser):
+        """Add the file path, delay, dry-run, start row, and limit options."""
         parser.add_argument(
             "--filepath",
             type=str,
@@ -466,6 +471,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Process each CSV file.
+
+        Raises:
+            CommandError: If no file path is given.
+        """
         files = options["filepath"]
         delay = options["delay"]
         dry_run = options["dry_run"]

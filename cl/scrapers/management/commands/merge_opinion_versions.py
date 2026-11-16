@@ -1,3 +1,5 @@
+"""Find opinions that are versions of each other and merge them."""
+
 import itertools
 import re
 from collections import defaultdict
@@ -375,7 +377,7 @@ def get_same_url_opinions(
     """
     standard_url = opinion_group["download_url"].replace("https", "http")
     if standard_url in seen_urls:
-        return
+        return None
 
     seen_urls.add(standard_url)
     download_url_query = get_query_from_url(
@@ -936,9 +938,12 @@ def merge_versions_by_text_similarity(
 
 
 class Command(VerboseCommand):
+    """Merge opinions that are versions of each other."""
+
     help = "Find and merge Opinion objects that are versions of each other"
 
     def add_arguments(self, parser):
+        """Add the method, URL template, limit, and dry-run options."""
         super().add_arguments(parser)
         parser.add_argument(
             "method",
@@ -978,6 +983,11 @@ class Command(VerboseCommand):
         # - date ranges
 
     def handle(self, *args, **options):
+        """Merge opinion versions grouped by download URL.
+
+        Only the ``download_url`` method does anything. With ``--dry-run``,
+        sets the module's ``DRY_RUN`` flag.
+        """
         super().handle(*args, **options)
         if options["dry_run"]:
             global DRY_RUN

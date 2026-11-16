@@ -1,3 +1,5 @@
+"""Queries for checking a user's prayer eligibility."""
+
 from datetime import timedelta
 
 from asgiref.sync import sync_to_async
@@ -9,6 +11,15 @@ from cl.favorites.models import Prayer
 
 
 async def prayer_eligible(user: User) -> tuple[bool, int]:
+    """Check whether a user can make another prayer.
+
+    Users get ``ALLOWED_PRAYER_COUNT`` prayers per 24 hours, tripled for
+    members.
+
+    Returns:
+        Whether the user is under their limit, and their limit minus their
+        recent prayers.
+    """
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
     @sync_to_async

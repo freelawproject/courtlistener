@@ -1,3 +1,5 @@
+"""Helpers for audio binaries, file names, and transcription quality checks."""
+
 import datetime
 
 from distutils.spawn import find_executable

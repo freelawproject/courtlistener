@@ -1,3 +1,5 @@
+"""Helpers for building, running, and processing Elasticsearch queries."""
+
 import datetime
 import json
 import logging
@@ -119,6 +121,8 @@ def elasticsearch_enabled[**P, R](
 
 
 class CSVSerializableDocumentMixin:
+    """Mixin for documents that can be exported as CSV rows."""
+
     @classmethod
     def get_csv_headers(cls) -> list[str]:
         """Returns a list of strings representing the headers for a CSV file.
@@ -2030,7 +2034,7 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 
 
 def fill_position_mapping(
-    positions: QuerySet[Position, Position],
+    positions: QuerySet[Position],
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
 ) -> BasePositionMapping | ApiPositionMapping:
     """Extract all the data from the position queryset and fill the attributes of the mapping.
