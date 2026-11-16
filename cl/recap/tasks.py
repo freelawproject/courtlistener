@@ -4268,7 +4268,7 @@ def check_pdf_redactions(rd_pk: int) -> None:
     try:
         redaction_response = async_to_sync(check_redactions_service)(rd)
     except Exception:
-        logger.error("Redaction check failed for RD %s", rd_pk, exc_info=True)
+        logger.exception("Redaction check failed for RD %s", rd_pk)
         raise
 
     if not redaction_response.is_success:

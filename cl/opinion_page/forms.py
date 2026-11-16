@@ -558,7 +558,8 @@ class BaseCourtUploadForm(forms.Form):
 
         if not citations:
             logger.warning(
-                f"Citation not found for court id: {self.cleaned_data.get('court_str')} form"
+                "Citation not found for court id: %s form",
+                self.cleaned_data.get("court_str"),
             )
 
         save_everything(

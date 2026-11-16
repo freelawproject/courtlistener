@@ -300,10 +300,10 @@ def read_json(file_path: str, ia_download_url: str) -> Any | None:
         with open(file_path) as f:
             data = json.load(f)
     except ValueError:
-        logger.warning(f"Empty json: missing case at: {ia_download_url}")
+        logger.warning("Empty json: missing case at: %s", ia_download_url)
         return None
     except Exception as e:
-        logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        logger.warning("Unknown error %s for: %s", e, ia_download_url)
         return None
     return data
 
@@ -339,7 +339,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     fix_list = get_fix_list()
 
     for file_path in filepaths:
-        logger.info(f"Processing opinion at {file_path}")
+        logger.info("Processing opinion at %s", file_path)
 
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
@@ -348,7 +348,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         oc = OpinionCluster.objects.filter(filepath_json_harvard=file_path)
         if len(oc) > 0:
             logger.info(
-                f"Skipping {oc[0].id} - already in system {ia_download_url}"
+                "Skipping %s - already in system %s", oc[0].id, ia_download_url
             )
             continue
 
@@ -358,7 +358,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         identifier = "/".join(file_path.rsplit("/", 2)[1:])
         if identifier in fix_list:
-            logger.info(f"Fetching fixes and merging data at {file_path}")
+            logger.info("Fetching fixes and merging data at %s", file_path)
             data = merge_fixes(data, identifier)
 
         # Cleanup whitespace on citations
@@ -366,7 +366,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         cites = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
-            logger.warning(f"No citation found for {clean_cite}")
+            logger.warning("No citation found for %s", clean_cite)
             continue
 
         case_name = harmonize(data["name_abbreviation"])
@@ -394,14 +394,14 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             court_id = found_court[0]
 
         if not Court.objects.filter(id=court_id).exists():
-            logger.warning(f"Court not found in Courtlistener: {court_id}")
+            logger.warning("Court not found in Courtlistener: %r", court_id)
             continue
 
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         if not date_filed:
             logger.warning(
-                f"No date found for {data['decision_date']} at {file_path}"
+                "No date found for %s at %s", data["decision_date"], file_path
             )
             continue
         case_body = data["casebody"]["data"]
@@ -410,7 +410,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
-            logger.warning(f"No opinion in Harvard XML at {file_path}")
+            logger.warning("No opinion in Harvard XML at %s", file_path)
             continue
 
         previously_imported_case = find_previously_imported_cases(
@@ -431,14 +431,16 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                     cluster_id=previously_imported_case.id,
                 )
                 logger.info(
-                    f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
+                    "Adding citations for case at https://www.courtlistener.com/opinion/%s/%s",
+                    previously_imported_case.id,
+                    previously_imported_case.slug,
                 )
                 # Add the filepath to the harvard file for the associated opinion
                 previously_imported_case.filepath_json_harvard = file_path
                 previously_imported_case.save()
             continue
 
-        logger.info(f"Adding case {case_name_full}")
+        logger.info("Adding case %s", case_name_full)
         add_new_case(
             data,
             case_body,
@@ -523,7 +525,9 @@ def add_new_case(
 
     with transaction.atomic():
         logger.info(
-            f"Adding docket for {case_name}: {citation.corrected_citation()}"
+            "Adding docket for %s: %s",
+            case_name,
+            citation.corrected_citation(),
         )
         docket = update_or_create_docket(
             case_name,
@@ -585,7 +589,9 @@ def add_new_case(
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
-        f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
+        "Finished adding case at https://www.courtlistener.com/opinion/%s/%s",
+        cluster.id,
+        cluster.slug,
     )
 
 
