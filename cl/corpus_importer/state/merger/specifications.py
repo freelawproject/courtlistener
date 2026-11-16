@@ -135,7 +135,7 @@ class AttributeMerger[Scrape, Params, Transform](
     _transform: Transformer[Any, Any, Any]
 
     def __init__(self):
-        """Create an expression using the `overwrite_if_present` strategy."""
+        """Create an expression."""
         super().__init__()
         self.strategy: Strategy = overwrite
 

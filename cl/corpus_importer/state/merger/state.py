@@ -265,7 +265,7 @@ class Machine[Scrape, Params, M: Model](ABC):
     Methods can be overridden to customize handling of specific states.
     """
 
-    runners: ClassVar[Mapping[type[AnyState], str]] = {
+    runners: ClassVar[Mapping[type[AnyState], StateName]] = {
         Lookup: "lookup",
         Resolve: "resolve",
         Create: "create",

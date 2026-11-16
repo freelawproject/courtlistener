@@ -179,21 +179,6 @@ class FloridaDocumentMerger(
     )
     link_uuid: UUID = Scrape(ScrapeFloridaDocument).document_link_uuid
 
-    def scrape_link_uuids(
-        self,
-        state: MergerState.NonTerminal[
-            ScrapeFloridaDocument,
-            RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-            FloridaDocketEntry,
-        ],
-    ) -> list[UUID]:
-        """Shorthand to get the full set of link UUIDs passed as a parameter to the root merger."""
-        return [
-            attachment.document_link_uuid
-            for entry in state.params.params.params
-            for attachment in entry.attachments
-        ]
-
     def scraped_entry(
         self,
         state: MergerState.Lookup[
