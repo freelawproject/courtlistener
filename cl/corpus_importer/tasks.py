@@ -2350,7 +2350,7 @@ def create_attachment_pq(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
+    return ProcessingQueue(
         court_id=rd.docket_entry.docket.court_id,
         pacer_doc_id=rd.pacer_doc_id,
         uploader=user,
@@ -2358,7 +2358,6 @@ def create_attachment_pq(
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
         source=source,
     )
-    return pq
 
 
 @app.task(bind=True, ignore_result=True)

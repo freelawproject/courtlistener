@@ -297,5 +297,4 @@ class DocumentSerializer(serializers.Serializer):
             for field_name in declared_fields:
                 field_mapping[field_name] = declared_fields[field_name]
 
-        field_mapping = OrderedDict(sorted(field_mapping.items()))
-        return field_mapping
+        return OrderedDict(sorted(field_mapping.items()))

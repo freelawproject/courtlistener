@@ -2393,6 +2393,7 @@ class V4DRFPaginationTest(TestCase):
             return await api_client.get(url, params)
         if method == "post":
             return await api_client.post(url, params)
+        return None
 
     @classmethod
     def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:

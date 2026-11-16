@@ -202,8 +202,7 @@ def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
     long_data = parse_extra_fields(soup, long_fields, True)
     all_data.update(short_data)
     all_data.update(long_data)
-    all_data = {k: v for k, v in all_data.items() if v}
-    return all_data
+    return {k: v for k, v in all_data.items() if v}
 
 
 def combine_non_overlapping_data(

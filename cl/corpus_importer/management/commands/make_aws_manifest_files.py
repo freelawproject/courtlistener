@@ -852,3 +852,4 @@ class Command(VerboseCommand):
         # Store the timestamp of the last successful bulk import for this
         # record type, expiring after 45 days.
         r.set(last_export_key, str(timezone.now()), 60 * 60 * 24 * 45)
+        return None

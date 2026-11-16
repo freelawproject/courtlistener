@@ -2054,8 +2054,7 @@ def get_data_from_att_report(text: str, court_id: str) -> dict[str, str]:
     """Parse a district or bankruptcy attachment page's text for a court."""
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    att_data = att_page.data
-    return att_data
+    return att_page.data
 
 
 def get_data_from_appellate_att_report(
@@ -2072,8 +2071,7 @@ def get_data_from_appellate_att_report(
     """
     att_page = AppellateAttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    att_data = att_page.data
-    return att_data
+    return att_page.data
 
 
 async def add_tags_to_objs(

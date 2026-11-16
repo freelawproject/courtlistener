@@ -116,6 +116,7 @@ def elasticsearch_enabled[**P, R](
     def wrapper_func(*args: P.args, **kwargs: P.kwargs) -> R | None:
         if not settings.ELASTICSEARCH_DISABLED:
             return func(*args, **kwargs)
+        return None
 
     return wrapper_func
 
@@ -290,8 +291,7 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     # Exclude opinion clusters to which the related IDs to query belong.
     cluster_ids_list = list(unique_clusters)
     exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
-    bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
-    return bool_query
+    return Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
 
 
 def make_es_boost_list(fields: dict[str, float]) -> list[str]:
@@ -781,7 +781,7 @@ def build_sort_results(
 
         order_by_key = re.sub(r"random_\S*", "random_", order_by)
         order = order_by_map[order_by_key]["random_"]["order"]
-        random_sort = {
+        return {
             "_script": {
                 "type": "number",
                 "script": {
@@ -791,7 +791,6 @@ def build_sort_results(
                 "order": order,
             }
         }
-        return random_sort
 
     if order_by not in order_by_map:
         # Sort by score in descending order
@@ -1837,8 +1836,7 @@ def add_es_highlighting[S: (Search, SearchDSL)](
 
     extra_options = {"highlight": highlight_options}
     search_query = search_query.extra(**extra_options)
-    search_query = search_query.source(excludes=fields_to_exclude)
-    return search_query
+    return search_query.source(excludes=fields_to_exclude)
 
 
 def merge_highlights_into_result(
@@ -2675,9 +2673,7 @@ def add_highlighting_for_feed_query(s: Search, field: str) -> Search:
         pre_tags=[f"<{SEARCH_HL_TAG}>"],
         post_tags=[f"</{SEARCH_HL_TAG}>"],
     )
-    s = s.source(excludes=[field])
-
-    return s
+    return s.source(excludes=[field])
 
 
 def build_search_feed_query(
@@ -2853,7 +2849,7 @@ def nullify_query_score(query: Query) -> Query:
         The modified Query object with a script score that always
         returns zero.
     """
-    query = Q(
+    return Q(
         "function_score",
         query=query,
         script_score={
@@ -2864,7 +2860,6 @@ def nullify_query_score(query: Query) -> Query:
         # Replace the original score with the one computed by the script
         boost_mode="replace",
     )
-    return query
 
 
 def apply_custom_score_to_main_query(

@@ -95,14 +95,13 @@ def get_object_list(request, cd, paginator):
             request.version,
         )
 
-    sl = ESList(
+    return ESList(
         request=request,
         main_query=main_query,
         offset=offset,
         page_size=page_size,
         type=cd["type"],
     )
-    return sl
 
 
 class ESList:

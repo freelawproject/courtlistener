@@ -36,8 +36,7 @@ def process_date_string(date_input):
     """Return date as YYYY-MM-DD."""
     if not date_input:
         return None
-    date_object = datetime.strptime(date_input, "%Y-%m-%d")
-    return date_object
+    return datetime.strptime(date_input, "%Y-%m-%d")
 
 
 C = Counter()  # for fixing school names.
@@ -292,8 +291,7 @@ def get_aba(abastr):
     )
     if not abastr:
         return None
-    aba = abadict[abastr]
-    return aba
+    return abadict[abastr]
 
 
 def get_select(state, year):
@@ -312,5 +310,4 @@ def get_gender(gender_str):
         "Male": "m",
         "Other": "o",
     }
-    gender = gender_dict[gender_str]
-    return gender
+    return gender_dict[gender_str]

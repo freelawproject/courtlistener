@@ -146,8 +146,7 @@ class Command(VerboseCommand, CommandUtils):
         '''
         value = re.sub(r'"$', "", value)
         value = re.sub(r'^"', "", value)
-        value = re.sub(r'""', '"', value)
-        return value
+        return re.sub(r'""', '"', value)
 
     def make_csv_row_dict(self, line, col_headers):
         """Because the PACER data is so nasty, we need our own CSV parser.

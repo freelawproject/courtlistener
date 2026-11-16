@@ -101,12 +101,11 @@ def get_nos_700_items():
         FAMILY_AND_MEDICAL_LEAVE_ACT,
         EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT,
     ]
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_cand_items():
@@ -183,13 +182,12 @@ def get_cand_items():
         ARBITRATION,
         APA_REVIEW_OR_APPEAL_OF_AGENCY_DECISION,
     }
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         district_id="cand",
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_nos_700_docket_sample(options):

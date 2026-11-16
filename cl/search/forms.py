@@ -705,9 +705,7 @@ class SearchForm(forms.Form):
             q = re.sub(bad, good, q)
 
         # Make pipes work
-        q = re.sub(r"\|", " OR ", q)
-
-        return q
+        return re.sub(r"\|", " OR ", q)
 
     def clean_order_by(self):
         """Sets the default order_by value if one isn't provided by the user."""

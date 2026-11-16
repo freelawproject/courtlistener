@@ -1557,8 +1557,7 @@ async def make_reporter_dict() -> dict:
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
                 reporters[name].append(abbrev)
-    reporters = OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
-    return reporters
+    return OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
 
 
 async def citation_handler(

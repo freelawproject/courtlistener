@@ -2154,8 +2154,7 @@ def download_embedding(
     try:
         with storage.open(file_path, "rb") as f:
             file_contents = f.read().decode("utf-8")
-        embedding_data = json.loads(file_contents)
-        return embedding_data
+        return json.loads(file_contents)
     except FileNotFoundError:
         logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
         return None

@@ -23,6 +23,8 @@ lint.select = [
   "G",
   # flake8-pie
   "PIE",
+  # flake8-return
+  "RET",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

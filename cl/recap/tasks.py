@@ -237,7 +237,6 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     Args:
         fq: The PacerFetchQueue item to process
     """
-    result = None
     match fq.request_type:
         case REQUEST_TYPE.DOCKET:
             court_id = get_court_id_from_fetch_queue(fq)
@@ -264,8 +263,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
                 f"Unsupported request_type: {fq.request_type}"
             )
 
-    result = c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
-    return result
+    return c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
 
 
 async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
@@ -2993,12 +2991,11 @@ def get_recap_email_recipients(
         List of recap.email addresses
     """
     # Select only @recap.email addresses
-    recap_email_recipients = [
+    return [
         recap_email.lower()
         for recap_email in email_recipients
         if "@recap.email" in recap_email
     ]
-    return recap_email_recipients
 
 
 async def get_attachment_page_by_url(

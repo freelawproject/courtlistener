@@ -101,11 +101,10 @@ def get_last_complete_date(
 
     # Ensure that we go back a few days from the last time we had success if
     # that success was in the last few days.
-    last_complete_date = min(
+    return min(
         now().date() - datetime.timedelta(days=RECENT_REQUERY_DAYS),
         last_completion_log.date_queried,
     )
-    return last_complete_date
 
 
 def get_outstanding_failed_dates(

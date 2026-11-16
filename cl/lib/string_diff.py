@@ -47,9 +47,7 @@ def gen_diff_ratio(left: str, right: str) -> float:
     right = remove_words(right)
 
     # compute the difference value
-    diff = difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
-
-    return diff
+    return difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
 
 
 class _BestMatchOutput(TypedDict):

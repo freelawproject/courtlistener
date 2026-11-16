@@ -153,8 +153,7 @@ def filepath_list(
     glob_paths = _make_glob_from_args(reporter, volumes, page)
     for glob_path in glob_paths:
         files.extend(glob(glob_path))
-    files = human_sort(files, key=None)  # type: ignore
-    return files  # type: ignore
+    return human_sort(files, key=None)  # type: ignore
 
 
 def check_for_match(new_case: str, possibilities: list[str]) -> bool:

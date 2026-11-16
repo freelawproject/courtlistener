@@ -122,7 +122,7 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
     Returns:
         A list of Court IDs.
     """
-    court_ids_to_scrape = (
+    return (
         get_iquery_pacer_courts_to_scrape()
         if court_type == "all"
         else (
@@ -135,7 +135,6 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
             )
         )
     )
-    return court_ids_to_scrape
 
 
 def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:

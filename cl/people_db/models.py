@@ -1424,6 +1424,7 @@ class CriminalCount(models.Model):
             return CriminalCount.PENDING
         if status_str == "terminated":
             return CriminalCount.TERMINATED
+        return None
 
 
 class CriminalComplaint(models.Model):

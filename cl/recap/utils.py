@@ -102,7 +102,7 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet[RECAPDocument]:
     Returns:
         The main RECAPDocument queryset.
     """
-    main_rds_qs = (
+    return (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .filter(
             pacer_doc_id=pacer_doc_id,
@@ -116,7 +116,6 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet[RECAPDocument]:
             "docket_entry__docket__court_id",
         )
     )
-    return main_rds_qs
 
 
 def find_subdocket_pdf_rds_from_data(

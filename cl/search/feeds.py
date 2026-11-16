@@ -308,8 +308,7 @@ def search_feed_error_handler(view_func: Callable) -> Callable:
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
         try:
-            response = view_func(request, *args, **kwargs)
-            return response
+            return view_func(request, *args, **kwargs)
         except (
             UnbalancedParenthesesQuery,
             UnbalancedQuotesQuery,

@@ -163,13 +163,12 @@ def prelim_clean_F(s: str) -> str:
     s = re.sub(r"_\d+$", "", s)  # Remove trailing numbers after underscores
     s = re.sub(r"^-+|-+$", "", s)  # Remove leading/trailing dashes
     s = re.sub(r"\.+$", "", s)  # Remove trailing periods
-    s = re.sub(
+    return re.sub(
         r"^(?:No\.?|Case No\.?|Docket No\.?|Docket|Case)\s+",
         "",
         s,
         flags=re.IGNORECASE,
     )  # Remove common prefixes
-    return s
 
 
 def regex_clean_F(s: str) -> str:

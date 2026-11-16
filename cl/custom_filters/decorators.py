@@ -39,6 +39,7 @@ def verify_honeypot_value(request, field_name):
                 {"fieldname": field},
                 status=400,
             )
+    return None
 
 
 @overload

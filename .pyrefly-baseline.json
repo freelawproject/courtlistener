@@ -3362,10 +3362,10 @@
       "severity": "error"
     },
     {
-      "column": 35,
+      "column": 16,
       "path": "cl/search/models.py",
       "name": "bad-return",
-      "concise_description": "Function declared to return `str`, but one or more paths are missing an explicit `return`",
+      "concise_description": "Returned type `None` is not assignable to declared return type `str`",
       "severity": "error"
     },
     {

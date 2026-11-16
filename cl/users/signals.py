@@ -51,8 +51,7 @@ def get_message_id(mail_obj: dict) -> str:
     headers = mail_obj["headers"]
     for header in headers:
         if header["name"] == "X-CL-ID":
-            message_id = header["value"]
-            return message_id
+            return header["value"]
     return ""
 
 

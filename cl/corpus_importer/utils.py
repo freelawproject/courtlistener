@@ -348,10 +348,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
     for overlap in filtered_subset:
         count += len(overlap)
 
-    percent_match = int(
-        100 * (count / min([len(file_characters), len(cl_characters)]))
-    )
-    return percent_match
+    return int(100 * (count / min([len(file_characters), len(cl_characters)])))
 
 
 def similarity_scores(
@@ -386,10 +383,9 @@ def similarity_scores(
     )
 
     # Calculate cosine similarity between weight of words for each text in list
-    scores = cosine_similarity(
+    return cosine_similarity(
         X[: len(texts_to_compare_1)], X[len(texts_to_compare_1) :]
     )
-    return scores
 
 
 def match_opinion_lists(
@@ -469,8 +465,7 @@ def clean_docket_number(docket_number: str) -> str:
         A stripped down docket number.
     """
     docket_number = re.sub("Department.*", "", docket_number)
-    docket_number = re.sub("Nos?. ", "", docket_number)
-    return docket_number
+    return re.sub("Nos?. ", "", docket_number)
 
 
 def merge_docket_numbers(

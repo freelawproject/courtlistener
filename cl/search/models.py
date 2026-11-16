@@ -1457,6 +1457,7 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
+        return None
 
     def get_authorities_url(self) -> str:
         """Get the URL of the page listing the opinions this document or attachment cites."""

@@ -216,13 +216,11 @@ def query_possible_matches(
             cluster__date_filed=date_filed,
         )
         citation_queries |= citation_query
-    possible_matches = (
+    return (
         Citation.objects.filter(citation_queries)
         .select_related("cluster")
         .distinct("cluster__id")
     )
-
-    return possible_matches
 
 
 def update_matched_case_name(

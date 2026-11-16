@@ -170,8 +170,7 @@ class ESIndexTestCase(SimpleTestCase):
     @staticmethod
     def _get_model_classes(model):
         models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        return model_classes
+        return [apps.get_model(m) for m in models]
 
     @staticmethod
     def _get_indices(model):
@@ -330,6 +329,7 @@ class CountESTasksTestCase(SimpleTestCase):
         if immutable_signature:
             return task.s(*args, **kwargs)
         task.apply_async(args=args, kwargs=kwargs)
+        return None
 
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
@@ -596,8 +596,7 @@ class SearchAlertsAssertions:
         if len(parts) > 1:
             case_title = parts[1].strip()
         # Remove everything from the first open parenthesis to the end
-        case_title = re.split(r"\s*\(", case_title)[0].strip()
-        return case_title
+        return re.split(r"\s*\(", case_title)[0].strip()
 
     def _count_alert_hits_and_child_hits(
         self,
@@ -889,11 +888,10 @@ class SearchAlertsAssertions:
         percolator_index, es_document_index, documents_to_percolate = (
             prepare_percolator_content(app_label, document_id)
         )
-        responses = percolate_es_document(
+        return percolate_es_document(
             str(document_id),
             percolator_index,
             es_document_index,
             documents_to_percolate,
             app_label=app_label,
         )
-        return responses

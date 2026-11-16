@@ -164,12 +164,11 @@ def build_parent_model_queryset(
         # If the model is Docket, incorporate a source filter to only match
         # Dockets that belong to the RECAP collection.
         query_args["source__in"] = Docket.RECAP_SOURCES()
-    queryset = (
+    return (
         model.objects.filter(**query_args)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    return queryset
 
 
 class Command(VerboseCommand):

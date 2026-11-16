@@ -46,8 +46,7 @@ class V3APIPermission(permissions.BasePermission):
         Returns:
             True if the user is new for V3, False otherwise.
         """
-        is_new_user = self.r.sismember(self.v3_users_list_key, user.id) != 1
-        return is_new_user
+        return self.r.sismember(self.v3_users_list_key, user.id) != 1
 
     def is_user_v3_blocked(self, user: User) -> bool:
         """Check if the user is already blocked form V3 by determining their presence in the v3-blocked-users-list.
@@ -58,10 +57,7 @@ class V3APIPermission(permissions.BasePermission):
         Returns:
             True if the user is blocked for V3, False otherwise.
         """
-        is_blocked_user = (
-            self.r.sismember(self.v3_blocked_list_key, user.id) == 1
-        )
-        return is_blocked_user
+        return self.r.sismember(self.v3_blocked_list_key, user.id) == 1
 
     @staticmethod
     def is_v3_api_request(request: Request) -> bool:

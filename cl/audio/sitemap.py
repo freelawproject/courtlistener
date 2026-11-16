@@ -17,13 +17,12 @@ class AudioSitemap(sitemaps.Sitemap):
 
     def items(self) -> QuerySet[Audio]:
         """Get the unblocked audio files."""
-        q = (
+        return (
             Audio.objects.filter(blocked=False)
             .select_related("docket")
             .only("date_modified", "pk", "docket__slug")
             .order_by("pk")
         )
-        return q
 
     def lastmod(self, obj: Audio) -> datetime:
         """Use the audio's modification date."""
@@ -39,7 +38,7 @@ class BlockedAudioSitemap(sitemaps.Sitemap):
 
     def items(self) -> QuerySet[Audio]:
         """Get the audio files blocked in the last 30 days."""
-        q = (
+        return (
             Audio.objects.filter(
                 blocked=True,
                 date_blocked__gt=datetime.today() - timedelta(days=30),
@@ -48,7 +47,6 @@ class BlockedAudioSitemap(sitemaps.Sitemap):
             .only("date_modified", "pk", "docket__slug")
             .order_by("pk")
         )
-        return q
 
     def lastmod(self, obj: Audio) -> datetime:
         """Use the audio's modification date."""

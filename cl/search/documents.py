@@ -208,10 +208,7 @@ class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
         """Map the highlighted fields to functions that render them for CSV export."""
         hl_fields = ["representative_text", "docketNumber"]
-        transformations = {
-            key: lambda x: render_string_or_list(x) for key in hl_fields
-        }
-        return transformations
+        return {key: lambda x: render_string_or_list(x) for key in hl_fields}
 
     def prepare_citation(self, instance):
         """List the opinion's cluster citations as strings."""
@@ -489,6 +486,7 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
                 )
                 return None
             return deepgetattr(instance, "local_path_mp3.size", None)
+        return None
 
     def prepare_local_path(self, instance):
         """Get the storage path of the audio's MP3 file.
@@ -507,6 +505,7 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
                 )
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
+        return None
 
     def prepare_judge(self, instance):
         """Get the audio's judges, or an empty string if there are none."""
@@ -524,16 +523,19 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         """Format the docket's argument date as text, if it has one."""
         if instance.docket.date_argued:
             return instance.docket.date_argued.strftime("%-d %B %Y")
+        return None
 
     def prepare_dateReargued_text(self, instance):
         """Format the docket's reargument date as text, if it has one."""
         if instance.docket.date_reargued:
             return instance.docket.date_reargued.strftime("%-d %B %Y")
+        return None
 
     def prepare_dateReargumentDenied_text(self, instance):
         """Format the docket's reargument denial date as text, if it has one."""
         if instance.docket.date_reargument_denied:
             return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
+        return None
 
     def prepare_timestamp(self, instance):
         """Use the current UTC time as the timestamp."""
@@ -929,16 +931,19 @@ class PositionDocument(PersonBaseDocument):
         """Get the appointer's reversed full name, if the position has an appointer."""
         if instance.appointer:
             return instance.appointer.person.name_full_reverse
+        return None
 
     def prepare_predecessor(self, instance):
         """Get the predecessor's reversed full name, if the position has a predecessor."""
         if instance.predecessor:
             return instance.predecessor.name_full_reverse
+        return None
 
     def prepare_supervisor(self, instance):
         """Get the supervisor's reversed full name, if the position has a supervisor."""
         if instance.supervisor:
             return instance.supervisor.name_full_reverse
+        return None
 
     def prepare_position_type(self, instance):
         """Get the display name of the position type."""
@@ -1492,6 +1497,7 @@ class ESRECAPDocument(
         """Get the name of the document's local file, if it has one."""
         if instance.filepath_local:
             return instance.filepath_local.name
+        return None
 
     def prepare_is_available(self, instance: SourceDocument) -> bool | None:
         """Index whether the document's file is available."""
@@ -1519,6 +1525,7 @@ class ESRECAPDocument(
             return instance.docket_entry.docket.assigned_to.name_full
         if instance.docket_entry.docket.assigned_to_str:
             return instance.docket_entry.docket.assigned_to_str
+        return None
 
     def prepare_referredTo(self, instance):
         """Get the full name of the docket's referred judge, falling back to the referred-to string."""
@@ -1526,6 +1533,7 @@ class ESRECAPDocument(
             return instance.docket_entry.docket.referred_to.name_full
         if instance.docket_entry.docket.referred_to_str:
             return instance.docket_entry.docket.referred_to_str
+        return None
 
     def prepare_docket_id(self, instance):
         """Get the docket's ID."""
@@ -1571,11 +1579,13 @@ class ESRECAPDocument(
         """Get the ID of the docket's assigned judge, if it has one."""
         if instance.docket_entry.docket.assigned_to:
             return instance.docket_entry.docket.assigned_to.pk
+        return None
 
     def prepare_referred_to_id(self, instance):
         """Get the ID of the docket's referred judge, if it has one."""
         if instance.docket_entry.docket.referred_to:
             return instance.docket_entry.docket.referred_to.pk
+        return None
 
     def prepare_court(self, instance):
         """Get the full name of the docket's court."""
@@ -1593,6 +1603,7 @@ class ESRECAPDocument(
         """Get the docket's bankruptcy chapter, if it has bankruptcy information."""
         if hasattr(instance.docket_entry.docket, "bankruptcy_information"):
             return instance.docket_entry.docket.bankruptcy_information.chapter
+        return None
 
     def prepare_trustee_str(self, instance):
         """Get the docket's bankruptcy trustee, if it has bankruptcy information."""
@@ -1600,6 +1611,7 @@ class ESRECAPDocument(
             return (
                 instance.docket_entry.docket.bankruptcy_information.trustee_str
             )
+        return None
 
     def prepare_plain_text(self, instance):
         """Get the document's plain text, HTML-escaped with null characters removed."""
@@ -1785,6 +1797,7 @@ class DocketDocument(
             return instance.assigned_to.name_full
         if instance.assigned_to_str:
             return instance.assigned_to_str
+        return None
 
     def prepare_referredTo(self, instance):
         """Get the full name of the referred judge, falling back to the referred-to string."""
@@ -1792,16 +1805,19 @@ class DocketDocument(
             return instance.referred_to.name_full
         if instance.referred_to_str:
             return instance.referred_to_str
+        return None
 
     def prepare_chapter(self, instance):
         """Get the bankruptcy chapter, if the docket has bankruptcy information."""
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.chapter
+        return None
 
     def prepare_trustee_str(self, instance):
         """Get the bankruptcy trustee, if the docket has bankruptcy information."""
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.trustee_str
+        return None
 
     def prepare_capital_case(self, instance: Docket) -> bool | None:
         """Return the docket's SCOTUS capital_case flag; empty for dockets without SCOTUS metadata."""
@@ -2196,10 +2212,7 @@ class OpinionBaseDocument(Document):
             return None
 
         if isinstance(instance.date_filed, str):
-            datetime_object = datetime.strptime(
-                instance.date_filed, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.date_filed, "%Y-%m-%d")
 
         return instance.date_filed
 
@@ -2209,10 +2222,7 @@ class OpinionBaseDocument(Document):
             return None
 
         if isinstance(instance.docket.date_argued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_argued, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.docket.date_argued, "%Y-%m-%d")
 
         return instance.docket.date_argued
 
@@ -2222,10 +2232,7 @@ class OpinionBaseDocument(Document):
             return None
 
         if isinstance(instance.docket.date_reargued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_reargued, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.docket.date_reargued, "%Y-%m-%d")
 
         return instance.docket.date_reargued
 
@@ -2235,10 +2242,9 @@ class OpinionBaseDocument(Document):
             return None
 
         if isinstance(instance.docket.date_reargument_denied, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.docket.date_reargument_denied
 
@@ -2383,6 +2389,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         """Get the name of the opinion's local file, if it has one."""
         if instance.local_path:
             return instance.local_path.name
+        return None
 
     def prepare_cites(self, instance):
         """List the IDs of the opinions this opinion cites."""
@@ -2454,10 +2461,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return None
 
         if isinstance(instance.cluster.date_filed, str):
-            datetime_object = datetime.strptime(
-                instance.cluster.date_filed, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.cluster.date_filed, "%Y-%m-%d")
 
         return instance.cluster.date_filed
 
@@ -2467,10 +2471,9 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return None
 
         if isinstance(instance.cluster.docket.date_argued, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_argued, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_argued
 
@@ -2480,10 +2483,9 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return None
 
         if isinstance(instance.cluster.docket.date_reargued, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_reargued, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_reargued
 
@@ -2493,10 +2495,9 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
             return None
 
         if isinstance(instance.cluster.docket.date_reargument_denied, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_reargument_denied
 

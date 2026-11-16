@@ -628,8 +628,7 @@ def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
-        court_status = pickle.loads(pickle_status)
-        return court_status
+        return pickle.loads(pickle_status)
 
     # Unable to find court_status in cache, getting it from request.
     connection_info = check_pacer_court_connectivity(court_id)
@@ -698,5 +697,4 @@ def is_pacer_court_accessible(court_id: str) -> bool:
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
 
-    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
-    return court_status
+    return get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
