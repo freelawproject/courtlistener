@@ -4443,8 +4443,8 @@ class EsOpinionsIndexingTest(
         test_dir = (
             Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
         )
-        with open(
-            test_dir / "opinion_1_embeddings.json", encoding="utf-8"
+        with (test_dir / "opinion_1_embeddings.json").open(
+            encoding="utf-8"
         ) as f:
             expected_embeddings = json.load(f)
         inception_mock.return_value = self._get_mock_for_inception(

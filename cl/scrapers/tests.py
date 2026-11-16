@@ -1,5 +1,4 @@
 import json
-import os
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -567,8 +566,7 @@ class IngestionTest(TestCase):
         files = Opinion.objects.all()
         for opinion in files:
             opinion.file_with_date = datetime.today()
-            with open(Path(MEDIA_ROOT, opinion.local_path.name), "rb") as f:
-                content = f.read()
+            content = Path(MEDIA_ROOT, opinion.local_path.name).read_bytes()
             opinion.local_path.save(
                 opinion.local_path.name, ContentFile(content)
             )
@@ -712,32 +710,25 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
 
 class ExtensionIdentificationTest(SimpleTestCase):
     def setUp(self) -> None:
-        self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
+        self.path = Path(settings.MEDIA_ROOT) / "test" / "search"
 
     def test_wpd_extension(self) -> None:
-        with open(os.path.join(self.path, "opinion_wpd.wpd"), "rb") as f:
-            data = f.read()
+        data = (self.path / "opinion_wpd.wpd").read_bytes()
         self.assertEqual(get_extension(data), ".wpd")
 
     def test_pdf_extension(self) -> None:
-        with open(
-            os.path.join(self.path, "opinion_pdf_text_based.pdf"), "rb"
-        ) as f:
-            data = f.read()
+        data = (self.path / "opinion_pdf_text_based.pdf").read_bytes()
         self.assertEqual(get_extension(data), ".pdf")
 
     def test_doc_extension(self) -> None:
-        with open(os.path.join(self.path, "opinion_doc.doc"), "rb") as f:
-            data = f.read()
+        data = (self.path / "opinion_doc.doc").read_bytes()
         self.assertEqual(get_extension(data), ".doc")
 
     def test_html_extension(self) -> None:
-        with open(os.path.join(self.path, "opinion_html.html"), "rb") as f:
-            data = f.read()
+        data = (self.path / "opinion_html.html").read_bytes()
         self.assertEqual(get_extension(data), ".html")
 
-        with open(os.path.join(self.path, "not_wpd.html"), "rb") as f:
-            data = f.read()
+        data = (self.path / "not_wpd.html").read_bytes()
         self.assertEqual(get_extension(data), ".html")
 
 
@@ -2520,8 +2511,8 @@ class SubscribeToSCOTUSTest(TestCase):
         )
 
     def add_response(self, file_name: str, **kwargs):
-        with open(
-            self.test_asset_dir / f"{file_name}.headers.json", "rb"
+        with (self.test_asset_dir / f"{file_name}.headers.json").open(
+            "rb"
         ) as f:
             headers = json.load(f)
 
@@ -2533,10 +2524,9 @@ class SubscribeToSCOTUSTest(TestCase):
         ):
             body_extension = f"{body_extension}.gz"
 
-        with open(
-            self.test_asset_dir / f"{file_name}.body.{body_extension}", "rb"
-        ) as f:
-            body = f.read()
+        body = (
+            self.test_asset_dir / f"{file_name}.body.{body_extension}"
+        ).read_bytes()
 
         response = responses.Response(headers=headers, body=body, **kwargs)
         responses.add(response)
@@ -2766,9 +2756,9 @@ class TexasCaseMailIntegrationTest(TestCase):
         )
 
         with (
-            open(test_dir / "texas_coa01_notification.txt", "rb") as email_f,
-            open(
-                test_dir / "texas_coa01_post_data.json", encoding="utf-8"
+            (test_dir / "texas_coa01_notification.txt").open("rb") as email_f,
+            (test_dir / "texas_coa01_post_data.json").open(
+                encoding="utf-8"
             ) as post_f,
         ):
             texas_email_content = email_f.read()
