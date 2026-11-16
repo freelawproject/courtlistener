@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TypedDict, cast
 
 from django.conf import settings
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from redis import Redis
 from redis.exceptions import ConnectionError
 

@@ -29,6 +29,8 @@ lint.select = [
   "SLOT",
   # flake8-use-pathlib
   "PTH",
+  # pygrep-hooks
+  "PGH",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

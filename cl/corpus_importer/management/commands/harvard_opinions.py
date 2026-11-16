@@ -133,7 +133,7 @@ def filepath_list(
         files.extend(
             str(path) for path in glob_files(corpus_dir, glob_pattern)
         )
-    return human_sort(files, key=None)  # type: ignore
+    return human_sort(files, key=None)
 
 
 def check_for_match(new_case: str, possibilities: list[str]) -> bool:
@@ -710,7 +710,7 @@ def find_previously_imported_cases(
             harvard_characters,
             docket_number,
             case_name_full,
-            possible_cases,  # type: ignore
+            possible_cases,
             data["name_abbreviation"],
             citation,
         )

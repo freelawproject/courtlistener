@@ -155,7 +155,7 @@ async def microservice(
             ) as client:
                 req = client.build_request(
                     method=method,
-                    url=services[service]["url"],  # type: ignore
+                    url=services[service]["url"],
                     # pyrefly:ignore[bad-argument-type] httpx's stubs omit the (deprecated) raw-content form of data it still accepts
                     data=data,
                     files=files,

@@ -8,7 +8,7 @@ from itertools import batched
 from typing import Any
 
 import boto3
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django.db import connections
 from django.db.models import Q
 from django.utils import timezone

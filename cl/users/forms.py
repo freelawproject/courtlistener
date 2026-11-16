@@ -478,7 +478,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         return [
             user
             for user in self.accounts_at_address(email)
-            if user.profile.email_confirmed  # type: ignore
+            if user.profile.email_confirmed  # pyrefly: ignore[missing-attribute]
         ]
 
     def get_users(self, email: str) -> Iterator[User]:

@@ -4702,13 +4702,11 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
             xml_tree.xpath(
                 "//atom:entry[1]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         second_item_published_str = str(
             xml_tree.xpath(
                 "//atom:entry[2]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         first_item_published_dt = datetime.datetime.strptime(
             first_item_published_str, published_format
