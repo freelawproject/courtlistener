@@ -4290,7 +4290,8 @@ class DownloadCasePdfsTest(TestCase):
     @override_settings(MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC=0)
     def test_large_docket_dispatches_background_task(self) -> None:
         """Above the threshold, the view hands off to Celery instead of
-        building the zip itself."""
+        building the zip itself.
+        """
         self.client.login(username=self.user.username, password="password")
 
         with mock.patch(
@@ -4340,9 +4341,7 @@ class BuildAndEmailDocketPdfZipTest(TestCase):
         )
 
     def test_builds_zip_uploads_and_emails_link(self) -> None:
-        fake_url = (
-            "https://storage.courtlistener.com/recap/bulk-pdfs/fake.zip"
-        )
+        fake_url = "https://storage.courtlistener.com/recap/bulk-pdfs/fake.zip"
         with mock.patch(
             "cl.opinion_page.tasks.IncrementingAWSMediaStorage"
         ) as mock_storage_cls:
