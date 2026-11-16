@@ -32,6 +32,7 @@ from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.docket_alert_sources import (
     RECAP_ALERT_SOURCE,
     SCOTUS_ALERT_SOURCE,
+    TEXAS_ALERT_SOURCE,
 )
 from cl.alerts.factories import (
     AlertFactory,
@@ -106,6 +107,10 @@ from cl.search.models import (
     Docket,
     DocketEntry,
     RECAPDocument,
+)
+from cl.search.state.texas.factories import (
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
 )
 from cl.search.types import PercolatorResponses
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -1146,6 +1151,62 @@ class DocketAlertSourceTest(TestCase):
             self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
         )
 
+    def test_texas_courts_use_the_texas_source(self) -> None:
+        """Do the Texas Supreme Court, the Court of Criminal Appeals and the courts of appeals route to TEXAS_ALERT_SOURCE?"""
+        for court_id in ("tex", "texcrimapp", "txctapp1", "txctapp15"):
+            with self.subTest(court_id=court_id):
+                docket = DocketFactory(
+                    court=CourtFactory(id=court_id, jurisdiction="S")
+                )
+                self.assertIs(docket.get_alert_source(), TEXAS_ALERT_SOURCE)
+
+    def test_texas_source_lookups_return_new_entries_oldest_first(
+        self,
+    ) -> None:
+        """Do both Texas lookups return TexasDocketEntry rows oldest first, and does entries_since leave out the ones created before `since`?"""
+        docket = DocketFactory(court=CourtFactory(id="tex", jurisdiction="S"))
+        old_entry = TexasDocketEntryFactory(
+            docket=docket, sequence_number="2025-01-01.001"
+        )
+        before = now()
+        des = [
+            TexasDocketEntryFactory(docket=docket, sequence_number=seq)
+            for seq in ("2025-01-03.001", "2025-01-02.001")
+        ]
+        expected = ["2025-01-02.001", "2025-01-03.001"]
+        lookups = {
+            "entries_by_pk": TEXAS_ALERT_SOURCE.entries_by_pk(
+                [de.pk for de in des]
+            ),
+            "entries_since": TEXAS_ALERT_SOURCE.entries_since(docket, before),
+        }
+        for lookup_name, qs in lookups.items():
+            with self.subTest(lookup=lookup_name):
+                self.assertEqual([de.sequence_number for de in qs], expected)
+                self.assertNotIn(old_entry, list(qs))
+
+    def test_texas_entries_since_loads_in_two_queries(self) -> None:
+        """Does the Texas lookup load its entries, their docket and their documents (minus plain_text) in two queries, however many entries there are?"""
+        docket = DocketFactory(court=CourtFactory(id="tex", jurisdiction="S"))
+        before = now()
+        for n in (1, 2):
+            TexasDocumentFactory(
+                docket_entry=TexasDocketEntryFactory(
+                    docket=docket, sequence_number=f"2025-01-0{n}.001"
+                )
+            )
+        with self.assertNumQueries(2):
+            docs = [
+                doc
+                for de in TEXAS_ALERT_SOURCE.entries_since(docket, before)
+                for doc in de.texasdocument_set.all()
+            ]
+            for doc in docs:
+                str(doc.docket_entry.docket.court)
+        self.assertEqual(len(docs), 2)
+        for doc in docs:
+            self.assertIn("plain_text", doc.get_deferred_fields())
+
     def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
         """Does entries_since load the entries, their docket and their documents (minus plain_text) in two queries, however many entries there are?"""
         before = now()
@@ -1266,6 +1327,88 @@ class DocketAlertScotusTest(TestCase):
                 send_alert_and_webhook(self.docket.pk, self.before)
                 self.assertEqual(len(mail.outbox), 1)
                 self.assertEqual(mock_webhooks.delay.called, enabled)
+
+
+class DocketAlertTexasTest(TestCase):
+    """Does send_alert_and_webhook work end to end for a Texas docket, resolving TexasDocketEntry rows and rendering the Texas templates?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create the subscriber and a Texas Supreme Court."""
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="tex", jurisdiction="S")
+
+    def setUp(self) -> None:
+        """Create a subscribed Texas docket and remember when the test started."""
+        self.before = now()
+        self.docket = DocketFactory(court=self.court, docket_number="26-0999")
+        DocketAlert.objects.create(docket=self.docket, user=self.user)
+
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_alert_email_shows_the_tames_text_and_no_webhook_goes_out(
+        self, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """Does one email go out with the entry's type, description, disposition and remarks and a TAMES link for the document, with scraped markup escaped in the HTML part and no webhook queued?"""
+        entry = TexasDocketEntryFactory(
+            docket=self.docket,
+            entry_type="Petition for Review filed",
+            description="Petition for review",
+            disposition="Granted",
+            remarks="<script>alert(1)</script>",
+        )
+        TexasDocumentFactory(
+            docket_entry=entry,
+            description="Petition",
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+        )
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        html = message.alternatives[0][0]
+        for part in (message.body, html):
+            self.assertIn("Petition for Review filed", part)
+            self.assertIn("Disposition: Granted", part)
+            self.assertIn(
+                "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1", part
+            )
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertNotIn("Document<br>Number", html)
+        self.assertIn("View Docket on TAMES", html)
+        # Plain text isn't HTML, so its links keep a bare "&".
+        self.assertIn(self.docket.texas_docket_url, message.body)
+        mock_webhooks.delay.assert_not_called()
+
+    def test_entries_without_documents_are_listed(self) -> None:
+        """Most TAMES entries have no attachment: does the email still list them?"""
+        TexasDocketEntryFactory(
+            docket=self.docket, entry_type="Notice of appearance"
+        )
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Notice of appearance", mail.outbox[0].body)
+
+    def test_multiple_new_entries_go_in_one_email(self) -> None:
+        """Does a single alert email bundle every entry created since `since`?"""
+        for n, entry_type in enumerate(("First event", "Second event"), 1):
+            TexasDocketEntryFactory(
+                docket=self.docket,
+                entry_type=entry_type,
+                sequence_number=f"2025-01-0{n}.001",
+            )
+        send_alert_and_webhook(self.docket.pk, self.before)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn("First event", body)
+        self.assertIn("Second event", body)
+
+    def test_nothing_happens_for_entries_before_since(self) -> None:
+        """Is no email sent when every entry predates `since`?"""
+        TexasDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(self.docket.pk, now())
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class DocketAlertWebhookSourceGateTest(TestCase):

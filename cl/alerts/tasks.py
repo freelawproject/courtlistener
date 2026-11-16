@@ -69,6 +69,7 @@ from cl.search.models import (
     RECAPDocument,
     SCOTUSDocketEntry,
     SCOTUSDocument,
+    TexasDocketEntry,
 )
 from cl.search.types import (
     ESDictDocument,
@@ -235,7 +236,9 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry],
+    new_des: QuerySet[DocketEntry]
+    | QuerySet[SCOTUSDocketEntry]
+    | QuerySet[TexasDocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users.
@@ -243,7 +246,8 @@ def make_alert_messages(
     Args:
         d: The docket to work on
         new_des: The new docket entries (SCOTUSDocketEntry for a SCOTUS
-            docket, DocketEntry otherwise -- see Docket.get_alert_source())
+            docket, TexasDocketEntry for a Texas one, DocketEntry otherwise
+            -- see Docket.get_alert_source())
         da_recipients: A list of DocketAlertRecipients objects
 
     Returns:
@@ -265,6 +269,7 @@ def make_alert_messages(
         str,
         QuerySet[DocketEntry]
         | QuerySet[SCOTUSDocketEntry]
+        | QuerySet[TexasDocketEntry]
         | int
         | Docket
         | None

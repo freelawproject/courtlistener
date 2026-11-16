@@ -30,13 +30,13 @@
 
     <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
     <table cellpadding="8">
-      <thead>
+      <thead>{% block table_head %}
       <tr>
         <th style="text-align: center">Document<br>Number</th>
         <th>Date&nbsp;Filed</th>
         <th>Description</th>
         <th>Download PDF</th>
-      </tr>
+      </tr>{% endblock %}
       </thead>
       <tbody>{% block rows %}{% endblock %}
       </tbody>

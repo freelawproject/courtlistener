@@ -6,18 +6,21 @@ from datetime import datetime
 
 from django.db.models import Prefetch, QuerySet
 
+from cl.search.constants import TAMES_COURT_IDS
 from cl.search.models import (
     Docket,
     DocketEntry,
     RECAPDocument,
     SCOTUSDocketEntry,
     SCOTUSDocument,
+    TexasDocketEntry,
+    TexasDocument,
 )
 
 
 @dataclass(frozen=True)
 class DocketAlertSource:
-    """Describes how one "flavor" of docket resolves the entries a docket alert should notify about, and which templates render its email. RECAP/PACER is the default; SCOTUS is the first override.
+    """Describes how one "flavor" of docket resolves the entries a docket alert should notify about, and which templates render its email. RECAP/PACER is the default; SCOTUS and Texas override it.
 
     ``entries_by_pk`` resolves a precise list of entry pks into a queryset --
     used for RECAP's recap.email re-notify case, where the caller already
@@ -124,6 +127,40 @@ SCOTUS_ALERT_SOURCE = DocketAlertSource(
 )
 
 
+# Texas
+
+
+def _texas_entries_by_pk(des_pks: list[int]) -> QuerySet:
+    """Return the TexasDocketEntry rows matching the given pks."""
+    return _with_email_relations(
+        TexasDocketEntry.objects.filter(pk__in=des_pks).order_by(
+            "sequence_number"
+        ),
+        "texasdocument_set",
+        TexasDocument.objects.all(),
+    )
+
+
+def _texas_entries_since(docket: Docket, since: datetime) -> QuerySet:
+    """Return the docket's TexasDocketEntry rows created at or after `since`."""
+    return _with_email_relations(
+        TexasDocketEntry.objects.filter(
+            date_created__gte=since, docket=docket
+        ).order_by("sequence_number"),
+        "texasdocument_set",
+        TexasDocument.objects.all(),
+    )
+
+
+TEXAS_ALERT_SOURCE = DocketAlertSource(
+    entries_by_pk=_texas_entries_by_pk,
+    entries_since=_texas_entries_since,
+    email_txt_template="docket_alert_email_texas.txt",
+    email_html_template="docket_alert_email_texas.html",
+)
+
+
 _ALERT_SOURCES_BY_COURT_ID: dict[str, DocketAlertSource] = {
     "scotus": SCOTUS_ALERT_SOURCE,
+    **{court_id: TEXAS_ALERT_SOURCE for court_id in TAMES_COURT_IDS},
 }

@@ -1,0 +1,43 @@
+{% extends "docket_alert_email_base.html" %}
+{% load extras %}
+
+{# TAMES text is scraped, so unlike the RECAP and SCOTUS templates nothing here is rendered with |safe. #}
+
+{% block preheader %}
+      {% for de in new_des %}{% if forloop.first %}{{ de.entry_type }}{% endif %}{% endfor %}{% endblock %}
+
+{% block docket_links %}{% if docket.texas_docket_url %}
+      <a href="{{ docket.texas_docket_url }}">View Docket on TAMES</a><br>{% endif %}{% endblock %}
+
+{% block table_head %}
+      <tr>
+        <th>Date&nbsp;Filed</th>
+        <th>Description</th>
+        <th>Documents</th>
+      </tr>{% endblock %}
+
+{% block rows %}
+      {% for de in new_des %}
+        <tr>
+          <td>
+            {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}
+          </td>
+          <td>
+            {{ de.entry_type }}
+            {% if de.description %}<br>{{ de.description }}{% endif %}
+            {% if de.disposition %}<br>Disposition: {{ de.disposition }}{% endif %}
+            {% if de.remarks %}<br>Remarks: {{ de.remarks }}{% endif %}
+          </td>
+          <td>
+            {% for doc in de.texasdocument_set.all %}
+              {% if doc.filepath_local %}
+                <a href="{{ doc.filepath_local.url }}">{{ doc.description|default:"Document" }}</a>
+              {% elif doc.url|http_url %}
+                <a href="{{ doc.url|http_url }}">{{ doc.description|default:"Document" }} (TAMES)</a>
+              {% else %}
+                {{ doc.description|default:"Document" }}
+              {% endif %}{% if not forloop.last %}<br>{% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}{% endblock %}
