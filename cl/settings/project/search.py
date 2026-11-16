@@ -14,7 +14,7 @@ MAX_SEARCH_RESULTS_EXPORTED = env("MAX_SEARCH_RESULTS_EXPORTED", default=250)
 # Celery task and emailed to the user, instead of built synchronously in the
 # request/response cycle.
 MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC = env(
-    "MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC", default=10
+    "MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC", default=3
 )
 
 ###################

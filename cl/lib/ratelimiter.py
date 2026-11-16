@@ -233,12 +233,6 @@ ratelimiter_unsafe_2000_per_h: RatelimitDecorator = make_ratelimiter(
     rate="2000/h" if "test" not in sys.argv else None,
     method=UNSAFE,
 )
-# Keyed by account rather than IP, for endpoints whose cost is tied to the
-# user (e.g. background jobs, emails) rather than to request volume.
-ratelimiter_user_5_per_h: RatelimitDecorator = make_ratelimiter(
-    key="user",
-    rate="5/h" if "test" not in sys.argv else None,
-)
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en

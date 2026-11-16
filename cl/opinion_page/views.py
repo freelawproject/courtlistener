@@ -73,7 +73,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import (
     ratelimit_deny_list,
     ratelimiter_all_10_per_h,
-    ratelimiter_user_5_per_h,
 )
 from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
@@ -663,7 +662,6 @@ def download_docket_entries_csv(
     return response
 
 
-@ratelimiter_user_5_per_h
 @login_required
 def download_case_pdfs(
     request: AuthenticatedHttpRequest, docket_id: int
