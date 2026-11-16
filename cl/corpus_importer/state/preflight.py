@@ -52,12 +52,13 @@ class CheckOutcome(Enum):
 class CheckError:
     """One thing a check found wrong.
 
-    :ivar summary: What was found, as a line an operator can act on. This is
-        what reaches the log and so Sentry.
-    :ivar detail: The same finding in fields, which ride along to Sentry as
-        `extra` so an issue can be read without parsing the summary back
-        apart. Keep it small: Sentry truncates, and a check that wants to hand
-        over a whole table wants a narrower question instead.
+    Attributes:
+        summary: What was found, as a line an operator can act on. This is
+            what reaches the log and so Sentry.
+        detail: The same finding in fields, which ride along to Sentry as
+            `extra` so an issue can be read without parsing the summary back
+            apart. Keep it small: Sentry truncates, and a check that wants to hand
+            over a whole table wants a narrower question instead.
     """
 
     summary: str
@@ -71,12 +72,13 @@ class CheckError:
 class CheckResult:
     """One check's answer, and what it found getting there.
 
-    :ivar description: What the check was checking, for the report.
-    :ivar outcome: What it made of the answer.
-    :ivar errors: What it found, empty for a check that passed. Materialised
-        rather than lazy: the same findings are logged, sent to Sentry and
-        printed in the report, and the cursor they were read from is closed
-        by the time any of that happens.
+    Attributes:
+        description: What the check was checking, for the report.
+        outcome: What it made of the answer.
+        errors: What it found, empty for a check that passed. Materialised
+            rather than lazy: the same findings are logged, sent to Sentry and
+            printed in the report, and the cursor they were read from is closed
+            by the time any of that happens.
     """
 
     description: str
@@ -116,9 +118,12 @@ class PreflightCheck(ABC):
     def run(self, connection: sqlite3.Connection) -> CheckResult:
         """Run the preflight check query.
 
-        :param connection: An open, read-only connection to the run database,
-            with `row_factory` set to `sqlite3.Row`.
-        :return: What the check made of it.
+        Args:
+            connection: An open, read-only connection to the run database,
+                with `row_factory` set to `sqlite3.Row`.
+
+        Returns:
+            What the check made of it.
         """
         try:
             with closing(connection.execute(self.query)) as cursor:
@@ -139,8 +144,11 @@ class PreflightCheck(ABC):
     def evaluate(self, rows: Sequence[sqlite3.Row]) -> CheckResult:
         """Say what the query's answer means.
 
-        :param rows: Everything `query` returned, already read off the cursor.
-        :return: The check's verdict, built with `passed`, `partial` or
+        Args:
+            rows: Everything `query` returned, already read off the cursor.
+
+        Returns:
+            The check's verdict, built with `passed`, `partial` or
             `failed`.
         """
 
@@ -151,7 +159,8 @@ class PreflightCheck(ABC):
     def partial(self, errors: Iterable[CheckError]) -> CheckResult:
         """The load can go on, but will not see everything.
 
-        :param errors: What was found.
+        Args:
+            errors: What was found.
         """
         return CheckResult(
             self.description, CheckOutcome.PARTIAL, tuple(errors)
@@ -160,7 +169,8 @@ class PreflightCheck(ABC):
     def failed(self, errors: Iterable[CheckError]) -> CheckResult:
         """The load must not go on.
 
-        :param errors: What was found.
+        Args:
+            errors: What was found.
         """
         return CheckResult(
             self.description, CheckOutcome.FAILED, tuple(errors)
@@ -187,9 +197,12 @@ class InvalidRows(PreflightCheck):
     def evaluate(self, rows: Sequence[sqlite3.Row]) -> CheckResult:
         """Report every result type holding rows the load will not read.
 
-        :param rows: One row per result type, with its valid and invalid
-            counts.
-        :return: `PARTIAL` where any result type has invalid rows, since the
+        Args:
+            rows: One row per result type, with its valid and invalid
+                counts.
+
+        Returns:
+            `PARTIAL` where any result type has invalid rows, since the
             load can read the rest, and `PASSED` where none has.
         """
         errors = [
@@ -232,9 +245,12 @@ class UnhashedFiles(PreflightCheck):
     def evaluate(self, rows: Sequence[sqlite3.Row]) -> CheckResult:
         """Report anything short of every downloaded file being hashed.
 
-        :param rows: The one row an aggregate with no `GROUP BY` always
-            returns, even over an empty archive.
-        :return: `PARTIAL` unless every file has a hash; an empty archive
+        Args:
+            rows: The one row an aggregate with no `GROUP BY` always
+                returns, even over an empty archive.
+
+        Returns:
+            `PARTIAL` unless every file has a hash; an empty archive
             passes.
         """
         total, hashed = rows[0]["total"], rows[0]["hashed"]
@@ -276,9 +292,12 @@ def run_checks(
     time. Acting on the results -- logging them, and stopping the load -- is
     the caller's.
 
-    :param connection: An open, read-only connection to the run database,
-        with `row_factory` set to `sqlite3.Row`.
-    :param checks: The checks to run.
-    :return: What each of them made of it, in the order they were given.
+    Args:
+        connection: An open, read-only connection to the run database,
+            with `row_factory` set to `sqlite3.Row`.
+        checks: The checks to run.
+
+    Returns:
+        What each of them made of it, in the order they were given.
     """
     return tuple(check.run(connection) for check in checks)

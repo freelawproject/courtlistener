@@ -120,9 +120,7 @@ class CreateAlertForm(ModelForm):
         return rate
 
     def clean_query(self):
-        """Validate that the query is not a match-all query, as these alerts
-        would trigger for every new document ingested or updated.
-        """
+        """Validate that the query is not a match-all query, as these alerts would trigger for every new document ingested or updated."""
         query = self.cleaned_data["query"]
         match_all_query = is_match_all_query(query)
         if match_all_query:

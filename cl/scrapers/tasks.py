@@ -72,15 +72,18 @@ ExtractProcessResult = tuple[str, str | None]
 def update_document_from_text(
     opinion: Opinion, juriscraper_module: str = ""
 ) -> dict:
-    """Extract additional metadata from document text
+    """Extract additional metadata from document text.
 
     Note that this updates the values but does not save them for Docket,
     OpinionCluster, Opinion and OriginatingCourtInformation. Saving is left to
     the calling function. It does save Citations
 
-    :param opinion: Opinion object
-    :param juriscraper_module: full module to get Site object
-    :return: the extracted data dictionary
+    Args:
+        opinion: Opinion object
+        juriscraper_module: full module to get Site object
+
+    Returns:
+        the extracted data dictionary
     """
     court_id = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court_id, juriscraper_module)
@@ -140,10 +143,7 @@ def extract_opinion_content(
     ocr_available: bool = False,
     percolate_opinion: bool = False,
 ) -> None:
-    """
-    Given an opinion PK, we extract it, sniffing its extension, then store its
-    contents in the database.  Finally, we asynchronously find citations in
-    the document content and match them to other documents.
+    """Given an opinion PK, we extract it, sniffing its extension, then store its contents in the database.  Finally, we asynchronously find citations in the document content and match them to other documents.
 
     This implementation uses local paths.
 
@@ -168,15 +168,15 @@ def extract_opinion_content(
     text content. Fortunately seems that documents like those are not too
     common.
 
-    :param self: The Celery task
-    :param pk: The opinion primary key to work on
-    :param juriscraper_module: the full module string to re-import a Site object
-    :param ocr_available: Whether the PDF converting function should use OCR
-    :param percolate_opinion: Whether to percolate the related opinion document in
-    order to trigger search alerts.
-    larger scrape.
+    Args:
+        self: The Celery task
+        pk: The opinion primary key to work on
+        juriscraper_module: the full module string to re-import a Site object
+        ocr_available: Whether the PDF converting function should use OCR
+        percolate_opinion: Whether to percolate the related opinion document in
+            order to trigger search alerts.
+            larger scrape.
     """
-
     opinion = Opinion.objects.get(pk=pk)
 
     with opinion.local_path.open(mode="rb") as document_file:
@@ -281,10 +281,7 @@ def extract_doc_content(
     ocr_available: bool = False,
     citation_jitter: bool = False,
 ) -> None:
-    """
-    Given an opinion PK, we extract it, sniffing its extension, then store its
-    contents in the database.  Finally, we asynchronously find citations in
-    the document content and match them to other documents.
+    """Given an opinion PK, we extract it, sniffing its extension, then store its contents in the database.  Finally, we asynchronously find citations in the document content and match them to other documents.
 
     This implementation uses local paths.
 
@@ -309,15 +306,15 @@ def extract_doc_content(
     text content. Fortunately seems that documents like those are not too
     common.
 
-    :param self: The Celery task
-    :param pk: The opinion primary key to work on
-    :param juriscraper_module: the full module string to re-import a Site object
-    :param ocr_available: Whether the PDF converting function should use OCR
-    :param citation_jitter: Whether to apply jitter before running the citation
-    parsing code. This can be useful do spread these tasks out when doing a
-    larger scrape.
+    Args:
+        self: The Celery task
+        pk: The opinion primary key to work on
+        juriscraper_module: the full module string to re-import a Site object
+        ocr_available: Whether the PDF converting function should use OCR
+        citation_jitter: Whether to apply jitter before running the citation
+            parsing code. This can be useful do spread these tasks out when doing a
+            larger scrape.
     """
-
     opinion = Opinion.objects.get(pk=pk)
 
     with opinion.local_path.open(mode="rb") as document_file:
@@ -410,7 +407,7 @@ def extract_doc_content(
 
 @app.task(bind=True)
 def find_and_merge_versions(self, pk: int) -> None:
-    """Find versions of the `pk` opinion, and try to merge them
+    """Find versions of the `pk` opinion, and try to merge them.
 
     Since this relies on text similarity, we are calling it from
     `extract_opinion_content`
@@ -418,9 +415,9 @@ def find_and_merge_versions(self, pk: int) -> None:
     Currently only checks for exact `download_url` match, update this when
     different strategies are implemented
 
-    :param self: the celery task
-    :param pk: opinion primary key
-    :return None:
+    Args:
+        self: the celery task
+        pk: opinion primary key
     """
     recently_scraped_opinion = Opinion.objects.get(id=pk)
     if not recently_scraped_opinion.download_url:
@@ -463,11 +460,7 @@ def extract_recap_pdf(
     check_if_needed: bool = True,
     citation_queue: str | None = None,
 ):
-    """
-    Temporary task method to prevent `extract_recap_pdf` tasks currently in the
-    Celery queue from failing. Should be removed once there are no remaining
-    tasks referencing this method.
-    """
+    """Temporary task method to prevent `extract_recap_pdf` tasks currently in the Celery queue from failing. Should be removed once there are no remaining tasks referencing this method."""
     return async_to_sync(extract_pdf_document_base)(
         pks,
         ocr_available,
@@ -514,22 +507,25 @@ def extract_formatted_text_document(
     And this task wrapper should be used elsewhere for asynchronous calls
     (delay, async).
 
-    :param pks: The document pk or list of pks to work on.
-    :param ocr_available: Whether it's necessary to perform OCR extraction.
-    :param check_if_needed: Whether it's necessary to check if the document
-    needs extraction.
-    :param model_name: The name of the document model (inheriting from
-    `AbstractPDF`) to operate on. This is passed as a string to avoid
-    serialization errors during task initialization (see [this comment](
-    https://github.com/freelawproject/courtlistener/pull/6761/changes/BASE..540fd91fa5e9e43a96926e891cdb2de83d31088b#r2717354169
-    )).
-    :param strip_html_tags: Whether to strip HTML tags from the extracted
-    content. Use for HTML or WPD documents so that plain_text contains
-    plain text rather than markup.
+    Args:
+        self: The bound Celery task.
+        pks: The document pk or list of pks to work on.
+        ocr_available: Whether it's necessary to perform OCR extraction.
+        check_if_needed: Whether it's necessary to check if the document
+            needs extraction.
+        model_name: The name of the document model (inheriting from
+            `AbstractPDF`) to operate on. This is passed as a string to avoid
+            serialization errors during task initialization (see [this comment](
+            https://github.com/freelawproject/courtlistener/pull/6761/changes/BASE..540fd91fa5e9e43a96926e891cdb2de83d31088b#r2717354169
+            )).
+        strip_html_tags: Whether to strip HTML tags from the extracted
+            content. Use for HTML or WPD documents so that plain_text contains
+            plain text rather than markup.
+        citation_queue: Celery queue for the citation-extraction task. See `extract_formatted_text_document_base`.
 
-    :return: A list of processed document pks.
+    Returns:
+        A list of processed document pks.
     """
-
     return async_to_sync(extract_formatted_text_document_base)(
         pks,
         ocr_available,
@@ -582,21 +578,23 @@ async def extract_formatted_text_document_base(
 ) -> list[int]:
     """Extract the contents from a document if necessary.
 
-    :param pks: The document pk or list of pks to work on.
-    :param ocr_available: Whether it's necessary to perform OCR extraction.
-    :param check_if_needed: Whether it's necessary to check if the document
-    needs extraction.
-    :param model_name: The name of the document model (inheriting from
-    `AbstractPDF`) to operate on.
-    :param strip_html_tags: Whether to strip HTML tags from the extracted
-    content. Use for HTML or WPD documents so that plain_text contains
-    plain text rather than markup.
-    :param citation_queue: Celery queue for the citation-extraction task the
-    RECAPDocument post_save signal enqueues when plain_text changes. Lets batch
-    jobs route that costly work off the default queue. See
-    cl.search.signals.handle_recap_doc_change.
+    Args:
+        pks: The document pk or list of pks to work on.
+        ocr_available: Whether it's necessary to perform OCR extraction.
+        check_if_needed: Whether it's necessary to check if the document
+            needs extraction.
+        model_name: The name of the document model (inheriting from
+            `AbstractPDF`) to operate on.
+        strip_html_tags: Whether to strip HTML tags from the extracted
+            content. Use for HTML or WPD documents so that plain_text contains
+            plain text rather than markup.
+        citation_queue: Celery queue for the citation-extraction task the
+            RECAPDocument post_save signal enqueues when plain_text changes. Lets batch
+            jobs route that costly work off the default queue. See
+            cl.search.signals.handle_recap_doc_change.
 
-    :return: A list of processed document pks.
+    Returns:
+        A list of processed document pks.
     """
     if not is_iter(pks):
         pks = [pks]
@@ -722,12 +720,11 @@ async def extract_pdf_document_base(
     retry_backoff=10,
 )
 def process_audio_file(self, pk) -> None:
-    """Given the key to an audio file, extract its content and add the related
-    meta data to the database.
+    """Given the key to an audio file, extract its content and add the related meta data to the database.
 
-    :param self: A Celery task object
-    :param pk: Audio file pk
-    :return: None
+    Args:
+        self: A Celery task object
+        pk: Audio file pk
     """
     audio_obj = Audio.objects.get(pk=pk)
     date_argued = audio_obj.docket.date_argued
@@ -812,11 +809,11 @@ def update_docket_info_iquery(
 
 
 async def update_docket_info_iquery_base(d_pk: int, court_id: str) -> None:
-    """Update the docket info from iquery
+    """Update the docket info from iquery.
 
-    :param d_pk: The ID of the docket
-    :param court_id: The court of the docket. Needed for throttling by court.
-    :return: None
+    Args:
+        d_pk: The ID of the docket
+        court_id: The court of the docket. Needed for throttling by court.
     """
     session_data = await get_or_cache_pacer_cookies(
         "pacer_scraper",
@@ -855,9 +852,12 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
 
     SCOTUS audio CAPTCHAs consist of three alphanumeric characters read out using the NATO phonetic alphabet. This makes extracting them from a transcription quite easy. The main challenge is that certain transcription models may choose odd spellings of certain phonetic characters, alternatively spell or not spell numbers, and insert punctuation in arbitrary locations. This method attempts to deal with all of those.
 
-    :param transcription: The transcription of the CAPTCHA.
-    :return: The alphanumeric characters extracted from the transcription."""
+    Args:
+        transcription: The transcription of the CAPTCHA.
 
+    Returns:
+        The alphanumeric characters extracted from the transcription.
+    """
     numeric_map = {
         "zero": "0",
         "one": "1",
@@ -897,16 +897,19 @@ def get_scotus_captcha_solution(
 ) -> tuple[str, str]:
     """Get the solution to the SCOTUS audio CAPTCHA with retries.
 
-    :param session: The requests session to use.
-    :param base_url: The base URL of the SCOTUS website.
-    :param form_url: The URL for the subscription form.
-    :param anti_forgery_token: The anti-forgery token to pass in requests.
-    :param n_tries: The maximum number of times to try generating CAPTCHAs.
-        Defaults to 3, which given the 4% failure rate observed in whisper-1,
-        should produce an overall failure rate of 0.0064%.
-    :param wait: Time in seconds to wait between consecutive transcription attempts.
+    Args:
+        session: The requests session to use.
+        base_url: The base URL of the SCOTUS website.
+        form_url: The URL for the subscription form.
+        anti_forgery_token: The anti-forgery token to pass in requests.
+        n_tries: The maximum number of times to try generating CAPTCHAs.
+            Defaults to 3, which given the 4% failure rate observed in whisper-1,
+            should produce an overall failure rate of 0.0064%.
+        wait: Time in seconds to wait between consecutive transcription attempts.
 
-    :return: A tuple containing the solution and the CAPTCHA ID."""
+    Returns:
+        A tuple containing the solution and the CAPTCHA ID.
+    """
     captcha_reset_url = f"{base_url}/Captcha/Reset"
     captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
     error_messages = []
@@ -965,11 +968,13 @@ def get_scotus_captcha_solution(
 def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     """Subscribe to SCOTUS email updates for a given opinion.
 
-    :param self: The celery task
-    :param pk: The primary key of the Docket object to subscribe for.
-    :return: None
-    :raises ScrapeFailed: If the subscription form could not be found, the CAPTCHA could not be solved, a JSON response
-    could not be decoded, or the subscription process failed for any other reason.
+    Args:
+        self: The celery task
+        pk: The primary key of the Docket object to subscribe for.
+
+    Raises:
+        ScrapeFailed: If the subscription form could not be found, the CAPTCHA could not be solved, a JSON response
+            could not be decoded, or the subscription process failed for any other reason.
     """
     if settings.OPENAI_TRANSCRIPTION_KEY is None:
         logger.error(
@@ -1114,10 +1119,10 @@ def save_response_to_s3(self: celery.Task, key: str, content: bytes) -> None:
     scrape. Writes to the private Glacier Instant Retrieval bucket, clobbering any
     existing object at ``key``.
 
-    :param self: The Celery task instance.
-    :param key: Destination S3 key.
-    :param content: Raw bytes to write.
-    :return: None
+    Args:
+        self: The Celery task instance.
+        key: Destination S3 key.
+        content: Raw bytes to write.
     """
     storage = S3GlacierInstantRetrievalStorage(
         naming_strategy=clobbering_get_name

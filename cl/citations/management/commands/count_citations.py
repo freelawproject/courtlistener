@@ -45,10 +45,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        """
-        For any item that has a citation count > 0, update the citation
-        count based on the DB.
-        """
+        """For any item that has a citation count > 0, update the citation count based on the DB."""
         super().handle(*args, **options)
 
         clusters = OpinionCluster.objects.filter(citation_count__gt=0)

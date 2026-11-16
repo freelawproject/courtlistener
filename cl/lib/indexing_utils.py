@@ -10,11 +10,13 @@ def log_last_document_indexed(
 ) -> Mapping[str | bytes, int | str]:
     """Log the last document_id indexed in ES.
 
-    :param document_pk: The last document_id processed.
-    :param log_key: The log key to use in redis.
-    :return: The data logged to redis.
-    """
+    Args:
+        document_pk: The last document_id processed.
+        log_key: The log key to use in redis.
 
+    Returns:
+        The data logged to redis.
+    """
     r = get_redis_interface("CACHE")
     pipe = r.pipeline()
     pipe.hgetall(log_key)
@@ -31,7 +33,9 @@ def log_last_document_indexed(
 
 def get_last_parent_document_id_processed(log_key: str) -> int:
     """Get the last document ID indexed in ES.
-    :return: The last document ID indexed.
+
+    Returns:
+        The last document ID indexed.
     """
     r = get_redis_interface("CACHE")
     stored_values = r.hgetall(log_key)
@@ -43,7 +47,10 @@ def get_last_parent_document_id_processed(log_key: str) -> int:
 def compose_app_label(instance: ESModelType) -> str:
     """Compose the app label and model class name for an ES model instance.
 
-    :param instance: The ES Model instance.
-    :return: A string combining the app label and the Model class name.
+    Args:
+        instance: The ES Model instance.
+
+    Returns:
+        A string combining the app label and the Model class name.
     """
     return f"{instance._meta.app_label}.{instance.__class__.__name__}"

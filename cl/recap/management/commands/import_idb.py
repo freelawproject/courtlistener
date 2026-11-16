@@ -131,10 +131,12 @@ class Command(VerboseCommand, CommandUtils):
         return value
 
     def make_csv_row_dict(self, line, col_headers):
-        """Because the PACER data is so nasty, we need our own CSV parser. I
-        guess this is how we learn, by doing things at lower and lower levels.
-        For that, I thank PACER. In any case, this little guy takes in a line of
-        text from a PACER file, and makes it into a nice dict of data.
+        """Because the PACER data is so nasty, we need our own CSV parser.
+
+        I guess this is how we learn, by doing things at lower and lower
+        levels. For that, I thank PACER. In any case, this little guy takes in
+        a line of text from a PACER file, and makes it into a nice dict of
+        data.
 
         Along the way, it:
          1. Removes bad characters, like null values, information separators,
@@ -223,8 +225,9 @@ class Command(VerboseCommand, CommandUtils):
                 create_or_update_row(values)
 
     def normalize_nulls(self, row):
-        """The IDB uses the value -8 to indicate a null value. Fix this
-        and normalize to either a blank entry ('') or None.
+        """The IDB uses the value -8 to indicate a null value.
+
+        Fix this and normalize to either a blank entry ('') or None.
         """
         for k, v in row.items():
             if v == "-8" or v == "" or v == "01/01/1900":
@@ -234,21 +237,21 @@ class Command(VerboseCommand, CommandUtils):
                     row[k] = ""
 
     def normalize_ints(self, row):
-        """Normalize any column that should be an integer"""
+        """Normalize any column that should be an integer."""
         for col in self.int_fields:
             if row[col] is None:
                 continue
             row[col] = int(row[col])
 
     def normalize_dates(self, row):
-        """Normalize any column that should be a date"""
+        """Normalize any column that should be a date."""
         for col in self.date_fields:
             if row[col] is None:
                 continue
             row[col] = parser.parse(row[col]).date()
 
     def normalize_booleans(self, row):
-        """Normalize boolean fields"""
+        """Normalize boolean fields."""
         for col in self.bool_fields:
             if row[col] is None:
                 continue
@@ -300,7 +303,7 @@ class Command(VerboseCommand, CommandUtils):
                 )
 
     def convert_to_cl_data_model(self, row, source):
-        """Convert the CSV dict with it's headers to our data model"""
+        """Convert the CSV dict with it's headers to our data model."""
         values = {"dataset_source": source}
         for k, v in row.items():
             if k in self.field_mappings:

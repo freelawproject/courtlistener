@@ -46,6 +46,7 @@ from cl.search.es_docket_sources import (
 from cl.search.models import (
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     ParentheticalGroup,
@@ -73,18 +74,20 @@ def check_fields_that_changed(
     tracked_set: FieldInstanceTracker,
     previous_instance: Model | None = None,
 ) -> list[str]:
-    """Identify which fields have changed between two instances of a model or
-    between an instance and its previous state.
+    """Identify which fields have changed between two instances of a model or between an instance and its previous state.
 
-    :param current_instance: The current instance of the model to check for
-    changes.
-    :param tracked_set: An instance of FieldInstanceTracker for tracking field
-    changes.
-    :param previous_instance: Optional the previous instance of the model to
-    compare against. If None, the function compares against the tracked
-    previous values.
-    :return: A list of strings representing the names of the fields that have
-    changed.
+    Args:
+        current_instance: The current instance of the model to check for
+            changes.
+        tracked_set: An instance of FieldInstanceTracker for tracking field
+            changes.
+        previous_instance: Optional the previous instance of the model to
+            compare against. If None, the function compares against the tracked
+            previous values.
+
+    Returns:
+        A list of strings representing the names of the fields that have
+        changed.
     """
     changed_fields = []
     # A field deferred during the merge process (`add_docket_entries`) in
@@ -130,9 +133,13 @@ def updated_fields(
     instance: Model, es_document: type[ESDocumentType]
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
-    :param instance: The instance to check for changed fields.
-    :param es_document: The Elasticsearch document type.
-    :return: A list of the names of fields that have changed in the instance.
+
+    Args:
+        instance: The instance to check for changed fields.
+        es_document: The Elasticsearch document type.
+
+    Returns:
+        A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
     tracked_set = None
@@ -163,9 +170,12 @@ def get_fields_to_update(
 ) -> list[str]:
     """Generate a list of fields to be updated based on provided map and changed fields.
 
-    :param changed_fields: A list of field names that have been changed.
-    :param fields_map: A dict containing field names that can be updated.
-    :return: A list with field names that need to be updated.
+    Args:
+        changed_fields: A list of field names that have been changed.
+        fields_map: A dict containing field names that can be updated.
+
+    Returns:
+        A list with field names that need to be updated.
     """
     fields_to_update = []
     for field in changed_fields:
@@ -183,14 +193,14 @@ def update_es_documents(
     created: bool,
     mapping_fields: dict,
 ) -> None:
-    """Update documents in Elasticsearch if there are changes in the tracked
-     fields of an instance.
-    :param main_model: The main model to fetch objects from.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance whose changes should be tracked and updated.
-    :param created: A boolean indicating whether the instance is newly created.
-    :param mapping_fields: A dict containing the query to use and the fields_map
-    :return: None
+    """Update documents in Elasticsearch if there are changes in the tracked fields of an instance.
+
+    Args:
+        main_model: The main model to fetch objects from.
+        es_document: The Elasticsearch document type.
+        instance: The instance whose changes should be tracked and updated.
+        created: A boolean indicating whether the instance is newly created.
+        mapping_fields: A dict containing the query to use and the fields_map
     """
     if created:
         return
@@ -356,18 +366,40 @@ def update_es_documents(
                     if fields_to_update:
                         # Update main document in ES, including fields to be
                         # extracted from a related instance.
-                        transaction.on_commit(
-                            partial(
-                                update_es_document.delay,
-                                es_document.__name__,
-                                fields_to_update,
-                                (
-                                    compose_app_label(main_object),
-                                    main_object.pk,
-                                ),
-                                (compose_app_label(instance), instance.pk),
-                                fields_map,
+                        update_args = (
+                            es_document.__name__,
+                            fields_to_update,
+                            (
+                                compose_app_label(main_object),
+                                main_object.pk,
+                            ),
+                            # Same "app_label.ClassName" as compose_app_label,
+                            # which only accepts ES model types.
+                            (instance._meta.label, instance.pk),
+                            fields_map,
+                        )
+                        # RECAP documents are never percolated on docket entry
+                        # changes, since the RECAPDocument itself is the
+                        # percolated unit, so skip the percolation chain.
+                        is_recap_entry = isinstance(instance, DocketEntry)
+                        if (
+                            type(main_object) not in SOURCE_BY_MODEL
+                            or is_recap_entry
+                        ):
+                            transaction.on_commit(
+                                partial(update_es_document.delay, *update_args)
                             )
+                            continue
+                        # A docket-source document updated from a related
+                        # instance (e.g. its SCOTUS docket entry) can trigger
+                        # alerts; should_percolate_update in
+                        # update_es_document decides.
+                        transaction.on_commit(
+                            chain(
+                                update_es_document.si(*update_args),
+                                send_or_schedule_search_alerts.s(),
+                                percolator_response_processing.s(),
+                            ).apply_async
                         )
 
 
@@ -379,13 +411,14 @@ def update_remove_m2m_documents(
     affected_field: str,
 ) -> None:
     """Update many-to-many related documents in Elasticsearch.
-    :param main_model: The main model to fetch objects from.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance whose many-to-many relationships are to be updated.
-    :param mapping_fields: A dict containing the query to use and the fields_map
-    :param affected_field: The name of the field that has many-to-many
-    relationships with the instance.
-    :return: None
+
+    Args:
+        main_model: The main model to fetch objects from.
+        es_document: The Elasticsearch document type.
+        instance: The instance whose many-to-many relationships are to be updated.
+        mapping_fields: A dict containing the query to use and the fields_map
+        affected_field: The name of the field that has many-to-many
+            relationships with the instance.
     """
     for key, fields_map in mapping_fields.items():
         if main_model.__name__.lower() != key:
@@ -408,11 +441,12 @@ def update_m2m_field_in_es_document[DocumentT: ESDocumentType](
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
-    :param instance: The instance of the document to update.
-    :param es_document: The Elasticsearch document type.
-    :param affected_field: The name of the field that has many-to-many
-    relationships with the instance.
-    :return: None
+
+    Args:
+        instance: The instance of the document to update.
+        es_document: The Elasticsearch document type.
+        affected_field: The name of the field that has many-to-many
+            relationships with the instance.
     """
     transaction.on_commit(
         partial(
@@ -451,17 +485,17 @@ def update_reverse_related_documents(
     fields_map: dict[str, str],
 ) -> None:
     """Update reverse related documents in Elasticsearch.
-    :param main_model: The main model to fetch objects from.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance for which the reverse related documents are
-    to be updated.
-    :param query_string: The query string to filter the main model objects.
-    :param affected_fields: The list of field names that are reverse related to
-    the instance.
-    :param fields_map: A dict containing field names that can be updated.
-    :return: None
-    """
 
+    Args:
+        main_model: The main model to fetch objects from.
+        es_document: The Elasticsearch document type.
+        instance: The instance for which the reverse related documents are
+            to be updated.
+        query_string: The query string to filter the main model objects.
+        affected_fields: The list of field names that are reverse related to
+            the instance.
+        fields_map: A dict containing field names that can be updated.
+    """
     # Set related instance if fields_map is provided.
     related_instance: tuple[str, int] | None = (
         compose_app_label(instance),
@@ -487,6 +521,7 @@ def update_reverse_related_documents(
                         (compose_app_label(main_object), main_object.pk),
                         related_instance,
                         fields_map_to_pass,
+                        getattr(instance, "skip_percolator_request", False),
                     ),
                     send_or_schedule_search_alerts.s(),
                     percolator_response_processing.s(),
@@ -552,18 +587,17 @@ def delete_reverse_related_documents(
     query_string: str,
     affected_fields: list[str],
 ) -> None:
-    """Update reverse related document fields in Elasticsearch when the reverse
-    instance is removed.
-    :param main_model: The main model to fetch objects from.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance for which the reverse related documents are
-    to be updated.
-    :param query_string: The query string to filter the main model objects.
-    :param affected_fields: The list of field names that are reverse related to
-    the instance.
-    :return: None
-    """
+    """Update reverse related document fields in Elasticsearch when the reverse instance is removed.
 
+    Args:
+        main_model: The main model to fetch objects from.
+        es_document: The Elasticsearch document type.
+        instance: The instance for which the reverse related documents are
+            to be updated.
+        query_string: The query string to filter the main model objects.
+        affected_fields: The list of field names that are reverse related to
+            the instance.
+    """
     match instance:
         case Person() if es_document is PersonDocument:  # type: ignore
             # Update the Person document after the reverse instanced is deleted
@@ -666,14 +700,17 @@ def allow_es_audio_indexing(
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
+
     Avoid indexing for Audio instances which their mp3 file has not been
     processed yet by process_audio_file.
 
-    :param instance: The Audio instance to evaluate for Elasticsearch indexing.
-    :param update_fields: List of fields being updated, or None.
-    :return: True if indexing should be avoided, False otherwise.
-    """
+    Args:
+        instance: The Audio instance to evaluate for Elasticsearch indexing.
+        update_fields: List of fields being updated, or None.
 
+    Returns:
+        True if indexing should be avoided, False otherwise.
+    """
     if isinstance(instance, Audio) and (
         update_fields and "processing_complete" in update_fields
     ):
@@ -686,11 +723,10 @@ def allow_es_audio_indexing(
 def remove_non_judge_person_and_positions_from_index(
     instance: Position,
 ) -> None:
-    """Remove non-judge person and associated positions from ES index if a
-     Judiciary position is removed.
+    """Remove non-judge person and associated positions from ES index if a Judiciary position is removed.
 
-    :param instance: The Position instance being removed.
-    :return: None
+    Args:
+        instance: The Position instance being removed.
     """
     try:
         if (person := instance.person) is None or person.is_judge:
@@ -719,9 +755,10 @@ def remove_non_judge_person_and_positions_from_index(
 
 
 class ESSignalProcessor:
-    """Custom signal processor for Elasticsearch documents. It is responsible
-    for managing the Elasticsearch index after certain events happen, such as
-    saving, deleting, or modifying instances of related models.
+    """Custom signal processor for Elasticsearch documents.
+
+    It is responsible for managing the Elasticsearch index after certain events
+    happen, such as saving, deleting, or modifying instances of related models.
     """
 
     save_uid_template = "update_related_{}_documents_in_es_index"
@@ -822,7 +859,7 @@ class ESSignalProcessor:
         update_fields=None,
         **kwargs,
     ) -> None:
-        """Receiver function that gets called after an object instance is saved"""
+        """Receiver function that gets called after an object instance is saved."""
         if instance is None:
             raise TypeError("Signals did not send an instance")
 
@@ -896,7 +933,7 @@ class ESSignalProcessor:
     def handle_delete[M: Model](
         self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
-        """Receiver function that gets called after an object instance is deleted"""
+        """Receiver function that gets called after an object instance is deleted."""
         if instance is None:
             raise TypeError("Signals did not send an instance")
 
@@ -919,7 +956,7 @@ class ESSignalProcessor:
     def handle_m2m[M: Model](
         self, sender: type[M], instance: M | None = None, action=None, **kwargs
     ) -> None:
-        """Receiver function that gets called after a m2m relation is modified"""
+        """Receiver function that gets called after a m2m relation is modified."""
         if instance is None:
             raise TypeError("Signals did not send an instance")
 
@@ -939,9 +976,7 @@ class ESSignalProcessor:
     def handle_reverse_actions[M: Model](
         self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
-        """Receiver function that gets called after a reverse relation is
-        created, updated or removed.
-        """
+        """Receiver function that gets called after a reverse relation is created, updated or removed."""
         if instance is None:
             raise TypeError("Signals did not send an instance")
 
@@ -991,9 +1026,7 @@ class ESSignalProcessor:
     def handle_reverse_actions_delete[M: Model](
         self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
-        """Receiver function that gets called after a reverse relation is
-        removed.
-        """
+        """Receiver function that gets called after a reverse relation is removed."""
         if instance is None:
             raise TypeError("Signals did not send an instance")
 

@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class UPLOAD_TYPE:
-    """This enumeration of upload types should be in sync with
-    recap-chrome/src/pacer.js: UPLOAD_TYPES [plural, sic]
-    """
+    """This enumeration of upload types should be in sync with recap-chrome/src/pacer.js: UPLOAD_TYPES [plural, sic]."""
 
     DOCKET = 1
     ATTACHMENT_PAGE = 2
@@ -87,7 +85,7 @@ def make_recap_email_processing_queue_aws_path(instance, filename: str) -> str:
 
 
 class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
-    """This is a simple object for holding original HTML content from PACER
+    """This is a simple object for holding original HTML content from PACER.
 
     We use this object to make sure that for every item we receive from users,
     we can go back and re-parse it one day if we have to. This becomes
@@ -268,9 +266,7 @@ class ProcessingQueue(AbstractDateTimeModel):
 
 
 class EmailSource:
-    """
-    Possible sources for entries in the email processing queue.
-    """
+    """Possible sources for entries in the email processing queue."""
 
     PACER = 1
     """
@@ -292,24 +288,24 @@ class EmailSource:
 
 
 class EmailProcessingQueue(AbstractDateTimeModel):
-    """
-    Where @recap.email emails go when received by the API
+    """Where @recap.email emails go when received by the API.
 
-    :ivar uploader: The user that sent in the email for processing.
-    :ivar court: The court where the upload was from.
-    :ivar message_id: The S3 message identifier, used to pull the file in the\
-        processing tasks.
-    :ivar destination_emails: The emails that received the notification.
-    :ivar filepath: The S3 filepath to the email and receipt stored as JSON\
-        text.
-    :ivar status_message: Any errors that occurred while processing an item.
-    :ivar recap_documents: Document(s) created from the PACER email, processed\
-        as a function of this queue. Kept for compatibility; use get_related_objects
-        in the future.
-    :ivar source: The source of this email notification.
-    :ivar related_model: The type of model that was created or updated by this
-        email.
-    :ivar object_ids: The PKs of models created or updated by this email.
+    Attributes:
+        uploader: The user that sent in the email for processing.
+        court: The court where the upload was from.
+        message_id: The S3 message identifier, used to pull the file in the\
+            processing tasks.
+        destination_emails: The emails that received the notification.
+        filepath: The S3 filepath to the email and receipt stored as JSON\
+            text.
+        status_message: Any errors that occurred while processing an item.
+        recap_documents: Document(s) created from the PACER email, processed\
+            as a function of this queue. Kept for compatibility; use get_related_objects
+            in the future.
+        source: The source of this email notification.
+        related_model: The type of model that was created or updated by this
+            email.
+        object_ids: The PKs of models created or updated by this email.
     """
 
     uploader = models.ForeignKey(
@@ -530,7 +526,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
 
 
 class FjcIntegratedDatabase(AbstractDateTimeModel):
-    """The Integrated Database of PACER data as described here:
+    """The Integrated Database of PACER data, as described at the link below.
 
     https://www.fjc.gov/research/idb
 

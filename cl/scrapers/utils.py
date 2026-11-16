@@ -59,7 +59,7 @@ def make_citation(
 
 
 def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
-    """Checks if the citation is duplicated for the cluster
+    """Checks if the citation is duplicated for the cluster.
 
     Following corpus_importer.utils.add_citations_to_cluster we
     identify 2 types of duplication:
@@ -67,10 +67,12 @@ def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
     - duplication in the same reporter: the cluster already has a citation
         in that reporter
 
-    :param citation_candidate: the citation object
-    :param cite: citation string
+    Args:
+        citation_candidate: the citation object
+        cite: citation string
 
-    :return: True if citation is duplicated, False if not
+    Returns:
+        True if citation is duplicated, False if not
     """
     citation_params = {**citation_candidate.__dict__}
     citation_params.pop("_state", "")
@@ -101,15 +103,17 @@ def citation_is_duplicated(citation_candidate: Citation, cite: str) -> bool:
 
 
 def get_child_court(child_court_name: str, court_id: str) -> Court | None:
-    """Get Court object from "child_courts" scraped string
+    """Get Court object from "child_courts" scraped string.
 
     Ensure that the Court object found has the same parent court id has the
     Court object got from the scraper
 
-    :param item: scraped court's name
-    :param court_id: court id got from the Site scraper object
+    Args:
+        child_court_name: scraped court's name
+        court_id: court id got from the Site scraper object
 
-    :return: Court object for the child_court string if it exists and is valid
+    Returns:
+        Court object for the child_court string if it exists and is valid
     """
     if not child_court_name:
         return None
@@ -185,7 +189,7 @@ def signal_handler(signal, frame):
 def get_existing_docket(
     court_id: str, docket_number: str, appeal_from_str: str = ""
 ) -> Docket | None:
-    """Look for an existing docket for a given court_id and docket number
+    """Look for an existing docket for a given court_id and docket number.
 
     recap.mergers.find_docket_object prioritizes lookups by docket_number_core
     which is designed for federal / PACER sources. This function is rough
@@ -200,12 +204,14 @@ def get_existing_docket(
     Examples of  docket numbers do not map to a docket_number_core
     (fldistctapp '5D2023-0888'), (ohioctapp, '22CA15')
 
-    :param court_id: the court id
-    :param docket_number: the docket number
-    :param appeal_from_str: useful for disambiguating `ohioctapp` dockets,
-        this is the "lower_courts" returned juriscraper field
+    Args:
+        court_id: the court id
+        docket_number: the docket number
+        appeal_from_str: useful for disambiguating `ohioctapp` dockets,
+            this is the "lower_courts" returned juriscraper field
 
-    :return: Docket if find a match, None if we don't
+    Returns:
+        Docket if find a match, None if we don't
     """
     # Avoid lookups by blank docket number
     if not docket_number.strip():
@@ -240,15 +246,15 @@ def get_existing_docket(
 def case_names_are_too_different(
     first: str, second: str, threshold: float = 0.5
 ) -> bool:
-    """Compares 2 case names' words as a similitude measure
-    Useful to raise a warning when updating a docket and names are found
-    to be too different
+    """Compares 2 case names' words as a similitude measure Useful to raise a warning when updating a docket and names are found to be too different.
 
-    :param first: first case name
-    :param second: second case name
-    :param threshold: minimum percentage of words in common
+    Args:
+        first: first case name
+        second: second case name
+        threshold: minimum percentage of words in common
 
-    :return: True if case names are too different according to the threshold;
+    Returns:
+        True if case names are too different according to the threshold;
         False if names are similar
     """
     new_parts = winnow_case_name(first.lower())
@@ -268,9 +274,9 @@ def link_judges(cluster: OpinionCluster, opinions: list[Opinion]) -> None:
 
     Caveat: a name that matches more than one person is left unresolved.
 
-    :param cluster: The saved cluster.
-    :param opinions: The cluster's unsaved opinions.
-    :return: None
+    Args:
+        cluster: The saved cluster.
+        opinions: The cluster's unsaved opinions.
     """
     court_id = cluster.docket.court_id
     if cluster.judges:
@@ -311,28 +317,30 @@ def update_or_create_docket(
     appeal_from_str: str = "",
     appeal_from_id: str = "",
 ) -> Docket:
-    """Look for an existing Docket and update it or create a new one if it's
-    not found.
+    """Look for an existing Docket and update it or create a new one if it's not found.
 
-    :param case_name: The docket case_name.
-    :param case_name_short: The docket case_name_short
-    :param court: The court objects the docket belongs to
-    :param docket_number: The docket number.
-    :param source: The docket source.
-    :param from_harvard: True when this function is called from the
-        Harvard importer; the Harvard data is considered
-        more trustable  and should overwrite an existing docket's data
-        Should be False when called from scrapers.
-    :param blocked: If the docket should be blocked, default False. May
-        block an existing docket, but will never unblock one
-    :param date_blocked: The docket date_blocked if it's blocked. Ignored if
-        the existing docket is already blocked.
-    :param case_name_full: The docket case_name_full.
-    :param date_argued: The docket date_argued if it's an oral argument.
-    :param ia_needs_upload: If the docket needs upload to IA, default None.
-    :param appeal_from_str: Name (not standardized id) of the lower level court.
-    :param appeal_from_id: Lower court id.
-    :return: The docket.
+    Args:
+        case_name: The docket case_name.
+        case_name_short: The docket case_name_short
+        court: The court objects the docket belongs to
+        docket_number: The docket number.
+        source: The docket source.
+        from_harvard: True when this function is called from the
+            Harvard importer; the Harvard data is considered
+            more trustable  and should overwrite an existing docket's data
+            Should be False when called from scrapers.
+        blocked: If the docket should be blocked, default False. May
+            block an existing docket, but will never unblock one
+        date_blocked: The docket date_blocked if it's blocked. Ignored if
+            the existing docket is already blocked.
+        case_name_full: The docket case_name_full.
+        date_argued: The docket date_argued if it's an oral argument.
+        ia_needs_upload: If the docket needs upload to IA, default None.
+        appeal_from_str: Name (not standardized id) of the lower level court.
+        appeal_from_id: Lower court id.
+
+    Returns:
+        The docket.
     """
     docket_fields = {
         "case_name": case_name,
@@ -421,13 +429,16 @@ def update_or_create_docket(
 
 
 def scraped_citation_object_is_valid(citation_object: dict) -> bool:
-    """Validate Citation objects from `Site.extract_from_text`
+    """Validate Citation objects from `Site.extract_from_text`.
 
     Check that the parsed `Citation.reporter` exists in reporters-db
     and that the `Citation.type` matches the reporters-db type
 
-    :param citation_object: dict got from `Site.extract_from_text`
-    :return: True if the parsed reporter and type match with reporters-db
+    Args:
+        citation_object: dict got from `Site.extract_from_text`
+
+    Returns:
+        True if the parsed reporter and type match with reporters-db
         False otherwise
     """
     parsed_reporter = citation_object["reporter"]
@@ -449,16 +460,15 @@ def scraped_citation_object_is_valid(citation_object: dict) -> bool:
 
 
 def save_response(site: AbstractSite) -> None:
-    """Stores scrapers responses content and headers in a S3 bucket
+    """Stores scrapers responses content and headers in a S3 bucket.
 
     This is passed to juriscraper's Site objects as the
     `save_response_fn` argument, which will make Juriscraper
     save every response
 
-    :param site: the Site object, used to access the saved response
-    :return None
+    Args:
+        site: the Site object, used to access the saved response
     """
-
     storage = S3GlacierInstantRetrievalStorage()
     response = site.request["response"]
 
@@ -483,8 +493,7 @@ def save_response(site: AbstractSite) -> None:
 
 
 def check_duplicate_ingestion(local_path_name: str) -> None:
-    """
-    Send an error log to Sentry if a filename has a high repetition count
+    """Send an error log to Sentry if a filename has a high repetition count.
 
     S3 filenames / filepaths for opinions and oral arguments are created using
     created via `cl.lib.storage.get_name_by_incrementing`. The name is composed
@@ -503,8 +512,8 @@ def check_duplicate_ingestion(local_path_name: str) -> None:
     - a common case name in the same date, for example, "State v. Doe"
     - opinion versions
 
-    :param local_path_name: filepath of the file in S3
-    :return None
+    Args:
+        local_path_name: filepath of the file in S3
     """
     # Trigger error log for repetitions beyond this count
     SUSPECT_DUPLICATES_THRESHOLD = 4
@@ -526,11 +535,12 @@ def check_duplicate_ingestion(local_path_name: str) -> None:
 def update_or_create_originating_court_information(
     docket: Docket, lower_court_number: str, lower_court_judge: str
 ) -> OriginatingCourtInformation | None:
-    """Update or create an OriginatingCourtInformation given the scraped values
+    """Update or create an OriginatingCourtInformation given the scraped values.
 
-    :param docket: the docket to which the OCI will be linked
-    :param lower_court_number: will go into OCI.docket_number
-    :param lower_court_judge: will go into OCI.assigned_to_str
+    Args:
+        docket: the docket to which the OCI will be linked
+        lower_court_number: will go into OCI.docket_number
+        lower_court_judge: will go into OCI.assigned_to_str
     """
     if not (lower_court_judge or lower_court_number):
         return

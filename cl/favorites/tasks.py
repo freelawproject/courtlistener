@@ -34,8 +34,9 @@ def check_prayer_pacer(self: Task, rd_pk: int, user_pk: int) -> None:
 async def check_prayer_pacer_base(rd_pk: int, user_pk: int) -> None:
     """Check document availability on PACER and update the prayer.
 
-    :param rd_pk: The primary key of RECAPDocument of interest
-    :param user_pk: The primary key of the user who requested the document
+    Args:
+        rd_pk: The primary key of RECAPDocument of interest
+        user_pk: The primary key of the user who requested the document
     """
     rd = await (
         RECAPDocument.objects.select_related("docket_entry__docket")

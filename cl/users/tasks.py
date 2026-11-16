@@ -40,13 +40,10 @@ def abort_or_retry(task, exc):
     ignore_result=True,
 )
 def create_neon_account(self: Task, user_id: int) -> None:
-    """
-    Checks for existing Neon CRM accounts using the user's email address
-    and handles account creation or sends an email alert to donate@free.law
-    when multiple unmerged accounts share the same email address, requesting
-    further action to resolve the issue and minimize data inconsistencies.
+    """Checks for existing Neon CRM accounts using the user's email address and handles account creation or sends an email alert to donate@free.law when multiple unmerged accounts share the same email address, requesting further action to resolve the issue and minimize data inconsistencies.
 
     Args:
+        self: The bound Celery task.
         user_id (int): The ID of the user to check and potentially create an
         account for.
     """
@@ -107,8 +104,8 @@ def send_new_account_emails(user_id: int) -> None:
     notify_existing_account_holder) both return after one enqueue and no SMTP
     round trips. Otherwise the response time would reveal which case occurred.
 
-    :param user_id: The pk of the User that was just created or claimed.
-    :return: None
+    Args:
+        user_id: The pk of the User that was just created or claimed.
     """
     user = User.objects.filter(pk=user_id).select_related("profile").first()
     if user is None:
@@ -150,8 +147,8 @@ def notify_existing_account_holder(recipient: str) -> None:
     let anyone test whether an address has an account; this email is how the
     owner learns what happened and how to get back into their account.
 
-    :param recipient: The email address the signup attempt used.
-    :return: None
+    Args:
+        recipient: The email address the signup attempt used.
     """
     # Imported here to avoid a circular import; see send_new_account_emails.
     from cl.users.utils import emails
@@ -173,14 +170,14 @@ def notify_existing_account_holder(recipient: str) -> None:
     ignore_result=True,
 )
 def update_neon_account(self: Task, user_id: int) -> None:
-    """
-    Updates the Neon CRM account associated with the given user_id.
+    """Updates the Neon CRM account associated with the given user_id.
 
     This task retrieves the user information from the database, fetches the
     Neon CRM account ID, and then updates the Neon CRM account with any
     relevant user data changes.
 
     Args:
+        self: The bound Celery task.
         user_id (int): The ID of the user whose Neon CRM account should be
         updated.
 
@@ -200,17 +197,20 @@ def update_neon_account(self: Task, user_id: int) -> None:
 def create_or_update_zoho_account(
     self: Task, user_id: int, milestone: int
 ) -> tuple[str, int] | None:
-    """
-    Celery task to create or update a Zoho CRM record for a given user.
+    """Celery task to create or update a Zoho CRM record for a given user.
 
     This task:
     - Builds a Zoho payload from the User model
     - Checks if the user exists as a Contact or Lead in Zoho
     - Updates the existing record or creates a new Contact if none exist
 
-    :param user_id: The primary key of the user to sync with Zoho
-    :param milestone: A milestone value to store in the 'API_calls' field
-    :return: A ``(module_name, record_id)`` tuple identifying the record that
+    Args:
+        self: The bound Celery task.
+        user_id: The primary key of the user to sync with Zoho
+        milestone: A milestone value to store in the 'API_calls' field
+
+    Returns:
+        A ``(module_name, record_id)`` tuple identifying the record that
         was created or updated. The chained ``tag_zoho_record`` task uses
         this to skip a follow-up search.
     """
@@ -268,16 +268,17 @@ def _membership_tag_for_level(level: int) -> str:
 def tag_zoho_record_for_membership(
     self: Task, user_id: int, level: int
 ) -> None:
-    """
-    Add the membership tag to the user's Zoho Lead or Contact record.
+    """Add the membership tag to the user's Zoho Lead or Contact record.
 
     Looks up the user in Zoho by CourtListener ID and email, preferring a
     Lead match over a Contact match (mirroring `create_or_update_zoho_account`).
     If no record is found, the task is a no-op — the record will get tagged
     next time the user shows up in Zoho.
 
-    :param user_id: The primary key of the user whose Zoho record to tag.
-    :param level: The NeonMembershipLevel value used to choose the tag name.
+    Args:
+        self: The bound Celery task.
+        user_id: The primary key of the user whose Zoho record to tag.
+        level: The NeonMembershipLevel value used to choose the tag name.
     """
     user = User.objects.get(pk=user_id)
     tag_name = _membership_tag_for_level(level)
@@ -333,11 +334,10 @@ def notify_new_or_updated_webhook(
 ) -> None:
     """Send a notification to the admins if a webhook was created or updated.
 
-    :param webhook_pk: The webhook PK that was created or updated.
-    :param created: Whether the webhook was just created or not.
-    :return: None
+    Args:
+        webhook_pk: The webhook PK that was created or updated.
+        created: Whether the webhook was just created or not.
     """
-
     webhook = Webhook.objects.get(pk=webhook_pk)
 
     action = "created" if created else "updated"
@@ -361,15 +361,13 @@ def notify_failing_webhook(
     failure_counter: int,
     webhook_enabled: bool,
 ) -> None:
-    """Send a notification to the webhook user when a webhook event fails, or
-    it has been disabled.
+    """Send a notification to the webhook user when a webhook event fails, or it has been disabled.
 
-    :param webhook_event_pk: The related webhook event PK.
-    :param failure_counter: The current webhook event failure counter.
-    :param webhook_enabled: Whether the webhook has been disabled.
-    :return: None
+    Args:
+        webhook_event_pk: The related webhook event PK.
+        failure_counter: The current webhook event failure counter.
+        webhook_enabled: Whether the webhook has been disabled.
     """
-
     webhook_event = WebhookEvent.objects.get(pk=webhook_event_pk)
     webhook = webhook_event.webhook
     first_name = webhook.user.first_name
@@ -392,13 +390,14 @@ def notify_failing_webhook(
 
 
 def get_days_disabled(webhook: Webhook) -> str:
-    """Compute and return a string saying the number of days the webhook has
-    been disabled.
+    """Compute and return a string saying the number of days the webhook has been disabled.
 
-    :param: The related Webhook object.
-    :return: A string with the number of days the webhook has been disabled.
+    Args:
+        webhook: The related Webhook object.
+
+    Returns:
+        A string with the number of days the webhook has been disabled.
     """
-
     date_disabled = webhook.date_modified
     today = now()
     days = (today - date_disabled).days
@@ -410,13 +409,11 @@ def get_days_disabled(webhook: Webhook) -> str:
 
 @app.task(ignore_result=True)
 def send_webhook_still_disabled_email(webhook_pk: int) -> None:
-    """Send an email to the webhook owner when a webhook endpoint is
-    still disabled after 1, 2, and 3 days.
+    """Send an email to the webhook owner when a webhook endpoint is still disabled after 1, 2, and 3 days.
 
-    :param webhook_pk: The related webhook PK.
-    :return: None
+    Args:
+        webhook_pk: The related webhook PK.
     """
-
     webhook = Webhook.objects.get(pk=webhook_pk)
     first_name = webhook.user.first_name
     days_disabled = get_days_disabled(webhook)

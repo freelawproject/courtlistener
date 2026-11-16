@@ -29,8 +29,10 @@ INPUT_FORMATS = [
 
 class ParseFloorDateMixin:
     def _parse_floor_date(self, value):
-        """Validates that the input can be converted to a date. Returns a Python
-        datetime.date object or the original input if it cannot be converted.
+        """Validates that the input can be converted to a date.
+
+        Returns a Python datetime.date object or the original input if it
+        cannot be converted.
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
@@ -57,19 +59,11 @@ class ParseFloorDateMixin:
 
 
 class ParseCeilingDateMixin:
-    """
-    Uses django.forms.fields.DateField as a starting point, and then allows
-    users to input partial dates such as 2011-12. However, instead of assuming
-    such dates correspond with the first of the month, it assumes that such
-    dates represent the *last* day of the month. This allows a search for all
-    documents "After 2010" to work.
-    """
+    """Uses django.forms.fields.DateField as a starting point, and then allows users to input partial dates such as 2011-12. However, instead of assuming such dates correspond with the first of the month, it assumes that such dates represent the *last* day of the month. This allows a search for all documents "After 2010" to work."""
 
     @staticmethod
     def _calculate_extra_days(date_format, d):
-        """Given a date and a format, calculate how many days to add to it to
-        create the correct ceiling date.
-        """
+        """Given a date and a format, calculate how many days to add to it to create the correct ceiling date."""
         if date_format.count("%") == 1:
             if calendar.isleap(d.year):
                 num_days = 366
@@ -90,8 +84,10 @@ class ParseCeilingDateMixin:
         return num_days - 1
 
     def _parse_ceiling_date(self, value):
-        """Validates that the input can be converted to a date. Returns a Python
-        datetime.date object or the original input if it cannot be converted.
+        """Validates that the input can be converted to a date.
+
+        Returns a Python datetime.date object or the original input if it
+        cannot be converted.
         """
         if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
@@ -124,6 +120,7 @@ class ParseCeilingDateMixin:
 
 class FloorDateOrRelativeField(DateField, ParseFloorDateMixin):
     """Simply overrides the DateField to give it a better name.
+
     Validates whether the input is a date object or returns the original value
     if it's a potential relative date, which will be validated upstream.
     """
@@ -137,6 +134,7 @@ class FloorDateOrRelativeField(DateField, ParseFloorDateMixin):
 
 class FloorDateField(DateField, ParseFloorDateMixin):
     """Simply overrides the DateField to give it a better name.
+
     Validates whether the input is a date object or raises a ValidationError if
     the input cannot be parsed into a valid date.
     """
@@ -154,6 +152,7 @@ class FloorDateField(DateField, ParseFloorDateMixin):
 
 class CeilingDateOrRelativeField(DateField, ParseCeilingDateMixin):
     """Implements a DateField where partial input is accepted.
+
     Validates whether the input is a date object or returns the original value
     if it's a potential relative date, which will be validated upstream.
     """
@@ -167,6 +166,7 @@ class CeilingDateOrRelativeField(DateField, ParseCeilingDateMixin):
 
 class CeilingDateField(DateField, ParseCeilingDateMixin):
     """Implements a DateField where partial input is accepted.
+
     Validates whether the input is a date object or raises a ValidationError if
     the input cannot be parsed into a valid date.
     """
@@ -183,7 +183,7 @@ class CeilingDateField(DateField, ParseCeilingDateMixin):
 
 
 class RandomChoiceField(ChoiceField):
-    """A choice field, but it allows any value that starts with 'random_'"""
+    """A choice field, but it allows any value that starts with 'random_'."""
 
     def validate(self, value):
         super(ChoiceField, self).validate(value)

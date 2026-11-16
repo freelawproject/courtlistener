@@ -16,7 +16,7 @@ ignore_logger("internetarchive.item")
 
 
 def fingerprint_sentry_error(event: dict, hint: dict) -> dict:
-    """Captures fingerprint information from logger.error call, if present
+    """Captures fingerprint information from logger.error call, if present.
 
     logger.error calls allow to pass an `extra` dictionary with arbitrary keys
     We use this to pass a `fingerprint` key. The value should be a list.
@@ -29,10 +29,12 @@ def fingerprint_sentry_error(event: dict, hint: dict) -> dict:
     we can force the grouping of all events with the same fingerprint
     making Sentry's issues more granular and useful.
 
-    :param event: event dict to be sent to Sentry
-    :param hint: dict with extra information about the event
+    Args:
+        event: event dict to be sent to Sentry
+        hint: dict with extra information about the event
 
-    :return: the event that will be sent to Sentry,
+    Returns:
+        the event that will be sent to Sentry,
                 with explicit fingerprint values
     """
     if fingerprint := event.get("extra", {}).pop("fingerprint", []):

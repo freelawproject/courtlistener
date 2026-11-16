@@ -709,17 +709,20 @@ def match_court_string(
     Note you cannot use bankruptcy and federal_district together due to
     collisions between their regular expressions.
 
-    :param court_str: The court string to look up.
-    :param federal_appeals: Whether the string might be a federal appeals
-    court.
-    :param federal_district: Whether the string might be a federal district
-    court. This may return abolished or specialty federal courts courts.
-    :param bankruptcy: Whether the string might be a bankruptcy court. This may
-    return abolished courts.
-    :param state: Whether the string might be a state court.
-    :param state_ag: Whether it might be a state AG "court".
-    :param international: Whether it might be an international court.
-    :returns The abbreviation for the court, if possible. Else, returns None
+    Args:
+        court_str: The court string to look up.
+        federal_appeals: Whether the string might be a federal appeals
+            court.
+        federal_district: Whether the string might be a federal district
+            court. This may return abolished or specialty federal courts courts.
+        bankruptcy: Whether the string might be a bankruptcy court. This may
+            return abolished courts.
+        state: Whether the string might be a state court.
+        state_ag: Whether it might be a state AG "court".
+        international: Whether it might be an international court.
+
+    Returns:
+        The abbreviation for the court, if possible. Else, returns None
     """
     assert not (federal_district and bankruptcy), (
         "federal_district and bankruptcy cannot be used in conjunction"

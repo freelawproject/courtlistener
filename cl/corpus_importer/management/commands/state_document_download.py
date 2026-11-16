@@ -23,7 +23,9 @@ from cl.search.state.shared import AbstractStateDocument
 
 def compose_redis_key(model: type[AbstractStateDocument]) -> str:
     """Compose a Redis key for state document download log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return f"{model.__name__}_download:log"
 
@@ -51,14 +53,14 @@ def extract_state_documents(
     belong to very large files. Non-PDF documents never get a page_count, so
     they are always scheduled regardless of page_limit.
 
-    :param model: The state document model to extract.
-    :param throttle_min_items: CeleryThrottle min_items parameter.
-    :param extraction_queue: The celery queue for extraction tasks.
-    :param batch_size: The batch size for extraction tasks.
-    :param delay: Seconds to sleep between scheduling tasks.
-    :param page_limit: If given, only schedule PDFs whose page_count is
-    between 1 and this value. If None, no page_count filter is applied.
-    :return: None
+    Args:
+        model: The state document model to extract.
+        throttle_min_items: CeleryThrottle min_items parameter.
+        extraction_queue: The celery queue for extraction tasks.
+        batch_size: The batch size for extraction tasks.
+        delay: Seconds to sleep between scheduling tasks.
+        page_limit: If given, only schedule PDFs whose page_count is
+            between 1 and this value. If None, no page_count filter is applied.
     """
     extension_query = Q()
     if not model.extractable_extensions():
@@ -146,15 +148,15 @@ def download_state_documents(
     Queries state document instances that have no filepath_local, then
     schedules a download task for each.
 
-    :param model: The state document model to download.
-    :param throttle_min_items: CeleryThrottle min_items parameter.
-    :param download_queue: The celery queue for download tasks.
-    :param extraction_queue: The celery queue for extraction tasks.
-    :param delay: Seconds to sleep between scheduling tasks.
-    :param download_order: Sort order for the queryset by pk ("asc" or "desc").
-    :param skip_extraction: Skip the extraction step.
-    :param auto_resume: Resume from last pk stored in Redis.
-    :return: None
+    Args:
+        model: The state document model to download.
+        throttle_min_items: CeleryThrottle min_items parameter.
+        download_queue: The celery queue for download tasks.
+        extraction_queue: The celery queue for extraction tasks.
+        delay: Seconds to sleep between scheduling tasks.
+        download_order: Sort order for the queryset by pk ("asc" or "desc").
+        skip_extraction: Skip the extraction step.
+        auto_resume: Resume from last pk stored in Redis.
     """
     desc = download_order == "desc"
     docs = model._default_manager.filter(
@@ -297,18 +299,22 @@ class Command(VerboseCommand):
     ) -> None:
         """Download state docket entry attachments.
 
-        :param model: The model to download (app_label.ModelName).
-        :param download_queue: The celery queue to use for downloads.
-        :param extraction_queue: The celery queue to use for OCR extraction.
-        :param throttle_min_items: CeleryThrottle min_items parameter.
-        :param delay: Seconds to sleep between scheduling tasks.
-        :param skip_extraction: Skip the text extraction step.
-        :param skip_download: Skip the download step.
-        :param batch_size: The batch size for PDF extraction tasks.
-        :param page_limit: If given, only extract PDFs with a page count
-        between 1 and this value.
-        :param download_order: Sort order for downloading documents by pk.
-        :param auto_resume: Resume from last pk stored in Redis."""
+        Args:
+            *args: Unused.
+            model: The model to download (app_label.ModelName).
+            download_queue: The celery queue to use for downloads.
+            extraction_queue: The celery queue to use for OCR extraction.
+            throttle_min_items: CeleryThrottle min_items parameter.
+            delay: Seconds to sleep between scheduling tasks.
+            skip_extraction: Skip the text extraction step.
+            skip_download: Skip the download step.
+            batch_size: The batch size for PDF extraction tasks.
+            page_limit: If given, only extract PDFs with a page count
+                between 1 and this value.
+            download_order: Sort order for downloading documents by pk.
+            auto_resume: Resume from last pk stored in Redis.
+            **options: Unused.
+        """
         super().handle(*args, **options)
         if skip_extraction and skip_download:
             logger.info("Nothing to do.")

@@ -7,9 +7,7 @@ from django.utils.timezone import is_aware
 
 
 def midnight_pt(d: date) -> datetime:
-    """Cast a naive date object to midnight Pacific Time, PST or PDT according
-    to the date.
-    """
+    """Cast a naive date object to midnight Pacific Time, PST or PDT according to the date."""
     pst = pytz.timezone("US/Pacific")
     d = datetime.combine(d, time())
     d = pst.localize(d)
@@ -17,17 +15,14 @@ def midnight_pt(d: date) -> datetime:
 
 
 def fixed_midnight_pt(d: date) -> datetime:
-    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
-    according to the date. This method also considers historical timezone
-    offsets, similar to how they are handled in DRF.
-    """
+    """Cast a naive date object to midnight Pacific Time, either PST or PDT, according to the date. This method also considers historical timezone offsets, similar to how they are handled in DRF."""
     time_zone = timezone.get_current_timezone()
     d = datetime.combine(d, time())
     return timezone.make_aware(d, time_zone)
 
 
 def dt_as_local_date(dt: datetime) -> date:
-    """Convert a datetime to a localized date
+    """Convert a datetime to a localized date.
 
     Datetimes are stored in the DB in UTC. Dates are handled a bit differently:
 
@@ -44,8 +39,11 @@ def dt_as_local_date(dt: datetime) -> date:
     This is useful for comparing dates in the DB to datetimes in the DB (not
     that I recommend it).
 
-    :param dt: A tz-aware datetime object to convert
-    :returns A date object
+    Args:
+        dt: A tz-aware datetime object to convert
+
+    Returns:
+        A date object
     """
     assert is_aware(dt), "dt must be a timezone-aware datetime object"
     return dt.astimezone(pytz.timezone(settings.TIME_ZONE)).date()

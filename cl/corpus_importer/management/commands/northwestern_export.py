@@ -7,7 +7,7 @@ BULK_OUTPUT_DIRECTORY = "/tmp/northwestern-export/"
 
 
 def do_bulk_export(options):
-    """Save selected dockets from 2016 to disk
+    """Save selected dockets from 2016 to disk.
 
     This will serialize the items to disk using celery tasks and the IA
     serializer.

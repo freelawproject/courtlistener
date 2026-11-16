@@ -16,15 +16,15 @@ from cl.lib.date_time import dt_as_local_date
 
 
 def build_user_report(user, delete=False):
-    """Figure out which alerts are old or too old; disable very old ones based
-    on date_modified since this field is updated when the alert_type field is
-    toggled
+    """Figure out which alerts are old or too old; disable very old ones based on date_modified since this field is updated when the alert_type field is toggled.
 
-    :param user: A user that has alerts
-    :param delete: Whether to disable really old alerts
-    :return A dict indicating the counts of old alerts.
+    Args:
+        user: A user that has alerts
+        delete: Whether to disable really old alerts
+
+    Returns:
+        A dict indicating the counts of old alerts.
     """
-
     report = OldAlertReport()
     alerts = (
         user.docket_alerts.filter(alert_type=DocketAlert.SUBSCRIPTION)
@@ -80,13 +80,15 @@ def build_user_report(user, delete=False):
 
 
 async def send_old_alert_warning_email_and_webhook(user, report) -> int:
-    """Send alerts emails and webhooks for old alerts
+    """Send alerts emails and webhooks for old alerts.
 
-    :param user: The user with terminated dockets
-    :param report: A dict containing information about old alerts
-    :return The number of webhook events sent
+    Args:
+        user: The user with terminated dockets
+        report: A dict containing information about old alerts
+
+    Returns:
+        The number of webhook events sent
     """
-
     user_webhooks = user.webhooks.filter(
         event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT, enabled=True
     )

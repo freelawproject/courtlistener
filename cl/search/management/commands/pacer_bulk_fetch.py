@@ -58,13 +58,16 @@ class MinimumWait:
 def enough_time_elapsed(
     datetime_to_compare: datetime, time_interval: float
 ) -> bool:
-    """Check if enough time has elapsed since datetime_to_compare
+    """Check if enough time has elapsed since datetime_to_compare.
 
-    :param datetime_to_compare: The datetime to compare against the
-    current time.
-    :param time_interval: The time interval to compare against in seconds.
-    :return: True if the difference between now and the given date exceeds
-    the defined interval, otherwise False.
+    Args:
+        datetime_to_compare: The datetime to compare against the
+            current time.
+        time_interval: The time interval to compare against in seconds.
+
+    Returns:
+        True if the difference between now and the given date exceeds
+        the defined interval, otherwise False.
     """
     now = timezone.now()
     return (now - datetime_to_compare) > timedelta(seconds=time_interval)
@@ -73,16 +76,17 @@ def enough_time_elapsed(
 def is_retry_interval_elapsed(
     date_created: datetime, retry_count: int, time_start: float
 ) -> tuple[bool, int]:
-    """Check if the retry interval has elapsed based on the exponential backoff
-    policy.
+    """Check if the retry interval has elapsed based on the exponential backoff policy.
 
-    :param date_created: The datetime when the FQ was created.
-    :param retry_count: The number of retry attempts already made.
-    :param time_start: The base time interval for the exponential backoff.
-    :return: A two tuple, a bool True if the required time has elapsed since
-    date_created, otherwise False. An integer representing the next_time_to_wait
+    Args:
+        date_created: The datetime when the FQ was created.
+        retry_count: The number of retry attempts already made.
+        time_start: The base time interval for the exponential backoff.
+
+    Returns:
+        A two tuple, a bool True if the required time has elapsed since
+        date_created, otherwise False. An integer representing the next_time_to_wait
     """
-
     exponential_backoff = int(pow(time_start, retry_count + 1))
     prev_exponential_backoff = int(pow(time_start, retry_count))
     # exponential_backoff is the time in seconds used to compare against the
@@ -197,7 +201,7 @@ class Command(VerboseCommand):
         )
 
     def identify_documents(self) -> None:
-        """Get eligible documents grouped by court"""
+        """Get eligible documents grouped by court."""
         filters = [
             Q(pacer_doc_id__isnull=False),
             Q(is_available=False),
@@ -284,8 +288,9 @@ class Command(VerboseCommand):
         To hit the same court again, the last fetch queue must have
         been completed more than `self.interval` seconds ago.
 
-        :return: A two-tuple containing True if the court is ready to be queried again,
-        False otherwise, and whether a long wait is needed.
+        Returns:
+            A two-tuple containing True if the court is ready to be queried again,
+            False otherwise, and whether a long wait is needed.
         """
         fetch_in_progress_court = self.fetches_in_progress.get(court_id)
         if not fetch_in_progress_court:
@@ -354,12 +359,11 @@ class Command(VerboseCommand):
     def cleanup_finished_court(
         self, court_id: str, remaining_courts: dict[str, list[dict[str, Any]]]
     ) -> None:
-        """Remove a court from remaining_courts and fetches_in_progress
-        if no documents remain and its last FQ task has completed.
+        """Remove a court from remaining_courts and fetches_in_progress if no documents remain and its last FQ task has completed.
 
-        :param court_id: the court to clean up
-        :param remaining_courts: the remaining courts
-        :return: None
+        Args:
+            court_id: the court to clean up
+            remaining_courts: the remaining courts
         """
         fetch_in_progress = self.fetches_in_progress.get(court_id)
         if not remaining_courts.get(court_id) and fetch_in_progress:
@@ -378,10 +382,13 @@ class Command(VerboseCommand):
     ) -> int | None:
         """Handle the reason for skipping a fetch attempt and update tracking data accordingly.
 
-        :param court_id: The court_id for which the fetch attempt is being processed.
-        :param skip_status: The SkipStatus response.
-        :param remaining_courts: A dictionary mapping court IDs to lists of pending fetch attempts.
-        :return: None or the corresponding exponential_backoff computed in seconds.
+        Args:
+            court_id: The court_id for which the fetch attempt is being processed.
+            skip_status: The SkipStatus response.
+            remaining_courts: A dictionary mapping court IDs to lists of pending fetch attempts.
+
+        Returns:
+            None or the corresponding exponential_backoff computed in seconds.
         """
         fetch_queue = skip_status.fetch_queue
         fetch_in_progress_court = self.fetches_in_progress.get(court_id)
@@ -461,7 +468,7 @@ class Command(VerboseCommand):
                 return None
 
     def fetch_docs_from_pacer(self) -> None:
-        """Process documents with one fetch per court at a time"""
+        """Process documents with one fetch per court at a time."""
         self.handle_pacer_session()
         remaining_courts = self.courts_with_docs.copy()
         while remaining_courts:

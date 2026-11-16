@@ -5,9 +5,7 @@ from django.utils.functional import cached_property
 
 
 class ESPaginator(Paginator):
-    """
-    Paginator for Elasticsearch hits(results).
-    """
+    """Paginator for Elasticsearch hits(results)."""
 
     def __init__(
         self, total_query_results: int | None, *args: Any, **kwargs: Any

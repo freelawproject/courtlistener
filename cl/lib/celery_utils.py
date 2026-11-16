@@ -30,7 +30,7 @@ def clear_queue(queue_name: str) -> int:
 
 
 def make_queue_name_for_pri(queue: str, pri: int) -> str:
-    """Make a queue name for redis
+    r"""Make a queue name for redis.
 
     Celery uses PRIORITY_SEP to separate different priorities of tasks into
     different queues in Redis. Each queue-priority combination becomes a key
@@ -47,9 +47,12 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
 
       - https://github.com/mher/flower/blob/master/flower/utils/broker.py#L135
 
-    :param queue: The name of the queue to make a name for.
-    :param pri: The priority to make a name with.
-    :return: A name for the queue-priority pair.
+    Args:
+        queue: The name of the queue to make a name for.
+        pri: The priority to make a name with.
+
+    Returns:
+        A name for the queue-priority pair.
     """
     if pri not in DEFAULT_PRIORITY_STEPS:
         raise ValueError("Priority not in priority steps")
@@ -61,8 +64,11 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
 def get_queue_length(queue_name: str = "celery") -> int:
     """Get the number of tasks in a celery queue.
 
-    :param queue_name: The name of the queue you want to inspect.
-    :return: the number of items in the queue.
+    Args:
+        queue_name: The name of the queue you want to inspect.
+
+    Returns:
+        the number of items in the queue.
     """
     priority_names = [
         make_queue_name_for_pri(queue_name, pri)
@@ -83,12 +89,13 @@ class CeleryThrottle:
     ) -> None:
         """Create a throttle to prevent celery runaways.
 
-        :param poll_interval: How long to wait between polling the queue
-        length in seconds, when you know it's greater than the min length.
-        :param min_items: Generally keep the queue longer than this, and
-        always shorter than 2× this value.
+        Args:
+            poll_interval: How long to wait between polling the queue
+                length in seconds, when you know it's greater than the min length.
+            min_items: Generally keep the queue longer than this, and
+                always shorter than 2× this value.
+            queue_name: The name of the queue to throttle.
         """
-
         # These variables are Final, i.e., they're consts.
         self.poll_interval: Final[float] = poll_interval
         self.queue_name: Final[str] = queue_name
@@ -106,7 +113,8 @@ class CeleryThrottle:
     def update_min_items(self, min_value: int) -> None:
         """Update the minimum items and adjust related parameters.
 
-        :param min_value: New minimum items value.
+        Args:
+            min_value: New minimum items value.
         """
         self.min = min_value
         self.max = min_value * 2
@@ -114,7 +122,7 @@ class CeleryThrottle:
         self.shortage = self.max - get_queue_length(self.queue_name)
 
     def maybe_wait(self) -> None:
-        """Make the user wait until the queue is short enough"""
+        """Make the user wait until the queue is short enough."""
         self.shortage -= 1
         if self.shortage > 0:
             # No need to sleep. Add items to the queue.
@@ -139,12 +147,15 @@ def throttle_task[**P, R](
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """A decorator for throttling tasks to a given rate.
 
-    :param rate: The maximum rate that you want your task to run. Takes the
-    form of '1/m', or '10/2h' or similar.
-    :param key: An argument name whose value should be used as part of the
-    throttle key in redis. This allows you to create per-argument throttles by
-    simply passing the name of the argument you wish to key on.
-    :return: The decorated function
+    Args:
+        rate: The maximum rate that you want your task to run. Takes the
+            form of '1/m', or '10/2h' or similar.
+        key: An argument name whose value should be used as part of the
+            throttle key in redis. This allows you to create per-argument throttles by
+            simply passing the name of the argument you wish to key on.
+
+    Returns:
+        The decorated function
     """
 
     def decorator_func(func: Callable[P, R]) -> Callable[P, R]:
@@ -194,9 +205,7 @@ def set_for_next_window(
     schedule_key: str,
     n: datetime,
 ) -> float:
-    """Set the schedule for the next window to start as soon as the current
-    one runs out.
-    """
+    """Set the schedule for the next window to start as soon as the current one runs out."""
     ttl = r.ttl(throttle_key)
     if ttl < 0:
         # Race condition. The key expired (-2) or doesn't have a
@@ -212,7 +221,7 @@ def get_task_wait(
     rate: str = "1/s",
     key: str | None = None,
 ) -> float:
-    """Keep a global throttle for tasks
+    """Keep a global throttle for tasks.
 
     Can be used via the `throttle_task` decorator above.
 
@@ -276,15 +285,18 @@ def get_task_wait(
 
     And so forth.
 
-    :param task: The task that is being checked
-    :param rate: How many times the task can be run during the time period.
-    Something like, 1/s, 2/h or similar.
-    :param key: If given, add this to the key placed in Redis for the item.
-    Typically, this will correspond to the value of an argument passed to the
-    throttled task.
-    :return: If throttled returns a float of how many seconds the task should
-    wait until the next open window for processing. If not throttled, returns
-    zero (i.e., don't wait).
+    Args:
+        task: The task that is being checked
+        rate: How many times the task can be run during the time period.
+            Something like, 1/s, 2/h or similar.
+        key: If given, add this to the key placed in Redis for the item.
+            Typically, this will correspond to the value of an argument passed to the
+            throttled task.
+
+    Returns:
+        If throttled returns a float of how many seconds the task should
+        wait until the next open window for processing. If not throttled, returns
+        zero (i.e., don't wait).
     """
     task_sub_key_suffix = f":{key}" if key else ""
     task_sub_key = f"{task.name}{task_sub_key_suffix}"

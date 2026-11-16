@@ -17,7 +17,9 @@ from cl.search.tasks import remove_documents_by_query
 
 def compose_redis_key_remove_content() -> str:
     """Compose a Redis key for storing the removal action status.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "es_remove_content_from_es:log"
 
@@ -154,10 +156,10 @@ class Command(VerboseCommand):
     ) -> None:
         """Process the queryset that removes non-recap dockets from ES.
 
-        :param items: Iterable of items IDS to process.
-        :param count: Total number of items expected to process.
-        :param chunk_size: The number of items to process in a single chunk.
-        :return: None
+        Args:
+            items: Iterable of items IDS to process.
+            count: Total number of items expected to process.
+            chunk_size: The number of items to process in a single chunk.
         """
         queue = self.options["queue"]
         queue_size = self.options["queue_size"]

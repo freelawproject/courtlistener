@@ -24,13 +24,15 @@ def create_zoho_desk_ticket(
 ) -> None:
     """Create a ticket in Zoho Desk from a contact form submission.
 
-    :param subject: User-provided subject line.
-    :param name: Submitter's full name.
-    :param email: Submitter's email address.
-    :param description: Full rendered body of the form submission.
-    :param request_type: Category label (e.g. "General Support",
-        "Sealing Order").
-    :param assignee_id: Zoho Desk agent ID, or empty for unassigned.
+    Args:
+        self: The bound Celery task.
+        subject: User-provided subject line.
+        name: Submitter's full name.
+        email: Submitter's email address.
+        description: Full rendered body of the form submission.
+        request_type: Category label (e.g. "General Support",
+            "Sealing Order").
+        assignee_id: Zoho Desk agent ID, or empty for unassigned.
     """
     client = ZohoDeskClient()
     client.create_ticket(

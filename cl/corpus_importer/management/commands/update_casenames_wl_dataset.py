@@ -57,11 +57,13 @@ DATE_FORMATS = (
 
 
 def tokenize_case_name(case_name: str) -> set[str]:
-    """Tokenizes case name and removes single-character words except for
-    letters with periods.
+    """Tokenizes case name and removes single-character words except for letters with periods.
 
-    :param case_name: case name to tokenize
-    :return: list of words
+    Args:
+        case_name: case name to tokenize
+
+    Returns:
+        list of words
     """
     words = []
     for word in WORD_PATTERN.findall(case_name):
@@ -74,17 +76,19 @@ def tokenize_case_name(case_name: str) -> set[str]:
 
 
 def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
-    """Compare two case name and decide whether they are the same or not
+    """Compare two case name and decide whether they are the same or not.
 
     Tokenize each string, capturing both words and abbreviations with periods
     and convert all words to lowercase for case-insensitive matching and check
     if there is an overlap between case names
 
-    :param west_case_name: case name from csv
-    :param cl_case_name: case name from cluster
-    :return: True if they match else False
-    """
+    Args:
+        west_case_name: case name from csv
+        cl_case_name: case name from cluster
 
+    Returns:
+        True if they match else False
+    """
     west_set = tokenize_case_name(west_case_name.lower())
     cl_set = tokenize_case_name(cl_case_name.lower())
 
@@ -119,8 +123,11 @@ def parse_date(date_str: str) -> date | None:
     Feb. 28, 2001
     2007-01-24
 
-    :param date_str: date string
-    :return: date object or none
+    Args:
+        date_str: date string
+
+    Returns:
+        date object or none
     """
     for fmt in DATE_FORMATS:
         try:
@@ -134,9 +141,12 @@ def parse_date(date_str: str) -> date | None:
 def parse_citations(citation_strings: list[str]) -> list[dict]:
     """Validate citations with Eyecite.
 
-    :param citation_strings: List of citation strings to validate.
-    :return: List of validated citation dictionaries with volume, reporter, and
-    page.
+    Args:
+        citation_strings: List of citation strings to validate.
+
+    Returns:
+        List of validated citation dictionaries with volume, reporter, and
+        page.
     """
     validated_citations = []
 
@@ -183,18 +193,19 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
 def query_possible_matches(
     valid_citations: list[dict], docket_number: str, date_filed: date
 ) -> QuerySet[Citation]:
-    """Find matches for row data
+    """Find matches for row data.
 
     It will remove duplicates, it could happen if we already have both
     citations, if we have multiple matches, these must be unique
 
-    :param valid_citations: list of FullCaseCitation objects
-    :param docket_number: cleaned docket number from row
-    :param date_filed: formatted filed date from row
+    Args:
+        valid_citations: list of FullCaseCitation objects
+        docket_number: cleaned docket number from row
+        date_filed: formatted filed date from row
 
-    :return: list of matched OpinionCluster
+    Returns:
+        list of matched OpinionCluster
     """
-
     citation_queries = Q()
 
     for citation in valid_citations:
@@ -215,13 +226,15 @@ def query_possible_matches(
 def update_matched_case_name(
     matched_cluster: OpinionCluster, west_case_name: str
 ) -> tuple[bool, bool]:
-    """Update case name of matched cluster and related docket if empty any of
-    them
+    """Update case name of matched cluster and related docket if empty any of them.
 
-    :param matched_cluster: OpinionCluster object
-    :param west_case_name: case name from csv row
-    :return: tuple with boolean values if cluster and related docket case name
-    updated
+    Args:
+        matched_cluster: OpinionCluster object
+        west_case_name: case name from csv row
+
+    Returns:
+        tuple with boolean values if cluster and related docket case name
+        updated
     """
     cluster_case_name_updated = False
     docket_case_name_updated = False
@@ -252,15 +265,15 @@ def process_csv(
     limit: int | None,
     start_row: int,
 ) -> None:
-    """Process rows from csv file
+    """Process rows from csv file.
 
-    :param filepath: path to csv file
-    :param delay: delay between saves in seconds
-    :param dry_run: flag to simulate update process
-    :param limit: limit number of rows to process
-    :param start_row: start row
+    Args:
+        filepath: path to csv file
+        delay: delay between saves in seconds
+        dry_run: flag to simulate update process
+        limit: limit number of rows to process
+        start_row: start row
     """
-
     total_clusters_updated = 0
     total_dockets_updated = 0
     total_citations_added = 0

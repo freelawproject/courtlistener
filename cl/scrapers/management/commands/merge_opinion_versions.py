@@ -58,12 +58,12 @@ def explain_version_differences(
     text_field: str = "plain_text",
     verbose: bool = False,
 ) -> None:
-    """Debugging function to inspect version differences
+    """Debugging function to inspect version differences.
 
-    :param opinions: a list of Opinion objects or ids
-    :param text_field: the field that holds the opinion's content
-    :param verbose: pass True to print all the differences between texts
-    :return None
+    Args:
+        opinions: a list of Opinion objects or ids
+        text_field: the field that holds the opinion's content
+        verbose: pass True to print all the differences between texts
     """
     if isinstance(opinions[0], int):
         opinions = [
@@ -155,10 +155,13 @@ models_that_reference_opinion = [(OpinionJoinedBy, "opinion", "person_id")]
 
 
 def get_separator(name: str) -> str:
-    """Try to find a separator for a list of comma or colon separated names
+    """Try to find a separator for a list of comma or colon separated names.
 
-    :param name: a judge name string
-    :return: a separator string
+    Args:
+        name: a judge name string
+
+    Returns:
+        a separator string
     """
     for sep in ["; ", ";", ", ", ","]:
         if name.count(sep) > 1:
@@ -168,15 +171,18 @@ def get_separator(name: str) -> str:
 
 
 def merge_judge_names(name1: str, name2: str) -> str:
-    """Merge 2 judge name strings while trying to reduce repetition in them
+    """Merge 2 judge name strings while trying to reduce repetition in them.
 
     If a string is contained in another, return the container.
     If they have something in common, merge them
     If there is nothing in common, concatenate them
 
-    :param name1: a name
-    :param name2: another name
-    :return: a merged name
+    Args:
+        name1: a name
+        name2: another name
+
+    Returns:
+        a merged name
     """
     noise = {"judge", "justice", "j", "p", "chief"}
 
@@ -301,15 +307,17 @@ cluster_fields_to_merge = [
 
 
 def get_query_from_url(url: str, url_filter: str) -> Q:
-    """Build an OR query with the alternative to http or https
+    """Build an OR query with the alternative to http or https.
 
-    :param url: the input url
-    :param url_filter: a string that identified a Django filter.
-        Currently supporting
-        - 'startswith'
-        - 'exact', meaning an equality filter
+    Args:
+        url: the input url
+        url_filter: a string that identified a Django filter.
+            Currently supporting
+            - 'startswith'
+            - 'exact', meaning an equality filter
 
-    :return: a Q OR object
+    Returns:
+        a Q OR object
     """
     if url_filter not in ["exact", "startswith"]:
         raise ValueError("`url_filter` must be in [exact, startswith]")
@@ -328,10 +336,13 @@ def get_query_from_url(url: str, url_filter: str) -> Q:
 
 
 def group_opinions_by_url(query: Q) -> QuerySet:
-    """Get duplicate candidates queryset by grouping opinions by `download_url`
+    """Get duplicate candidates queryset by grouping opinions by `download_url`.
 
-    :param query: a Q object to filter the opinions
-    :return: the opinion groups queryset
+    Args:
+        query: a Q object to filter the opinions
+
+    Returns:
+        the opinion groups queryset
     """
     qs = (
         Opinion.objects.filter(query)
@@ -352,12 +363,15 @@ def group_opinions_by_url(query: Q) -> QuerySet:
 def get_same_url_opinions(
     opinion_group: dict, seen_urls: set
 ) -> QuerySet | None:
-    """Given a URL, get a queryset for all opinions with that URL
+    """Given a URL, get a queryset for all opinions with that URL.
 
-    :param opinion_group: a dictionary with a 'download_url' key
-    :param seen_urls: a set to keep track of seen URLs.
-        Useful to skip urls we have already processed
-    :return: a queryset or None
+    Args:
+        opinion_group: a dictionary with a 'download_url' key
+        seen_urls: a set to keep track of seen URLs.
+            Useful to skip urls we have already processed
+
+    Returns:
+        a queryset or None
     """
     standard_url = opinion_group["download_url"].replace("https", "http")
     if standard_url in seen_urls:
@@ -376,10 +390,13 @@ def get_same_url_opinions(
 
 
 def clean_opinion_text(opinion: Opinion) -> str:
-    """Remove noise (HTML tags or extra whitespace) from an opinion's text
+    """Remove noise (HTML tags or extra whitespace) from an opinion's text.
 
-    :param opinion: the opinion
-    :return: the cleaned text
+    Args:
+        opinion: the opinion
+
+    Returns:
+        the cleaned text
     """
     if opinion.html:
         return clean_text(opinion.html, ["html", "all_whitespace"])
@@ -392,11 +409,14 @@ def passes_length_ratio_check(
 ) -> tuple[bool, float]:
     """Check if two texts have comparable lengths before comparing similarity.
 
-    :param text1: first text to compare
-    :param text2: second text to compare
-    :param min_ratio: minimum acceptable ratio of shorter to longer text.
-        Default 0.7 means the shorter text must be at least 70% of the longer.
-    :return: tuple of (passes_check, length_ratio)
+    Args:
+        text1: first text to compare
+        text2: second text to compare
+        min_ratio: minimum acceptable ratio of shorter to longer text.
+            Default 0.7 means the shorter text must be at least 70% of the longer.
+
+    Returns:
+        tuple of (passes_check, length_ratio)
     """
     len1, len2 = len(text1), len(text2)
 
@@ -410,7 +430,7 @@ def passes_length_ratio_check(
 def get_text_similarity(
     text1: str, text2: str
 ) -> tuple[bool, bool, float, float]:
-    """Check if the text from both opinions is the same or very similar
+    """Check if the text from both opinions is the same or very similar.
 
     A single character difference yields a 0.999 ratio
     A single word difference may reduce the similarity a few points,
@@ -420,9 +440,12 @@ def get_text_similarity(
     Note that this in sensible to argument order, so we retry with inverted
     order if the first run fails
 
-    :param text1: a cleaned opinion's text
-    :param text2: another cleaned opinion's text
-    :return: a tuple with:
+    Args:
+        text1: a cleaned opinion's text
+        text2: another cleaned opinion's text
+
+    Returns:
+        a tuple with:
         True in the first member if any of the text similarity ratios was
             greater than the strict threshold
         True in the second member if any of the ratios was greater than the
@@ -456,7 +479,7 @@ def update_referencing_objects(
     main_object: Docket | OpinionCluster | Opinion,
     version_object: Docket | OpinionCluster | Opinion,
 ) -> None:
-    """Make all objects referencing to `version_object` point to `main_object`
+    """Make all objects referencing to `version_object` point to `main_object`.
 
     This way, prevent cascade deletion. Unique constraints are handled:
     - no constraints, a naive update is performed
@@ -467,8 +490,9 @@ def update_referencing_objects(
     their object through a GenericForeignKey, which the generic
     single-FK-field handling above can't account for.
 
-    :param main_object: the main version OpinionCluster or Docket
-    :param version_object: the secondary version OpinionCluster or Docket
+    Args:
+        main_object: the main version OpinionCluster or Docket
+        version_object: the secondary version OpinionCluster or Docket
     """
     if isinstance(main_object, (OpinionCluster, Docket)):
         repoint_notes(main_object, version_object)
@@ -545,13 +569,15 @@ def merge_metadata(
     version_object: Opinion | OpinionCluster | Docket,
     error_on_diff: bool = False,
 ) -> bool:
-    """Merge `fields_to_merge` from `version_object` into `main_object`
+    """Merge `fields_to_merge` from `version_object` into `main_object`.
 
-    :param main_object: the main OpinionCluster or Opinion or Docket
-    :param version_object: the secondary version Opinion, or its OpinionCluster
-    :param error_on_diff: raise an exception if there is an unexpected difference
+    Args:
+        main_object: the main OpinionCluster or Opinion or Docket
+        version_object: the secondary version Opinion, or its OpinionCluster
+        error_on_diff: raise an exception if there is an unexpected difference
 
-    :return: True if the main object was updated and needs to be saved
+    Returns:
+        True if the main object was updated and needs to be saved
     """
     if main_object.id == version_object.id:
         return False
@@ -619,10 +645,10 @@ def merge_metadata(
 
 
 def delete_version_related_objects(version: Opinion) -> None:
-    """Delete objects related to citations that point to the version
+    """Delete objects related to citations that point to the version.
 
-    :param version: the versioned opinion
-    :return None
+    Args:
+        version: the versioned opinion
     """
     # Decrease citation_count of all clusters cited by the version
     cited_clusters = (
@@ -666,17 +692,17 @@ def merge_opinion_versions(
     version_opinion: Opinion,
     strict_merging: bool = False,
 ) -> None:
-    """Merge the version opinion and related objects into the main opinion
+    """Merge the version opinion and related objects into the main opinion.
 
     Currently,this merges Opinion, OpinionClusters and Dockets
     It also changes the references on related objects such as Notes for Cluster
     and a whole list of  `models_that_reference_docket` for Dockets
 
-    :param main_opinion: the main version
-    :param version_opinion: the secondary version
-    :param strict_merging: all metadata fields should be the same on the
-        opinion and cluster for the merge to succeed
-    :return None
+    Args:
+        main_opinion: the main version
+        version_opinion: the secondary version
+        strict_merging: all metadata fields should be the same on the
+            opinion and cluster for the merge to succeed
     """
     logger.info("Merging %s %s", main_opinion, version_opinion)
     update_main_opinion = merge_metadata(
@@ -739,16 +765,16 @@ def merge_opinion_versions(
 def merge_versions_by_download_url(
     url_start: str, limit: int | None = None
 ) -> None:
-    """Get opinion version candidates when they have the exact same download_url
+    """Get opinion version candidates when they have the exact same download_url.
 
     Note that this function applies only to scraped Opinions, which have a
     `download_url` field
 
-    :param url_start: the general domain and directory parts of the URL as
-        found on Opinion.download_url. For example, for `nev` opinions:
-        'http://caseinfo.nvsupreme'
-    :param limit: max number of groups to correct
-    :return None
+    Args:
+        url_start: the general domain and directory parts of the URL as
+            found on Opinion.download_url. For example, for `nev` opinions:
+            'http://caseinfo.nvsupreme'
+        limit: max number of groups to correct
     """
     if url_start:
         query = get_query_from_url(url_start, "startswith")
@@ -785,17 +811,18 @@ def merge_versions_by_download_url(
 
 
 def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
-    """
-    Make sure that the dockets have at least the same court_id and docket number
+    """Make sure that the dockets have at least the same court_id and docket number.
 
     Special case: For New York courts, skip the docket number check since newer
     versions may not have a docket number in the opinion text, which would
     otherwise prevent versioning from working.
 
+    Args:
+        docket: the main docket
+        version_docket: the version docket
 
-    :param docket: the main docket
-    :param version_docket: the version docket
-    :return: True if dockets have the same court_id and docket number
+    Returns:
+        True if dockets have the same court_id and docket number
     """
     # the same docket
     if docket.id == version_docket.id:
@@ -828,14 +855,13 @@ def merge_versions_by_text_similarity(
     versions: QuerySet[Opinion] | list[Opinion],
     stats: dict,
 ) -> None:
-    """Compare text of main and candidate version opinions; merge if similar
+    """Compare text of main and candidate version opinions; merge if similar.
 
-    :param main: the opinion that will be the main version
-    :param versions: a list or queryset of opinions that will be compared
-        to `main_opinion`, in order to decide if they should point to it
-    :param stats: a dictionary to hold stats
-
-    :return: None
+    Args:
+        main_opinion: the opinion that will be the main version
+        versions: a list or queryset of opinions that will be compared
+            to `main_opinion`, in order to decide if they should point to it
+        stats: a dictionary to hold stats
     """
     main_text = clean_opinion_text(main_opinion)
     if not main_text:

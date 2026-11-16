@@ -27,12 +27,14 @@ def build_admin_url(
     model_class: type[Model],
     query_params: dict[str, Any] | None = None,
 ) -> str:
-    """
-    Construct a URL for a given model's admin view, optionally appending query parameters.
+    """Construct a URL for a given model's admin view, optionally appending query parameters.
 
-    :param model_class: The Django model class for which the admin URL will be built.
-    :param query_params: A dictionary of query parameters to append to the URL (e.g. {"docket": 123}).
-    :return: A string representing the fully constructed admin URL, including any query parameters.
+    Args:
+        model_class: The Django model class for which the admin URL will be built.
+        query_params: A dictionary of query parameters to append to the URL (e.g. {"docket": 123}).
+
+    Returns:
+        A string representing the fully constructed admin URL, including any query parameters.
 
     Example usage:
         >>> from cl.search.models import DocketEntry
@@ -64,8 +66,8 @@ class AdminLink(TypedDict):
 def generate_admin_links(
     links: list[AdminLinkConfig],
 ) -> list[AdminLink]:
-    """
-    Construct a list of links with links to given admin views.
+    """Construct a list of links with links to given admin views.
+
     Each link should have the following keys:
     - label: Label for the link.
     - model_class: The Django model class for which the admin URL will be built.
@@ -88,7 +90,7 @@ def generate_admin_links(
 
 
 class IndexedPkSearchMixin:
-    """Search a large table by PK without the admin's varchar cast
+    """Search a large table by PK without the admin's varchar cast.
 
     Django's admin search builds an `icontains` lookup for every entry in
     `search_fields`, casting non-text fields to `CharField` to do so. That cast
@@ -113,12 +115,15 @@ class IndexedPkSearchMixin:
     def get_search_results(
         self, request: HttpRequest, queryset: QuerySet, search_term: str
     ) -> tuple[QuerySet, bool]:
-        """Filter the changelist queryset down to an exact PK match
+        """Filter the changelist queryset down to an exact PK match.
 
-        :param request: The current HTTP request.
-        :param queryset: The changelist queryset to filter.
-        :param search_term: The raw string typed into the search box.
-        :return: Two-tuple of the filtered queryset and whether the caller
+        Args:
+            request: The current HTTP request.
+            queryset: The changelist queryset to filter.
+            search_term: The raw string typed into the search box.
+
+        Returns:
+            Two-tuple of the filtered queryset and whether the caller
             needs to de-duplicate the results (never, here).
         """
         if not search_term:
@@ -133,8 +138,7 @@ class IndexedPkSearchMixin:
 
 
 class SealableDocumentAdmin(admin.ModelAdmin):
-    """Mixin for admin classes that support sealing RECAP documents
-    via a confirmation page and bulk actions.
+    """Mixin for admin classes that support sealing RECAP documents via a confirmation page and bulk actions.
 
     Subclasses must define:
         seal_url_name: URL name for the seal confirmation route
@@ -162,8 +166,11 @@ class SealableDocumentAdmin(admin.ModelAdmin):
     def get_seal_documents(self, obj: Model) -> list | QuerySet:
         """Return the RECAPDocuments to seal for the given object.
 
-        :param obj: The model instance from the confirmation view.
-        :return: List or QuerySet of RECAPDocument instances.
+        Args:
+            obj: The model instance from the confirmation view.
+
+        Returns:
+            List or QuerySet of RECAPDocument instances.
         """
         raise NotImplementedError
 
@@ -201,8 +208,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
     def seal_confirmation_view(
         self, request: HttpRequest, pk: int
     ) -> HttpResponse:
-        """Render a seal confirmation page (GET) or seal selected
-        documents (POST)."""
+        """Render a seal confirmation page (GET) or seal selected documents (POST)."""
         obj = get_object_or_404(self.seal_model, pk=pk)
         documents = self.get_seal_documents(obj)
         heading = self.seal_heading_template.format(pk=pk)
@@ -239,8 +245,9 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         reads doc_ids from request.POST. When called with a queryset (from
         a bulk action), seals those documents directly.
 
-        :param request: The current HTTP request.
-        :param queryset: QuerySet of RECAPDocuments to seal (bulk action).
+        Args:
+            request: The current HTTP request.
+            queryset: QuerySet of RECAPDocuments to seal (bulk action).
         """
         from cl.search.deletion_utils import seal_documents
         from cl.search.models import RECAPDocument

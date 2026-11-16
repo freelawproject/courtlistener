@@ -1,10 +1,9 @@
 import re
 from datetime import datetime
 from os.path import join
-from typing import Any
 
 from django.conf import settings
-from juriscraper.OpinionSite import OpinionSite
+from juriscraper.OpinionSite import ExtractedMetaData, OpinionSite
 
 
 class Site(OpinionSite):
@@ -65,8 +64,8 @@ class Site(OpinionSite):
         path = "//lower_court_judge"
         return [i.text for i in self.html.xpath(path)]
 
-    def extract_from_text(self, scraped_text):
-        metadata: dict[str, str | dict[str, Any]] = {}
+    def extract_from_text(self, scraped_text: str) -> ExtractedMetaData:
+        metadata: ExtractedMetaData = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
         disposition_regex = r"Disposition: (?P<disposition>\w+)"
         citation_regex = r"20\d{2} VT \d+"
@@ -98,5 +97,5 @@ class Site(OpinionSite):
 
     @staticmethod
     def cleanup_content(content):
-        """Implemented just to override OpinionSite.cleanup_content for tests"""
+        """Implemented just to override OpinionSite.cleanup_content for tests."""
         return content

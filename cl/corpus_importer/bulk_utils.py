@@ -10,13 +10,14 @@ from cl.search.models import RECAPDocument
 
 
 def make_bankr_docket_number(docket_number: str, office_code: str) -> str:
-    """Combine the office number and core docket number to make a nice one
+    """Combine the office number and core docket number to make a nice one.
 
     E.g., docket number of 1421168 + office number of 2 becomes '2:14-bk-21168'
 
-    :param docket_number: The docket number from the FJC IDB, as a string of
-    numbers.
-    :param office_code: The office code
+    Args:
+        docket_number: The docket number from the FJC IDB, as a string of
+            numbers.
+        office_code: The office code
     """
     return f"{office_code}:{docket_number[:2]}-bk-{docket_number[-5:]}"
 

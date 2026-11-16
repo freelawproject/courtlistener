@@ -1182,17 +1182,16 @@ class DocketSources:
     def generate_source_group(
         cls, base_source: str, exclude: bool = False
     ) -> list[int]:
-        """Generate a group of source IDs based on the inclusion or exclusion
-        of a base source, selecting those that either include or exclude the
-        specified base source in their names, as determined by the "exclude"
-        parameter.
+        """Generate a group of source IDs based on the inclusion or exclusion of a base source, selecting those that either include or exclude the specified base source in their names, as determined by the "exclude" parameter.
 
-        :param base_source: The base source name to include or exclude.
-        :param exclude: A flag indicating whether to exclude "True" or include
-         "False "the base source.
-        :return: A list of source IDs that match the filtering criteria.
+        Args:
+            base_source: The base source name to include or exclude.
+            exclude: A flag indicating whether to exclude "True" or include
+                "False "the base source.
+
+        Returns:
+            A list of source IDs that match the filtering criteria.
         """
-
         dict_sources = {
             key: value
             for key, value in DocketSources.__dict__.items()
@@ -1279,13 +1278,16 @@ class DocketSources:
 
     @classmethod
     def merge_sources(cls, source1: int, source2: int) -> int:
-        """If one source is included in the other; take the max. If not, sum
+        """If one source is included in the other; take the max. If not, sum.
 
         Use this to merge sources when merging dockets
 
-        :param source1: a DocketSource
-        :param source2: other DocketSource
-        :return: a Docket source which merges the input docket sources
+        Args:
+            source1: a DocketSource
+            source2: other DocketSource
+
+        Returns:
+            a Docket source which merges the input docket sources
         """
         if source1 == source2:
             return source1

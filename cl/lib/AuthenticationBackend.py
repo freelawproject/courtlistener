@@ -37,8 +37,11 @@ def accounts_for_email(email: str) -> QuerySet[User]:
     accounts an address refers to. Callers add their own ordering, limits and
     further filters.
 
-    :param email: The submitted address.
-    :return: A queryset of the accounts holding that address.
+    Args:
+        email: The submitted address.
+
+    Returns:
+        A queryset of the accounts holding that address.
     """
     return (
         filter_by_email(User.objects.all(), email)
@@ -85,11 +88,15 @@ class EmailOrUsernameModelBackend(ModelBackend):
         the email candidates anyway, so registering a username equal to
         somebody's address can't lock that person out of email sign-in.
 
-        :param request: The request being authenticated, if there is one.
-        :param username: What the person typed in the identifier field: a
-        username, an email address, or a User (whose str() is its username).
-        :param password: The submitted password.
-        :return: The matching User, or None if the credentials match nothing.
+        Args:
+            request: The request being authenticated, if there is one.
+            username: What the person typed in the identifier field: a
+                username, an email address, or a User (whose str() is its username).
+            password: The submitted password.
+            **kwargs: Unused.
+
+        Returns:
+            The matching User, or None if the credentials match nothing.
         """
         if username is None:
             username = kwargs.get(User.USERNAME_FIELD)
@@ -139,8 +146,11 @@ class EmailOrUsernameModelBackend(ModelBackend):
     def _get_by_username(self, identifier: str) -> User | None:
         """Look an account up by exact username.
 
-        :param identifier: The submitted identifier.
-        :return: The account with that username, or None.
+        Args:
+            identifier: The submitted identifier.
+
+        Returns:
+            The account with that username, or None.
         """
         try:
             return User.objects.get_by_natural_key(identifier)
@@ -160,11 +170,14 @@ class EmailOrUsernameModelBackend(ModelBackend):
         turn "you never confirmed your address" into a generic "wrong
         credentials", which is less helpful than what people get today.
 
-        :param identifier: The submitted identifier.
-        :param exclude: An account already checked by username, if any, so we
-        don't verify the same password against the same account twice.
-        :return: The candidate accounts, confirmed ones first and, within
-        that, most recently used first.
+        Args:
+            identifier: The submitted identifier.
+            exclude: An account already checked by username, if any, so we
+                don't verify the same password against the same account twice.
+
+        Returns:
+            The candidate accounts, confirmed ones first and, within
+            that, most recently used first.
         """
         # Only an address has candidates, and the query is worth skipping for
         # anything else. This also keeps an empty identifier from matching
@@ -191,8 +204,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
-    """Your average form, but with an additional tweak to ensure that only
-    users with confirmed email addresses can log in.
+    """Your average form, but with an additional tweak to ensure that only users with confirmed email addresses can log in.
 
     This is needed because we create stub accounts for people that donate and
     don't already have accounts. Without this check, people could sign up for
@@ -223,9 +235,12 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         the window: it ends a fixed time after the first attempt in it either
         way, so nobody can hold an account's owner out by continuing to guess.
 
-        :return: The form's cleaned data.
-        :raises forms.ValidationError: If the credentials are wrong, the
-        identifier is over its limit, or the user isn't allowed to log in.
+        Returns:
+            The form's cleaned data.
+
+        Raises:
+            forms.ValidationError: If the credentials are wrong, the
+                identifier is over its limit, or the user isn't allowed to log in.
         """
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
@@ -250,7 +265,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         return self.cleaned_data
 
     def confirm_login_allowed(self, user: AbstractBaseUser) -> None:
-        """Make sure the user is active and has a confirmed email address
+        """Make sure the user is active and has a confirmed email address.
 
         If the given user cannot log in, this method should raise a
         ``forms.ValidationError``.

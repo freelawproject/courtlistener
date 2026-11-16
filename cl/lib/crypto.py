@@ -6,16 +6,19 @@ import uuid
 
 
 def md5(s: bytes | str) -> str:
-    """Return the md5 hexdigest of a string
+    """Return the md5 hexdigest of a string.
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! This algorithm is obsolete for most purposes. Its !
     ! usage is discouraged. Please use SHA256 instead.  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
-    will convert it to bytes first.
-    :return a hexadecimal MD5 hash of the data
+    Args:
+        s: The data to hash. Ideally bytes, but if unicode is passed in, it
+            will convert it to bytes first.
+
+    Returns:
+        a hexadecimal MD5 hash of the data
     """
     if isinstance(s, str):
         s = s.encode()
@@ -32,9 +35,12 @@ def sha1(s: bytes | str) -> str:
     ! usage is discouraged. Please use SHA256 instead.  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
-    will convert it to bytes first.
-    :return: a hexadecimal SHA1 hash of the data
+    Args:
+        s: The data to hash. Ideally bytes, but if unicode is passed in, it
+            will convert it to bytes first.
+
+    Returns:
+        a hexadecimal SHA1 hash of the data
     """
     if isinstance(s, str):
         s = s.encode()
@@ -44,17 +50,20 @@ def sha1(s: bytes | str) -> str:
 
 
 def sha1_of_file(file_path: str, buffer_size: int = 2**16) -> str:
-    """Generate a SHA1 hash of a file in constant memory
+    """Generate a SHA1 hash of a file in constant memory.
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! This algorithm is obsolete for most purposes. Its !
     ! usage is discouraged. Please use SHA256 instead.  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    :param file_path: The path to the file to hash.
-    :param buffer_size: The amount of data to read into memory at a time,
-    default is 64Kb.
-    :return: A hexadecimal SHA1 hash of the file.
+    Args:
+        file_path: The path to the file to hash.
+        buffer_size: The amount of data to read into memory at a time,
+            default is 64Kb.
+
+    Returns:
+        A hexadecimal SHA1 hash of the file.
     """
     sha1sum = hashlib.sha1()
     with open(file_path, "rb") as f:
@@ -67,11 +76,13 @@ def sha1_of_file(file_path: str, buffer_size: int = 2**16) -> str:
 
 
 def sha1_of_json_data(d: bytes | str) -> str:
-    """
-    Generate SHA1 from a python object, stripping whitespace
+    """Generate SHA1 from a python object, stripping whitespace.
 
-    :param d: A string of JSON data
-    :return: A generated SHA1 code.
+    Args:
+        d: A string of JSON data
+
+    Returns:
+        A generated SHA1 code.
     """
     json_as_python = json.loads(d)
     json_without_spaces = json.dumps(json_as_python, separators=(",", ":"))
@@ -79,9 +90,10 @@ def sha1_of_json_data(d: bytes | str) -> str:
 
 
 def generate_activation_key() -> str:
-    """Make an unguessable activation key for confirming a user's email
+    """Make an unguessable activation key for confirming a user's email.
 
-    :return: A 40-character unguessable hex token.
+    Returns:
+        A 40-character unguessable hex token.
     """
     return secrets.token_hex(20)
 
@@ -89,9 +101,12 @@ def generate_activation_key() -> str:
 def sha256(s: bytes | str) -> str:
     """Return the sha256sum of a string.
 
-    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
-    will convert it to bytes first.
-    :return A hexadecimal SHA256 hash of the data
+    Args:
+        s: The data to hash. Ideally bytes, but if unicode is passed in, it
+            will convert it to bytes first.
+
+    Returns:
+        A hexadecimal SHA256 hash of the data
     """
     if isinstance(s, str):
         s = s.encode()
@@ -101,8 +116,9 @@ def sha256(s: bytes | str) -> str:
 
 
 def uuid_hex() -> str:
-    """Generate a UUID4 hex code
+    """Generate a UUID4 hex code.
 
-    :return: A UUID4 hex code
+    Returns:
+        A UUID4 hex code
     """
     return uuid.uuid4().hex

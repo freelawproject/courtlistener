@@ -47,6 +47,6 @@ class WebhookEventFactory(DjangoModelFactory):
 
 
 class WebhookEventWithParentsFactory(WebhookEventFactory):
-    """Make a WebhookEvent with a parent Webhook"""
+    """Make a WebhookEvent with a parent Webhook."""
 
     webhook = SubFactory(WebhookFactory)

@@ -18,8 +18,7 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ReadOnlyModelViewSet):
-    """Read-only: JSONVersions are only ever created server-side, by
-    build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
+    """Read-only: JSONVersions are only ever created server-side, by build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
 
     permission_classes = [
         IsAuthenticated,

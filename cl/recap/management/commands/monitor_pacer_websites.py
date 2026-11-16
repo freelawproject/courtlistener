@@ -13,26 +13,31 @@ from cl.search.models import Court
 
 @retry(requests.RequestException, tries=2, backoff=1)
 def check_and_log_url(session: requests.Session, url: str, timeout: int = 10):
-    """Check if a URL is accessible by sending it a GET request
+    """Check if a URL is accessible by sending it a GET request.
 
-    :param session: A requests.Session object
-    :param url: The URL to check
-    :param timeout: How long to wait for the website to respond
-    :return requests.Response object for the query, assuming it doesn't time
-    out
+    Args:
+        session: A requests.Session object
+        url: The URL to check
+        timeout: How long to wait for the website to respond
+
+    Returns:
+        requests.Response object for the query, assuming it doesn't time
+        out
     """
     return session.get(url, timeout=timeout, verify=False)
 
 
 def check_if_global_outage(session, url, timeout=5):
-    """Use our lambda proxy to see if it's actually down for me or if it's
-    down for everybody
+    """Use our lambda proxy to see if it's actually down for me or if it's down for everybody.
 
-    :param session: A requests.Session object
-    :param url: A URL to check
-    :param timeout: The amount of time the *proxy* should wait (this function
-    will wait a little longer)
-    :return True if unavailable to our proxy, else False.
+    Args:
+        session: A requests.Session object
+        url: A URL to check
+        timeout: The amount of time the *proxy* should wait (this function
+            will wait a little longer)
+
+    Returns:
+        True if unavailable to our proxy, else False.
     """
     api_url = settings.AWS_LAMBDA_PROXY_URL
     response = session.get(
@@ -58,10 +63,11 @@ def make_simple_url(court: Court) -> str:
 
 
 def down_for_only_me(session: requests.Session, url: str) -> bool:
-    """Check if a URL is down just our server, or globally
+    """Check if a URL is down just our server, or globally.
 
-    :return: True if the url is only down for me, or False if entirely up or
-    entirely down.
+    Returns:
+        True if the url is only down for me, or False if entirely up or
+        entirely down.
     """
     try:
         check_and_log_url(session, url)

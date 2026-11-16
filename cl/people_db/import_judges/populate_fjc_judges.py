@@ -424,10 +424,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
 
 
 def make_federal_judge(item, testing=False):
-    """Takes the federal judge data <item> and associates it with a Judge object.
-    Returns a Judge object.
-    """
-
+    """Takes the federal judge data <item> and associates it with a Judge object. Returns a Judge object."""
     date_dob, date_granularity_dob = process_date(
         item["Birth Year"], item["Birth Month"], item["Birth Day"]
     )
@@ -621,9 +618,9 @@ def make_federal_judge(item, testing=False):
 
 @transaction.atomic()
 def make_mag_bk_judge(item, testing=False):
-    """Takes the federal judge data <item> and associates it with a Judge
-    object.  Returns a Judge object.  To be used for importing bankruptcy
-    and magistrate judges.  Example data below:
+    """Takes the federal judge data <item> and associates it with a Judge object.  Returns a Judge object.  To be used for importing bankruptcy and magistrate judges.
+
+     Example data below:
 
     CL_ID: fjc-bk-12
     COURT: AR,E
@@ -638,7 +635,6 @@ def make_mag_bk_judge(item, testing=False):
     START_DATE_GRANULARITY: %Y-%m-%d
     SOURCE: https://www.uscourts.gov/judicial-milestones/phyllis-m-jones
     """
-
     name = "{NAME_FIRST} {NAME_LAST}".format(**item)
     print(f"Now processing: {name}")
 

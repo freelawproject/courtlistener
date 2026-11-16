@@ -252,6 +252,12 @@ PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED = env(
     "PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED", default=False
 )
 
+# SCOTUS content is percolated against the RECAP percolator index, but can
+# be turned on independently of RECAP content.
+PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED", default=False
+)
+
 # The maximum number of attorneys in parties data allowed for percolating a
 # docket after merging parties.
 MAX_ATTORNEYS_TO_PERCOLATE = env("MAX_ATTORNEYS_TO_PERCOLATE", default=50)

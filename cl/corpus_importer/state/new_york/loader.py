@@ -321,10 +321,13 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
         or a list of files, then assume there's some html error and be noisy
         about it.
 
-        :param payload: The docket payload, for naming the docket refused.
-        :param row: The query row, read for the two columns `QUERY` selects
-            alongside the payload.
-        :raises UnusableScrape: If the page attested to neither.
+        Args:
+            payload: The docket payload, for naming the docket refused.
+            row: The query row, read for the two columns `QUERY` selects
+                alongside the payload.
+
+        Raises:
+            UnusableScrape: If the page attested to neither.
         """
         if row["no_files_for_case"] == 1 or row["file_count"]:
             return
@@ -339,8 +342,11 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
     def _content_type(document: dict[str, Any]) -> str:
         """The MIME type to store and to serve a downloaded file under.
 
-        :param document: One file of a filing, as `QUERY` shaped it.
-        :return: The type, or the empty string
+        Args:
+            document: One file of a filing, as `QUERY` shaped it.
+
+        Returns:
+            The type, or the empty string
         """
         kind = document.get("file_type") or ""
         path = document.get("local_path") or ""
@@ -368,12 +374,12 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
     def normalize(
         self, payload: dict[str, Any], row: sqlite3.Row
     ) -> dict[str, Any]:
-        """Name the enum members `QUERY` has no way to state, resolve each
-        file's MIME type, and refuse a docket whose file list did not parse.
+        """Name the enum members `QUERY` has no way to state, resolve each file's MIME type, and refuse a docket whose file list did not parse.
 
-        :raises UnusableScrape: For a docket whose filing detail page carried
-            neither the Court's "no files available for this case" line nor a
-            file table the scraper could read. See `_refuse_unread_file_list`.
+        Raises:
+            UnusableScrape: For a docket whose filing detail page carried
+                neither the Court's "no files available for this case" line nor a
+                file table the scraper could read. See `_refuse_unread_file_list`.
         """
         self._refuse_unread_file_list(payload, row)
         payload["docket_type"] = DocketType.UNKNOWN

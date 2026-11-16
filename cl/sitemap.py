@@ -18,7 +18,7 @@ from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 def make_cache_key(
     request: HttpRequest, section: str, force_page: bool = False
 ) -> str:
-    """Make a Cache key for a URL
+    """Make a Cache key for a URL.
 
     This is a simplified version of django's get_cache_key method, which
     factors in additional things like the method and the headers that were
@@ -27,10 +27,13 @@ def make_cache_key(
 
     Note that only 'p' GET parameter is included in the key.
 
-    :param request: The HttpRequest from the client
-    :param section: The section of the sitemap that is loaded
-    :param force_page: Include page=1 to the cache key by default
-    :return a key that can be used to cache the request
+    Args:
+        request: The HttpRequest from the client
+        section: The section of the sitemap that is loaded
+        force_page: Include page=1 to the cache key by default
+
+    Returns:
+        a key that can be used to cache the request
     """
     # url without query string
     base_url: str = request.build_absolute_uri(escape_uri_path(request.path))
@@ -53,11 +56,10 @@ def cached_sitemap(
     template_name: str = "sitemap.xml",
     content_type: str = "application/xml",
 ) -> HttpResponse:
-    """Copy the django sitemap code, but cache URLs
+    """Copy the django sitemap code, but cache URLs.
 
     See Django documentation for parameter details.
     """
-
     req_protocol = request.scheme
     req_site = get_current_site(request)
 

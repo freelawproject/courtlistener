@@ -25,9 +25,7 @@ BUCKWALD_TAG = "GhkcARCmMnPeDrXqqKTX"
 
 
 def add_all_nysd_to_cl(options):
-    """Alas, there's only one way to get all the cases about a particular
-    judge: Get all the cases in the entire jurisdiction. We do that here using
-    the iquery.pl endpoint.
+    """Alas, there's only one way to get all the cases about a particular judge: Get all the cases in the entire jurisdiction. We do that here using the iquery.pl endpoint.
 
     Once added to the DB we'll ensure they're tagged. In the next step, we'll
     download all the tagged items.
@@ -63,9 +61,7 @@ def add_all_nysd_to_cl(options):
 
 
 def get_dockets(options):
-    """Get the dockets by the particular judge now that we have run iquery
-    for all of the cases in the jurisdiction, and now that we have
-    """
+    """Get the dockets by the particular judge now that we have run iquery for all of the cases in the jurisdiction, and now that we have."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
     session = async_to_sync(log_into_pacer)(

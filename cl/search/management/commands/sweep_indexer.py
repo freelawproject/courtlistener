@@ -33,8 +33,10 @@ r = get_redis_interface("CACHE")
 
 
 def compose_indexer_redis_key() -> str:
-    """Compose the redis key for the sweep indexer
-    :return: A Redis key as a string.
+    """Compose the redis key for the sweep indexer.
+
+    Returns:
+        A Redis key as a string.
     """
     return "es_sweep_indexer:log"
 
@@ -44,12 +46,14 @@ def log_indexer_last_status(
 ) -> Mapping[str, int | str]:
     """Log the sweep indexer last status to Redis.
 
-    :param model_name: The document name being processed.
-    :param document_pk: The last document_id processed.
-    :param chunk_size: The last chunk size being processed.
-    :return: The data logged to redis.
-    """
+    Args:
+        model_name: The document name being processed.
+        document_pk: The last document_id processed.
+        chunk_size: The last chunk size being processed.
 
+    Returns:
+        The data logged to redis.
+    """
     log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
     # Build the documents key containing the documents indexed dynamically.
@@ -73,9 +77,10 @@ def log_indexer_last_status(
 
 def get_last_document_processed() -> tuple[str, int]:
     """Get the last model_name and ID indexed from Redis.
-    :return: The last document name and ID indexed.
-    """
 
+    Returns:
+        The last document name and ID indexed.
+    """
     log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
     model_name = str(stored_values.get("model_name", ""))
@@ -85,12 +90,11 @@ def get_last_document_processed() -> tuple[str, int]:
 
 
 def get_documents_processed_count_and_restart() -> dict[str, int]:
-    """Retrieve the number of documents processed and delete the Redis key to
-     start a new indexing cycle.
+    """Retrieve the number of documents processed and delete the Redis key to start a new indexing cycle.
 
-    :return: A dict containing the number of documents processed of each type.
+    Returns:
+        A dict containing the number of documents processed of each type.
     """
-
     log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
 
@@ -106,13 +110,14 @@ def get_documents_processed_count_and_restart() -> dict[str, int]:
 
 
 def find_starting_model(target_model: str) -> int | None:
-    """Find the index of a model in the list whose name matches the target
-    name.
+    """Find the index of a model in the list whose name matches the target name.
 
-    :param target_model: The name of the model to find.
-    :return: The index of the model if found, otherwise None.
+    Args:
+        target_model: The name of the model to find.
+
+    Returns:
+        The index of the model if found, otherwise None.
     """
-
     try:
         return supported_models.index(target_model)
     except ValueError:
@@ -122,12 +127,14 @@ def find_starting_model(target_model: str) -> int | None:
 def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> int:
     """Retrieve the Elasticsearch document ID according to their es_document.
 
-    :param es_document: The ES document class type.
-    :param instance_id: The DB instance ID related to the ES document.
-    :return: A two-tuple containing the Elasticsearch document ID and the
-    parent ID.
-    """
+    Args:
+        es_document: The ES document class type.
+        instance_id: The DB instance ID related to the ES document.
 
+    Returns:
+        A two-tuple containing the Elasticsearch document ID and the
+        parent ID.
+    """
     if es_document is ESRECAPDocument:
         doc_id = ES_CHILD_ID(instance_id).RECAP
     elif es_document is OpinionDocument:
@@ -140,12 +147,14 @@ def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> int:
 def build_parent_model_queryset(
     app_label: str, last_document_id: int
 ) -> QuerySet:
-    """
-    Build a queryset for the parent model starting from the last document ID.
+    """Build a queryset for the parent model starting from the last document ID.
 
-    :param app_label: The label of the app to which the model belongs.
-    :param last_document_id: The instance ID from which to start the queryset.
-    :return: A QuerySet that retrieves only IDs values.
+    Args:
+        app_label: The label of the app to which the model belongs.
+        last_document_id: The instance ID from which to start the queryset.
+
+    Returns:
+        A QuerySet that retrieves only IDs values.
     """
     model = apps.get_model(app_label)
     query_args: dict[str, int | list[int]] = {"pk__gte": last_document_id}
@@ -199,13 +208,7 @@ class Command(VerboseCommand):
                 break
 
     def execute_sweep_indexer_cycle(self) -> None:
-        """Executes a sweep indexing cycle by processing documents starting
-        from the last processed document, if it's stored, or starting from
-        scratch if the command initiates a new cycle.
-
-        :return: None
-        """
-
+        """Executes a sweep indexing cycle by processing documents starting from the last processed document, if it's stored, or starting from scratch if the command initiates a new cycle."""
         model_name, last_document_id = get_last_document_processed()
         start_model_index = find_starting_model(model_name)
         if start_model_index is not None and last_document_id:
@@ -221,16 +224,14 @@ class Command(VerboseCommand):
     def process_model_stack(
         self, models_stack: list[str], last_document_id: int = 0
     ) -> None:
-        """Processes models names and documents serially for indexing by
-        iterating over the stack of model names.
+        """Processes models names and documents serially for indexing by iterating over the stack of model names.
 
-        :param models_stack: A list of model names to be processed for indexing
-        :param last_document_id: An optional integer indicating the last
-        document ID processed, allowing the command to continue from where it
-        left off. Defaults to 0.
-        :return:None
+        Args:
+            models_stack: A list of model names to be processed for indexing
+            last_document_id: An optional integer indicating the last
+                document ID processed, allowing the command to continue from where it
+                left off. Defaults to 0.
         """
-
         parent: Literal["parent", "child"] = "parent"
         child: Literal["parent", "child"] = "child"
         while models_stack:
@@ -340,20 +341,19 @@ class Command(VerboseCommand):
             Literal["parent", "child"], str, type[ESDocumentType]
         ],
     ) -> None:
-        """Process a queryset and execute tasks based on the specified indexing
-        task_to_use.
+        """Process a queryset and execute tasks based on the specified indexing task_to_use.
 
-        :param items: Iterable of items to process. Items can be a simple
-        iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
-        field changes.
-        :param count: Total number of items expected to process.
-        :param app_label: The app label and model that belongs to the queryset
-        being indexed.
-        :param task_to_use: The name of the celery task to execute.
-        :param task_params: A three tuple containing the task params, the
-        document_type 'parent' or 'child', the Search type and the ES document
-        class.
-        :return: None
+        Args:
+            items: Iterable of items to process. Items can be a simple
+                iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
+                field changes.
+            count: Total number of items expected to process.
+            app_label: The app label and model that belongs to the queryset
+                being indexed.
+            task_to_use: The name of the celery task to execute.
+            task_params: A three tuple containing the task params, the
+                document_type 'parent' or 'child', the Search type and the ES document
+                class.
         """
         testing_mode = self.options.get("testing_mode", False)
         chunk = []

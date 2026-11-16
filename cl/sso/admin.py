@@ -17,8 +17,11 @@ from cl.sso.models import (
 def spreadsheet_safe(value: str) -> str:
     """Stop a spreadsheet from running a CSV cell as a formula.
 
-    :param value: A cell's text.
-    :return: The text, with a leading quote if it starts like a formula.
+    Args:
+        value: A cell's text.
+
+    Returns:
+        The text, with a leading quote if it starts like a formula.
     """
     if value.startswith(("=", "+", "-", "@", "\t", "\r")):
         return f"'{value}"

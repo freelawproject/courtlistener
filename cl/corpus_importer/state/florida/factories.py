@@ -31,9 +31,7 @@ Faker.add_provider(LegalProvider)
 
 
 class _PydanticConstructFactory(Factory):
-    """Builds Pydantic models via ``model_construct`` so factories can use
-    field names directly even though the upstream models declare
-    ``validation_alias``\\es matching the Florida API payload shape."""
+    r"""Builds Pydantic models via ``model_construct`` so factories can use field names directly even though the upstream models declare ``validation_alias``\\es matching the Florida API payload shape."""
 
     class Meta:
         abstract = True

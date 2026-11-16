@@ -24,9 +24,7 @@ TAG = "QAV5K6HU93A67WS6-760"
 
 
 def get_dockets(options):
-    """Download the dockets described in the CSV according to the `tasks`
-    option.
-    """
+    """Download the dockets described in the CSV according to the `tasks` option."""
     f = options["file"]
     reader = csv.DictReader(f)
     q = options["queue"]

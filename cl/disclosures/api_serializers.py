@@ -79,7 +79,7 @@ class PositionSerializer(
     resource_uri = serializers.SerializerMethodField()
 
     def get_resource_uri(self, position: Position) -> str:
-        """Override incorrect resource uri in disclousre-position api
+        """Override incorrect resource uri in disclousre-position api.
 
         This 'hack' is used to correctly generate the resource_uri field
         in the api. Currently django-rest-framework auto-generates the
@@ -88,10 +88,12 @@ class PositionSerializer(
         Here we are simply overriding the incorrect field with the correct one
         by passing in the correct path and id.
 
-        :param position: The position object
-        :return: Corrected resouce_uri
-        """
+        Args:
+            position: The position object
 
+        Returns:
+            Corrected resouce_uri
+        """
         path = f"/api/rest/v3/disclosure-positions/{position.id}/"
         return self.context["request"].build_absolute_uri(path)
 

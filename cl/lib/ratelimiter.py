@@ -44,8 +44,11 @@ def get_viewer_ip(request: HttpRequest) -> str:
     the address itself, as crawler verification does. To count requests, use
     get_ratelimit_ident instead.
 
-    :param request: The HTTP request from the user
-    :return: The address, normalized, with an IPv4-mapped IPv6 address
+    Args:
+        request: The HTTP request from the user
+
+    Returns:
+        The address, normalized, with an IPv4-mapped IPv6 address
         unwrapped to plain IPv4. The empty string when CloudFront didn't send
         the header, as in local development, or sent something that isn't an
         address.
@@ -75,8 +78,11 @@ def get_ratelimit_ident(request: HttpRequest) -> str:
     its /64, the smallest block a client is normally assigned. Otherwise a
     client could rotate through the addresses in its block to dodge a limit.
 
-    :param request: The HTTP request from the user
-    :return: The key, or the empty string when there's no viewer address, as
+    Args:
+        request: The HTTP request from the user
+
+    Returns:
+        The key, or the empty string when there's no viewer address, as
         in local development, where callers need their own fallback.
     """
     if not (ip := get_viewer_ip(request)):
@@ -87,22 +93,29 @@ def get_ratelimit_ident(request: HttpRequest) -> str:
 
 
 def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
-    """A wrapper to get the IP in a ratelimiter
+    """A wrapper to get the IP in a ratelimiter.
 
-    :param group: Unused: The group key from the ratelimiter
-    :param request: The HTTP request from the user
-    :return: A simple key that can be used to throttle the user if needed.
+    Args:
+        group: Unused: The group key from the ratelimiter
+        request: The HTTP request from the user
+
+    Returns:
+        A simple key that can be used to throttle the user if needed.
     """
     return get_ratelimit_ident(request)
 
 
 def get_path_to_make_key(group: str, request: HttpRequest) -> str:
-    """Return a string representing the full path to the requested page. This
-    helper makes a good key to create a global limit to throttle requests.
+    """Return a string representing the full path to the requested page.
 
-    :param group: Unused: The group key from the ratelimiter
-    :param request: The HTTP request from the user
-    :return: A key that can be used to throttle request to a single URL if needed.
+    This helper makes a good key to create a global limit to throttle requests.
+
+    Args:
+        group: Unused: The group key from the ratelimiter
+        request: The HTTP request from the user
+
+    Returns:
+        A key that can be used to throttle request to a single URL if needed.
     """
     return request.path
 
@@ -137,11 +150,14 @@ def make_ratelimiter[
     path here ignores the ``RATELIMIT_EXCEPTION_CLASS`` setting, which we
     don't set.
 
-    :param key: What to count by, as django-ratelimit's ``key`` argument: our
-        key functions take (group, request) and return the string to count.
-    :param rate: A django-ratelimit rate, like "10/m".
-    :param method: Which HTTP methods to count. Defaults to all of them.
-    :return: A decorator to apply to a view.
+    Args:
+        key: What to count by, as django-ratelimit's ``key`` argument: our
+            key functions take (group, request) and return the string to count.
+        rate: A django-ratelimit rate, like "10/m".
+        method: Which HTTP methods to count. Defaults to all of them.
+
+    Returns:
+        A decorator to apply to a view.
     """
     sync_decorator = ratelimit(key=key, rate=rate, method=method)
 
@@ -235,8 +251,7 @@ def ratelimit_deny_list[
 ](
     view: DjangoViewType[P, Request, Response],
 ) -> DjangoViewType[P, Request, Response]:
-    """A wrapper for the ratelimit function that adds an allowlist for approved
-    crawlers.
+    """A wrapper for the ratelimit function that adds an allowlist for approved crawlers.
 
     Works on sync and async views alike. The allowlist check does a pair of
     DNS lookups, so on an async view it runs in a worker thread rather than on
@@ -297,8 +312,11 @@ def host_is_approved(host: str) -> bool:
     would let anyone who registers such a look-alike domain allowlist
     themselves.
 
-    :param host: The hostname from a reverse DNS lookup.
-    :return: True if the host is an approved domain or one of its subdomains.
+    Args:
+        host: The hostname from a reverse DNS lookup.
+
+    Returns:
+        True if the host is an approved domain or one of its subdomains.
     """
     host = host.lower().rstrip(".")
     return any(
@@ -310,8 +328,9 @@ def host_is_approved(host: str) -> bool:
 def get_ratelimit_cache() -> BaseCache:
     """Return the cache backend that the rate limiters count in.
 
-    :return: The cache named by the RATELIMIT_USE_CACHE setting, or the default
-    cache if that setting is unset.
+    Returns:
+        The cache named by the RATELIMIT_USE_CACHE setting, or the default
+        cache if that setting is unset.
     """
     cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     return caches[cache_name]
@@ -325,9 +344,12 @@ def is_verified_crawler(ip: str) -> bool:
     counts as "no" rather than raising: this runs for requests already over
     their limit, and a lookup error there should get a 429, not a 500.
 
-    :param ip: The viewer's exact address, as from get_viewer_ip. A /64 from
-        get_ratelimit_ident has no PTR record and would never match.
-    :return: True if the address belongs to an approved crawler.
+    Args:
+        ip: The viewer's exact address, as from get_viewer_ip. A /64 from
+            get_ratelimit_ident has no PTR record and would never match.
+
+    Returns:
+        True if the address belongs to an approved crawler.
     """
     try:
         host = socket.getfqdn(ip)
@@ -361,8 +383,11 @@ def should_bypass_ratelimit(request: HttpRequest) -> bool:
     Also True when the cache can't be reached: a Redis outage shouldn't turn
     the allowlist into a 500, so it fails open like the rate limit itself.
 
-    :param request: The HTTP request from the user
-    :return: True when the view should run despite the limit, else False.
+    Args:
+        request: The HTTP request from the user
+
+    Returns:
+        True when the view should run despite the limit, else False.
     """
     if not (ip := get_viewer_ip(request)):
         # No CloudFront header, as in local development. There's nothing to
@@ -389,9 +414,7 @@ def should_bypass_ratelimit(request: HttpRequest) -> bool:
 
 
 def parse_rate(rate: str) -> tuple[int, int]:
-    """
-    Given the request rate string, return a two tuple of:
-    <allowed number of requests>, <period of time in seconds>
+    """Given the request rate string, return a two tuple of: <allowed number of requests>, <period of time in seconds>.
 
     Supported forms:
       - "1/s", "60/min", "5000/hour", "100/day" — unit form (uses first letter)
@@ -426,11 +449,14 @@ def make_failed_login_key(identifier: str) -> str:
     username or email doesn't buy a fresh bucket. Hashing keeps the key a fixed,
     cache-safe length and keeps submitted email addresses out of the cache.
 
-    :param identifier: The account identifier submitted on the sign-in form. It
-    is whatever the person typed, not a resolved user, so that attempts against
-    addresses with no account get counted too. Counting only resolved users
-    would turn the throttle into an account-existence oracle.
-    :return: The cache key to count that identifier's failures under.
+    Args:
+        identifier: The account identifier submitted on the sign-in form. It
+            is whatever the person typed, not a resolved user, so that attempts against
+            addresses with no account get counted too. Counting only resolved users
+            would turn the throttle into an account-existence oracle.
+
+    Returns:
+        The cache key to count that identifier's failures under.
     """
     digest = hashlib.blake2s(
         identifier.strip().lower().encode(), digest_size=16
@@ -464,8 +490,11 @@ def count_login_attempt(identifier: str) -> int:
     password gets. A distinct message would tell an attacker they'd found a live
     account.
 
-    :param identifier: The account identifier submitted on the sign-in form.
-    :return: How many attempts are now counted in the current window.
+    Args:
+        identifier: The account identifier submitted on the sign-in form.
+
+    Returns:
+        How many attempts are now counted in the current window.
     """
     if not identifier:
         return 0
@@ -485,8 +514,8 @@ def count_login_attempt(identifier: str) -> int:
 def reset_failed_login_count(identifier: str) -> None:
     """Forget an identifier's failed sign-ins after it authenticates.
 
-    :param identifier: The account identifier submitted on the sign-in form.
-    :return: None
+    Args:
+        identifier: The account identifier submitted on the sign-in form.
     """
     if not identifier:
         return

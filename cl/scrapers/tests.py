@@ -348,7 +348,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
-
         d_1 = DocketFactory(
             case_name="Jeremy v. Julian",
             docket_number="23-232388",
@@ -427,7 +426,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
     def test_scrape_multiple_opinions_per_cluster(
         self, patched_get_opinions_content
     ):
-        """Test if we can ingest multiple opinions per opinion cluster"""
+        """Test if we can ingest multiple opinions per opinion cluster."""
         # Define two opinions for the same cluster
         op1 = {
             "download_urls": "https://example.com/op1.pdf",
@@ -617,7 +616,7 @@ class IngestionTest(TestCase):
         self.assertIn("ideal", txt_opinion.plain_text.lower())
 
     def test_duplicate_ingestion_warnings(self) -> None:
-        """Can we detect duplicate ingestion"""
+        """Can we detect duplicate ingestion."""
         with mock.patch.object(logger, "error") as error_mock:
             check_duplicate_ingestion("pdf/2025/06/05/state_v._walsh_1.pdf")
             error_mock.assert_not_called()
@@ -628,16 +627,13 @@ class IngestionTest(TestCase):
 
 
 class ExtractFormattedTextSanitizationTest(TestCase):
-    """Tests that extract_formatted_text_document_base scrubs content
-    that PostgreSQL won't accept (e.g. NUL bytes) before saving."""
+    """Tests that extract_formatted_text_document_base scrubs content that PostgreSQL won't accept (e.g. NUL bytes) before saving."""
 
     @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
     def test_nul_bytes_in_extracted_content_are_stripped(
         self, microservice_mock
     ):
-        """Does extraction strip NUL bytes so the save does not raise
-        DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
-        """
+        """Does extraction strip NUL bytes so the save does not raise DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?"""
         texas_document = TexasDocumentFactory.create()
         texas_document.filepath_local.save(
             "document.pdf", ContentFile(b"document")
@@ -671,9 +667,7 @@ class ExtractFormattedTextSanitizationTest(TestCase):
 
 
 class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
-    """Tests that extract_formatted_text_document_base doesn't hold a
-    database connection open while it waits on Doctor. Idle connections get
-    dropped during long extractions and the final save then fails.
+    """Tests that extract_formatted_text_document_base doesn't hold a database connection open while it waits on Doctor. Idle connections get dropped during long extractions and the final save then fails.
 
     A TransactionTestCase is needed because inside a test transaction the
     release is deliberately a no-op.
@@ -683,8 +677,7 @@ class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
     def test_db_connection_is_released_before_calling_doctor(
         self, microservice_mock
     ) -> None:
-        """Is the DB connection closed when Doctor is called, and reopened
-        for the save afterwards?"""
+        """Is the DB connection closed when Doctor is called, and reopened for the save afterwards?"""
         texas_document = TexasDocumentFactory.create()
         texas_document.filepath_local.save(
             "document.pdf", ContentFile(b"document")
@@ -780,8 +773,7 @@ class DupcheckerTest(TestCase):
             dup_checker.url_hash.delete()
 
     def test_abort_on_unchanged_court_website(self) -> None:
-        """Similar to the above, but we create a UrlHash object before
-        checking if it exists."""
+        """Similar to the above, but we create a UrlHash object before checking if it exists."""
         site = test_opinion_scraper.Site()
         site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
@@ -801,9 +793,7 @@ class DupcheckerTest(TestCase):
             dup_checker.url_hash.delete()
 
     def test_abort_on_changed_court_website(self) -> None:
-        """Similar to the above, but we create a UrlHash with a different
-        hash before checking if it exists.
-        """
+        """Similar to the above, but we create a UrlHash with a different hash before checking if it exists."""
         site = test_opinion_scraper.Site()
         site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
@@ -906,9 +896,7 @@ class DupcheckerPressOnTest(TestCase):
             pass  # expected behavior
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
-        """Do we raise the appropriate exception when a duplicate is found
-        and we account for case dates?
-        """
+        """Do we raise the appropriate exception when a duplicate is found and we account for case dates?"""
         self.dc_not_full_crawl.reset()
         self.dc_full_crawl.reset()
 
@@ -985,7 +973,7 @@ class AudioFileTaskTest(TestCase):
             )
 
     def test_audio_conversion(self) -> None:
-        """Can we convert wav to audio and update the metadata"""
+        """Can we convert wav to audio and update the metadata."""
         audio_obj = Audio.objects.get(pk=self.audio2.id)
         audio_data = {
             "court_full_name": audio_obj.docket.court.full_name,
@@ -1049,7 +1037,7 @@ class ScraperContentTypeTest(TestCase):
 
     @mock.patch("httpx.AsyncClient.get")
     async def test_no_content_type(self, mock_get):
-        """Test for no content type expected (ie. Montana)"""
+        """Test for no content type expected (ie. Montana)."""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = None
 
@@ -1059,10 +1047,7 @@ class ScraperContentTypeTest(TestCase):
 
 
 class ScrapeCitationsTest(TestCase):
-    """This class only tests the update of existing clusters
-    Since the ingestion of new clusters and their citations call
-    super().scrape_court(), it should be tested in the superclass
-    """
+    """This class only tests the update of existing clusters Since the ingestion of new clusters and their citations call super().scrape_court(), it should be tested in the superclass."""
 
     def setUp(self):
         keys = [
@@ -1098,7 +1083,7 @@ class ScrapeCitationsTest(TestCase):
         OpinionFactory(sha1=self.hash, cluster=self.cluster)
 
     def test_citation_scraper(self):
-        """Test if citation scraper creates a citation or ignores duplicates"""
+        """Test if citation scraper creates a citation or ignores duplicates."""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
         with (
             mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
@@ -1117,10 +1102,11 @@ class ScrapeCitationsTest(TestCase):
 
 
 class ScraperDocketMatchingTest(TestCase):
-    """Docket matching behaves differently depending on court jurisdiction
+    """Docket matching behaves differently depending on court jurisdiction.
+
     - Federal courts use `docket_number_core`
     - State courts do not
-    - There are also special cases such as ohioctapp
+    - There are also special cases such as ohioctapp.
 
     Also, test if we can detect when a docket match has a
     case_name to different than the incoming case_name
@@ -1172,8 +1158,7 @@ class ScraperDocketMatchingTest(TestCase):
         )
 
     def test_get_existing_docket(self):
-        """Can we get an existing docket if it exists,
-        or None if it doesn't?
+        """Can we get an existing docket if it exists, or None if it doesn't?
 
         Can we handle special cases like ohioctapp and
         multi-docket docket numbers without semicolons?
@@ -1246,10 +1231,7 @@ class ScraperDocketMatchingTest(TestCase):
             )
 
     def test_federal_jurisdictions(self):
-        """These courts should follow the flow that uses
-        cl.recap.mergers.find_docket_object and relies on
-        Docket.docket_number_core
-        """
+        """These courts should follow the flow that uses cl.recap.mergers.find_docket_object and relies on Docket.docket_number_core."""
         docket = update_or_create_docket(
             "Garbutt v Conway", "", self.ca2, "10-1039", Docket.SCRAPER, False
         )
@@ -1258,9 +1240,7 @@ class ScraperDocketMatchingTest(TestCase):
         )
 
     def test_does_not_unblock_existing_docket(self) -> None:
-        """Matching an existing docket should never unblock it, nor
-        overwrite its original date_blocked. It may block an unblocked one
-        """
+        """Matching an existing docket should never unblock it, nor overwrite its original date_blocked. It may block an unblocked one."""
         original_date = date(2020, 1, 1)
         new_date = date(2024, 1, 1)
         cases = [
@@ -1337,7 +1317,7 @@ class ScraperDocketMatchingTest(TestCase):
 
 
 class UpdateFromTextCommandTest(TestCase):
-    """Test the input processing and DB querying for the command"""
+    """Test the input processing and DB querying for the command."""
 
     def setUp(self):
         self.vt = CourtFactory(id="vt")
@@ -1390,7 +1370,6 @@ class UpdateFromTextCommandTest(TestCase):
 
     def test_inputs(self):
         """Do all command inputs work properly?"""
-
         # will target a single opinion, for which extract_from_text
         # extracts no metadata. No object should be updated
         cmd = update_from_text.Command()
@@ -1474,7 +1453,7 @@ class UpdateFromTextCommandTest(TestCase):
 
 class CommandInputTest(TestCase):
     def test_get_module_by_court_id(self):
-        """Test if get_module_by_court_id helper is working properly"""
+        """Test if get_module_by_court_id helper is working properly."""
         try:
             get_module_by_court_id("lactapp", "opinions")
             self.fail("Court id matches more than 1 Site object, should fail")
@@ -1931,8 +1910,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
     def test_cluster_source_merging_base_plus_base(self):
-        """Merging two base ClusterSources produces the explicit
-        combination."""
+        """Merging two base ClusterSources produces the explicit combination."""
         test_cases = (
             # (source1, source2, expected)
             # Same source returns itself
@@ -2006,8 +1984,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
                 )
 
     def test_cluster_source_merging_composite_plus_base(self):
-        """Merging a composite ClusterSource with a base source produces the
-        explicit combination."""
+        """Merging a composite ClusterSource with a base source produces the explicit combination."""
         test_cases = (
             # (composite, base, expected)
             # Three-char combinations from composite + base
@@ -2159,8 +2136,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             self.assertEqual(merge_judge_names(str1, str2), expected_result)
 
     def test_transitive_redirection(self):
-        """Can we keep existing ClusterRedirections when its target cluster is
-        versioned?"""
+        """Can we keep existing ClusterRedirections when its target cluster is versioned?"""
         to_keep = OpinionClusterWithParentsFactory.create(id=99999)
         to_delete = OpinionClusterWithParentsFactory.create(id=888888)
         existing_redirection_id = 77777
@@ -2273,9 +2249,7 @@ class DeleteVersionRelatedObjectsTest(TestCase):
     """Tests for the delete_version_related_objects helper."""
 
     def test_decrement_clamps_at_zero(self):
-        """citation_count must not go negative when a version is deleted
-        from a cluster whose count is already 0. See #7393
-        """
+        """citation_count must not go negative when a version is deleted from a cluster whose count is already 0. See #7393."""
         cited_cluster = OpinionClusterWithParentsFactory.create(
             citation_count=0
         )
@@ -2303,10 +2277,7 @@ class UpdateReferencingObjectsNotesTest(TestCase):
     """
 
     def test_repoints_notes(self):
-        """Every user's Note on the version object is moved onto the main
-        one, instead of being left behind to be lost when the version is
-        deleted.
-        """
+        """Every user's Note on the version object is moved onto the main one, instead of being left behind to be lost when the version is deleted."""
         for factory in (DocketFactory, OpinionClusterWithParentsFactory):
             with self.subTest(model=factory._meta.model.__name__):
                 main_object = factory.create()
@@ -2325,9 +2296,7 @@ class UpdateReferencingObjectsNotesTest(TestCase):
                     self.assertEqual(note.content_type, content_type)
 
     def test_leaves_version_note_when_main_already_has_one(self):
-        """If the same user already has a Note on the main docket, the
-        version docket's Note is left where it is.
-        """
+        """If the same user already has a Note on the main docket, the version docket's Note is left where it is."""
         main_docket = DocketFactory.create()
         version_docket = DocketFactory.create()
         user = UserWithChildProfileFactory.create()
@@ -2434,7 +2403,7 @@ class DeleteDuplicatesTest(TestCase):
         )
 
     def test_same_hash_duplicate_deletion(self):
-        """Test that we can delete same hash duplicates
+        """Test that we can delete same hash duplicates.
 
         - confirm deletion
         - confirm ClusterDuplication is created, with proper values
@@ -2473,7 +2442,7 @@ class DeleteDuplicatesTest(TestCase):
             self.fail("`should_not_merge` should still exist")
 
     def test_cleanup_content_method(self):
-        """Can we delete different hash duplicates using the `cleanup_content` method"""
+        """Can we delete different hash duplicates using the `cleanup_content` method."""
         stats = defaultdict(lambda: 0)
         site = test_opinion_scraper.Site()
         with mock.patch(
@@ -2510,7 +2479,7 @@ class DeleteDuplicatesTest(TestCase):
         )
 
     def test_delete_by_text_comparison(self):
-        """Test that we can delete opinions by text comparison"""
+        """Test that we can delete opinions by text comparison."""
         stats = defaultdict(lambda: 0)
 
         delete_duplicates.delete_by_text_comparison(stats, "coloctapp")
@@ -2745,7 +2714,7 @@ class SubscribeToSCOTUSTest(TestCase):
 
 class SetOrderingKeysTest(SimpleTestCase):
     def test_set_ordering_keys(self):
-        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions"""
+        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions."""
         opinions_content = [
             (
                 {"types": "030concurrence", "download_urls": "url1"},
@@ -2837,8 +2806,7 @@ class TexasCaseMailIntegrationTest(TestCase):
         mock_storage_cls,
         mock_httpx_get,
     ):
-        """Test the complete flow from endpoint POST through task
-        execution to successful EPQ update."""
+        """Test the complete flow from endpoint POST through task execution to successful EPQ update."""
         fake_docket_html = "hi"
 
         mock_storage = mock_storage_cls.return_value

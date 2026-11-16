@@ -65,8 +65,7 @@ class CitationRedirectorForm(forms.Form):
 
 
 class DocketEntryFilterForm(forms.Form):
-    """Filters and sorts the entries shown on a docket page, bound to the
-    request's GET params."""
+    """Filters and sorts the entries shown on a docket page, bound to the request's GET params."""
 
     ASCENDING = "asc"
     DESCENDING = "desc"
@@ -155,7 +154,7 @@ class DocketEntryFilterForm(forms.Form):
 
 
 class BaseCourtUploadForm(forms.Form):
-    """Base form to be used with court uploads
+    """Base form to be used with court uploads.
 
     Here we define the minimum required fields and some methods to add extra fields,
     in case of require something special those can be redefined on each court form.
@@ -216,9 +215,7 @@ class BaseCourtUploadForm(forms.Form):
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
     def clean(self) -> dict[str, Any] | None:
-        """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class:
-        these render with the `safe` filter wherever case metadata is shown).
-        """
+        """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class: these render with the `safe` filter wherever case metadata is shown)."""
         cleaned_data = super().clean()
         if cleaned_data is None:
             return None
@@ -228,10 +225,10 @@ class BaseCourtUploadForm(forms.Form):
         return cleaned_data
 
     def add_author_field(self, required: bool = False) -> None:
-        """Add author field to form
+        """Add author field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["lead_author"] = forms.ModelChoiceField(
             queryset=Person.objects.none(),
@@ -247,10 +244,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_author_str_field(self, required: bool = True) -> None:
-        """Add author str field to form
+        """Add author str field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["author_str"] = forms.CharField(
             label="Author String",
@@ -266,10 +263,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_judges_field(self, required: bool = True) -> None:
-        """Add judges field to form
+        """Add judges field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["judges"] = forms.CharField(
             label="Judges",
@@ -285,10 +282,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_panel_field(self, required: bool = True) -> None:
-        """Add panel field to form
+        """Add panel field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["panel"] = forms.ModelMultipleChoiceField(
             queryset=Person.objects.none(),
@@ -305,10 +302,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_argue_fields(self, required: bool = True) -> None:
-        """Add argued/reargued field to form
+        """Add argued/reargued field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["date_argued"] = forms.DateField(
             label="Argued Date",
@@ -336,10 +333,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_citation_fields(self, required: bool = True) -> None:
-        """Add citations fields to form
+        """Add citations fields to form.
 
-        :param required: fields are required or not
-        :return: None
+        Args:
+            required: fields are required or not
         """
         self.fields["cite_volume"] = forms.IntegerField(
             label="Cite Year",
@@ -365,10 +362,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_download_url(self, required: bool = False) -> None:
-        """Add download url field to form
+        """Add download url field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["download_url"] = forms.URLField(
             validators=[URLValidator()],
@@ -386,18 +383,18 @@ class BaseCourtUploadForm(forms.Form):
 
     @staticmethod
     def person_label(obj: Person) -> str:
-        """Get person full name
+        """Get person full name.
 
-        :param obj: Person object
-        :return: person full name
+        Args:
+            obj: Person object
+
+        Returns:
+            person full name
         """
         return obj.name_full
 
     def make_panel(self) -> None:
-        """Build panel from lead_author and panel field
-
-        :return: None
-        """
+        """Build panel from lead_author and panel field."""
         if not self.cleaned_data.get("panel") and self.cleaned_data.get(
             "lead_author"
         ):
@@ -407,9 +404,10 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data["panel"] = self.cleaned_data.get("panel", [])
 
     def get_judges_qs(self) -> QuerySet[Person]:
-        """Get judges from specific court
+        """Get judges from specific court.
 
-        :return: list of judges from specific court
+        Returns:
+            list of judges from specific court
         """
         return Person.objects.filter(
             positions__court_id=self.pk,
@@ -418,10 +416,7 @@ class BaseCourtUploadForm(forms.Form):
         ).order_by("name_first")
 
     def set_judges_qs(self) -> None:
-        """Set Person queryset for panel/judge fields
-
-        :return: None
-        """
+        """Set Person queryset for panel/judge fields."""
         judges_qs = self.get_judges_qs()
 
         for field_name in [
@@ -436,10 +431,7 @@ class BaseCourtUploadForm(forms.Form):
                 field.label_from_instance = self.person_label
 
     def validate_neutral_citation(self) -> None:
-        """Validate if we already have the neutral citation in the system
-
-        :return: None
-        """
+        """Validate if we already have the neutral citation in the system."""
         volume = self.cleaned_data.get("cite_volume")
         reporter = self.cleaned_data.get("cite_reporter")
         page = self.cleaned_data.get("cite_page")
@@ -463,14 +455,17 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
     def clean_pdf_upload(self) -> bytes:
-        """Check the upload is a PDF we don't already have
+        """Check the upload is a PDF we don't already have.
 
         The field's validators cover the file's extension and size, but the
         uploader picks the extension, so check the contents too before
         reading the file into memory.
 
-        :return: pdf data
-        :raises ValidationError: If the file isn't a PDF.
+        Returns:
+            pdf data
+
+        Raises:
+            ValidationError: If the file isn't a PDF.
         """
         pdf_file = self.cleaned_data["pdf_upload"]
         if not content_is_pdf(pdf_file):
@@ -494,10 +489,7 @@ class BaseCourtUploadForm(forms.Form):
         return pdf_data
 
     def make_item_dict(self) -> None:
-        """Make item dictionary for adding to our DB
-
-        :return: None
-        """
+        """Make item dictionary for adding to our DB."""
         lead_author = self.cleaned_data.get("lead_author")
 
         judges_list = [
@@ -534,9 +526,9 @@ class BaseCourtUploadForm(forms.Form):
     def save(self) -> OpinionCluster:
         """Save court decision data to db.
 
-        :return: Cluster
+        Returns:
+            Cluster
         """
-
         self.make_panel()
         self.make_item_dict()
 
@@ -590,7 +582,7 @@ class BaseCourtUploadForm(forms.Form):
 
 
 class MeCourtUploadForm(BaseCourtUploadForm):
-    """Form for Supreme Judicial Court of Maine (me) Upload Portal"""
+    """Form for Supreme Judicial Court of Maine (me) Upload Portal."""
 
     def get_judges_qs(self) -> QuerySet[Person]:
         return (
@@ -666,8 +658,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
 
 
 class TennWorkCompClUploadForm(BaseCourtUploadForm):
-    """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl)
-    Upload Portal"""
+    """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl) Upload Portal."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -700,8 +691,7 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
 
 
 class TennWorkCompAppUploadForm(BaseCourtUploadForm):
-    """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp)
-    Upload Portal"""
+    """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp) Upload Portal."""
 
     second_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
@@ -778,7 +768,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
 
 
 class MoCourtUploadForm(BaseCourtUploadForm):
-    """Form for Missouri Upload Portal
+    """Form for Missouri Upload Portal.
 
     Missouri Supreme Court [mo]
     Missouri Court of Appeals, Eastern District [moctapped]
@@ -820,7 +810,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
 
 
 class MissCourtUploadForm(BaseCourtUploadForm):
-    """Form for Mississippi Upload Portal
+    """Form for Mississippi Upload Portal.
 
     Mississippi Supreme Court [miss]
     Mississippi Court of Appeals [missctapp]

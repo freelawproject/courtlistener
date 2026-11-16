@@ -30,7 +30,7 @@ class THUMBNAIL_STATUSES:
 
 
 class AbstractDateTimeModel(models.Model):
-    """An abstract base class for most models"""
+    """An abstract base class for most models."""
 
     date_created = models.DateTimeField(
         help_text="The moment when the item was created.",
@@ -49,7 +49,7 @@ class AbstractDateTimeModel(models.Model):
 
 
 class AbstractPDF(models.Model):
-    """An abstract model to hold PDF-related information"""
+    """An abstract model to hold PDF-related information."""
 
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
@@ -124,9 +124,7 @@ class AbstractPDF(models.Model):
 
     @abstractmethod
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Return the storage path for this document, or for its thumbnail
-        when `thumbs` is True. Used by the `upload_to` callbacks on
-        `filepath_local` and `thumbnail`.
+        """Return the storage path for this document, or for its thumbnail when `thumbs` is True. Used by the `upload_to` callbacks on `filepath_local` and `thumbnail`.
 
         Django's `ModelBase` is not `ABCMeta`, so the decorator documents the
         contract and lets MyPy enforce it, but nothing stops a subclass at
@@ -168,7 +166,7 @@ class AbstractJSON(AbstractFile):
 
 
 class Note(AbstractDateTimeModel):
-    """An polymorphic field that can be used to add notes to most objects"""
+    """An polymorphic field that can be used to add notes to most objects."""
 
     date_entered = models.DateTimeField(
         help_text="The datetime when the note was entered",

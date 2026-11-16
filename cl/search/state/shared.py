@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class DocketEntryType:
-    """
-    Represents the type of docket entries. Mirror of Juriscraper `DocketEntryType` enum.
-    """
+    """Represents the type of docket entries. Mirror of Juriscraper `DocketEntryType` enum."""
 
     UNKNOWN = 0
     """A docket entry whose type cannot be determined."""
@@ -76,13 +74,16 @@ class CourtRefused(Exception):
     URL usually downloads once the block lifts. Download tasks retry on this
     exception with a long backoff instead of giving up on the document.
 
-    :ivar model_name: The document model that was being downloaded.
-    :ivar pk: The primary key of the document.
-    :ivar url: The URL that was refused. This is the endpoint that turned us
-        away, which for gated courts may be the challenge endpoint rather than
-        the document itself."""
+    Attributes:
+        model_name: The document model that was being downloaded.
+        pk: The primary key of the document.
+        url: The URL that was refused. This is the endpoint that turned us
+            away, which for gated courts may be the challenge endpoint rather
+            than the document itself.
+    """
 
     def __init__(self, model_name: str, pk: int, url: str) -> None:
+        """Record which document was refused, and at which URL."""
         # All constructor arguments go to the base class so the exception
         # pickles, which Celery needs to report a failed task.
         super().__init__(model_name, pk, url)
@@ -96,8 +97,11 @@ class CourtRefused(Exception):
 
 @document_model
 class AbstractStateDocument(AbstractPDF):
+    """Abstract state document.
+
+    Attributes:
+        processing_error: The processing error for the document, if any.
     """
-    :ivar processing_error: The processing error for the document, if any."""
 
     if TYPE_CHECKING:
         # Every state document points at its state's docket entry model, so
@@ -118,8 +122,8 @@ class AbstractStateDocument(AbstractPDF):
         The default implementation returns the `url` column unchanged, but it can be overridden for states like Florida that
         require a proof-of-work token to fetch documents. Returns `None`, after logging why, if we failed to construct a URL
         and therefore shouldn't attempt downloading anything. Overrides may also raise; `download` logs the error itself in
-        that case and skips the document either way."""
-
+        that case and skips the document either way.
+        """
         return self.url
 
     def path_date_filed(self) -> date | None:
@@ -148,12 +152,17 @@ class AbstractStateDocument(AbstractPDF):
         when missing. Only the extension of `filename` survives, since state
         scrapers serve several formats (TAMES .html/.wpd/.mp3, ACIS .tiff).
 
-        :param filename: The filename Django hands to the `upload_to` callback.
-        :param thumbs: Whether to return the thumbnail path instead.
-        :return: The path to store the document at, relative to the bucket
+        Args:
+            filename: The filename Django hands to the `upload_to` callback.
+            thumbs: Whether to return the thumbnail path instead.
+
+        Returns:
+            The path to store the document at, relative to the bucket
             root.
-        :raises ValueError: If the document hasn't been saved yet; its pk is
-            part of the name.
+
+        Raises:
+            ValueError: If the document hasn't been saved yet; its pk is
+                part of the name.
         """
         if self.pk is None:
             raise ValueError(
@@ -186,11 +195,13 @@ class AbstractStateDocument(AbstractPDF):
 
     @classmethod
     def written_since(cls, since: datetime) -> QuerySet[Self]:
-        """Documents of this model written since `since` that carry no
-        extracted text.
+        """Documents of this model written since `since` that carry no extracted text.
 
-        :param since: The moment to count from.
-        :return: The documents still missing their text.
+        Args:
+            since: The moment to count from.
+
+        Returns:
+            The documents still missing their text.
         """
         extensions = Q()
         for extension in cls.extractable_extensions():
@@ -203,20 +214,23 @@ class AbstractStateDocument(AbstractPDF):
 
     @classmethod
     def unextracted(cls, since: datetime) -> QuerySet[Self]:
-        """Documents that have not been OCRed but have been modified
-        since provided datetime.
+        """Documents that have not been OCRed but have been modified since provided datetime.
 
-        :param since: The moment to count from.
-        :return: The documents nothing has yet tried and failed to read.
+        Args:
+            since: The moment to count from.
+
+        Returns:
+            The documents nothing has yet tried and failed to read.
         """
         return cls.written_since(since).exclude(ocr_status=cls.OCR_FAILED)
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
 
-        :param content: The file content to validate.
-        :param extension: The file extension of the content."""
-
+        Args:
+            content: The file content to validate.
+            extension: The file extension of the content.
+        """
         return None
 
     async def fetch_page_count(self) -> int | None:
@@ -231,8 +245,12 @@ class AbstractStateDocument(AbstractPDF):
     def extract(self, queue: str = "celery") -> bool:
         """Run the OCR extraction task for this document.
 
-        :param queue: The queue to use for the extraction task.
-        :return: True if dispatch occurred, else False."""
+        Args:
+            queue: The queue to use for the extraction task.
+
+        Returns:
+            True if dispatch occurred, else False.
+        """
         from cl.scrapers.tasks import extract_formatted_text_document
 
         if (
@@ -280,16 +298,20 @@ class AbstractStateDocument(AbstractPDF):
     def download(
         cls, pk: int, extract: bool = True, queue: str = "celery"
     ) -> Self | None:
-        """Download the document from the URL, save it to a local file. Returns the document if download was
-        successful and `None` otherwise.
+        """Download the document from the URL, save it to a local file.
 
-        Raises `CourtRefused` when the court answers with 403, since that is
-        a transient block the calling task should retry later rather than a
-        failure of this document.
+        Returns the document if download was successful and `None` otherwise.
 
-        :param pk: The primary key of the document to download.
-        :param extract: Whether to extract the document after downloading.
-        :param queue: The queue to use for the extraction task."""
+        Args:
+            pk: The primary key of the document to download.
+            extract: Whether to extract the document after downloading.
+            queue: The queue to use for the extraction task.
+
+        Raises:
+            CourtRefused: When the court answers with 403, since that is a
+                transient block the calling task should retry later rather
+                than a failure of this document.
+        """
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
         from cl.corpus_importer.tasks import download_document_in_stream
@@ -366,16 +388,19 @@ class AbstractStateDocument(AbstractPDF):
         extract: bool,
         queue: str,
     ) -> Self | None:
-        """Validate a downloaded file and save it onto `document`. Returns the
-        document on success and `None` if there was nothing to store or the
-        file was rejected.
+        """Validate a downloaded file and save it onto `document`.
 
-        :param document: The document the file belongs to.
-        :param url: The URL the file was fetched from, for logging.
-        :param result: The temporary file and its SHA-1 as yielded by
-            `download_document_in_stream`, or `None` if the download failed.
-        :param extract: Whether to dispatch text extraction after saving.
-        :param queue: The queue to use for the extraction task."""
+        Returns the document on success and `None` if there was nothing to
+        store or the file was rejected.
+
+        Args:
+            document: The document the file belongs to.
+            url: The URL the file was fetched from, for logging.
+            result: The temporary file and its SHA-1 as yielded by
+                `download_document_in_stream`, or `None` if the download failed.
+            extract: Whether to dispatch text extraction after saving.
+            queue: The queue to use for the extraction task.
+        """
         # Imported here to avoid a circular import; see `download`.
         from cl.scrapers.utils import get_extension
 

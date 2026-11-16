@@ -11,7 +11,8 @@ def fetchall_as_dict(cursor: CursorWrapper) -> list[dict]:
 
     From: https://docs.djangoproject.com/en/3.0/topics/db/sql/#executing-custom-sql-directly
 
-    :param cursor: The cursor that you wish to query
+    Args:
+        cursor: The cursor that you wish to query
     """
     columns = [col[0] for col in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -20,11 +21,10 @@ def fetchall_as_dict(cursor: CursorWrapper) -> list[dict]:
 def log_db_connection_info(model_name: str, instance_id: int) -> None:
     """Log connection information for the current database session.
 
-    :param model_name: The name of the model being logged.
-    :param instance_id: The ID of the model instance.
-    :return: None
+    Args:
+        model_name: The name of the model being logged.
+        instance_id: The ID of the model instance.
     """
-
     # Log connection settings and transaction details.
     try:
         db_settings = connection.settings_dict
@@ -86,8 +86,7 @@ def log_db_connection_info(model_name: str, instance_id: int) -> None:
 
 
 def release_db_connection() -> None:
-    """Close this thread's database connections so they don't sit idle while
-    the caller waits on something slow, such as a Doctor extraction.
+    """Close this thread's database connections so they don't sit idle while the caller waits on something slow, such as a Doctor extraction.
 
     Idle connections get dropped by network and server idle timeouts, after
     which the next query fails with "SSL connection has been closed

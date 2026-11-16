@@ -274,9 +274,7 @@ class Person(AbstractDateTimeModel):
 
     @property
     def is_judge(self) -> bool:
-        """Examine the positions a person has had and identify if they were ever
-        a judge.
-        """
+        """Examine the positions a person has had and identify if they were ever a judge."""
         return any(
             position.is_judicial_position for position in self.positions.all()
         )
@@ -894,7 +892,7 @@ class Position(AbstractDateTimeModel):
 
     @property
     def vote_string(self):
-        """Make a human-friendly string from the vote information"""
+        """Make a human-friendly string from the vote information."""
         s = ""
 
         # Do vote type first
@@ -1143,7 +1141,7 @@ class Race(models.Model):
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
 class PersonRace(Person.race.through):
-    """A model class to track person race m2m relation"""
+    """A model class to track person race m2m relation."""
 
     class Meta:
         proxy = True
@@ -1287,8 +1285,9 @@ class ABARating(AbstractDateTimeModel):
 
 
 class PartyType(models.Model):
-    """Links together the parties and the docket. Probably a poorly named
-    model.
+    """Links together the parties and the docket.
+
+    Probably a poorly named model.
 
     (It made sense at the time.)
     """
@@ -1352,9 +1351,7 @@ class PartyType(models.Model):
 
 
 class CriminalCount(models.Model):
-    """The criminal counts associated with a PartyType object (i.e., associated
-    with a party in a docket.
-    """
+    """The criminal counts associated with a PartyType object (i.e., associated with a party in a docket."""
 
     PENDING = 1
     TERMINATED = 2
@@ -1386,7 +1383,7 @@ class CriminalCount(models.Model):
 
     @staticmethod
     def normalize_status(status_str: str):
-        """Convert a status string into one of COUNT_STATUSES"""
+        """Convert a status string into one of COUNT_STATUSES."""
         if status_str == "pending":
             return CriminalCount.PENDING
         elif status_str == "terminated":
@@ -1394,9 +1391,7 @@ class CriminalCount(models.Model):
 
 
 class CriminalComplaint(models.Model):
-    """The criminal complaints associated with a PartyType object (i.e.,
-    associated with a party in a docket.
-    """
+    """The criminal complaints associated with a PartyType object (i.e., associated with a party in a docket."""
 
     party_type = models.ForeignKey(
         PartyType,
@@ -1444,7 +1439,7 @@ class Party(AbstractDateTimeModel):
 
 
 class Role(models.Model):
-    """Links together the party, the attorney, and the docket"""
+    """Links together the party, the attorney, and the docket."""
 
     ATTORNEY_TO_BE_NOTICED = 1
     ATTORNEY_LEAD = 2

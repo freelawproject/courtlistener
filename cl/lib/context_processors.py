@@ -147,8 +147,11 @@ def inject_email_ban_status(
 ) -> _EmailBanStatus | dict[Never, Never]:
     """This function injects the status of the user's email address.
 
-    :param request: Contains the user for checking if their email is valid.
-    return dict: The message and date for the user's email status.
+    Args:
+        request: Contains the user for checking if their email is valid.
+
+    Returns:
+        dict: The message and date for the user's email status.
     """
     user = request.user
     if user.is_authenticated:

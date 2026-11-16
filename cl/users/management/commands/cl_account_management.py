@@ -58,12 +58,10 @@ class Command(VerboseCommand):
             print("**************************************")
 
     def delete_old_accounts(self) -> None:
-        """Delete old, unused accounts
+        """Delete old, unused accounts.
 
         Delete accounts older than 60 days that lack a confirmed email
         address and never logged in.
-
-        :return None
         """
         two_months_ago = now() - datetime.timedelta(60)
         unconfirmed_ups = UserProfile.objects.filter(
@@ -83,8 +81,7 @@ class Command(VerboseCommand):
                 print(f"User {up.user.username} deleted")
 
     def notify_unconfirmed_accounts(self) -> None:
-        """This function will notify people who have not confirmed their
-        accounts that they must do so for fear of deletion.
+        """This function will notify people who have not confirmed their accounts that they must do so for fear of deletion.
 
         This function should be run once a week, or so.
 
@@ -97,7 +94,6 @@ class Command(VerboseCommand):
         their key will be old again, and they will be selected. It's not ideal,
         but it's OK.
         """
-
         # if your account is more than a week old, and you have not confirmed
         # it, we will send you a notification, requesting that you confirm it.
         a_week_ago = now() - datetime.timedelta(7)

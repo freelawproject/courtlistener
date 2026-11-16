@@ -29,9 +29,7 @@ def escape_sql_comment_value(value: Any) -> str | None:
 
 
 def add_sql_comment(sql: str, **meta: Any) -> str:
-    """
-    Append a SQL comment containing key=value pairs from meta.
-    """
+    """Append a SQL comment containing key=value pairs from meta."""
     if not meta:
         return sql
 
@@ -54,10 +52,7 @@ def add_sql_comment(sql: str, **meta: Any) -> str:
 
 
 class SqlCommenter:
-    """
-    Middleware to append a comment to each database query with details about
-    the framework and the execution context.
-    """
+    """Middleware to append a comment to each database query with details about the framework and the execution context."""
 
     def __init__(
         self, get_response: Callable[[HttpRequest], HttpResponseBase]
@@ -82,9 +77,7 @@ class QueryWrapper:
         self.request: HttpRequest = request
 
     def get_context(self) -> dict[str, Any]:
-        """
-        Extract relevant context information from the request for SQL comments.
-        """
+        """Extract relevant context information from the request for SQL comments."""
         user = None
         if hasattr(self.request, "user"):
             user_obj = self.request.user

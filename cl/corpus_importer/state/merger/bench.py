@@ -1,7 +1,4 @@
-"""Benchmarks for every phase of a merger's life: spec construction, class
-creation (registry inheritance and validation), instance initialisation
-(transforms and natural-key hashing), the pure-Python merge paths, and the
-DB-backed merge paths for each kind of relation.
+"""Benchmarks for every phase of a merger's life: spec construction, class creation (registry inheritance and validation), instance initialisation (transforms and natural-key hashing), the pure-Python merge paths, and the DB-backed merge paths for each kind of relation.
 
 Run with::
 
@@ -10,30 +7,20 @@ Run with::
 The DB-backed benches run inside a single test transaction per bench, so rows
 created by one round stay visible to the next. Each "rescrape" bench therefore
 measures the steady state of re-merging data that is already in the DB, and
-each "create" bench uses a fresh natural key per round."""
+each "create" bench uses a fresh natural key per round.
+"""
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import new_class
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import pytest
 from django.db.models import Model, QuerySet
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from cl.corpus_importer.state.merger import (
-    Attribute,
-    ManyToManyRelation,
-    Merger,
-    MergerSpecRegistry,
-    OneToManyRelation,
-    OneToOneRelation,
-    RelatedParams,
-    ThroughParameters,
-    overwrite,
-    overwrite_if_present,
-)
+from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Party, PartyType
 from cl.search.docket_sources import DocketSources
@@ -43,6 +30,25 @@ from cl.search.models import (
     Docket,
     DocketEntry,
     OriginatingCourtInformation,
+)
+
+from .base import (
+    Merger,
+    MergerSpecRegistry,
+    RelatedParams,
+    ThroughParameters,
+)
+from .specifications import (
+    Constant,
+    ManyToManyRelation,
+    OneToManyRelation,
+    OneToOneRelation,
+    Params,
+)
+from .specifications import Scrape as ScrapeProxy
+from .strategy import (
+    overwrite,
+    overwrite_if_present,
 )
 
 Scrape = dict[str, Any]
@@ -88,7 +94,7 @@ def many_attr_merger() -> type[Merger[None, None, Docket]]:
     def body(namespace: dict[str, Any]) -> None:
         namespace["model"] = Docket
         for name in DOCKET_TEXT_FIELDS:
-            namespace[name] = Attribute(default="")
+            namespace[name] = Constant("")
 
     return new_class(
         "ManyAttrMerger", (Merger[None, None, Docket],), exec_body=body
@@ -97,15 +103,13 @@ def many_attr_merger() -> type[Merger[None, None, Docket]]:
 
 @dataclass(frozen=True)
 class DocketParams:
-    """Parameters for the docket mergers below. `court_id` is picked up by the
-    default transform of the `court_id` attribute."""
+    """Parameters for the docket mergers below. `court_id` is read by the transform of the `court_id` attribute."""
 
     court_id: str
 
 
 def make_scrape(docket_number: str) -> Scrape:
-    """Build a docket scrape with `ENTRY_COUNT` entries, `PARTY_COUNT` parties
-    and an originating court."""
+    """Build a docket scrape with `ENTRY_COUNT` entries, `PARTY_COUNT` parties and an originating court."""
     return {
         "docket_number": docket_number,
         "case_name": f"Case {docket_number}",
@@ -125,8 +129,8 @@ class EntryMerger(Merger[Scrape, RelatedParams[DocketParams], DocketEntry]):
     model: ClassVar[type[Model]] = DocketEntry
     key: ClassVar[Iterable[str]] = ["entry_number"]
 
-    entry_number: int = Attribute(lambda d, params: d["entry_number"])
-    description: str = Attribute(lambda d, params: d["description"])
+    entry_number: int = ScrapeProxy(Scrape)["entry_number"]
+    description: str = ScrapeProxy(Scrape)["description"]
 
 
 class OriginMerger(
@@ -134,11 +138,10 @@ class OriginMerger(
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-    docket_number: str = Attribute(lambda d, params: d["docket_number"])
+    docket_number: str = ScrapeProxy(Scrape)["docket_number"]
 
     def query(self) -> QuerySet[OriginatingCourtInformation]:
-        """A forward one-to-one is only ever created from here; the parent
-        hands over any existing object itself."""
+        """A forward one-to-one is only ever created from here; the parent hands over any existing object itself."""
         return self.manager.none()
 
 
@@ -146,7 +149,7 @@ class PartyMerger(Merger[Scrape, RelatedParams[DocketParams], Party]):
     model: ClassVar[type[Model]] = Party
     key: ClassVar[Iterable[str]] = ["name"]
 
-    name: str = Attribute(lambda d, params: d["name"])
+    name: str = ScrapeProxy(Scrape)["name"]
 
 
 class PartyTypeMerger(
@@ -155,17 +158,17 @@ class PartyTypeMerger(
     model: ClassVar[type[Model]] = PartyType
     key: ClassVar[Iterable[str]] = ["name"]
 
-    name: str = Attribute(lambda d, params: d["type"])
+    name: str = ScrapeProxy(Scrape)["type"]
 
 
 class DocketMerger(Merger[Scrape, DocketParams, Docket]):
     model: ClassVar[type[Model]] = Docket
     key: ClassVar[Iterable[str]] = ["court_id", "docket_number"]
 
-    court_id: str = Attribute()
-    source: int = Attribute(default=DocketSources.SCRAPER)
-    docket_number: str = Attribute(lambda d, params: d["docket_number"])
-    case_name: str = Attribute(lambda d, params: d["case_name"])
+    court_id: str = Params(DocketParams).court_id
+    source: int = Constant(DocketSources.SCRAPER)
+    docket_number: str = ScrapeProxy(Scrape)["docket_number"]
+    case_name: str = ScrapeProxy(Scrape)["case_name"]
 
 
 class AtomicDocketMerger(DocketMerger):
@@ -174,19 +177,21 @@ class AtomicDocketMerger(DocketMerger):
 
 class DocketWithEntriesMerger(DocketMerger):
     docket_entries: list[DocketEntry] = OneToManyRelation(
-        EntryMerger, lambda d, params: d["entries"]
+        EntryMerger, ScrapeProxy(Scrape)["entries"]
     )
 
 
 class DocketWithOriginMerger(DocketMerger):
     originating_court_information: OriginatingCourtInformation = (
-        OneToOneRelation(OriginMerger, lambda d, params: d["origin"])
+        OneToOneRelation(OriginMerger, ScrapeProxy(Scrape)["origin"])
     )
 
 
 class DocketWithPartiesMerger(DocketMerger):
     parties: list[Party] = ManyToManyRelation(
-        PartyMerger, PartyTypeMerger, lambda d, params: d["parties"]
+        PartyMerger,
+        ScrapeProxy(Scrape)["parties"],
+        PartyTypeMerger,
     )
 
 
@@ -197,37 +202,34 @@ class RejectingDocketMerger(DocketMerger):
 
 
 class SpecificationBench:
-    """The per-attribute building blocks that run once per attribute on
-    every init and merge."""
+    """The per-attribute building blocks that run once per attribute on every init and merge."""
 
     def bench_attr_transform_custom(self, benchmark: BenchmarkFixture):
-        spec = Attribute(
-            transform=lambda scrape, params: None, default="abcdefg"
-        )
+        spec = cast(AttributeMerger, Constant("abcdefg"))
 
         benchmark(spec.transform, None, None)
 
     def bench_attr_transform_default_no_params(
         self, benchmark: BenchmarkFixture
     ):
-        spec = Attribute(default="abcdefg")
-        spec.name = "docket_number"
+        spec = cast(AttributeMerger, Constant("abcdefg"))
+        spec._name = "docket_number"
 
         benchmark(spec.transform, None, None)
 
     def bench_attr_transform_default_dict_params(
         self, benchmark: BenchmarkFixture
     ):
-        spec = Attribute(default="abcdefg")
-        spec.name = "docket_number"
+        spec = cast(AttributeMerger, Constant("abcdefg"))
+        spec._name = "docket_number"
 
         benchmark(spec.transform, None, {"docket_number": "hijklmn"})
 
     def bench_attr_transform_default_object_params(
         self, benchmark: BenchmarkFixture
     ):
-        spec = Attribute()
-        spec.name = "court_id"
+        spec = cast(AttributeMerger, Params(DocketParams).court_id)
+        spec._name = "court_id"
 
         benchmark(spec.transform, None, DocketParams(court_id=STUB_COURT.pk))
 
@@ -238,14 +240,16 @@ class SpecificationBench:
         benchmark(overwrite_if_present, None, "db")
 
     def bench_attr_validation(self, benchmark: BenchmarkFixture):
-        spec = Attribute(default="abcdefg")
-        spec.name = "docket_number"
+        spec = cast(AttributeMerger, Constant("abcdefg"))
+        spec._name = "docket_number"
 
         benchmark(spec.run_validation, DocketMerger)
 
     def bench_related_validation(self, benchmark: BenchmarkFixture):
-        spec = OneToManyRelation(EntryMerger)
-        spec.name = "docket_entries"
+        spec = OneToManyRelation(
+            EntryMerger, cast(AttributeMerger, ScrapeProxy(Scrape))
+        )
+        spec._name = "docket_entries"
 
         benchmark(spec.run_validation, DocketMerger)
 
@@ -258,8 +262,7 @@ class SpecificationBench:
 
 
 class ClassCreationBench:
-    """Defining a merger subclass: building the registry from the bases,
-    registering each spec, and validating the whole class."""
+    """Defining a merger subclass: building the registry from the bases, registering each spec, and validating the whole class."""
 
     def bench_subclass_init_bare(self, benchmark: BenchmarkFixture):
         def run():
@@ -273,7 +276,7 @@ class ClassCreationBench:
             class AttrMerger(Merger[None, None, Docket]):
                 model: ClassVar[type[Docket]] = Docket
 
-                docket_number: str = Attribute(default="abcdefg")
+                docket_number: str = Constant("abcdefg")
 
         benchmark(run)
 
@@ -286,7 +289,10 @@ class ClassCreationBench:
                 model: ClassVar[type[Docket]] = Docket
 
                 originating_court_information: OriginatingCourtInformation = (
-                    OneToOneRelation(OriginMerger)
+                    OneToOneRelation(
+                        OriginMerger,
+                        cast(AttributeMerger, ScrapeProxy(Scrape)),
+                    )
                 )
 
         benchmark(run)
@@ -297,7 +303,8 @@ class ClassCreationBench:
                 model: ClassVar[type[Docket]] = Docket
 
                 docket_entries: list[DocketEntry] = OneToManyRelation(
-                    EntryMerger
+                    EntryMerger,
+                    cast(AttributeMerger, ScrapeProxy(Scrape)),
                 )
 
         benchmark(run)
@@ -308,18 +315,19 @@ class ClassCreationBench:
                 model: ClassVar[type[Docket]] = Docket
 
                 parties: list[Party] = ManyToManyRelation(
-                    PartyMerger, PartyTypeMerger
+                    PartyMerger,
+                    cast(AttributeMerger, ScrapeProxy(Scrape)),
+                    PartyTypeMerger,
                 )
 
         benchmark(run)
 
     def bench_subclass_init_inherited(self, benchmark: BenchmarkFixture):
-        """Subclassing a merger that already carries specs for every kind of
-        relation, so the registry has to be copied and re-validated."""
+        """Subclassing a merger that already carries specs for every kind of relation, so the registry has to be copied and re-validated."""
 
         def run():
             class InheritedMerger(DocketWithPartiesMerger):
-                case_name_short: str = Attribute(default="")
+                case_name_short: str = Constant("")
 
         benchmark(run)
 
@@ -327,15 +335,15 @@ class ClassCreationBench:
         def run():
             class AbstractMerger(Merger[Scrape, None, Docket], abstract=True):
                 docket_entries: list[DocketEntry] = OneToManyRelation(
-                    EntryMerger
+                    EntryMerger,
+                    cast(AttributeMerger, ScrapeProxy(Scrape)),
                 )
 
         benchmark(run)
 
 
 class InstanceInitBench:
-    """Instantiating a merger: validating the scrape, running every transform
-    and resolving the relation parameters."""
+    """Instantiating a merger: validating the scrape, running every transform and resolving the relation parameters."""
 
     def bench_init_bare(self, benchmark: BenchmarkFixture):
         class BareMerger(Merger[None, None, Docket]):
@@ -347,7 +355,7 @@ class InstanceInitBench:
         class AttrMerger(Merger[None, None, Docket]):
             model: ClassVar[type[Docket]] = Docket
 
-            docket_number: str = Attribute(default="abcdefg")
+            docket_number: str = Constant("abcdefg")
 
         benchmark(AttrMerger, None, params=None)
 
@@ -357,10 +365,14 @@ class InstanceInitBench:
     def bench_init_all_relations(self, benchmark: BenchmarkFixture):
         class AllRelationsMerger(DocketWithPartiesMerger):
             docket_entries: list[DocketEntry] = OneToManyRelation(
-                EntryMerger, lambda d, params: d["entries"]
+                EntryMerger,
+                ScrapeProxy(Scrape)["entries"],
             )
             originating_court_information: OriginatingCourtInformation = (
-                OneToOneRelation(OriginMerger, lambda d, params: d["origin"])
+                OneToOneRelation(
+                    OriginMerger,
+                    ScrapeProxy(Scrape)["origin"],
+                )
             )
 
         benchmark(
@@ -447,8 +459,7 @@ class MergeBench:
         benchmark(merger.merge)
 
     def bench_merge_noop_update(self, benchmark: BenchmarkFixture):
-        """Merging into an existing object that already matches: every
-        attribute is compared and none is written."""
+        """Merging into an existing object that already matches: every attribute is compared and none is written."""
         scrape = make_scrape("MERGE")
         existing = Docket(
             court=STUB_COURT,
@@ -502,8 +513,7 @@ def court(db: None) -> Court:
 
 
 def per_round_scrapes() -> Callable[[], Scrape]:
-    """Build a scrape with a docket number nobody has used before, for the
-    benches that create a fresh object every round."""
+    """Build a scrape with a docket number nobody has used before, for the benches that create a fresh object every round."""
     counter = count()
     return lambda: make_scrape(f"NEW-{next(counter)}")
 
@@ -513,8 +523,7 @@ class MergeDBBench:
     """The merge paths that read from and write to the DB."""
 
     def bench_lookup_hit(self, benchmark: BenchmarkFixture, court: Court):
-        """Natural-key lookup that finds the object and has nothing to
-        write."""
+        """Natural-key lookup that finds the object and has nothing to write."""
         params = DocketParams(court_id=court.pk)
         scrape = make_scrape("HIT")
         DocketMerger(scrape, params=params).merge()
@@ -540,8 +549,7 @@ class MergeDBBench:
         )
 
     def bench_update(self, benchmark: BenchmarkFixture, court: Court):
-        """Natural-key lookup followed by a save, because the case name
-        differs from the DB every round."""
+        """Natural-key lookup followed by a save, because the case name differs from the DB every round."""
         params = DocketParams(court_id=court.pk)
         scrape = make_scrape("UPDATE")
         DocketMerger(scrape, params=params).merge()
@@ -563,8 +571,7 @@ class MergeDBBench:
         benchmark(lambda: AtomicDocketMerger(scrape, params=params).merge())
 
     def bench_init_many(self, benchmark: BenchmarkFixture, court: Court):
-        """Batched natural-key lookup for `BULK_COUNT` scrapes that are all
-        already in the DB."""
+        """Batched natural-key lookup for `BULK_COUNT` scrapes that are all already in the DB."""
         params = DocketParams(court_id=court.pk)
         scrapes = [make_scrape(f"BULK-{n}") for n in range(BULK_COUNT)]
         for scrape in scrapes:

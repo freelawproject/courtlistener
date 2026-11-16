@@ -38,10 +38,12 @@ class SESEventType(StrEnum):
 def get_message_id(mail_obj: dict) -> str:
     """Returns the unique message_id from the SES notification header.
 
-    :param mail_obj: The notification mail object to extract the message_id
-    :return message_id: The unique message_id
-    """
+    Args:
+        mail_obj: The notification mail object to extract the message_id
 
+    Returns:
+        message_id: The unique message_id
+    """
     headers = mail_obj["headers"]
     for header in headers:
         if header["name"] == "X-CL-ID":
@@ -53,14 +55,13 @@ def get_message_id(mail_obj: dict) -> str:
 def store_bounce_or_complaint_obj(
     bounce_obj: dict[str, Any], email_recipient: str, obj_type: SESEventType
 ) -> None:
-    """
-    Store the SES bounce/complaint payload to S3 as JSON.
+    """Store the SES bounce/complaint payload to S3 as JSON.
 
-    :param bounce_obj: The bounce payload to store.
-    :param email_recipient: The email address the event belongs to.
-    :param obj_type: The type of the bounce/complaint.
+    Args:
+        bounce_obj: The bounce payload to store.
+        email_recipient: The email address the event belongs to.
+        obj_type: The type of the bounce/complaint.
     """
-
     match obj_type:
         case SESEventType.COMPLAINT:
             dir_name = "complaints"
@@ -97,10 +98,7 @@ def store_bounce_or_complaint_obj(
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
-    """Receiver function to handle bounce notifications sent by Amazon SES via
-    handle_event_webhook
-    """
-
+    """Receiver function to handle bounce notifications sent by Amazon SES via handle_event_webhook."""
     message_id = get_message_id(mail_obj)
     normalized_recipients = []
     if bounce_obj:
@@ -145,10 +143,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
 def complaint_handler(
     sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
 ):
-    """Receiver function to handle complaint notifications sent by
-    Amazon SES via handle_event_webhook
-    """
-
+    """Receiver function to handle complaint notifications sent by Amazon SES via handle_event_webhook."""
     if complaint_obj:
         complained_recipients = complaint_obj["complainedRecipients"]
         recipient_emails = [
@@ -202,8 +197,9 @@ def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
 def webhook_created_or_updated(
     sender, instance=None, created=False, update_fields=None, **kwargs
 ) -> None:
-    """Notify admins when a new webhook is created or updated. Avoid sending
-    the notification when the webhook failure_count is updated.
+    """Notify admins when a new webhook is created or updated.
+
+    Avoid sending the notification when the webhook failure_count is updated.
     """
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)

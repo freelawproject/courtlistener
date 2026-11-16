@@ -23,10 +23,7 @@ from cl.users.forms import WebhookForm
 
 
 class WebhooksViewSet(ModelViewSet):
-    """
-    A set of actions to handle the listing, creation, deleting, and updating
-    of webhooks for htmx.
-    """
+    """A set of actions to handle the listing, creation, deleting, and updating of webhooks for htmx."""
 
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [JSONRenderer, TemplateHTMLRenderer]
@@ -34,10 +31,7 @@ class WebhooksViewSet(ModelViewSet):
     throttle_classes = []
 
     def get_queryset(self):
-        """
-        Return a list of all the webhooks
-        for the currently authenticated user.
-        """
+        """Return a list of all the webhooks for the currently authenticated user."""
         user = self.request.user
         return Webhook.objects.filter(user=user).order_by("date_created")
 
@@ -117,10 +111,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=True, methods=["get", "post"])
     def test_webhook(self, request, *args, **kwargs):
-        """Render the webhook test template on GET and send the test webhook
-        event on POST.
-        """
-
+        """Render the webhook test template on GET and send the test webhook event on POST."""
         webhook = self.get_object()
         event_type = webhook.event_type
         version = webhook.version
@@ -238,10 +229,7 @@ class WebhooksViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def get_available_versions(self, request, *args, **kwargs):
-        """Render the webhook version field containing available versions for
-        the select event type.
-        """
-
+        """Render the webhook version field containing available versions for the select event type."""
         event_type = request.GET.get("event_type")
         htmx_template = "includes/webhooks_htmx/webhook-version-select.html"
         context = {"version_choices": []}
@@ -270,9 +258,7 @@ class WebhooksViewSet(ModelViewSet):
 
 
 class WebhookEventViewSet(ModelViewSet):
-    """
-    A set of actions to handle listing and filtering webhooks events for htmx.
-    """
+    """A set of actions to handle listing and filtering webhooks events for htmx."""
 
     permission_classes = [IsAuthenticated, IsOwner]
     renderer_classes = [TemplateHTMLRenderer]
@@ -281,10 +267,7 @@ class WebhookEventViewSet(ModelViewSet):
     throttle_classes = []
 
     def get_queryset(self):
-        """
-        Returns a list of all webhook events for the currently authenticated
-        user.
-        """
+        """Returns a list of all webhook events for the currently authenticated user."""
         user = self.request.user
         return WebhookEvent.objects.filter(webhook__user=user).order_by(
             "-date_created"

@@ -7,7 +7,7 @@ from cl.search.models import Court, Opinion
 
 
 def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
-    """Figure out if the case should be blocked from search engines
+    """Figure out if the case should be blocked from search engines.
 
     Use a number of rules to figure out if a case is better off out of search
     results. Also check the content of the document to see if it has SSNs or
@@ -18,10 +18,10 @@ def set_blocked_status(opinion: Opinion, content: str, extension: str) -> None:
     For a discussion of the rules below, see:
     https://github.com/freelawproject/courtlistener/issues/691
 
-    :param opinion: An opinion to check.
-    :param content: The text of that opinion (usually from an extracted PDF).
-    :param extension: The extension of the file, without the leading period.
-    :return: None
+    Args:
+        opinion: An opinion to check.
+        content: The text of that opinion (usually from an extracted PDF).
+        extension: The extension of the file, without the leading period.
     """
 
     def set_blocked(opinion: Opinion) -> None:

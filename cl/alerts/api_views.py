@@ -65,10 +65,7 @@ class SearchAlertViewSet(LoggingMixin, ModelViewSet):
         return [ExceptionalUserRateThrottle()]
 
     def get_queryset(self):
-        """
-        Return a list of all the search alerts
-        for the currently authenticated user.
-        """
+        """Return a list of all the search alerts for the currently authenticated user."""
         user = self.request.user
         return Alert.objects.filter(user=user).order_by("-date_created")
 
@@ -90,9 +87,6 @@ class DocketAlertViewSet(LoggingMixin, ModelViewSet):
     cursor_ordering_fields = ["date_created"]
 
     def get_queryset(self):
-        """
-        Return a list of all the docket alerts
-        for the currently authenticated user.
-        """
+        """Return a list of all the docket alerts for the currently authenticated user."""
         user = self.request.user
         return DocketAlert.objects.filter(user=user).order_by("-date_created")
