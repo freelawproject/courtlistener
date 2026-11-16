@@ -3,14 +3,15 @@ import logging
 import traceback
 import zipfile
 from dataclasses import dataclass, field
-from datetime import date
-from io import BytesIO, StringIO
-from typing import Any, NotRequired, TypedDict, cast
+from io import StringIO
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
@@ -36,8 +37,6 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
-from cl.lib.model_helpers import choices_to_csv
-from cl.lib.recap_utils import get_document_filename
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
@@ -62,6 +61,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
     SCOTUSDocketEntry,
+    RECAPDocument,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -7,8 +7,6 @@ import os
 import re
 import shutil
 import threading
-import zipfile
-from collections import Counter
 from datetime import date
 from hashlib import md5
 from http import HTTPStatus
@@ -24,9 +22,6 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
-from django.contrib.staticfiles.finders import find
-from django.core import mail
-from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -4204,6 +4199,170 @@ class DocketFeedTest(TestCase):
         r = await self.get_feed(self.empty_scotus_docket)
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertNotIn("<entry>", r.content.decode())
+
+
+class DownloadCasePdfsTest(TestCase):
+    """Test the bulk PDF zip download view.
+
+    `filepath_local=SimpleUploadedFile(...)` plus the `@override_storage()`
+    applied globally in `cl.tests.runner.TestRunner.run_tests` means every
+    RECAPDocument read/write here stays in memory. No real S3 access or AWS
+    credentials are involved.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+        cls.entry = DocketEntryFactory(docket=cls.docket, entry_number=1)
+        cls.rd_available = RECAPDocumentFactory(
+            docket_entry=cls.entry,
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local=SimpleUploadedFile("test.pdf", b"pdf-bytes-one"),
+            is_available=True,
+        )
+        # Purchased from PACER, but the PDF itself hasn't been retrieved yet.
+        cls.rd_unavailable = RECAPDocumentFactory(
+            docket_entry=cls.entry,
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local="",
+            is_available=False,
+        )
+        cls.user = UserFactory.create(
+            username="learned", email="learnedhand@scotus.gov"
+        )
+
+    def test_redirect_anonymous_users(self) -> None:
+        download_path = reverse(
+            "download_case_pdfs", kwargs={"docket_id": self.docket.id}
+        )
+        redirect_path = f"{reverse('sign-in')}?next={download_path}"
+        response = self.client.get(download_path)
+        self.assertRedirects(response, redirect_path)
+
+    def test_small_docket_returns_zip_synchronously(self) -> None:
+        """Below the threshold, the zip with only the available document's
+        real bytes is built and returned directly, without touching Celery.
+        """
+        self.client.login(username=self.user.username, password="password")
+
+        with mock.patch(
+            "cl.opinion_page.views.build_and_email_docket_pdf_zip"
+        ) as mock_task:
+            response = self.client.get(
+                reverse(
+                    "download_case_pdfs",
+                    kwargs={"docket_id": self.docket.id},
+                )
+            )
+
+        mock_task.delay.assert_not_called()
+        self.assertEqual(response["Content-Type"], "application/zip")
+        with zipfile.ZipFile(BytesIO(response.content)) as zf:
+            names = zf.namelist()
+            self.assertEqual(
+                names,
+                [get_document_filename("ca5", "12345", "1", 0)],
+                "Only the available document should be in the zip, named "
+                "with the standard PACER filename convention.",
+            )
+            self.assertEqual(zf.read(names[0]), b"pdf-bytes-one")
+
+    def test_no_available_documents_returns_404(self) -> None:
+        empty_docket = DocketFactory(court=self.court)
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "download_case_pdfs",
+                kwargs={"docket_id": empty_docket.id},
+            )
+        )
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+    @override_settings(MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC=0)
+    def test_large_docket_dispatches_background_task(self) -> None:
+        """Above the threshold, the view hands off to Celery instead of
+        building the zip itself."""
+        self.client.login(username=self.user.username, password="password")
+
+        with mock.patch(
+            "cl.opinion_page.views.build_and_email_docket_pdf_zip"
+        ) as mock_task:
+            response = self.client.get(
+                reverse(
+                    "download_case_pdfs",
+                    kwargs={"docket_id": self.docket.id},
+                )
+            )
+
+        mock_task.delay.assert_called_once_with(self.docket.id, self.user.pk)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotEqual(response.get("Content-Type"), "application/zip")
+
+
+class BuildAndEmailDocketPdfZipTest(TestCase):
+    """Test the Celery task backing the bulk PDF zip download feature's
+    background path.
+
+    Unlike `DownloadCasePdfsTest`, the global `override_storage()` doesn't
+    cover this task's S3 upload: it patches model `FileField` storage, but
+    the task instantiates `IncrementingAWSMediaStorage` directly rather than
+    going through a field, so the upload itself is mocked per-test instead.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+        cls.entry = DocketEntryFactory(docket=cls.docket, entry_number=1)
+        cls.rd_available = RECAPDocumentFactory(
+            docket_entry=cls.entry,
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local=SimpleUploadedFile("test.pdf", b"pdf-bytes-one"),
+            is_available=True,
+        )
+        cls.user = UserFactory.create(
+            username="learned", email="learnedhand@scotus.gov"
+        )
+
+    def test_builds_zip_uploads_and_emails_link(self) -> None:
+        fake_url = (
+            "https://storage.courtlistener.com/recap/bulk-pdfs/fake.zip"
+        )
+        with mock.patch(
+            "cl.opinion_page.tasks.IncrementingAWSMediaStorage"
+        ) as mock_storage_cls:
+            mock_storage = mock_storage_cls.return_value
+            mock_storage.save.return_value = "recap/bulk-pdfs/fake.zip"
+            mock_storage.url.return_value = fake_url
+
+            build_and_email_docket_pdf_zip(self.docket.id, self.user.pk)
+
+        mock_storage.save.assert_called_once()
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, [self.user.email])
+        self.assertIn(self.docket.case_name, sent.body)
+        self.assertIn(fake_url, sent.body)
+
+    def test_no_available_documents_sends_no_email(self) -> None:
+        empty_docket = DocketFactory(court=self.court)
+        build_and_email_docket_pdf_zip(empty_docket.id, self.user.pk)
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class CachePageIgnoreParamsTest(TestCase):
