@@ -1,3 +1,5 @@
+"""Atom feeds of docket updates."""
+
 from datetime import datetime
 
 from django.contrib.syndication.views import Feed
@@ -36,6 +38,7 @@ class DocketFeed(Feed):
     item_enclosure_mimetype = "application/pdf"
 
     def title(self, obj: Docket) -> str:
+        """Title the feed as updates for the docket."""
         return f"Docket updates for {make_docket_title(obj)}"
 
     def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
@@ -69,6 +72,7 @@ class DocketFeed(Feed):
         )
 
     def item_title(self, item: SourceDocketEntry) -> SafeText:
+        """Title an entry by its number, or by its filing date for minute entries."""
         docket_title = make_docket_title(item.docket)
         entry_number = _entry_number_of(item)
         if entry_number:
@@ -93,6 +97,7 @@ class DocketFeed(Feed):
         return text or main_doc.description
 
     def item_link(self, item: SourceDocketEntry) -> str:
+        """Link to the entry on the docket page."""
         if entry_number := _entry_number_of(item):
             anchor = f"entry-{entry_number}"
         else:
@@ -100,9 +105,17 @@ class DocketFeed(Feed):
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
     def item_pubdate(self, item: SourceDocketEntry) -> datetime:
+        """Use midnight Pacific time on the entry's filing date."""
         return midnight_pt(item.date_filed)
 
     def item_enclosure_url(self, item: SourceDocketEntry) -> str | None:
+        """Link to the entry's main document.
+
+        Returns:
+            The stored PDF's URL, or the source's external URL if there is no
+            stored PDF. None for entries without a number (RECAP minute
+            entries and every Texas entry) and entries without documents.
+        """
         if not _entry_number_of(item):
             return None
 

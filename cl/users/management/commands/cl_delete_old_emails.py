@@ -1,3 +1,5 @@
+"""Delete stored emails older than a number of days."""
+
 from datetime import UTC, datetime, timedelta
 
 from django.utils.timezone import make_aware
@@ -25,6 +27,7 @@ class Command(VerboseCommand):
     help = "Delete stored emails older than the specified number of days."
 
     def add_arguments(self, parser):
+        """Add the required age option."""
         parser.add_argument(
             "--older-than-days",
             type=int,
@@ -34,6 +37,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Delete the old emails and print how many were deleted."""
         super().handle(*args, **options)
         self.options = options
         emails = delete_old_emails(options["older_than_days"])

@@ -1,3 +1,5 @@
+"""Shared options, checkpoints, and response caching for state scraper commands."""
+
 import asyncio
 import hashlib
 import re
@@ -64,11 +66,15 @@ def _make_case_number_key(case_number: str) -> str:
 
 
 class ScraperCheckpointTracker:
+    """Store a scraper's resume date in Redis."""
+
     def __init__(self, key: str, *, redis: Redis | None = None):
+        """Track the checkpoint for ``key``, using the cache Redis unless one is given."""
         self.autoresume_key: str = f"scraper:{key}:end-date"
         self.redis: Redis = redis or get_redis_interface("CACHE")
 
     def get(self) -> date | None:
+        """Get the saved checkpoint date, or None if there isn't one."""
         stored_values = self.redis.hgetall(self.autoresume_key)
         if not stored_values:
             return None
@@ -84,6 +90,7 @@ class ScraperCheckpointTracker:
         return latest_checkpoint
 
     def set(self, checkpoint: date) -> None:
+        """Save the checkpoint date and the time it was saved, expiring after four weeks."""
         pipe = self.redis.pipeline()
         pipe.hgetall(self.autoresume_key)
         log_info: Mapping[str | bytes, int | str] = {
@@ -96,10 +103,13 @@ class ScraperCheckpointTracker:
 
 
 class StateBackScrapeCommand(BaseCommand):
+    """Base command for back-scraping state courts over a range."""
+
     checkpoint_tracker: ClassVar[ScraperCheckpointTracker]
     date_range_required: ClassVar[bool] = True
 
     def add_arguments(self, parser: CommandParser):
+        """Add the back-scrape range, courts, and auto-resume options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--backscrape-start",
@@ -131,7 +141,10 @@ class StateBackScrapeCommand(BaseCommand):
 
 
 class StatePollCommand(BaseCommand):
+    """Base command for continuously polling state courts."""
+
     def add_arguments(self, parser: CommandParser):
+        """Add the polling delay, backfill days, and courts options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--polling-delay",
@@ -166,7 +179,10 @@ FL_COURT_ID_MAP: dict[str, FloridaCourtID] = {
 
 
 class FLScrapeCommand(BaseCommand):
+    """Base command for scraping Florida appellate courts."""
+
     def add_arguments(self, parser: CommandParser):
+        """Add the rate limit, retry, archiving, cache, and queue options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--rps",
@@ -220,6 +236,7 @@ class FLScrapeCommand(BaseCommand):
         )
 
     def parse_court_ids(self, courts: str | None) -> list[FloridaCourtID]:
+        """Parse a comma-separated list of court IDs, defaulting to all Florida courts."""
         if courts is None:
             courts = ""
         court_ids = [
@@ -310,6 +327,7 @@ class S3Cache(RequestHandler):
         return False
 
     def make_s3_key(self, request: ScheduledRequest) -> str:
+        """Make the S3 key for a request from its URL path and a hash of its method, path, and parameters."""
         url_path = request.url.path.lower().strip("/")
         url_params = "&".join(
             [f"{k}={v}" for k, v in sorted(request.url.params.items())]
@@ -321,6 +339,7 @@ class S3Cache(RequestHandler):
         return str(self.base / url_path / request_hash)
 
     def load_from_s3(self, request: ScheduledRequest) -> Response | None:
+        """Load a request's archived response, or None if it isn't archived or fails to load."""
         key = self.make_s3_key(request)
 
         try:
@@ -342,6 +361,12 @@ class S3Cache(RequestHandler):
     def save_to_s3(
         self, request: ScheduledRequest, response: Response
     ) -> None:
+        """Queue a task to archive a response.
+
+        Skipped when loading from the archive is enabled and the response is
+        already archived. Errors while checking or queuing are logged rather
+        than raised.
+        """
         key = self.make_s3_key(request)
         try:
             # Don't try to cache responses that we pulled from the cache
@@ -359,6 +384,7 @@ class S3Cache(RequestHandler):
     async def before_send(
         self, manager: RequestManager, request: ScheduledRequest
     ) -> None:
+        """When loading is enabled, answer the request from the archive if it is there."""
         if not self.load:
             return
         loop = asyncio.get_running_loop()
@@ -367,6 +393,7 @@ class S3Cache(RequestHandler):
             request.response.set_result(response)
 
     async def listen(self, manager: RequestManager, request: ScheduledRequest):
+        """When saving is enabled, archive the request's response once it arrives."""
         if not self.save:
             return
 

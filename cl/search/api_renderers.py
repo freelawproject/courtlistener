@@ -1,3 +1,5 @@
+"""REST API renderers that handle invalid XML characters."""
+
 import re
 from typing import Any
 
@@ -32,6 +34,11 @@ class SafeXMLRenderer(XMLRenderer):
     redis_set_name = "api:invalid_xml_chars:opinion_ids"
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
+        """Render the data as XML, cleaning invalid characters if needed.
+
+        If the data can't be serialized, the IDs found in list or dict data
+        are saved to a Redis set before the cleaned data is rendered.
+        """
         if data is None:
             return b""
 

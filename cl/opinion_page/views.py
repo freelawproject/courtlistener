@@ -1,3 +1,5 @@
+"""Views for court, docket, RECAP document, opinion, and citation pages."""
+
 import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
@@ -342,6 +344,11 @@ async def redirect_docket_recap(
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
+    """Redirect to the page of the court's docket with the PACER case ID.
+
+    Raises:
+        Http404: If there is no such docket.
+    """
     docket: Docket = await aget_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
@@ -370,6 +377,10 @@ async def fetch_docket_entries(
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
+    """Render a docket's page of entries, filtered and sorted by the request's parameters.
+
+    Shows 100 entries per page.
+    """
     sort_order_asc = True
     docket, context = await core_docket_data(request, pk)
 
@@ -474,6 +485,7 @@ async def view_docket(
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
+    """Render a docket's Atom feed."""
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
@@ -558,6 +570,11 @@ async def docket_idb_data(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's FJC Integrated Database tab.
+
+    Raises:
+        Http404: If the docket has no IDB data.
+    """
     docket, context = await core_docket_data(request, docket_id)
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
@@ -601,6 +618,11 @@ async def docket_authorities(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's authorities tab.
+
+    Raises:
+        Http404: If the docket has no authorities.
+    """
     docket, context = await core_docket_data(request, docket_id)
     if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
@@ -1348,6 +1370,7 @@ async def view_opinion_related_cases(
 
 
 async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
+    """Render the reporter volumes page with a 404 status."""
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",

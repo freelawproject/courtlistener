@@ -23,6 +23,8 @@ from cl.search.models import Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
+    """Back-scrape opinion sites to add citations to the opinions they list."""
+
     scrape_target_descr = "citations"
     juriscraper_module_type = "opinions"
 

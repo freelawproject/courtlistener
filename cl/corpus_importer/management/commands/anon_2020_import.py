@@ -1,3 +1,5 @@
+"""Import opinions from the anonymous 2020 database."""
+
 import json
 import re
 from datetime import date, datetime
@@ -461,9 +463,12 @@ def import_anon_2020_db(
 
 
 class Command(VerboseCommand):
+    """Import the anonymous 2020 database from a directory of files."""
+
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
+        """Add the import directory and skip-until options."""
         parser.add_argument(
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
@@ -479,6 +484,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the files in the import directory."""
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
         import_anon_2020_db(import_dir, skip_until)

@@ -1,3 +1,5 @@
+"""REST API filters for oral argument audio."""
+
 import rest_framework_filters as filters
 
 from cl.api.utils import (
@@ -13,6 +15,8 @@ from cl.search.models import Docket
 
 
 class AudioFilter(NoEmptyFilterSet):
+    """Filter audio by its docket, source, dates, and processing status."""
+
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     source = filters.MultipleChoiceFilter(choices=AudioSources.NAMES)
 

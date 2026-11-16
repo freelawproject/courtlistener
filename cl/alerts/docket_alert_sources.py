@@ -1,3 +1,5 @@
+"""Per-docket-type sources of the entries and templates for docket alerts."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime

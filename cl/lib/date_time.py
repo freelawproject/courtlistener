@@ -1,3 +1,5 @@
+"""Helpers for converting between dates and timezone-aware datetimes."""
+
 from datetime import date, datetime, time
 
 import pytz

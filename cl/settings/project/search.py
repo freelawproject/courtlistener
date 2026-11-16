@@ -1,3 +1,5 @@
+"""Settings for search, related results, and search alerts."""
+
 import environ
 
 env = environ.FileAwareEnv()

@@ -1,3 +1,5 @@
+"""Settings for the hosts, timeouts, and URLs of the microservices."""
+
 import environ
 
 env = environ.FileAwareEnv()

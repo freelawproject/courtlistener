@@ -418,9 +418,12 @@ def _checkpoint_and_sleep(
 
 
 class Command(StateBackScrapeCommand):
+    """Backfill dockets over a date range with a state scraper."""
+
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
 
     def add_arguments(self, parser):
+        """Add the scraper, rate limit, backoff, resume, sleep, and batch size options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--scraper",

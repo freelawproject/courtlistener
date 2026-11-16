@@ -1,3 +1,5 @@
+"""Helpers for docket numbers, upload paths, validation, and CSV export of models."""
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +41,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
+    """Check if a string starts with a district or appellate bankruptcy docket number."""
     pattern = rf"{dist_d_num_regex}|{appellate_bankr_d_num_regex}"
     if re.match(pattern, value):
         return True
@@ -134,6 +137,12 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
 
 
 def make_appellate_bankr_number_core(cleaned_docket_number: str) -> str | None:
+    """Make the core of an appellate or bankruptcy docket number.
+
+    Returns:
+        The two-digit year followed by the case number padded to six digits,
+        or None if the docket number doesn't match.
+    """
     bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
     if bankr_m:
         # Pad to six characters because some courts have a LOT of bankruptcies
@@ -429,7 +438,9 @@ class SupportsPdfPath(Protocol):
     document -- so the contract is a Protocol rather than the base class.
     """
 
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str: ...
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Get the storage path for a PDF, or for its thumbnail if ``thumbs`` is set."""
+        ...
 
 
 def make_pdf_path(
@@ -445,18 +456,21 @@ def make_pdf_path(
 
 
 def make_json_path(instance: Model, filename: str) -> str:
+    """`upload_to` callback for JSON files, dated under ``json-data``."""
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_path("json-data", filename)
 
 
 def make_lasc_json_path(instance: LASCJSON, filename: str) -> str:
+    """`upload_to` callback for LASC JSON files."""
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_lasc_path(instance, filename)
 
 
 def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
+    """`upload_to` callback for PDF thumbnails."""
     return make_pdf_path(instance, filename, thumbs=True)
 
 
@@ -838,4 +852,5 @@ class CSVExportMixin:
         return row
 
     def add_class_name(self, attribute_name: str) -> str:
+        """Prefix an attribute name with the lowercased class name and an underscore."""
         return f"{self.__class__.__name__.lower()}_{attribute_name}"

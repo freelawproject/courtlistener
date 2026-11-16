@@ -99,6 +99,11 @@ class DynamicClientRegistrationSerializer(serializers.Serializer):
     )
 
     def validate_redirect_uris(self, value: list[str]) -> list[str]:
+        """Validate that every redirect URI meets the redirect URI policy.
+
+        Raises:
+            serializers.ValidationError: If any redirect URI fails the policy.
+        """
         for raw in value:
             error = check_redirect_uri(raw)
             if error:
@@ -106,6 +111,12 @@ class DynamicClientRegistrationSerializer(serializers.Serializer):
         return value
 
     def validate_grant_types(self, value: list[str]) -> list[str]:
+        """Validate the grant types, defaulting to ``authorization_code``.
+
+        Raises:
+            serializers.ValidationError: If a grant type isn't allowed or
+                ``authorization_code`` is missing.
+        """
         if not value:
             value = ["authorization_code"]
         if not set(value).issubset(ALLOWED_GRANT_TYPES):
@@ -120,6 +131,11 @@ class DynamicClientRegistrationSerializer(serializers.Serializer):
         return value
 
     def validate_response_types(self, value: list[str]) -> list[str]:
+        """Validate the response types, defaulting to ``code``.
+
+        Raises:
+            serializers.ValidationError: If a response type isn't allowed.
+        """
         if not value:
             value = ["code"]
         if not set(value).issubset(ALLOWED_RESPONSE_TYPES):

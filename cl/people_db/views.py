@@ -1,3 +1,5 @@
+"""Views for people pages."""
+
 from django.conf import settings
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import aget_object_or_404
@@ -14,6 +16,7 @@ from cl.people_db.utils import make_title_str
 async def view_person(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponseRedirect | TemplateResponse:
+    """Render a person's page, redirecting aliases to the person they alias."""
     queryset = Person.objects.select_related("is_alias_of").prefetch_related(
         "positions__court"
     )

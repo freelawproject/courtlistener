@@ -1,3 +1,5 @@
+"""Helpers for building opinion cluster and docket pages."""
+
 import csv
 import logging
 import traceback
@@ -897,10 +899,15 @@ def separate_syllabus(cluster: OpinionCluster) -> bool:
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:
+    """Title a cluster with its case name, truncated to 100 characters, and its citations."""
     return f"{trunc(best_case_name(cluster), 100)}, {await cluster.acitation_string()}"
 
 
 def make_docket_title(docket: Docket) -> str:
+    """Title a docket with its case name, truncated to 100 characters, and its docket number.
+
+    Blank parts are left out.
+    """
     title = ", ".join(
         [
             s
@@ -929,6 +936,8 @@ async def _common_metadata_sections(
 
 
 class CoreDocketDataDict(TypedDict):
+    """Template context shared by every tab view of a docket."""
+
     docket: Docket
     title: str
     note_form: NoteForm
@@ -1053,6 +1062,7 @@ async def core_docket_data(
 
 
 async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
+    """Check if the user is subscribed to the docket's alerts."""
     has_alert = False
     if user.is_authenticated:
         has_alert = await DocketAlert.objects.filter(
@@ -1198,6 +1208,8 @@ async def build_related_clusters_query(
 
 @dataclass
 class RelatedCitingResults:
+    """Clusters citing a cluster, with the search parameters used to find them."""
+
     related_clusters: list[OpinionClusterDocument] = field(
         default_factory=list
     )
@@ -1210,6 +1222,8 @@ class RelatedCitingResults:
 
 @dataclass
 class RelatedClusterResults:
+    """Clusters related to a cluster, with the search parameters used to find them."""
+
     related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )

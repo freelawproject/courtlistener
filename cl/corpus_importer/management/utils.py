@@ -1,3 +1,5 @@
+"""Shared base class and types for corpus importer commands."""
+
 import csv
 import random
 import time
@@ -19,6 +21,8 @@ from cl.lib.indexing_utils import (
 
 
 class TexasDocketMeta(BaseModel):
+    """Metadata about a Texas docket."""
+
     case_number: str
     case_url: str
     date_filed: date
@@ -34,6 +38,7 @@ class TexasDocketMeta(BaseModel):
 
     @field_validator("date_filed", mode="before")
     def date_filed_validator(cls, v):
+        """Parse the filing date from MM/DD/YYYY format."""
         return date(*(time.strptime(v, "%m/%d/%Y")[0:3]))
 
 
@@ -64,6 +69,7 @@ class CorpusImporterCommand(VerboseCommand, ABC):
     compose_redis_key: str
 
     def add_arguments(self, parser):
+        """Add the inventory, queue, throttling, resume, and attachment options."""
         parser.add_argument(
             "--inventory-file",
             required=True,
@@ -125,13 +131,15 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     @staticmethod
     def download_task() -> Task:
+        """Get the default task for downloading inventory files from S3."""
         from cl.corpus_importer.tasks import default_corpus_download_task
 
         return default_corpus_download_task
 
     @staticmethod
     @abstractmethod
-    def merge_task() -> Task: ...
+    def merge_task() -> Task:
+        """Get the task that parses downloaded files and merges them into the database."""
 
     @staticmethod
     def transform_inventory_iterator(
@@ -150,6 +158,11 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
     def handle(self, *args, **options):
+        """Schedule a download and merge chain for each inventory row.
+
+        Starts at ``--start-row``, or the last logged row with
+        ``--auto-resume``, and logs progress to Redis every 100 rows.
+        """
         super().handle(*args, **options)
 
         retrieval_queue = options["retrieval_queue"]

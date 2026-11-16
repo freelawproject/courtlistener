@@ -1,3 +1,5 @@
+"""Helpers for the SCOTUS docket probing daemon."""
+
 from __future__ import annotations
 
 import json
