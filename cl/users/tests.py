@@ -6,6 +6,7 @@ from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -156,6 +157,22 @@ from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
+
+TEST_ASSETS_DIR = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+
+
+def load_test_asset(file_name: str) -> Any:
+    """Load a JSON file from this app's test assets.
+
+    Args:
+        file_name: The name of the file in the test assets directory.
+
+    Returns:
+        The parsed JSON object.
+    """
+    return json.loads(
+        (TEST_ASSETS_DIR / file_name).read_text(encoding="utf-8")
+    )
 
 
 class UserTest(LiveServerTestCase):
@@ -1354,33 +1371,17 @@ class LiveUserTest(BaseSeleniumTest):
 class SNSWebhookTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
-            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
-        ):
-            cls.soft_bounce_asset = json.load(general_soft_bounce)
-            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
-            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.suppressed_asset = json.load(suppressed_bounce)
-            cls.no_failed_bounce_asset = json.load(no_bounce)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.soft_bounce_cnt_rejected_asset = load_test_asset(
+            "cnt_rejected_bounce.json"
+        )
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.suppressed_asset = load_test_asset("suppressed_bounce.json")
+        cls.no_failed_bounce_asset = load_test_asset("no_bounce.json")
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event.
@@ -1960,30 +1961,16 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
-            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
-            cls.complaint_asset = json.load(complaint)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_asset_2 = load_test_asset("general_soft_bounce_2.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.complaint_asset = load_test_asset("complaint.json")
 
-        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
-        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.attachment_150 = TEST_ASSETS_DIR / "file_sample_150kB.pdf"
+        cls.attachment_500 = TEST_ASSETS_DIR / "file_example_500kB.pdf"
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -3008,17 +2995,10 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-        ):
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_with_id_asset = load_test_asset(
+            "soft_bounce_msg_id.json"
+        )
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -3525,29 +3505,15 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
-            cls.mail_box_full_soft_bounce_asset = json.load(
-                mail_box_full_soft_bounce
-            )
-            cls.msg_large_bounce_asset = json.load(msg_large_bounce)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.no_email_hard_bounce_asset = load_test_asset(
+            "no_email_hard_bounce.json"
+        )
+        cls.mail_box_full_soft_bounce_asset = load_test_asset(
+            "mail_box_full_soft_bounce.json"
+        )
+        cls.msg_large_bounce_asset = load_test_asset("msg_large_bounce.json")
         cls.user = UserFactory()
 
     async def send_signal(self, test_asset, event_name, signal) -> None:

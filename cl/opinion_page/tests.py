@@ -3,7 +3,6 @@ import csv
 import datetime
 import io
 import json
-import os
 import re
 import shutil
 import threading
@@ -12,6 +11,7 @@ from datetime import date
 from hashlib import md5
 from http import HTTPStatus
 from itertools import product
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
@@ -2679,7 +2679,7 @@ class BlockedSitemapTest(SitemapTest):
 
 
 @override_settings(
-    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
+    MEDIA_ROOT=Path(settings.INSTALL_ROOT) / "cl/assets/media/test"
 )
 @mock.patch(
     "cl.lib.storage.get_name_by_incrementing",
@@ -2824,8 +2824,9 @@ class UploadPublication(TestCase):
         }
 
     def tearDown(self) -> None:
-        if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
-            shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
+        pdf_dir = Path(settings.MEDIA_ROOT) / "pdf/2019"
+        if pdf_dir.exists():
+            shutil.rmtree(pdf_dir)
         Docket.objects.all().delete()
 
     async def test_access_upload_page(self, mock: MagicMock) -> None:
@@ -5387,14 +5388,14 @@ class DocketFilterRenderTestCase(TestCase):
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        template_path = os.path.join(
-            settings.INSTALL_ROOT,
-            "cl",
-            "opinion_page",
-            "test_assets",
-            "docket_filter_wrapper.html",
+        template_path = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "opinion_page"
+            / "test_assets"
+            / "docket_filter_wrapper.html"
         )
-        with open(template_path, encoding="utf-8") as f:
+        with template_path.open(encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
         template = engines["django"].from_string(compiled)
         return template.render(

@@ -3361,7 +3361,7 @@ class TexasMergerTest(TestCase):
         def get_test_wpd(
             request: requests.Request,
         ) -> tuple[int, dict[str, str], bytes]:
-            with open(wpd_path, "rb") as f:
+            with wpd_path.open("rb") as f:
                 return (
                     200,
                     {"Content-Type": "application/octet-stream"},
@@ -6107,7 +6107,7 @@ class TamesMissingFileTest(SimpleTestCase):
     def test_missing_file_page_detected(self):
         """Verify a TAMES 'File not found' page is correctly identified."""
         fixture_path = self.test_dir / "missing_file.html"
-        with open(fixture_path, "rb") as f:
+        with fixture_path.open("rb") as f:
             self.assertTrue(is_missing_file_page(f.read()))
 
     def test_normal_page_not_flagged(self):
@@ -6305,12 +6305,12 @@ class CentraliaIngestTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
-        with open(
-            cls.test_dir / "centralia_payload_multi.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_multi.json").open(
+            encoding="utf-8"
         ) as f:
             cls.multi_payload = json.load(f)
-        with open(
-            cls.test_dir / "centralia_payload_single.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_single.json").open(
+            encoding="utf-8"
         ) as f:
             cls.single_payload = json.load(f)
 

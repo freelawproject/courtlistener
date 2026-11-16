@@ -3,8 +3,7 @@
 import argparse
 import json
 import logging
-import os
-from glob import glob
+from pathlib import Path
 from typing import IO
 
 from dateutil import parser
@@ -12,6 +11,7 @@ from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.crypto import sha1
+from cl.lib.utils import glob_files
 from cl.people_db.models import Person
 from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
@@ -110,10 +110,10 @@ def import_tn_corpus(
         logger.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
-        pdf_path = glob(f"{os.path.dirname(file.name)}/{case['label']}/*.pdf")[
-            0
-        ]
-        with open(pdf_path, "rb") as p:
+        pdf_path = list(
+            glob_files(Path(file.name).parent / case["label"], "*.pdf")
+        )[0]
+        with pdf_path.open("rb") as p:
             pdf_data = p.read()
 
         sha1_hash = sha1(force_bytes(pdf_data))

@@ -2,8 +2,9 @@
 
 import datetime
 import re
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Iterator
 from itertools import chain, islice, tee
+from pathlib import Path, PurePath
 from re import Match
 from typing import Any, TypeIs
 
@@ -124,6 +125,67 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     See: https://stackoverflow.com/a/9427216/64911
     """
     return [dict(t) for t in {tuple(d.items()) for d in dicts}]
+
+
+def glob_files(
+    root: Path, pattern: str, recursive: bool = False
+) -> Iterator[Path]:
+    """Yield paths under `root` matching `pattern`, as `glob.glob` would.
+
+    `Path.glob` differs from `glob.glob` in two ways that this smooths over:
+    wildcards match names starting with a dot, and `**` always recurses.
+
+    Args:
+        root: Directory the pattern is relative to. Never matched against
+            the hidden-name rule, so it may itself live under a dot directory.
+        pattern: Relative glob pattern. Hidden files and directories are
+            only matched when the pattern is itself explicit about them.
+        recursive: Whether `**` matches any number of directories. When
+            False, `**` is treated like `*`.
+
+    Returns:
+        The matching paths, in arbitrary order.
+    """
+    pattern_parts = PurePath(pattern).parts
+    if not recursive:
+        pattern_parts = tuple("*" if p == "**" else p for p in pattern_parts)
+    for path in root.glob("/".join(pattern_parts)):
+        relative_parts = path.relative_to(root).parts
+        if any(
+            part.startswith(".") and not pattern_part.startswith(".")
+            for part, pattern_part in zip(
+                relative_parts,
+                _align_pattern_parts(pattern_parts, len(relative_parts)),
+                strict=True,
+            )
+        ):
+            continue
+        yield path
+
+
+def _align_pattern_parts(
+    pattern_parts: tuple[str, ...], length: int
+) -> list[str]:
+    """Pair each matched path component with its glob pattern component.
+
+    `**` is expanded to cover however many components it consumed.
+
+    Args:
+        pattern_parts: Components of a glob pattern.
+        length: Number of components in the matched path.
+
+    Returns:
+        A list of `length` pattern components.
+    """
+    expansion = length - (len(pattern_parts) - pattern_parts.count("**"))
+    aligned: list[str] = []
+    for part in pattern_parts:
+        if part == "**":
+            aligned.extend(["**"] * max(expansion, 0))
+            expansion = 0
+        else:
+            aligned.append(part)
+    return aligned
 
 
 def human_sort[T: str | tuple[str, Any]](
