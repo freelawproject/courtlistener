@@ -43,11 +43,12 @@ document.addEventListener('alpine:init', () => {
 
     /** Ends the hover state after a delay; a pinned tooltip stays open. */
     scheduleHide() {
-      // The delay lets the pointer cross the gap between the button and the
-      // tooltip without it closing (WCAG 1.4.13: hover content stays hoverable).
+      // The live region's padding already joins the button and the tooltip
+      // (WCAG 1.4.13: hover content stays hoverable); the delay only forgives
+      // a pointer that briefly slips off.
       this.hideTimer = setTimeout(() => {
         this.hovered = false;
-      }, 200);
+      }, 100);
     },
 
     /**
@@ -87,20 +88,23 @@ document.addEventListener('alpine:init', () => {
       if (!arrow) return;
 
       const button = this.$refs.trigger.getBoundingClientRect();
-      const bubble = this.$refs.live.getBoundingClientRect();
-      const x = button.left + button.width / 2 - bubble.left;
-      const y = button.top + button.height / 2 - bubble.top;
+      const live = this.$refs.live.getBoundingClientRect();
+      // The live region's padding bridges the hover gap, so measure the
+      // bubble inside it and place the arrow relative to the live region.
+      const bubble = this.$refs.live.firstElementChild.getBoundingClientRect();
+      const x = button.left + button.width / 2 - live.left;
+      const y = button.top + button.height / 2 - live.top;
 
       // The SVG points down; rotate it toward the button.
       let left = x;
-      let top = bubble.height + ARROW_OUTSIDE;
+      let top = bubble.bottom - live.top + ARROW_OUTSIDE;
       let rotation = 0;
       if (bubble.top >= button.bottom) {
-        [top, rotation] = [-ARROW_OUTSIDE, 180];
+        [top, rotation] = [bubble.top - live.top - ARROW_OUTSIDE, 180];
       } else if (bubble.right <= button.left) {
-        [left, top, rotation] = [bubble.width + ARROW_OUTSIDE, y, -90];
+        [left, top, rotation] = [bubble.right - live.left + ARROW_OUTSIDE, y, -90];
       } else if (bubble.left >= button.right) {
-        [left, top, rotation] = [-ARROW_OUTSIDE, y, 90];
+        [left, top, rotation] = [bubble.left - live.left - ARROW_OUTSIDE, y, 90];
       }
 
       Object.assign(arrow.style, {

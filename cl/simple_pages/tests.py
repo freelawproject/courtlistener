@@ -930,17 +930,27 @@ class TooltipComponentTest(SimpleTestCase):
                 self.assertIn(background, self.render(source))
 
     def test_position_is_passed_to_the_anchor(self) -> None:
-        """The position prop sets the x-anchor placement, defaulting to bottom."""
+        """The position prop sets the x-anchor placement, defaulting to bottom,
+        and pads the live region only on that axis to bridge the hover gap."""
         cases = [
-            ('<c-tooltip label="Item">Message</c-tooltip>', "bottom"),
+            ('<c-tooltip label="Item">Message</c-tooltip>', "bottom", "py-1.5"),
+            (
+                '<c-tooltip label="Item" position="top-start">Message</c-tooltip>',
+                "top-start",
+                "py-1.5",
+            ),
             (
                 '<c-tooltip label="Item" position="right">Message</c-tooltip>',
                 "right",
+                "px-1.5",
             ),
         ]
-        for source, position in cases:
+        for source, position, padding in cases:
             with self.subTest(position=position):
-                self.assertIn(
-                    f'x-anchor.{position}.offset.6="$refs.trigger"',
-                    self.render(source),
+                live = fromstring(self.render(source)).xpath(
+                    "//*[@role='status']"
+                )[0]
+                self.assertEqual(
+                    live.get(f"x-anchor.{position}"), "$refs.trigger"
                 )
+                self.assertIn(padding, live.get("class").split())
