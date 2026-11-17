@@ -19,6 +19,7 @@ from typing import (
     Any,
     cast,
     final,
+    overload,
     override,
 )
 
@@ -479,6 +480,24 @@ class _CallProxy(AttributeMerger):
                 )
 
 
+class _CoalesceProxy(AttributeMerger):
+    __slots__ = ()
+
+    def __init__(self, *args: AttributeMerger, default: Any):
+        super().__init__()
+
+        self._uses_scrape = any(arg._uses_scrape for arg in args)
+        self._db_fields = tuple(f for arg in args for f in arg._db_fields)
+        self._transform = lambda s, p, m: next(
+            (
+                v
+                for arg in args
+                if bool((v := arg._transform(s, p, m))) or isinstance(v, int)
+            ),
+            default,
+        )
+
+
 def Fn[F: Callable](f: F) -> F:
     """Wrap a callable so it can be invoked at merge time.
 
@@ -581,6 +600,27 @@ def Constant[T](value: T) -> T:
     """
     # pyrefly: ignore[bad-return]
     return _ConstantProxy(value)
+
+
+@overload
+def Coalesce[T](*args: T | None, default: T) -> T | None: ...
+@overload
+def Coalesce[T](*args: T | None, default: None = ...) -> T | None: ...
+def Coalesce[T](*args: T | None, default: T | None = None) -> T | None:
+    """Output the first truthy, boolean, or integer argument, with a default.
+
+    Args:
+        *args: The values to coalesce
+        default: The value to output if all arguments are non-integer, non-boolean falsy
+            values. Will be treated as a literal value; specifications passed to this
+            parameter will not be evaluated
+
+    Returns:
+        An expression typed `T | None`. It is not that expression, this is only
+        to help the type checker enforce valid merger specifications
+    """
+    # pyrefly:ignore[bad-return,bad-argument-type]
+    return _CoalesceProxy(*args, default=default)
 
 
 def WithStrategy[T](specification: T, strategy: Strategy) -> T:
