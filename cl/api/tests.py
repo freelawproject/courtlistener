@@ -2868,9 +2868,10 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_scotus_docket_entries_endpoint(self) -> None:
-        """Test the V4 SCOTUS docket entries endpoint confirming that its
-        cursor and page number pagination works properly."""
+        """Test the V4 SCOTUS docket entries endpoint pagination.
 
+        Confirms that its cursor and page number pagination works properly.
+        """
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocketentry-list",
             default_ordering="-id",
@@ -2880,9 +2881,10 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_scotus_documents_endpoint(self) -> None:
-        """Test the V4 SCOTUS documents endpoint confirming that its cursor
-        and page number pagination works properly."""
+        """Test the V4 SCOTUS documents endpoint pagination.
 
+        Confirms that its cursor and page number pagination works properly.
+        """
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocument-list",
             default_ordering="-id",
