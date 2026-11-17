@@ -1,6 +1,6 @@
 """Serializers for exporting dockets, with their related data, and opinions as JSON."""
 
-from rest_framework.serializers import CharField, ModelSerializer
+from rest_framework.serializers import BooleanField, CharField, ModelSerializer
 
 from cl.people_db.models import (
     Attorney,
@@ -20,6 +20,8 @@ from cl.search.models import (
     Opinion,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
 )
 
 
@@ -97,6 +99,27 @@ class DocketEntrySerializer(ModelSerializer):
     class Meta:
         model = DocketEntry
         exclude = ("tags",)
+
+
+class SCOTUSDocumentSerializer(ModelSerializer):
+    """Serialize a SCOTUS document for docket alert webhooks."""
+
+    absolute_url = CharField(source="get_absolute_url", read_only=True)
+    is_available = BooleanField(read_only=True)
+
+    class Meta:
+        model = SCOTUSDocument
+        exclude = ("docket_entry", "plain_text")
+
+
+class SCOTUSDocketEntrySerializer(ModelSerializer):
+    """Serialize a SCOTUS docket entry and its documents for docket alert webhooks."""
+
+    scotus_documents = SCOTUSDocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SCOTUSDocketEntry
+        fields = "__all__"
 
 
 class OriginalCourtInformationSerializer(ModelSerializer):

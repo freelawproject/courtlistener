@@ -4014,6 +4014,39 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    async def test_docket_alert_webhook_test_source(self) -> None:
+        """Only v3 docket alert test events have a source, like real events."""
+        expected_sources = {
+            WebhookVersions.v2: None,
+            WebhookVersions.v3: reverse(
+                "docketentry-list", kwargs={"version": "v4"}
+            ),
+        }
+        for version, source in expected_sources.items():
+            with self.subTest(version=version):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(self.client, version=version)
+                webhook_pk = await Webhook.objects.values_list(
+                    "pk", flat=True
+                ).aget()
+                webhook_test_path = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhook_pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    await self.client.post(webhook_test_path, {})
+
+                content = await WebhookEvent.objects.values_list(
+                    "content", flat=True
+                ).aget()
+                self.assertEqual(content["payload"].get("source"), source)
+
     async def test_send_webhook_test_all_types(self) -> None:
         """Can we send a webhook test event for all webhook types?"""
         test_cases = {

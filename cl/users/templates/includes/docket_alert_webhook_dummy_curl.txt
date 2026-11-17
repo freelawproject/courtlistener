@@ -4,7 +4,8 @@ curl --request POST \
   --header 'Idempotency-Key: 59f1be59-e428-427a-a346-9cacded5c1d4' \
   --data '{
    "payload":{
-      "results":[
+{% if webhook_version >= 3 %}      "source":"{% url 'docketentry-list' version='v4' %}",
+{% endif %}      "results":[
          {
             "id":2208776613,
             "docket": 4214664,
