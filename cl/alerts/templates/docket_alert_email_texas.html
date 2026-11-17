@@ -1,7 +1,9 @@
 {% extends "docket_alert_email_base.html" %}
-{% load extras %}
+{% load extras text_filters %}
 
-{# TAMES text is scraped, so unlike the RECAP and SCOTUS templates nothing here is rendered with |safe. #}
+{# TAMES text is scraped, so unlike the RECAP and SCOTUS templates nothing here is rendered with |safe, the case name included. #}
+
+{% block case_name %}{{ docket|best_case_name }}{% endblock %}
 
 {% block preheader %}
       {% for de in new_des %}{% if forloop.first %}{{ de.entry_type }}{% endif %}{% endfor %}{% endblock %}
