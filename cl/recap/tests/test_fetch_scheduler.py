@@ -11,21 +11,23 @@ from rest_framework.test import APIClient
 from waffle.testutils import override_switch
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.recap import fetch_scheduler
+from cl.recap import fetch_queue
 from cl.recap.factories import PacerFetchQueueFactory
-from cl.recap.fetch_scheduler import (
-    SCHEDULER_SWITCH,
-    STALE_MESSAGE,
+from cl.recap.fetch_queue import (
     enqueue_fetch,
     estimate_delay,
-    fail_stale_fetches,
     get_court_interval_ms,
     get_courts_with_waiting_fetches,
     mark_fetch_started,
     pop_next_fetch,
+    set_court_rate,
+)
+from cl.recap.fetch_scheduler import (
+    SCHEDULER_SWITCH,
+    STALE_MESSAGE,
+    fail_stale_fetches,
     run_dispatch_cycle,
     schedule_fetch,
-    set_court_rate,
 )
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import fetch_docket
@@ -55,7 +57,7 @@ class SchedulerRedisTestCase(SimpleTestCase):
         """Point the scheduler at a fresh key prefix for this test."""
         super().setUp()
         prefix = f"test_recap_fetch:{uuid.uuid4().hex}"
-        patcher = mock.patch.object(fetch_scheduler, "KEY_PREFIX", prefix)
+        patcher = mock.patch.object(fetch_queue, "KEY_PREFIX", prefix)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(self._delete_keys, prefix)
