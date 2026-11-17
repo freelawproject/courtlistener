@@ -65,11 +65,13 @@ class MergerSpecification[Scrape, Params, Output](ABC):
     the attribute's name, which must be a field of the merger's model.
     """
 
-    __slots__ = ("_name",)
+    __slots__ = ("_name", "_uses_scrape", "_db_fields")
 
     def __init__(self, /):
         """Build a specification; its name is set when it is assigned on a merger."""
         self._name: str = ""
+        self._uses_scrape: bool = False
+        self._db_fields: tuple[str, ...] = ()
 
     def run_validation(
         self, merger: type[Merger[Scrape, Params, Any]]
@@ -130,7 +132,7 @@ class AttributeMerger[Scrape, Params, Transform](
             in the DB.
     """
 
-    __slots__ = ("strategy", "_transform", "_uses_scrape", "_db_fields")
+    __slots__ = ("strategy", "_transform")
 
     _transform: Transformer[Any, Any, Any, Any]
 
@@ -138,8 +140,6 @@ class AttributeMerger[Scrape, Params, Transform](
         """Create an expression."""
         super().__init__()
         self.strategy: Strategy = overwrite
-        self._uses_scrape: bool = False
-        self._db_fields: tuple[str, ...] = ()
 
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.
@@ -285,6 +285,40 @@ class _ParamsProxy(AttributeMerger):
         self._transform = lambda s, p, m: p
 
 
+class _DatabaseProxy(AttributeMerger):
+    """Expression evaluation to the DB row matched by a merger."""
+
+    __slots__ = ("_field",)
+
+    def __init__(self, field: Field):
+        """Create an expression evaluating to the matched DB row."""
+        super().__init__()
+        getter = operator.attrgetter(field.name)
+        self._field: Field = field
+        self._transform = lambda s, p, m: getter(m) if m is not None else None
+        self._db_fields = (*self._db_fields, field.name)
+
+    @override
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        errors = super().validate(field)
+
+        if not field.concrete:
+            errors.append(
+                TypeError(
+                    f"Field {field.name} must be concrete to be used in merger specifications."
+                )
+            )
+
+        if not issubclass(field.model, self._field.model):
+            errors.append(
+                TypeError(
+                    f"Field {self._field.name} is from {self._field.model.__name__} and cannot be merged into {field.model.__name__}.{field.name}"
+                )
+            )
+
+        return errors
+
+
 class _AttrProxy(AttributeMerger):
     """Expression reading an attribute of another expression's value."""
 
@@ -311,6 +345,8 @@ class _AttrProxy(AttributeMerger):
                 self._transform = lambda s, p, m: getter(s)
             case _ParamsProxy():
                 self._transform = lambda s, p, m: getter(p)
+            case _DatabaseProxy():
+                self._transform = lambda s, p, m: getter(m)
             case _ConstantProxy():
                 v = previous._value
                 self._transform = lambda s, p, m: getter(v)
@@ -483,6 +519,23 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
+def Database[ST, GT](field: Field[ST, GT]) -> GT | None:
+    """Start an expression from a model field passed to the merger.
+
+    For example, `Database(Docket).docket_number`.
+
+    Args:
+        field: The model field accessed from the model class.
+
+    Returns:
+        An expression typed as the type of the model field so chained accesses type-check. It
+        is not that type: it has no value until the merge runs, so it is only meaningful
+        as (part of) a merger attribute.
+    """
+    # pyrefly: ignore[bad-return]
+    return _DatabaseProxy(field)
+
+
 def Ancestor[M: Model](model: type[M]) -> M:
     """Start an expression from a parent this merger is nested under.
 
@@ -574,6 +627,8 @@ class RelatedMerger[
         super().__init__()
         self.merger: type[Merger[Child, RelatedParams[Params], RM]] = merger
         self.attribute: AttributeMerger[Scrape, Params, Transform] = attribute
+        self._db_fields = (*self._db_fields, *attribute._db_fields)
+        self._uses_scrape = self._uses_scrape or attribute._uses_scrape
         self.after: frozenset[str] = frozenset(after)
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
