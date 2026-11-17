@@ -1,3 +1,5 @@
+"""Settings for Waffle feature flags, switches, and samples."""
+
 import environ
 
 env = environ.FileAwareEnv()

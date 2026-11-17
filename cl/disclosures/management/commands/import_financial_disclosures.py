@@ -1,4 +1,7 @@
+"""Queue financial disclosures from a JSON file for import."""
+
 import json
+from pathlib import Path
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.disclosures.tasks import import_disclosure
@@ -19,7 +22,7 @@ def import_financial_disclosures(
         queue_name: The celery queue name.
     """
     throttle = CeleryThrottle(queue_name=queue_name)
-    with open(filepath) as f:
+    with Path(filepath).open() as f:
         disclosures = json.load(f)
 
     for data in disclosures:
@@ -40,9 +43,12 @@ def import_financial_disclosures(
 
 
 class Command(VerboseCommand):
+    """Queue financial disclosures listed in a JSON file for import."""
+
     help = "Add financial disclosures to CL database."
 
     def add_arguments(self, parser):
+        """Add the file path, skip-until, and queue options."""
         parser.add_argument(
             "--filepath",
             required=True,
@@ -64,6 +70,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue the file's disclosures for import."""
         super().handle(*args, **options)
         import_financial_disclosures(
             filepath=options["filepath"],

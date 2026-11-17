@@ -1,3 +1,5 @@
+"""Helpers for RECAP fetches, ACMS entries, subdocket documents, and bad redaction emails."""
+
 from typing import Any
 
 from django.conf import settings
@@ -90,7 +92,7 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     return court_id
 
 
-def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
+def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet[RECAPDocument]:
     """Return the main RECAPDocument queryset for a given court and pacer_doc_id.
 
     Args:
@@ -100,7 +102,7 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
     Returns:
         The main RECAPDocument queryset.
     """
-    main_rds_qs = (
+    return (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .filter(
             pacer_doc_id=pacer_doc_id,
@@ -114,7 +116,6 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
             "docket_entry__docket__court_id",
         )
     )
-    return main_rds_qs
 
 
 def find_subdocket_pdf_rds_from_data(

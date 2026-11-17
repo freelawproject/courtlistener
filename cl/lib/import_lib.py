@@ -1,3 +1,5 @@
+"""Lookups used when importing opinions."""
+
 from datetime import date
 
 from django.db.models import Min, Q, QuerySet

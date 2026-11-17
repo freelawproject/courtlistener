@@ -1,3 +1,5 @@
+"""Clients for the Zoho CRM and Zoho Desk APIs."""
+
 from typing import Any, Protocol, cast
 
 import requests
@@ -33,6 +35,8 @@ from cl.lib.command_utils import logger
 
 
 class HasModuleName(Protocol):
+    """Interface for Zoho modules with a module name and record-building helpers."""
+
     module_name: str
 
     @staticmethod
@@ -49,6 +53,7 @@ class HasModuleName(Protocol):
 
 
 def get_zoho_cache_key() -> str:
+    """Get the cache key prefix for Zoho tokens."""
     return "zoho_token"
 
 
@@ -62,6 +67,11 @@ class ZohoBase:
     module_name: str = ""
 
     def __init__(self):
+        """Initialize the Zoho SDK if needed.
+
+        Raises:
+            Exception: If the subclass hasn't set ``module_name``.
+        """
         if Initializer.get_initializer() is None:
             self.initialize()
 
@@ -70,6 +80,11 @@ class ZohoBase:
 
     @staticmethod
     def initialize() -> None:
+        """Initialize the Zoho SDK with the cached refresh token.
+
+        Raises:
+            Exception: If no refresh token is cached.
+        """
         refresh_token = cache.get(f"{get_zoho_cache_key()}:refresh")
         if not refresh_token:
             raise Exception(
@@ -273,6 +288,8 @@ class ZohoDeskClient(ZohoBase):
 
 
 class SearchRecordMixin:
+    """Mixin for searching a Zoho module's records."""
+
     def get_record_by_cl_id_or_email(
         self: HasModuleName,
         cl_ids: list[int] | None = None,
@@ -332,6 +349,8 @@ class SearchRecordMixin:
 
 
 class AddTagsMixin:
+    """Mixin for tagging a Zoho module's records."""
+
     def add_tags(
         self: HasModuleName, record_id: int, tag_names: list[str]
     ) -> list[Any] | None:
@@ -362,6 +381,8 @@ class AddTagsMixin:
 
 
 class CreateRecordMixin:
+    """Mixin for creating a Zoho module's records."""
+
     def create_record(
         self: HasModuleName, fields: dict[str | Field, Any]
     ) -> list[Any] | None:
@@ -391,6 +412,8 @@ class CreateRecordMixin:
 
 
 class UpdateRecordMixin:
+    """Mixin for updating a Zoho module's records."""
+
     def update_record(
         self: HasModuleName, record_id: int, fields: dict[str | Field, Any]
     ) -> list[Any] | None:
@@ -418,6 +441,7 @@ class BuildPayloadMixin:
     """Mixin for shared payload building logic between contact and lead modules."""
 
     def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
+        """Build a record payload with the user's ID, email, and any first and last name."""
         payload = {
             "CourtListener_ID": user.pk,
             Field.Leads.email(): user.email,
@@ -439,9 +463,12 @@ class LeadsModule(
     BuildPayloadMixin,
     ZohoModule,
 ):
+    """Create, update, search, and tag records in the Zoho CRM Leads module."""
+
     module_name = "Leads"
 
     def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
+        """Build a lead payload, adding the profile's employer, city, state, and ZIP code when set."""
         payload = super().build_payload_from_user(user)
 
         # Profile-related fields
@@ -473,9 +500,12 @@ class ContactsModule(
     BuildPayloadMixin,
     ZohoModule,
 ):
+    """Client for Zoho CRM contacts."""
+
     module_name = "Contacts"
 
     def build_payload_from_user(self, user: User) -> dict[str | Field, Any]:
+        """Build a contact payload, adding the profile's mailing address when set."""
         payload = super().build_payload_from_user(user)
 
         # Profile-related fields

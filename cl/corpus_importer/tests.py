@@ -42,6 +42,7 @@ from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.corpus_importer.centralia import (
     StructuredExtractionStatus,
+    compare_structured_extraction,
     merge_structured_opinion_into_cl_opinion,
     should_ingest,
 )
@@ -1130,12 +1131,11 @@ class HarvardTests(TestCase):
         cites = eyecite.get_citations(
             case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
         )
-        cite = Citation.objects.get(
+        return Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
             page=cites[0].groups["page"],
         )
-        return cite
 
     def assertSuccessfulParse(self, expected_count_diff, bankruptcy=False):
         pre_install_count = OpinionCluster.objects.all().count()
@@ -3367,7 +3367,7 @@ class TexasMergerTest(TestCase):
         def get_test_wpd(
             request: requests.Request,
         ) -> tuple[int, dict[str, str], bytes]:
-            with open(wpd_path, "rb") as f:
+            with wpd_path.open("rb") as f:
                 return (
                     200,
                     {"Content-Type": "application/octet-stream"},
@@ -6113,7 +6113,7 @@ class TamesMissingFileTest(SimpleTestCase):
     def test_missing_file_page_detected(self):
         """Verify a TAMES 'File not found' page is correctly identified."""
         fixture_path = self.test_dir / "missing_file.html"
-        with open(fixture_path, "rb") as f:
+        with fixture_path.open("rb") as f:
             self.assertTrue(is_missing_file_page(f.read()))
 
     def test_normal_page_not_flagged(self):
@@ -6293,6 +6293,37 @@ class CentraliaShouldIngestTest(SimpleTestCase):
         self.assertFalse(ingestible)
         self.assertIn("already extracted", reason)
 
+    def test_text_coverage_ignores_whitespace_and_counts_the_syllabus(
+        self,
+    ) -> None:
+        """Is coverage counted without whitespace and with the syllabus?
+
+        pdftotext pads `plain_text` with layout whitespace a structured read
+        drops, and the PDF it came from includes the syllabus.
+        """
+        syllabus_text = "Held: the statute applies to petitioner."
+        payload = self.make_payload(
+            opinions=[
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            headmatter={"text": "COURT OF APPEALS"},
+            sections={"syllabus": {"html": [syllabus_text]}},
+        )
+        payload["opinions"][0]["text"] = "Affirmed."
+        whole_pdf = f"COURT OF APPEALS {syllabus_text} Affirmed."
+        for label, plain_text in (
+            ("padded", "\n\n    ".join(whole_pdf.split(" ")) + " " * 500),
+            ("unpadded", whole_pdf),
+        ):
+            with self.subTest(label=label):
+                opinion = Opinion(plain_text=plain_text)
+
+                ingestible, reason = should_ingest(opinion, payload)
+
+                self.assertTrue(ingestible, msg=reason)
+                metrics = compare_structured_extraction(opinion, payload)
+                self.assertEqual(metrics["old_chars"], metrics["new_chars"])
+
     def test_ingests_a_clean_read(self) -> None:
         """Does a complete read of a real opinion pass the gate?"""
         opinion = Opinion(plain_text="Affirmed.")
@@ -6311,12 +6342,12 @@ class CentraliaIngestTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
-        with open(
-            cls.test_dir / "centralia_payload_multi.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_multi.json").open(
+            encoding="utf-8"
         ) as f:
             cls.multi_payload = json.load(f)
-        with open(
-            cls.test_dir / "centralia_payload_single.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_single.json").open(
+            encoding="utf-8"
         ) as f:
             cls.single_payload = json.load(f)
 

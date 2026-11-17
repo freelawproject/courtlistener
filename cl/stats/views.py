@@ -1,3 +1,5 @@
+"""Views for monitoring and checking the health of services."""
+
 from http import HTTPStatus
 from typing import NoReturn
 
@@ -17,6 +19,7 @@ from cl.stats.utils import (
 
 
 async def heartbeat(request: HttpRequest) -> HttpResponse:
+    """Respond with OK."""
     return HttpResponse("OK", content_type="text/plain")
 
 
@@ -36,6 +39,7 @@ def health_check(request: HttpRequest) -> JsonResponse:
 
 
 def replication_status(request: HttpRequest) -> HttpResponse:
+    """Render the status of each database's replication slots."""
     statuses = get_replication_statuses()
     return render(
         request,
@@ -81,15 +85,18 @@ def redis_writes(request: HttpRequest) -> HttpResponse:
 
 
 def sentry_fail(request: HttpRequest) -> NoReturn:
+    """Raise an error on purpose to test Sentry."""
     raise ZeroDivisionError("Intentional error for Sentry")
 
 
 def celery_fail(request: HttpRequest) -> HttpResponse:
+    """Queue a task that fails on purpose to test Celery error reporting."""
     fail_task.delay()
     return HttpResponse("Successfully failed Celery.")
 
 
 def celery_queue_lengths(request: HttpRequest) -> HttpResponse:
+    """Respond with the length of each Celery queue as JSON."""
     queue_lengths = {}
     for q in settings.CELERY_QUEUES:
         queue_lengths[q] = get_queue_length(q)

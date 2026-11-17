@@ -1,3 +1,5 @@
+"""Helpers for reporters, citation types, and finding citations in text."""
+
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -223,7 +225,7 @@ def chunk_text(text: str, chunk_size: int):
 
 
 def make_get_citations_kwargs(
-    document: "RECAPDocument | Opinion", chunk_size: int = 200_000
+    document: RECAPDocument | Opinion, chunk_size: int = 200_000
 ) -> list[dict]:
     """Prepare markup kwargs for `get_citations` - chunked.
 

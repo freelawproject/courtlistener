@@ -1,3 +1,5 @@
+"""Timing decorator for functions."""
+
 import time
 from collections.abc import Callable
 

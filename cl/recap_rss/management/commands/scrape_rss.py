@@ -1,7 +1,10 @@
+"""Scrape PACER RSS feeds and merge their contents."""
+
 import fcntl
 import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from celery.canvas import chain
 from django.utils.timezone import make_aware, now
@@ -19,6 +22,8 @@ from cl.search.models import Court
 
 
 class Command(VerboseCommand):
+    """Repeatedly queue crawls of PACER courts' RSS feeds."""
+
     help = "Scrape PACER RSS feeds"
 
     RSS_MAX_VISIT_FREQUENCY = 5 * 60
@@ -27,6 +32,7 @@ class Command(VerboseCommand):
     DELAY_BETWEEN_CACHE_TRIMS = 60 * 60
 
     def add_arguments(self, parser):
+        """Add the courts, iterations, and sweep options."""
         parser.add_argument(
             "--courts",
             type=str,
@@ -55,6 +61,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue feed crawls for the courts on each iteration.
+
+        Outside a sweep, a local lock file stops a second instance for the
+        same set of courts on this machine, and courts whose crawl is still
+        recently in progress are skipped. When crawling all courts
+        outside a sweep, courts crawled too recently are skipped too. Old
+        feed statuses are trimmed at most once an hour.
+        """
         super().handle(*args, **options)
 
         if options["sweep"] is False:
@@ -62,7 +76,7 @@ class Command(VerboseCommand):
             # Note that multiple scripts on multiple machines could still be
             # run.
             court_str = "-".join(sorted(options["courts"]))
-            with open(f"/tmp/rss-scraper-{court_str}.pid", "w") as fp:
+            with Path(f"/tmp/rss-scraper-{court_str}.pid").open("w") as fp:
                 try:
                     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError:

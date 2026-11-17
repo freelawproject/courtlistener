@@ -1,3 +1,5 @@
+"""Copy docket numbers into empty raw docket number fields."""
+
 import time
 
 import pgtrigger
@@ -10,9 +12,12 @@ from cl.settings import TESTING
 
 
 class Command(VerboseCommand):
+    """Copy ``docket_number`` into ``docket_number_raw`` for a docket ID range."""
+
     help = "Populate `Docket.docket_number_raw` using `docket_number`"
 
     def add_arguments(self, parser):
+        """Add the start and end docket ID arguments."""
         parser.add_argument(
             "start-id", help="Value of Docket.id to start from", type=int
         )
@@ -21,6 +26,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Copy docket numbers in batches, updating at most 10 million IDs per run.
+
+        Raises:
+            ValueError: If the end ID isn't greater than the start ID.
+            CommandError: If a batch's first docket already has a raw docket
+                number.
+        """
         super().handle(*args, **options)
         start_id = options["start_id"]
         end_id = options["end_id"]

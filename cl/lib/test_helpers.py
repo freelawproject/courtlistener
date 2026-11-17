@@ -1345,7 +1345,7 @@ class SerializeLockFileTestMixin(SerializeMixin):
 class SimpleUserDataMixin:
     @classmethod
     def setUpTestData(cls) -> None:
-        super().setUpTestData()  # type: ignore
+        super().setUpTestData()  # pyrefly: ignore[missing-attribute]
         UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),

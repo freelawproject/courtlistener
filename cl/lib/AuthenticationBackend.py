@@ -1,3 +1,5 @@
+"""Authentication backend and sign-in form that accept a username or email."""
+
 import re
 from typing import Any
 
@@ -217,6 +219,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form."""
         super().__init__(*args, **kwargs)
 
     def clean(self) -> dict[str, Any]:
@@ -272,13 +275,14 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
 
         If the given user may log in, this method should return None.
         """
-        if not user.is_active:  # type: ignore
+        if not user.is_active:
             raise forms.ValidationError(
                 self.error_messages["inactive"],
                 code="inactive",
             )
 
-        if not user.profile.email_confirmed:  # type: ignore
+        # pyrefly: ignore[missing-attribute]
+        if not user.profile.email_confirmed:
             raise forms.ValidationError(
                 'Please <a href="{}">validate your email address</a> to '
                 "log in.".format(reverse("email_confirmation_request"))
