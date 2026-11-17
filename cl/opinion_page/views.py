@@ -70,7 +70,10 @@ from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimiter_all_10_per_h
+from cl.lib.ratelimiter import (
+    ratelimit_deny_list,
+    ratelimiter_all_10_per_h,
+)
 from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
@@ -103,6 +106,9 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    generate_docket_pdf_zip_data,
+    get_available_recap_documents,
+    separate_syllabus,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -653,44 +659,8 @@ def download_docket_entries_csv(
     return response
 
 
-@ratelimiter_user_5_per_h
 @login_required
-def download_case_pdfs(
-    request: AuthenticatedHttpRequest, docket_id: int
-) -> HttpResponse:
-    """Download a zip file containing every available PDF for a docket.
-
-    Only RECAPDocuments that have actually been purchased from PACER
-    (``has_valid_pdf``) are included. Dockets with more documents than
-    ``settings.MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC`` are too slow to zip
-    within the request/response cycle, so those are instead built by a
-    background task that emails the user a download link when it's done.
-    """
-    docket, _ = async_to_sync(core_docket_data)(request, docket_id)
-    recap_documents = get_available_recap_documents(docket_id)
-
-    if recap_documents.count() > settings.MAX_DOCKET_PDF_ZIP_DOCUMENTS_SYNC:
-        build_and_email_docket_pdf_zip.delay(docket_id, request.user.pk)
-        # TODO: Update the frontend using Htmx to show a message indicating
-        # the export is in progress, rather than navigating to this response.
-        return HttpResponse(
-            "This case has a lot of documents, so we're zipping them up in "
-            "the background. We'll email you a download link when it's "
-            "ready."
-        )
-
-    zip_content = generate_docket_pdf_zip_data(docket, recap_documents)
-    if zip_content is None:
-        raise Http404("No available documents found for this docket.")
-
-    response = HttpResponse(zip_content, content_type="application/zip")
-    response["Content-Disposition"] = (
-        f'attachment; filename="{docket.slug}.zip"'
-    )
-    return response
-
-
-@login_required
+@ratelimiter_all_10_per_h
 def download_case_pdfs(
     request: AuthenticatedHttpRequest, docket_id: int
 ) -> HttpResponse:
