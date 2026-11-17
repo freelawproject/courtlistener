@@ -1038,7 +1038,7 @@ class DocketAlertTest(TestCase):
 
 
 class DocketAlertSourceTest(TestCase):
-    """Does the per-source alert registry resolve the right queries and templates for RECAP vs. SCOTUS dockets?"""
+    """Does the per-source alert registry resolve the right queries and templates for RECAP, SCOTUS and Texas dockets?"""
 
     @classmethod
     def setUpTestData(cls) -> None:
