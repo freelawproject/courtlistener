@@ -207,36 +207,47 @@ def make_ratelimiter[
 
 ratelimiter_all_1000_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
-    rate="1000/h" if "test" not in sys.argv else None,
+    rate="250/h",
 )
-ratelimiter_all_2_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="2/m" if "test" not in sys.argv else None,
-)
-ratelimiter_unsafe_3_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="3/m" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_unsafe_5_per_d: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="5/d" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_unsafe_10_per_m: RatelimitDecorator = make_ratelimiter(
-    key=get_ip_for_ratelimiter,
-    rate="10/m" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
-ratelimiter_all_10_per_h: RatelimitDecorator = make_ratelimiter(
-    key=get_path_to_make_key,
-    rate="10/h" if "test" not in sys.argv else None,
-)
-ratelimiter_unsafe_2000_per_h: RatelimitDecorator = make_ratelimiter(
-    key=get_path_to_make_key,
-    rate="2000/h" if "test" not in sys.argv else None,
-    method=UNSAFE,
-)
+# Decorators can't easily be mocked, and we need to not trigger this decorator
+# during tests or else the first test works and the rest are blocked. So,
+# check if we're doing a test and adjust the decorator accordingly.
+if "test" in sys.argv:
+    ratelimiter_all_2_per_m = lambda func: func
+    ratelimiter_unsafe_3_per_m = lambda func: func
+    ratelimiter_unsafe_5_per_d = lambda func: func
+    ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_all_10_per_h = lambda func: func
+    ratelimiter_unsafe_2000_per_h = lambda func: func
+else:
+    ratelimiter_all_2_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="2/m",
+    )
+    ratelimiter_unsafe_3_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="3/m",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_5_per_d = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="5/d",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_10_per_m = ratelimit(
+        key=get_ip_for_ratelimiter,
+        rate="10/m",
+        method=UNSAFE,
+    )
+    ratelimiter_all_10_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="10/h",
+    )
+    ratelimiter_unsafe_2000_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="2000/h",
+        method=UNSAFE,
+    )
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en

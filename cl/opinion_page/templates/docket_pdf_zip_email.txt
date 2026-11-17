@@ -1,0 +1,17 @@
+Hi {{username}},
+
+The PDFs for {{case_name}} are ready to download:
+
+{{download_url}}
+
+Please review the data carefully.
+
+If you have any questions or need further assistance, please don't hesitate to contact us.
+
+Sincerely,
+
+The Free Law Project Team
+
+-------
+For questions or comments, please visit our contact page, https://www.courtlistener.com/contact/
+We're always happy to hear from you.
