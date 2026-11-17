@@ -1582,32 +1582,36 @@ Sample code here.
 
     <h4 class="mt-3">Demo — Dark (default)</h4>
     <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
-      <c-tooltip label="the top arrow" position="top" has_arrow>Top</c-tooltip>
-      <c-tooltip label="the top-start arrow" position="top-start" has_arrow>Top start</c-tooltip>
-      <c-tooltip label="the top-end arrow" position="top-end" has_arrow>Top end</c-tooltip>
-      <c-tooltip label="the bottom arrow" has_arrow>Bottom</c-tooltip>
-      <c-tooltip label="the left arrow" position="left" has_arrow>Left</c-tooltip>
-      <c-tooltip label="the right arrow" position="right" has_arrow>Right</c-tooltip>
-      <c-tooltip label="the tooltip without an arrow">No arrow</c-tooltip>
-      <c-tooltip label="the tooltip with a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function.">With a description</c-tooltip>
+      <c-tooltip label="the top arrow" message="Top" position="top" has_arrow />
+      <c-tooltip label="the top-start arrow" message="Top start" position="top-start" has_arrow />
+      <c-tooltip label="the top-end arrow" message="Top end" position="top-end" has_arrow />
+      <c-tooltip label="the bottom arrow" message="Bottom" has_arrow />
+      <c-tooltip label="the left arrow" message="Left" position="left" has_arrow />
+      <c-tooltip label="the right arrow" message="Right" position="right" has_arrow />
+      <c-tooltip label="the tooltip without an arrow" message="No arrow" />
+      <c-tooltip label="the tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." />
     </div>
 
     <h4 class="mt-3">Demo — Light</h4>
     <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
-      <c-tooltip variant="light" label="the light top arrow" position="top" has_arrow>Top</c-tooltip>
-      <c-tooltip variant="light" label="the light top-start arrow" position="top-start" has_arrow>Top start</c-tooltip>
-      <c-tooltip variant="light" label="the light top-end arrow" position="top-end" has_arrow>Top end</c-tooltip>
-      <c-tooltip variant="light" label="the light bottom arrow" has_arrow>Bottom</c-tooltip>
-      <c-tooltip variant="light" label="the light left arrow" position="left" has_arrow>Left</c-tooltip>
-      <c-tooltip variant="light" label="the light right arrow" position="right" has_arrow>Right</c-tooltip>
-      <c-tooltip variant="light" label="the light tooltip without an arrow">No arrow</c-tooltip>
-      <c-tooltip variant="light" label="the light tooltip with a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function.">With a description</c-tooltip>
+      <c-tooltip variant="light" label="the light top arrow" message="Top" position="top" has_arrow />
+      <c-tooltip variant="light" label="the light top-start arrow" message="Top start" position="top-start" has_arrow />
+      <c-tooltip variant="light" label="the light top-end arrow" message="Top end" position="top-end" has_arrow />
+      <c-tooltip variant="light" label="the light bottom arrow" message="Bottom" has_arrow />
+      <c-tooltip variant="light" label="the light left arrow" message="Left" position="left" has_arrow />
+      <c-tooltip variant="light" label="the light right arrow" message="Right" position="right" has_arrow />
+      <c-tooltip variant="light" label="the light tooltip without an arrow" message="No arrow" />
+      <c-tooltip variant="light" label="the light tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." />
     </div>
 
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>label</code></c-slot>
         <c-slot name="description">What the tooltip explains, e.g. <code>Last Updated</code>. The button is announced as "More about {label}": an icon-only button has no name of its own, and "Help" alone wouldn't tell screen reader users which item it explains.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>message</code></c-slot>
+        <c-slot name="description">The text the tooltip shows, in medium weight and above the description when there is one. Text with emphasis only, such as a <code>&lt;strong&gt;</code> in a <code>mark_safe</code> string from the view: no links, buttons or other interactive content. Screen readers announce the tooltip as a status message, so a control inside it wouldn't be announced as one.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>description</code></c-slot>
@@ -1631,23 +1635,27 @@ Sample code here.
       </c-library.item>
     </c-library.list>
 
-    <c-library.list title="Slots" only>
-      <c-library.item only>
-        <c-slot name="label">Default</c-slot>
-        <c-slot name="description">The message. It may contain HTML such as <code>&lt;strong&gt;</code>; it's shown in medium weight, and above the description when there is one.</c-slot>
-      </c-library.item>
-    </c-library.list>
-
     <c-expansion-panel title="Code">
       <c-code>
-      &lt;c-tooltip
-        label="Last Updated"
-        position="right"
-        has_arrow
-        description="Optional supporting text."
-      &gt;
-        The message, which may contain &lt;strong&gt;HTML&lt;/strong&gt;.
-      &lt;/c-tooltip&gt;
+&lt;!-- Dark (default) --&gt;
+&lt;c-tooltip label="the top arrow" message="Top" position="top" has_arrow /&gt;
+&lt;c-tooltip label="the top-start arrow" message="Top start" position="top-start" has_arrow /&gt;
+&lt;c-tooltip label="the top-end arrow" message="Top end" position="top-end" has_arrow /&gt;
+&lt;c-tooltip label="the bottom arrow" message="Bottom" has_arrow /&gt;
+&lt;c-tooltip label="the left arrow" message="Left" position="left" has_arrow /&gt;
+&lt;c-tooltip label="the right arrow" message="Right" position="right" has_arrow /&gt;
+&lt;c-tooltip label="the tooltip without an arrow" message="No arrow" /&gt;
+&lt;c-tooltip label="the tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." /&gt;
+
+&lt;!-- Light --&gt;
+&lt;c-tooltip variant="light" label="the light top arrow" message="Top" position="top" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light top-start arrow" message="Top start" position="top-start" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light top-end arrow" message="Top end" position="top-end" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light bottom arrow" message="Bottom" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light left arrow" message="Left" position="left" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light right arrow" message="Right" position="right" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light tooltip without an arrow" message="No arrow" /&gt;
+&lt;c-tooltip variant="light" label="the light tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

@@ -9,6 +9,7 @@
   has_arrow
   description=""
   label
+  message
   position="bottom"
 />
 
@@ -43,7 +44,7 @@
   {# Copied into the live region on open; Alpine never initialises this copy, so the arrow is positioned from JS #}
   <template x-ref="message">
     <div class="flex flex-col w-max max-w-xs rounded-lg text-xs shadow-[0_12px_8px_rgba(0,0,0,0.08),0_4px_3px_rgba(0,0,0,0.03)] {% if description %} gap-1 p-3{% else %} px-3 py-2{% endif %} {% if variant == 'light' %}bg-white text-greyscale-700{% else %}bg-greyscale-900 text-white{% endif %}">
-      <p class="font-medium">{{ slot }}</p>
+      <p class="font-medium">{{ message }}</p>
       {% if description %}
         <p class="{% if variant == 'light' %}text-greyscale-500{% else %}text-greyscale-200{% endif %}">{{ description }}</p>
       {% endif %}
