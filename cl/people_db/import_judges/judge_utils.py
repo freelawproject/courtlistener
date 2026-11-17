@@ -265,10 +265,7 @@ def get_races(str_race):
         rawraces = [x.strip() for x in str_race.split("/")]
     else:
         rawraces = [str_race]
-    races = []
-    for rawrace in rawraces:
-        races.append(racedict[rawrace])
-    return races
+    return [racedict[rawrace] for rawrace in rawraces]
 
 
 def get_aba(abastr):

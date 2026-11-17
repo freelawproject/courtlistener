@@ -425,7 +425,7 @@ def update_remove_m2m_documents(
         affected_field: The name of the field that has many-to-many
             relationships with the instance.
     """
-    for key, fields_map in mapping_fields.items():
+    for key in mapping_fields.keys():
         if main_model.__name__.lower() != key:
             # The m2m relationship is not defined in the main model but
             # we use the relationship to add data to the ES documents.
@@ -753,7 +753,7 @@ def remove_non_judge_person_and_positions_from_index(
             PersonDocument.__name__, instance.person_id, None
         )
 
-    except (Person.DoesNotExist, ValueError):
+    except Person.DoesNotExist, ValueError:
         # The Person was removed before the Positions.
         # Do nothing all the Positions were removed from the index.
         pass
@@ -969,7 +969,7 @@ class ESSignalProcessor:
 
         if action == "post_add" or action == "post_remove":
             mapping_fields = self.documents_model_mapping["m2m"][sender]
-            for key, fields_map in mapping_fields.items():
+            for fields_map in mapping_fields.values():
                 affected_field = list(fields_map.keys())[0]
                 update_remove_m2m_documents(
                     self.main_model,
@@ -1016,7 +1016,7 @@ class ESSignalProcessor:
                 case _:
                     try:
                         affected_fields = fields_map[instance.type]
-                    except (KeyError, AttributeError):
+                    except KeyError, AttributeError:
                         affected_fields = fields_map["all"]
 
             instance_field = query_string.split("__")[-1]
@@ -1041,7 +1041,7 @@ class ESSignalProcessor:
         for query_string, fields_map in mapping_fields.items():
             try:
                 affected_fields = fields_map[instance.type]
-            except (KeyError, AttributeError):
+            except KeyError, AttributeError:
                 affected_fields = fields_map["all"]
 
             instance_field = query_string.split("__")[-1]

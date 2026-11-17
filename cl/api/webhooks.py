@@ -96,15 +96,15 @@ async def send_old_alerts_webhook_event(
     serialized_very_old_alerts = []
     serialized_disabled_alerts = []
 
-    for very_old_alert in report.very_old_alerts:
-        serialized_very_old_alerts.append(
-            DocketAlertSerializer(very_old_alert.da_alert).data
-        )
+    serialized_very_old_alerts.extend(
+        DocketAlertSerializer(very_old_alert.da_alert).data
+        for very_old_alert in report.very_old_alerts
+    )
 
-    for disabled_alert in report.disabled_alerts:
-        serialized_disabled_alerts.append(
-            DocketAlertSerializer(disabled_alert.da_alert).data
-        )
+    serialized_disabled_alerts.append(
+        DocketAlertSerializer(disabled_alert.da_alert).data
+        for disabled_alert in report.disabled_alerts
+    )
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

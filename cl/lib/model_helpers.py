@@ -267,16 +267,17 @@ def clean_texas_docket_number(docket_number: str | None) -> str:
         if regex.fullmatch(docket_number):
             return docket_number
 
-    tokens = [
+    tokens = (
         # Strip leading and trailing punctuation from tokens since it's likely invalid.
         re.compile(r"^[^a-z0-9]+|[^a-z0-9]+$", re.IGNORECASE).sub("", token)
         for token in docket_number.split()
+    )
+    matching_parts = [
+        token
+        for token in tokens
+        for regex in TEXAS_DN_REGEXES
+        if regex.fullmatch(token)
     ]
-    matching_parts = []
-    for token in tokens:
-        for regex in TEXAS_DN_REGEXES:
-            if regex.fullmatch(token):
-                matching_parts.append(token)
 
     if len(matching_parts) == 0:
         logger.warning(
@@ -690,10 +691,7 @@ def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
 
     (key:, 'value') -> {'value': key}.
     """
-    d = {}
-    for choice, value in c:
-        d[value] = choice
-    return d
+    return {value: choice for choice, value in c}
 
 
 def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:

@@ -31,6 +31,8 @@ lint.select = [
   "PTH",
   # pygrep-hooks
   "PGH",
+  # perflint
+  "PERF",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules
