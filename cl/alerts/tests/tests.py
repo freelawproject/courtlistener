@@ -1030,6 +1030,18 @@ class DocketAlertTest(TestCase):
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
+    @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
+    def test_recap_webhook_task_gets_two_arguments(
+        self, mock_webhooks
+    ) -> None:
+        """RECAP alerts queue the webhook task with its old two arguments.
+
+        Workers still on the old task signature accept them during a deploy.
+        """
+        send_alert_and_webhook(self.docket.pk, self.before)
+
+        self.assertEqual(len(mock_webhooks.delay.call_args.args), 2)
+
 
 class DocketAlertSourceTest(TestCase):
     """Does the per-source alert registry resolve the right queries and templates for RECAP vs. SCOTUS dockets?"""
@@ -1145,6 +1157,30 @@ class DocketAlertSourceTest(TestCase):
             self.scotus_docket.get_alert_source(), SCOTUS_ALERT_SOURCE
         )
 
+    def test_scotus_webhook_payload_takes_two_queries(self) -> None:
+        """Serializing SCOTUS entries_by_pk for webhooks takes two queries.
+
+        That holds however many entries and documents there are.
+        """
+        entries = []
+        for _ in range(2):
+            entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
+            for n in (1, 2):
+                SCOTUSDocumentFactory(docket_entry=entry, attachment_number=n)
+            entries.append(entry)
+
+        with self.assertNumQueries(2):
+            payload = [
+                SCOTUS_ALERT_SOURCE.webhook_serializer(de).data
+                for de in SCOTUS_ALERT_SOURCE.entries_by_pk(
+                    [entry.pk for entry in entries]
+                )
+            ]
+
+        self.assertEqual(
+            [len(entry["scotus_documents"]) for entry in payload], [2, 2]
+        )
+
     def test_entries_since_preloads_what_the_alert_email_renders(self) -> None:
         """Does entries_since load the entries, their docket and their documents (minus plain_text) in two queries, however many entries there are?"""
         before = now()
@@ -1245,6 +1281,36 @@ class DocketAlertScotusTest(TestCase):
         body = mail.outbox[0].body
         self.assertIn("First entry", body)
         self.assertIn("Second entry", body)
+
+    @override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=True)
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_triggering_scotus_docket_webhook(self, mock_post) -> None:
+        """A SCOTUS docket alert sends the SCOTUS entries to the webhook."""
+        WebhookFactory(
+            user=self.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        de = SCOTUSDocketEntryFactory(
+            docket=self.docket, description="SCOTUS entry"
+        )
+        document = SCOTUSDocumentFactory(docket_entry=de)
+        # Entry pks of different sources can collide.
+        DocketEntryFactory(pk=de.pk, description="RECAP entry")
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+
+        content = WebhookEvent.objects.values_list("content", flat=True).get()
+        results = content["payload"]["results"]
+        self.assertEqual([e["description"] for e in results], ["SCOTUS entry"])
+        self.assertEqual(
+            [doc["id"] for doc in results[0]["scotus_documents"]],
+            [document.pk],
+        )
 
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
     def test_scotus_webhooks_are_gated_by_setting(self, mock_webhooks) -> None:
