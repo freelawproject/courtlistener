@@ -853,7 +853,9 @@ class DialogComponentTest(SimpleTestCase):
 class TooltipComponentTest(SimpleTestCase):
     """The c-tooltip component renders a help button and its message."""
 
-    def render(self, source: str, context: dict[str, Any] | None = None) -> str:
+    def render(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
         """Compiles a Cotton snippet and renders it with an optional context."""
         compiled = CottonCompiler().process(source)
         template = engines["django"].from_string(compiled)
@@ -934,10 +936,16 @@ class TooltipComponentTest(SimpleTestCase):
                 self.assertIn(background, self.render(source))
 
     def test_position_is_passed_to_the_anchor(self) -> None:
-        """The position prop sets the x-anchor placement, defaulting to bottom,
-        and pads the live region only on that axis to bridge the hover gap."""
+        """The position prop sets the x-anchor placement and its padding axis.
+
+        Defaults to bottom; only that axis is padded to bridge the hover gap.
+        """
         cases = [
-            ('<c-tooltip label="Item" message="Message" />', "bottom", "py-1.5"),
+            (
+                '<c-tooltip label="Item" message="Message" />',
+                "bottom",
+                "py-1.5",
+            ),
             (
                 '<c-tooltip label="Item" position="top-start" message="Message" />',
                 "top-start",
