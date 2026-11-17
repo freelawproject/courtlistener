@@ -14,7 +14,7 @@ from cl.search.state.florida.models import (
     AltchaChallengeSolution,
     FloridaDocument,
 )
-from cl.search.state.shared import CourtRefused
+from cl.search.state.shared import CourtRefused, ProcessingError
 from cl.tests.cases import SimpleTestCase, TestCase
 
 # A real challenge issued by Florida ACIS and the solution the browser
@@ -213,6 +213,56 @@ class DocumentDownloadTest(TestCase):
                 self.logger.exception.assert_not_called()
                 self.document.refresh_from_db()
                 self.assertFalse(self.document.filepath_local)
+                # Recorded on the row, so a refusal that outlives the task's
+                # retries is distinguishable from a download that never ran.
+                self.assertEqual(
+                    self.document.processing_error,
+                    ProcessingError.HTTP_FORBIDDEN,
+                )
+
+    def test_download_records_missing_document(self) -> None:
+        """Does a 404 from either the challenge endpoint or the document fetch record a bad URL on the document and skip it, so the dead URL isn't retried on every ingest?"""
+        ok_challenge = challenge_response(200, json=CHALLENGE_JSON)
+        missing_document = mock.Mock(status_code=404)
+        missing_document.request.url = REFUSED_URL
+        missing = requests.HTTPError(response=missing_document)
+        cases = {
+            "challenge endpoint": (challenge_response(404), None),
+            "document fetch": (ok_challenge, missing),
+        }
+        for name, (challenge, fetch_error) in cases.items():
+            with self.subTest(name):
+                self.challenge_get.return_value = challenge
+                self.pdf_response.raise_for_status.side_effect = fetch_error
+                self.document.processing_error = None
+                self.document.save()
+                self.logger.reset_mock()
+
+                result = FloridaDocument.download(self.document.pk)
+
+                self.assertIsNone(result)
+                self.document.refresh_from_db()
+                self.assertFalse(self.document.filepath_local)
+                self.assertEqual(
+                    self.document.processing_error, ProcessingError.BAD_URL
+                )
+                # A missing document is the court's answer, not our failure.
+                self.logger.exception.assert_not_called()
+
+    def test_download_success_clears_recorded_refusal(self) -> None:
+        """Once the court relents and the file is stored, is the refusal recorded by an earlier attempt cleared?"""
+        self.document.processing_error = ProcessingError.HTTP_FORBIDDEN
+        self.document.save()
+        self.challenge_get.return_value = challenge_response(
+            200, json=CHALLENGE_JSON
+        )
+
+        result = FloridaDocument.download(self.document.pk)
+
+        self.assertEqual(result, self.document)
+        self.document.refresh_from_db()
+        self.assertTrue(self.document.filepath_local)
+        self.assertIsNone(self.document.processing_error)
 
     def test_download_retries_transient_challenge_failures(self) -> None:
         """Is a dropped connection to the challenge endpoint retried rather than costing us the document?"""

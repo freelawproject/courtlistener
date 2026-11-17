@@ -58,12 +58,13 @@ class DocumentMerger[
 
     @override
     def needs_update(self) -> bool:
-        """Force the update path for a document with no stored file and no recorded processing error -- its download failed transiently, and reporting an update gets the download re-dispatched on re-ingest."""
+        """Force the update path for a document with no stored file whose download failed transiently, either without a recorded error or because the court refused it. Reporting an update gets the download re-dispatched on re-ingest."""
         if not isinstance(state := self.state, MergerState.Update):
             return False
         document = cast(AbstractStateDocument, state.instance)
-        return (
-            not document.filepath_local and document.processing_error is None
+        return not document.filepath_local and document.processing_error in (
+            None,
+            ProcessingError.HTTP_FORBIDDEN,
         )
 
     @override
