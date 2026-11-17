@@ -6384,7 +6384,8 @@ class CentraliaIngestTest(TestCase):
         for orders in ([1, 1], [None, 2], [0, 1]):
             with self.subTest(orders=orders):
                 cluster = OpinionClusterFactory(
-                    docket=DocketFactory(court=self.court)
+                    docket=DocketFactory(court=self.court),
+                    date_filed=date(2024, 1, 1),
                 )
                 seed = OpinionFactory(cluster=cluster, html="", plain_text="")
                 payload = copy.deepcopy(self.multi_payload)
@@ -6421,7 +6422,8 @@ class CentraliaIngestTest(TestCase):
         ):
             with self.subTest(name):
                 cluster = OpinionClusterFactory(
-                    docket=DocketFactory(court=self.court)
+                    docket=DocketFactory(court=self.court),
+                    date_filed=date(2024, 1, 1),
                 )
                 seed = OpinionFactory(cluster=cluster, html="", plain_text="")
                 if add_sibling:
@@ -6484,7 +6486,8 @@ class ExtractStructuredOpinionTest(TestCase):
 
     def setUp(self) -> None:
         self.cluster = OpinionClusterFactory(
-            docket=DocketFactory(court=self.court)
+            docket=DocketFactory(court=self.court),
+            date_filed=date(2024, 1, 1),
         )
         self.seed = OpinionFactory(
             cluster=self.cluster,
