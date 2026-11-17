@@ -2971,7 +2971,7 @@ class TieredCacheTest(SimpleTestCase):
         @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_nothing() -> None:
             self.call_count += 1
-            return None
+            return
 
         self.assertIsNone(get_nothing())
         self.assertEqual(self.call_count, 1)

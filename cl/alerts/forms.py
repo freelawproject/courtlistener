@@ -145,8 +145,7 @@ class CreateAlertForm(ModelForm):
             raise ValidationError(
                 "You can't create a match-all alert. Please try narrowing your query."
             )
-        else:
-            return query
+        return query
 
     def clean_alert_type(self):
         """Validate that the alert type hasn't changed in a disallowed way."""

@@ -222,7 +222,7 @@ async def check_if_feed_changed_base(
         )
         feed_status.status = RssFeedStatus.PROCESSING_FAILED
         await feed_status.asave()
-        return
+        return None
 
     content = rss_feed.response.content
     if not content:
@@ -234,7 +234,7 @@ async def check_if_feed_changed_base(
             logger.warning(str(exc))
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
-            return
+            return None
 
     try:
         rss_feed.response.raise_for_status()
@@ -247,7 +247,7 @@ async def check_if_feed_changed_base(
         )
         feed_status.status = RssFeedStatus.PROCESSING_FAILED
         await feed_status.asave()
-        return
+        return None
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
@@ -266,7 +266,7 @@ async def check_if_feed_changed_base(
             logger.warning(str(exc))
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
-            return
+            return None
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
@@ -278,7 +278,7 @@ async def check_if_feed_changed_base(
         # Abort. Nothing has changed here.
         feed_status.status = RssFeedStatus.UNCHANGED
         await feed_status.asave()
-        return
+        return None
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge.",
@@ -308,8 +308,7 @@ async def check_if_feed_changed_base(
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
             return None
-        else:
-            raise exc
+        raise exc
 
     return rss_feed.data
 
@@ -319,8 +318,7 @@ def hash_item(item):
     """Hash an RSS item. Item should be a dict at this stage."""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
-    item_hash = sha256(item_j)
-    return item_hash
+    return sha256(item_j)
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed

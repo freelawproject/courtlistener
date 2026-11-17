@@ -328,14 +328,13 @@ class Command(CommandUtils, BaseCommand):
             if matching_cluster:
                 # Match found, return object
                 return matching_cluster
-            else:
-                logger.info(
-                    "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
-                    cap_case_id,
-                    reporter_slug,
-                    volume,
-                    page,
-                )
+            logger.info(
+                "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
+                cap_case_id,
+                reporter_slug,
+                volume,
+                page,
+            )
 
         except Exception as e:
             logger.exception(

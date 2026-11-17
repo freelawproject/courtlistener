@@ -61,12 +61,11 @@ NOS_EXCLUSIONS = [
 
 def get_fjc_rows():
     """Get the FJC IDB rows from the 2017 and 2020 civil datasets filed since 2014, excluding some natures of suit."""
-    items = FjcIntegratedDatabase.objects.exclude(
+    return FjcIntegratedDatabase.objects.exclude(
         nature_of_suit__in=NOS_EXCLUSIONS,
     ).filter(
         date_filed__gte="2014-01-01", dataset_source__in=[CV_2017, CV_2020]
     )
-    return items
 
 
 def get_everything_sample(options, sample_size):
@@ -156,12 +155,10 @@ def get_dockets(
                 court_id=row.district_id,
                 session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                    "doc_num_end": doc_num_end,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=False,
+                doc_num_end=doc_num_end,
             ).set(queue=q),
         ).apply_async()
 

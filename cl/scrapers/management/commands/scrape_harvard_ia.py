@@ -62,12 +62,11 @@ def fetch_ia_volumes(
     vol_pattern = "|".join(
         rf"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
-    results = [
+    return [
         res
         for res in results
         if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
-    return results
 
 
 def download_file(ia_key: str, file_name) -> None:

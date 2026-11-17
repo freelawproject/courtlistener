@@ -4358,8 +4358,7 @@ def mock_bucket_open(message_id, r, read_file=False):
     if read_file:
         with open(test_dir / message_id, "rb") as file:
             return file.read()
-    recap_mail_example = open(test_dir / message_id, "rb")
-    return recap_mail_example
+    return open(test_dir / message_id, "rb")
 
 
 class DebugRecapUploadtest(TestCase):

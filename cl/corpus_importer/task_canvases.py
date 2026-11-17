@@ -34,11 +34,9 @@ def get_docket_and_claims(
             court_id=court,
             session_data=cookies_data,
             tag_names=tags,
-            **{
-                "show_parties_and_counsel": True,
-                "show_terminated_parties": True,
-                "show_list_of_member_cases": False,
-            },
+            show_parties_and_counsel=True,
+            show_terminated_parties=True,
+            show_list_of_member_cases=False,
         ).set(queue=q),
         get_bankr_claims_registry.s(
             session_data=cookies_data, tag_names=tags

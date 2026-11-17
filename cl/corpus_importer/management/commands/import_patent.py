@@ -84,12 +84,10 @@ def get_dockets(options: dict) -> None:
                     court_id=item.district_id,
                     session_data=session_data,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                        "doc_num_end": "",  # No end doc num
-                    },
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
+                    doc_num_end="",  # No end doc num
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -102,11 +100,9 @@ def get_dockets(options: dict) -> None:
                     session_data=session_data,
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                    },
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
                 ).set(queue=q),
             ).apply_async()
 

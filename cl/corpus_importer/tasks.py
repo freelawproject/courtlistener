@@ -412,11 +412,11 @@ async def download_recap_item(
             )
         r.raise_for_status()
     except TimeoutException:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
     except HTTPError as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
     except OSError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             tmp.write(r.content)
@@ -814,14 +814,13 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
-        else:
-            msg = (
-                "Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None
+        msg = (
+            "Ran into unknown HTTPError while getting PDF: "
+            f"{exc.response.status_code}. Aborting."
+        )
+        logger.error(msg)
+        self.request.chain = None
+        return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -1737,7 +1736,7 @@ def probe_or_scrape_iquery_pages(
                 exc,
             )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         except HTTPStatusError:
             # Set expiration accordingly and value to 2 to difference from
@@ -1781,7 +1780,7 @@ def probe_or_scrape_iquery_pages(
                     next_blocked_court_wait / 3600,
                 )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         if report is not None:
             # Find and update/store the Docket.
@@ -1817,7 +1816,7 @@ def probe_or_scrape_iquery_pages(
             highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
         )
         delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-        return None
+        return
 
     if not reports_data:
         today = localtime().weekday()
@@ -2227,11 +2226,10 @@ def get_attachment_page_by_rd(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting."
-            logger.error(msg, exc.response.status_code)
-            self.request.chain = None
-            return None
+        msg = "Ran into unknown HTTPError. %s. Aborting."
+        logger.error(msg, exc.response.status_code)
+        self.request.chain = None
+        return None
     except RequestError as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
@@ -2352,7 +2350,7 @@ def create_attachment_pq(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
+    return ProcessingQueue(
         court_id=rd.docket_entry.docket.court_id,
         pacer_doc_id=rd.pacer_doc_id,
         uploader=user,
@@ -2360,7 +2358,6 @@ def create_attachment_pq(
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
         source=source,
     )
-    return pq
 
 
 @app.task(bind=True, ignore_result=True)
@@ -2945,7 +2942,7 @@ def get_pacer_doc_by_rd_and_description(
         msg = f"Aborting. Did not find civil cover sheet for {rd}."
         logger.error(msg)
         self.request.chain = None
-        return None
+        return
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -3026,7 +3023,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             logger.error("%s Aborting.", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3140,7 +3137,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3178,7 +3175,7 @@ async def query_and_save_list_of_creditors_base(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return None
+            return
 
         # Check if HTML report for this docket_number already exists, if so
         # omit it. Otherwise, query the pacer_case_id and the list of creditors
@@ -3201,7 +3198,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             if not result:
                 logger.info(
@@ -3214,7 +3211,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             pacer_case_id = result.get("pacer_case_id")
             if not pacer_case_id:
@@ -3228,7 +3225,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             logger.info("File %s doesn't exist.", html_file)
             logger.info(
@@ -3252,7 +3249,7 @@ async def query_and_save_list_of_creditors_base(
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
                 logger.info("Invalid POST param for %s, aborting...", court_id)
-                return None
+                return
 
             await report.query(
                 pacer_case_id=pacer_case_id,
@@ -3678,7 +3675,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Docket %s does not exist; skipping.",
             docket_id,
         )
-        return None
+        return
 
     scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
 
@@ -3688,7 +3685,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: No questions_presented_url for docket %s.",
             docket_id,
         )
-        return None
+        return
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
@@ -3697,7 +3694,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "for docket %s; skipping.",
             docket_id,
         )
-        return None
+        return
 
     logger.info(
         "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
@@ -3714,7 +3711,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 docket_id,
                 qp_url,
             )
-            return None
+            return
 
         tmp, _ = result
         filename = f"{docket_id}-qp.pdf"
@@ -5691,7 +5688,8 @@ def fl_ingest_docket_task(
         )
 
     merger = FloridaDocketMerger(scrape=case, params=case.entries)
-    result = merger.merge()
+    with transaction.atomic():
+        result = merger.merge()
     if result.failures:
         logger.error(
             "An error occurred while merging Florida case %s: %s",
@@ -5811,7 +5809,7 @@ def merge_state_scrape_row(
         return
 
     try:
-        label, result = loader_class.merge_payload(payload)
+        label, result, files = loader_class.merge_payload(payload)
     except ValidationError as error:
         logger.error(
             "Row %s of the %s run no longer validates for %s: %s",
@@ -5860,7 +5858,7 @@ def merge_state_scrape_row(
 
     if result.success:
         logger.info("Merged row %s of the %s run (%s)", row, loader, label)
-        ledger.merged(row, result)
+        ledger.merged(row, result, files)
     else:
         logger.error(
             "Merge of row %s of the %s run (%s) reported failures: %s",
@@ -5870,7 +5868,7 @@ def merge_state_scrape_row(
             result.failures,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        ledger.rejected(row, result)
+        ledger.rejected(row, result, files)
 
     if not extract:
         return

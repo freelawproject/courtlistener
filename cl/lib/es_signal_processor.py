@@ -1,7 +1,8 @@
 """Signal handlers that keep Elasticsearch documents in sync with their models."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from functools import partial
+from typing import Literal
 
 from celery.canvas import chain
 from django.conf import settings
@@ -68,7 +69,10 @@ from cl.search.types import (
     ESModelType,
 )
 
-type DocumentModelMapping = dict[str, dict[type[Model], dict]]
+type DocumentModelMapping = Mapping[
+    Literal["save", "delete", "m2m", "reverse", "reverse-delete"],
+    Mapping[type[Model], dict],
+]
 
 
 def check_fields_that_changed(
@@ -163,8 +167,7 @@ def updated_fields(
         return []
 
     # Check each tracked field to see if it has changed
-    changed_fields = check_fields_that_changed(instance, tracked_set)
-    return changed_fields
+    return check_fields_that_changed(instance, tracked_set)
 
 
 def get_fields_to_update(
@@ -871,7 +874,7 @@ class ESSignalProcessor:
             # If the save includes 'view_count' in the update fields, abort
             # the operation.This indicates that a user view is incrementing
             # the 'view_count' for dockets and opinions.
-            return None
+            return
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
@@ -1002,14 +1005,14 @@ class ESSignalProcessor:
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
+                        return
                 case Opinion() if self.es_document is OpinionClusterDocument:  # type: ignore
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
+                        return
                 case _:
                     try:
                         affected_fields = fields_map[instance.type]

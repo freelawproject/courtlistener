@@ -750,8 +750,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def __str__(self) -> str:
         if self.case_name:
             return force_str(f"{self.pk}: {self.case_name}")
-        else:
-            return f"{self.pk}"
+        return f"{self.pk}"
 
     def save(self, update_fields=None, *args, **kwargs):
         """Save the docket, updating its slug and filling in its docket number core.
@@ -974,12 +973,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
             if not self.pacer_case_id:
                 return self.pacer_appellate_url_with_caseNum(path)
-            elif self.pacer_case_id.count("-") > 1:
+            if self.pacer_case_id.count("-") > 1:
                 return self.pacer_acms_url()
-            else:
-                return self.pacer_appellate_url_with_caseId(path)
-        else:
-            return self.pacer_district_url("DktRpt.pl")
+            return self.pacer_appellate_url_with_caseId(path)
+        return self.pacer_district_url("DktRpt.pl")
 
     @property
     def scotus_docket_url(self) -> str:
@@ -1450,7 +1447,7 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
-        elif self.document_type == self.ATTACHMENT:
+        if self.document_type == self.ATTACHMENT:
             return reverse(
                 "view_recap_attachment",
                 kwargs={
@@ -1460,6 +1457,7 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
+        return None
 
     def get_authorities_url(self) -> str:
         """Get the URL of the page listing the opinions this document or attachment cites."""
@@ -1473,15 +1471,14 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
-        else:
-            return reverse(
-                "view_document_authorities",
-                kwargs={
-                    "docket_id": self.docket_entry.docket.pk,
-                    "doc_num": self.document_number,
-                    "slug": self.docket_entry.docket.slug,
-                },
-            )
+        return reverse(
+            "view_document_authorities",
+            kwargs={
+                "docket_id": self.docket_entry.docket.pk,
+                "doc_num": self.document_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
 
     def is_acms_document(self) -> bool:
         """Checks if the document is from ACMS based on the presence of hyphens in the pacer_doc_id.
@@ -1509,7 +1506,7 @@ class RECAPDocument(
                     f"{self.docket_entry.docket.pacer_case_id}/"
                     f"{self.pacer_doc_id}"
                 )
-            elif court.jurisdiction == Court.FEDERAL_APPELLATE:
+            if court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
                 template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
@@ -1518,25 +1515,23 @@ class RECAPDocument(
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
-        else:
-            if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                return ""
-            else:
-                attachment_number = self.attachment_number or ""
-                return (
-                    "https://ecf.{court_id}.uscourts.gov/cgi-bin/"
-                    "show_case_doc?"
-                    "{document_number},"
-                    "{pacer_case_id},"
-                    "{attachment_number},"
-                    "{magic_number},".format(
-                        court_id=court_id,
-                        document_number=self.document_number,
-                        pacer_case_id=self.docket_entry.docket.pacer_case_id,
-                        attachment_number=attachment_number,
-                        magic_number="",  # For future use.
-                    )
-                )
+        if court.jurisdiction == Court.FEDERAL_APPELLATE:
+            return ""
+        attachment_number = self.attachment_number or ""
+        return (
+            "https://ecf.{court_id}.uscourts.gov/cgi-bin/"
+            "show_case_doc?"
+            "{document_number},"
+            "{pacer_case_id},"
+            "{attachment_number},"
+            "{magic_number},".format(
+                court_id=court_id,
+                document_number=self.document_number,
+                pacer_case_id=self.docket_entry.docket.pacer_case_id,
+                attachment_number=attachment_number,
+                magic_number="",  # For future use.
+            )
+        )
 
     @property
     def has_valid_pdf(self) -> bool:
@@ -2760,7 +2755,7 @@ class OpinionCluster(AbstractDateTimeModel):
                 caption += f", {citations[0]}"
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
-            elif (
+            if (
                 len(citations) >= 2
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
@@ -2806,7 +2801,7 @@ class OpinionCluster(AbstractDateTimeModel):
                 caption += f", {citations[0]}"
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
-            elif (
+            if (
                 len(citations) >= 2
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
@@ -2974,8 +2969,7 @@ class OpinionCluster(AbstractDateTimeModel):
     def __str__(self) -> str:
         if self.case_name:
             return f"{self.pk}: {self.case_name}"
-        else:
-            return f"{self.pk}"
+        return f"{self.pk}"
 
     def get_absolute_url(self) -> str:
         """Get the URL of the cluster's page."""
@@ -3193,26 +3187,24 @@ def sort_cites(c):
     if c.type == Citation.FEDERAL:
         if c.reporter == "U.S.":
             return 1.1
-        elif c.reporter == "S. Ct.":
+        if c.reporter == "S. Ct.":
             return 1.2
-        elif "L. Ed." in c.reporter:
+        if "L. Ed." in c.reporter:
             return 1.3
-        else:
-            return 1.4
-    elif c.type == Citation.SCOTUS_EARLY:
+        return 1.4
+    if c.type == Citation.SCOTUS_EARLY:
         return 2
-    elif c.type == Citation.SPECIALTY:
+    if c.type == Citation.SPECIALTY:
         return 3
-    elif c.type == Citation.STATE_REGIONAL:
+    if c.type == Citation.STATE_REGIONAL:
         return 4
-    elif c.type == Citation.STATE:
+    if c.type == Citation.STATE:
         return 5
-    elif c.type == Citation.WEST:
+    if c.type == Citation.WEST:
         return 6
-    elif c.type == Citation.LEXIS:
+    if c.type == Citation.LEXIS:
         return 7
-    else:
-        return 8
+    return 8
 
 
 OPINION_TEXT_SOURCE_FIELDS = [

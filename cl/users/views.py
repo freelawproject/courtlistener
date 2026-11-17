@@ -670,10 +670,9 @@ def register(request: HttpRequest) -> HttpResponse:
 
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
-                        logger.error(
+                        logger.exception(
                             "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
                             str(e),
-                            exc_info=True,
                         )
 
                         form.add_error(
@@ -701,10 +700,9 @@ def register(request: HttpRequest) -> HttpResponse:
             "register/register.html",
             {"form": form, "consent_form": consent_form, "private": False},
         )
-    else:
-        # The user is already logged in. Direct them to their settings page as
-        # a logical fallback
-        return HttpResponseRedirect(reverse("view_settings"))
+    # The user is already logged in. Direct them to their settings page as
+    # a logical fallback
+    return HttpResponseRedirect(reverse("view_settings"))
 
 
 @never_cache

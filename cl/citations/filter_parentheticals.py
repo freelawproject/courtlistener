@@ -94,5 +94,4 @@ def clean_parenthetical_text(text: str) -> str:
     # Remove weird "word ----- word" stuff (but don't screw up something like "123 U.S. ---")
     text = re.sub(r" [_-]{4,} ", " ", text)
     # Remove excess whitespace that may have appeared as a result of sequential dash sequences
-    text = re.sub(r"\s+", " ", text)
-    return text
+    return re.sub(r"\s+", " ", text)
