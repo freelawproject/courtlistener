@@ -1,3 +1,5 @@
+"""Models for Los Angeles Superior Court dockets and their contents."""
+
 from pathlib import Path
 
 from django.contrib.contenttypes.fields import (
@@ -16,6 +18,8 @@ from cl.lib.string_utils import trunc
 
 
 class UPLOAD_TYPE:
+    """Types of uploaded LASC JSON files."""
+
     DOCKET = 1
     NAMES = ((DOCKET, "JSON Docket"),)
 
@@ -41,7 +45,7 @@ class LASCJSON(AbstractJSON, AbstractDateTimeModel):
 
 
 class LASCPDF(AbstractPDF, AbstractDateTimeModel):
-    """Use the content framework to associate PDFs with our dockets"""
+    """Use the content framework to associate PDFs with our dockets."""
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -93,7 +97,7 @@ class LASCPDF(AbstractPDF, AbstractDateTimeModel):
 
 
 class QueuedCase(AbstractDateTimeModel):
-    """Cases we have yet to fetch
+    """Cases we have yet to fetch.
 
     This table is populated by crawling the date search interface.
     """
@@ -123,6 +127,7 @@ class QueuedCase(AbstractDateTimeModel):
 
     @property
     def case_url(self):
+        """The LASC API URL for the case."""
         return "/".join(
             ["https://media.lacourt.org/api/AzureApi", self.internal_case_id]
         )
@@ -147,6 +152,7 @@ class CaseIDQuerySet(models.query.QuerySet):
     """
 
     def filter(self, *args, **kwargs):
+        """Filter as usual, also accepting a ``case_id`` keyword."""
         clone = self._clone()
         case_id = kwargs.pop("case_id", None)
         if case_id:
@@ -165,7 +171,7 @@ class CaseIDQuerySet(models.query.QuerySet):
 
 
 class Docket(AbstractDateTimeModel):
-    """High-level table to contain all other LASC-related data"""
+    """High-level table to contain all other LASC-related data."""
 
     json_document = GenericRelation(
         LASCJSON,
@@ -268,6 +274,7 @@ class Docket(AbstractDateTimeModel):
 
     @property
     def case_id(self):
+        """The docket number, district, and division code, joined by semicolons."""
         return ";".join(
             [self.docket_number, self.district, self.division_code]
         )
@@ -298,6 +305,7 @@ class QueuedPDF(AbstractDateTimeModel):
 
     @property
     def document_url(self):
+        """The LASC API URL for viewing the document."""
         return "/".join(
             [
                 "https://media.lacourt.org/api/AzureApi/ViewDocument",
@@ -314,9 +322,7 @@ class QueuedPDF(AbstractDateTimeModel):
 
 
 class DocumentImage(AbstractDateTimeModel):
-    """Represents documents that are filed and scanned into the online system,
-    most of which are available to us.
-    """
+    """Represents documents that are filed and scanned into the online system, most of which are available to us."""
 
     """
         # caseNumber
@@ -450,9 +456,7 @@ class DocumentImage(AbstractDateTimeModel):
 
 
 class DocumentFiled(AbstractDateTimeModel):
-    """Filings on the docket whether or not they're digitally available to
-    anyone accessing the system.
-    """
+    """Filings on the docket whether or not they're digitally available to anyone accessing the system."""
 
     """
     # "CaseNumber": "18STCV02953",
@@ -491,7 +495,7 @@ class DocumentFiled(AbstractDateTimeModel):
 
 
 class Action(AbstractDateTimeModel):
-    """Actions registered on a docket"""
+    """Actions registered on a docket."""
 
     """
         # "IsPurchaseable": false,
@@ -576,7 +580,8 @@ class CrossReference(AbstractDateTimeModel):
 
 
 class Party(AbstractDateTimeModel):
-    """
+    """Party.
+
     # "EntityNumber": "3",
     # "PartyFlag": "L",
     # "DateOfBirthString": "",
@@ -591,7 +596,6 @@ class Party(AbstractDateTimeModel):
     # "DivisionCode": "CV",
     # "PartyTypeCode": "D",
     # "Name": "HERNANDEZ ANGEL ORTIZ AKA ANGEL HERNANDEZ"
-
     """
 
     docket = models.ForeignKey(
@@ -636,6 +640,8 @@ class Party(AbstractDateTimeModel):
 
 
 class TIME_CHOICES:
+    """Whether a proceeding is in the past or the future."""
+
     PAST = 1
     FUTURE = 2
     NAMES = (
@@ -645,19 +651,26 @@ class TIME_CHOICES:
 
 
 class PastProceedingManager(models.Manager):
+    """Manager for proceedings in the past."""
+
     def get_queryset(self):
+        """Get only past proceedings."""
         super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.PAST)
 
 
 class FutureProceedingManager(models.Manager):
+    """Manager for proceedings in the future."""
+
     def get_queryset(self):
+        """Get only future proceedings."""
         super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.FUTURE)
 
 
 class Proceeding(AbstractDateTimeModel):
-    """
+    """Proceeding.
+
     "ProceedingDateString": "08/24/2018",
     "CourtAlt": "",
     "CaseNumber": "BZ215634",
@@ -672,7 +685,7 @@ class Proceeding(AbstractDateTimeModel):
     "Judge": "Lowry, Stephen M.",
     "CourthouseName": "",
     "DivisionCode": "",
-    "Event": "DSU - RFO (Modification Hearing)
+    "Event": "DSU - RFO (Modification Hearing)"
     """
 
     docket = models.ForeignKey(
@@ -739,8 +752,7 @@ class Proceeding(AbstractDateTimeModel):
 
 
 class TentativeRuling(AbstractDateTimeModel):
-    """
-    Sample data taken from random cases.
+    """Sample data taken from random cases.
 
     "CaseNumber": "VC065473",
     "HearingDate": "2019-07-11T00:00:00-07:00",

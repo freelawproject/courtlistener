@@ -1,3 +1,5 @@
+"""Signal handlers that track the latest PACER case IDs and schedule iquery sweeps."""
+
 from functools import partial
 
 from django.conf import settings
@@ -27,12 +29,11 @@ def update_latest_case_id_and_schedule_iquery_sweep(
 
     Note: Provide either a Docket instance or a court_id with fixed_case_id_sweep.
 
-    :param docket: The Docket instance, if triggered by a Docket post_save signal.
-    :param court_pk: The court ID, if triggered in fixed sweep mode.
-    :param fixed_case_id_sweep: The target case ID for performing a fixed sweep.
-    :return: None
+    Args:
+        docket: The Docket instance, if triggered by a Docket post_save signal.
+        court_pk: The court ID, if triggered in fixed sweep mode.
+        fixed_case_id_sweep: The target case ID for performing a fixed sweep.
     """
-
     r = get_redis_interface("CACHE")
     court_id: str
     incoming_pacer_case_id: int
@@ -93,7 +94,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(
                     tasks_to_schedule,
                     court_id,
                 )
-                return None
+                return
 
             task_to_schedule_count = 0
             while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
@@ -153,10 +154,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(
 def handle_update_latest_case_id_and_schedule_iquery_sweep(
     sender, instance: Docket, created=False, update_fields=None, **kwargs
 ) -> None:
-    """post_save Docket signal receiver to handle
-    update_latest_case_id_and_schedule_iquery_sweep
-    """
-
+    """post_save Docket signal receiver to handle update_latest_case_id_and_schedule_iquery_sweep."""
     if not settings.IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED and getattr(
         instance, "skip_iquery_sweep", True
     ):
@@ -164,13 +162,13 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         # doesn't have skip_iquery_sweep set, abort it. This is a Docket
         # created by an upload or another RECAP source different from the
         # iquery probe daemon.
-        return None
+        return
 
     if getattr(instance, "skip_iquery_sweep", False):
         # This is an instance added by the probe_or_scrape_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
-        return None
+        return
 
     # Only call update_latest_case_id_and_schedule_iquery_sweep if:
     # - The docket belongs to a RECAP district or bankruptcy court,

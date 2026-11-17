@@ -33,6 +33,7 @@
         {'href': '#banner', 'text': 'Banner'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
+        {'href': '#profile-section-shell', 'text': 'Profile section shell'},
         {'href': '#docket-page', 'text': 'Docket page'},
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
@@ -1340,14 +1341,15 @@ Sample code here.
   {# ICON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="icon">
     <h2 class="mt-6 mb-3">Icon</h2>
-    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text colour. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has a label. A one-off icon that needs none of this can keep using the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag. The component only takes the props below and drops any other attribute, such as an <code>id</code> or an Alpine binding, so use the tag when the <code>&lt;svg&gt;</code> needs one.</p>
+    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text color. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has an <code>aria_label</code>.</p>
+    <p>Without the component, the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag from <code>svg_tags</code> inlines the same file and adds the attributes you pass, written in snake case, for example <code>{% templatetag openblock %} svg "magnifier" class="size-4" aria_hidden="true" {% templatetag closeblock %}</code>. Use it for a one-off icon that needs no sizing or variant logic, or when the <code>&lt;svg&gt;</code> needs an attribute the component doesn't take, such as an <code>id</code> or an Alpine binding (<code>x_bind__class</code>): the component only takes the props below and drops anything else.</p>
 
     <h4 class="mt-3">Demo</h4>
 
     <h5 class="mt-3">Sizes</h5>
     <div class="my-4 flex flex-row flex-wrap items-end gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
       <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" />sm (16px, default)</span>
-      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="md" label="Zoom"/>md (20px)</span>
+      <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="md" />md (20px)</span>
       <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="lg" />lg (24px)</span>
       <span class="flex flex-col items-center gap-1"><c-icon name="magnifier" size="custom" class="size-3" />custom</span>
     </div>
@@ -1356,6 +1358,11 @@ Sample code here.
     <div class="my-4 flex flex-row flex-wrap items-center gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
       <span class="flex items-center gap-2"><c-icon name="bell" class="text-greyscale-400" />Filled</span>
       <span class="flex items-center gap-2"><c-icon name="bell" outline />Outline</span>
+    </div>
+
+    <h5 class="mt-3">With an aria_label</h5>
+    <div class="my-4 flex flex-row flex-wrap items-center gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
+      <span class="flex items-center gap-2"><c-icon name="circle_question_mark" size="md" aria_label="Help" />Screen readers announce this icon as "Help".</span>
     </div>
 
     <c-library.list title="Props" only>
@@ -1369,10 +1376,10 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>outline</code></c-slot>
-        <c-slot name="description">Renders the <code>&lt;name&gt;_outline</code> file instead of the filled one. Pass it bare (<code>outline</code>) or bound (<code>:outline="is_current"</code>). Any non-empty string counts as set, including <code>"false"</code>. Only for icons that have an <code>_outline</code> file.</c-slot>
+        <c-slot name="description">Renders the <code>&lt;name&gt;_outline</code> file instead of the filled one. Pass it bare (<code>outline</code>) or bound to a boolean from the context (<code>:outline="show_outline"</code>). Any non-empty string counts as set, including <code>"false"</code>. Only for icons that have an <code>_outline</code> file.</c-slot>
       </c-library.item>
       <c-library.item optional only>
-        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="label"><code>aria_label</code></c-slot>
         <c-slot name="description">Accessible name, for an icon that carries meaning on its own. Without it the icon is decorative and gets <code>aria-hidden="true"</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
@@ -1388,11 +1395,12 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-icon name="magnifier" /&gt;
-&lt;c-icon name="magnifier" size="md" class="text-greyscale-400" /&gt;
-&lt;c-icon name="chevron" size="custom" class="size-3" /&gt;
+&lt;c-icon name="magnifier" size="md" /&gt;
+&lt;c-icon name="magnifier" size="lg" /&gt;
+&lt;c-icon name="magnifier" size="custom" class="size-3" /&gt;
+&lt;c-icon name="bell" /&gt;
 &lt;c-icon name="bell" outline /&gt;
-&lt;c-icon name="bell" :outline="is_outline" /&gt;
-&lt;c-icon name="circle_question_mark" label="Help" /&gt;
+&lt;c-icon name="circle_question_mark" size="md" aria_label="Help" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1630,6 +1638,51 @@ Sample code here.
           link_text="Go to Case"&gt;
           &lt;p&gt;It looks like you're trying to search for &lt;strong&gt;Miranda v. Arizona,&lt;/strong&gt; from 1966.&lt;/p&gt;
         &lt;/c-banner&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# PROFILE SECTION SHELL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="profile-section-shell">
+    <h2 class="mt-6 mb-3">Profile section shell</h2>
+    <p>Responsive shell shared by authenticated profile pages. It renders the profile navigation on desktop and page-specific content in its default slot. It owns the page's <code>h1</code>, so the page's own headings start at <code>h2</code>.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>active_section</code></c-slot>
+        <c-slot name="description">The active profile section: <code>"alerts"</code>, <code>"notes"</code>, <code>"tags"</code>, <code>"developer_tools"</code>, <code>"prayers"</code>, <code>"support"</code>, or <code>"account"</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>request</code></c-slot>
+        <c-slot name="description">The current request. The Tags and Prayers links use its user's username.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>csrf_token</code></c-slot>
+        <c-slot name="description">The page's CSRF token, for the Sign out form. Required because the shell is rendered with <code>only</code>, which hides the page's context.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional classes applied to the outer container.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Page-specific profile content rendered beside the desktop navigation and below the mobile heading.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-profile-section-shell
+  active_section="developer_tools"
+  :request="request"
+  :csrf_token="csrf_token"
+  only
+&gt;
+  &lt;!-- Page-specific content --&gt;
+&lt;/c-profile-section-shell&gt;
       </c-code>
     </c-expansion-panel>
   </section>

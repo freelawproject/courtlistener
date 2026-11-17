@@ -1,3 +1,5 @@
+"""Models for LLM prompts, requests, and the tasks within them."""
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -12,7 +14,7 @@ from cl.lib.storage import S3PrivateLLMStorage
 
 
 class LLMProvider(models.IntegerChoices):
-    """LLM Provider choices"""
+    """LLM Provider choices."""
 
     GEMINI = 1, "Google Gemini"
     OPENAI = 2, "OpenAI"
@@ -20,7 +22,7 @@ class LLMProvider(models.IntegerChoices):
 
 
 class LLMTaskChoices(models.IntegerChoices):
-    """LLM Task choices"""
+    """LLM Task choices."""
 
     SCAN_EXTRACTION = 1, "Extract text from scan"
     SCRAPER_EXTRACTION = 2, "Extract text from scraped documents"
@@ -29,7 +31,7 @@ class LLMTaskChoices(models.IntegerChoices):
 
 
 class LLMTaskStatusChoices(models.IntegerChoices):
-    """LLM Task status choices"""
+    """LLM Task status choices."""
 
     UNPROCESSED = 0, "Unprocessed"
     IN_PROGRESS = 1, "In Progress"
@@ -39,7 +41,7 @@ class LLMTaskStatusChoices(models.IntegerChoices):
 
 
 class LLMRequestStatusChoices(models.IntegerChoices):
-    """LLM Request status choices"""
+    """LLM Request status choices."""
 
     UNPROCESSED = 0, "Unprocessed"
     IN_PROGRESS = 1, "In Progress"
@@ -49,7 +51,7 @@ class LLMRequestStatusChoices(models.IntegerChoices):
 
 
 class PromptTypes(models.IntegerChoices):
-    """Prompt type choices"""
+    """Prompt type choices."""
 
     SYSTEM = 1, "System"
     USER = 2, "User"

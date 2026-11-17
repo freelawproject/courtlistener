@@ -1,3 +1,5 @@
+"""Template tags for requiring and rendering a page's scripts."""
+
 import logging
 from pathlib import Path
 
@@ -17,26 +19,21 @@ register = template.Library()
 
 
 def _script_registry_for(request):
-    """
-    Gets or sets the script registry for this request.
-    """
+    """Gets or sets the script registry for this request."""
     if not hasattr(request, "_required_component_scripts"):
         setattr(request, "_required_component_scripts", dict())
     return request._required_component_scripts
 
 
 def _extensionless_registry_for(request: HttpRequest) -> set[str]:
-    """
-    Gets or sets the registry of scripts required without an extension.
-    """
+    """Gets or sets the registry of scripts required without an extension."""
     if not hasattr(request, "_extensionless_scripts"):
         setattr(request, "_extensionless_scripts", set())
     return request._extensionless_scripts
 
 
 def _coerce_defer(value, script_path):
-    """
-    Accepts the real booleans True/False or the strings 'true'/'false'.
+    """Accepts the real booleans True/False or the strings 'true'/'false'.
 
     Raises:
         TemplateSyntaxError: any other value.
@@ -91,18 +88,21 @@ def _warn_about_unusable_scripts(request: HttpRequest) -> None:
     for path_stub in getattr(request, "_extensionless_scripts", ()):
         for problem in _script_problems(path_stub):
             logger.warning(
-                f"require_script: {problem}. Requiring '{path_stub}' without "
+                "require_script: %s. Requiring '%s' without "
                 "an extension needs a .js for DEBUG and a .min.js for "
                 "production — commit both, or require the script with its "
-                "'.js' extension."
+                "'.js' extension.",
+                problem,
+                path_stub,
             )
 
 
 @register.simple_tag(takes_context=True)
 def require_script(context, script_path, **kwargs):
-    """
-    Register .js scripts required for a given template. To enable the use of minified files
-    in production only, simply omit the extension in the script_path.
+    """Register .js scripts required for a given template.
+
+    To enable the use of minified files in production only, simply omit the
+    extension in the script_path.
 
     Usage:
         {% load component_tags %}
@@ -155,8 +155,7 @@ def require_script(context, script_path, **kwargs):
 
 @register.simple_tag(takes_context=True)
 def render_required_scripts(context):
-    """
-    Renders the required scripts for this request right before the Alpine script.
+    """Renders the required scripts for this request right before the Alpine script.
 
     Marks the request as rendered: a require_script after this point raises
     instead of registering a script that would never be emitted.

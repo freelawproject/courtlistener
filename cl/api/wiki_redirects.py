@@ -172,11 +172,12 @@ def _add_redirects(
     differs between them is how a row's middle column resolves to a
     destination URL, so that's the one piece each call site supplies.
 
-    :param patterns: The patterns list to append the built redirects to.
-    :param table: Rows of (old_path, url_key, url_name | "").
-    :param url_resolver: Converts a row's url_key into the destination
-        URL, e.g. a wiki_suffix appended to a base URL, or a settings
-        attribute name looked up via getattr.
+    Args:
+        patterns: The patterns list to append the built redirects to.
+        table: Rows of (old_path, url_key, url_name | "").
+        url_resolver: Converts a row's url_key into the destination
+            URL, e.g. a wiki_suffix appended to a base URL, or a settings
+            attribute name looked up via getattr.
     """
     for old_path, url_key, name in table:
         patterns.append(

@@ -1,6 +1,4 @@
-"""
-Functional testing of courtlistener RSS feeds
-"""
+"""Functional testing of courtlistener RSS feeds."""
 
 import os
 
@@ -18,7 +16,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
 class FeedsFunctionalTest(BaseSeleniumTest):
-    """Tests the feed rendering and functionality"""
+    """Tests the feed rendering and functionality."""
 
     fixtures = [
         "test_court.json",
@@ -30,9 +28,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(
         self,
     ) -> None:
-        """
-        Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
-        """
+        """Can the RSS feed for ALL jurisdictions render properly in an RSS reader?"""
         f = feedparser.parse(
             f"{self.live_server_url}{reverse('all_jurisdictions_feed')}"
         )
@@ -43,9 +39,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
 
     def test_court_opinion_rss_feeds_usable_in_rss_reader(self) -> None:
-        """
-        Can the RSS feeds be properly used in an RSS Reader?
-        """
+        """Can the RSS feeds be properly used in an RSS Reader?"""
         url = "{}{}".format(
             self.live_server_url,
             reverse("jurisdiction_feed", kwargs={"court": "test"}),
@@ -59,10 +53,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
 
     def test_opinion_rss_feeds_contain_valid_attachment_links(self) -> None:
-        """
-        For Opinions with stored PDFs, does the feed provide valid links
-        to the CourtListener copy of the original PDF?
-        """
+        """For Opinions with stored PDFs, does the feed provide valid links to the CourtListener copy of the original PDF?"""
         f = feedparser.parse(
             f"{self.live_server_url}{reverse('all_jurisdictions_feed')}"
         )
@@ -72,9 +63,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertTrue(len(entry.enclosures[0].type) > 0)
 
     def test_oral_argument_feeds_contain_valid_mp3_links(self) -> None:
-        """
-        For Oral Arguments, does the feed provide valid links to MP3 content?
-        """
+        """For Oral Arguments, does the feed provide valid links to MP3 content?"""
         f = feedparser.parse(
             f"{self.live_server_url}{reverse('all_jurisdictions_podcast')}"
         )
@@ -84,9 +73,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_based_opinion_feed(self) -> None:
-        """
-        Can a user perform a search via CL and use the RSS feed feature?
-        """
+        """Can a user perform a search via CL and use the RSS feed feature?"""
         # Dora goes to CL and searches for Bonvini
         self.browser.get(self.live_server_url)
         self.browser.find_element(By.ID, "id_q").send_keys("bonvini")

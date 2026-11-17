@@ -1,3 +1,5 @@
+"""Settings for user sign-up and storing email bounces and complaints."""
+
 import environ
 
 env = environ.FileAwareEnv()

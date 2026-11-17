@@ -1,3 +1,5 @@
+"""Django admin configuration for unmatched citations."""
+
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 
@@ -8,6 +10,8 @@ from cl.citations.models import (
 
 
 class UnmatchedCitationAdminMixin(CursorPaginatorAdmin):
+    """Shared admin settings for unmatched citations."""
+
     list_filter = ("type", "status")
     search_fields = (
         "volume",
@@ -16,6 +20,7 @@ class UnmatchedCitationAdminMixin(CursorPaginatorAdmin):
     )
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
+        """Show the status field's choices as bare values, described in its help text."""
         if db_field.name == "status":
             # Show only integer values in the dropdown
             kwargs["choices"] = [
@@ -36,6 +41,8 @@ class UnmatchedCitationAdminMixin(CursorPaginatorAdmin):
 
 @admin.register(UnmatchedCitation)
 class UnmatchedCitationAdmin(UnmatchedCitationAdminMixin):
+    """Admin for unmatched citations from opinions."""
+
     list_display = (
         "__str__",
         "citing_opinion",
@@ -46,6 +53,8 @@ class UnmatchedCitationAdmin(UnmatchedCitationAdminMixin):
 
 @admin.register(UnmatchedCitationFromRECAPDocument)
 class UnmatchedCitationFromRECAPDocumentAdmin(UnmatchedCitationAdminMixin):
+    """Admin for unmatched citations from RECAP documents."""
+
     list_display = (
         "__str__",
         "citing_recapdocument",

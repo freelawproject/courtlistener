@@ -1,3 +1,5 @@
+"""Make PNG thumbnails of PDF documents."""
+
 from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
 
@@ -10,14 +12,15 @@ async def make_png_thumbnail_for_instance[M: AbstractPDF](
     klass: type[M],
     max_dimension: int,
 ) -> int:
-    """Abstract function for making a thumbnail for a PDF
+    """Abstract function for making a thumbnail for a PDF.
 
     This function is a candidate for removal. Do not continue building off this
     function. Instead, use the approach provided by BTE.
 
-    :param pk: The PK of the item to make a thumbnail for
-    :param klass: The class of the instance
-    :param max_dimension: The longest you want any edge to be
+    Args:
+        pk: The PK of the item to make a thumbnail for
+        klass: The class of the instance
+        max_dimension: The longest you want any edge to be
     """
     item = await klass.objects.aget(pk=pk)
     response = await microservice(

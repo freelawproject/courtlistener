@@ -1,3 +1,5 @@
+"""Scrape PACER iquery pages across courts."""
+
 import itertools
 import time
 from typing import TypedDict
@@ -18,6 +20,8 @@ from cl.search.models import Court, Docket
 
 
 class OptionsType(TypedDict):
+    """The command options used when scraping iquery pages."""
+
     queue: str
     courts: list[str]
     iterations: int
@@ -27,8 +31,8 @@ class OptionsType(TypedDict):
 def add_all_cases_to_cl(options: OptionsType) -> None:
     """Iterate over courts and gather iquery results from them.
 
-    :param options: The options from the handle method
-    :return None
+    Args:
+        options: The options from the handle method
     """
     q = options["queue"]
     r = get_redis_interface("CACHE")
@@ -151,9 +155,12 @@ def update_open_cases(options) -> None:
 
 
 class Command(VerboseCommand):
+    """Run the ``everything`` or ``byu-project`` iquery task."""
+
     help = "Scrape all iquery pages sequentially."
 
     def add_arguments(self, parser: CommandParser):
+        """Add the queue, courts, iteration, task, and skip-rows options."""
         parser.add_argument(
             "--queue",
             default="batch2",
@@ -194,6 +201,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task."""
         if options["task"] == "everything":
             add_all_cases_to_cl(options)
         elif options["task"] == "byu-project":

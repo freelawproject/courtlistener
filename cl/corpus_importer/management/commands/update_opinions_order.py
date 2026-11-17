@@ -1,3 +1,5 @@
+"""Set the ordering key of sub-opinions in Harvard and Columbia clusters."""
+
 import argparse
 import re
 import time
@@ -13,17 +15,16 @@ from cl.search.models import Opinion, OpinionCluster
 
 
 def sort_harvard_opinions(options: dict) -> None:
-    """Sort harvard opinions
+    """Sort harvard opinions.
 
     We assume that harvard data is already ordered, we just need to fill
     the order field in each opinion
 
     The harvard importer created the opinions in order of appearance in the file
 
-    :param options: dict of arguments passed to the command
-    :return: None
+    Args:
+        options: dict of arguments passed to the command
     """
-
     skip_until = options.get("skip_until", None)
     limit = options.get("limit", None)
 
@@ -87,18 +88,20 @@ def sort_harvard_opinions(options: dict) -> None:
 
 
 def fetch_cleaned_columbia_text(filepath: str) -> str:
-    """Get cleaned columbia content to compare opinions against
+    """Get cleaned columbia content to compare opinions against.
 
-    :param filepath: the filepath
-    :return: the opinion text cleaned up
+    Args:
+        filepath: the filepath
+
+    Returns:
+        the opinion text cleaned up
     """
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
 
     columbia_xml = BeautifulSoup(content, "html.parser")
     clean_columbia_text = re.sub(r"[^a-zA-Z0-9\s]+", " ", columbia_xml.text)
-    clean_columbia_text = re.sub(r"\s+", " ", clean_columbia_text)
-    return clean_columbia_text
+    return re.sub(r"\s+", " ", clean_columbia_text)
 
 
 def generate_ngrams(words: list[str]) -> list[list[str]]:
@@ -109,8 +112,11 @@ def generate_ngrams(words: list[str]) -> list[list[str]]:
 
     Default to a 5 word n-gram unless opinion is very small
 
-    :param words: a list of words obtained splitting the opinion
-    :return: n-grams
+    Args:
+        words: a list of words obtained splitting the opinion
+
+    Returns:
+        n-grams
     """
     width = 5
     if len(words) <= 5:
@@ -121,15 +127,18 @@ def generate_ngrams(words: list[str]) -> list[list[str]]:
 
 
 def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
-    """Identify a unique set of text in opinions to identify order of opinions
+    """Identify a unique set of text in opinions to identify order of opinions.
 
     In a small subset of opinions, duplicate text or bad data fails and assign the
     end of the index. These opinions are usually short dissents that we add to be the
     back of the order.
 
-    :param opinions: Opinions to sort
-    :param xml_dir: Path to directory of the xml files
-    :return: Ordered opinion list
+    Args:
+        opinions: Opinions to sort
+        xml_dir: Path to directory of the xml files
+
+    Returns:
+        Ordered opinion list
     """
     _, _, _, local_path = opinions[0]
     filepath = local_path.replace("/home/mlissner/columbia/opinions", xml_dir)
@@ -153,15 +162,14 @@ def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
                 match_index = columbia_words.find(phrase)
                 break
         matches.append([opinion_id, opinion_type, match_index])
-    ordered_opinions = sorted(matches, key=lambda x: x[-1])
-    return ordered_opinions
+    return sorted(matches, key=lambda x: x[-1])
 
 
 def sort_columbia_opinions(options: dict) -> None:
-    """Update opinion ordering for columbia clusters
+    """Update opinion ordering for columbia clusters.
 
-    :param options: dict of arguments passed to the command
-    :return: None
+    Args:
+        options: dict of arguments passed to the command
     """
     xml_dir = options["xml_dir"]
     skip_until = options.get("skip_until", None)
@@ -193,7 +201,7 @@ def sort_columbia_opinions(options: dict) -> None:
             # Only one opinion is shown, no need to order
             logger.info("Skipping opinion cluster with only one opinion.")
             continue
-        elif (
+        if (
             len(op_types) == 2
             and Opinion.LEAD in op_types
             and len(set(op_types)) == 2
@@ -223,12 +231,20 @@ def sort_columbia_opinions(options: dict) -> None:
 
 
 class Command(VerboseCommand):
+    """Sort the sub-opinions of Harvard or Columbia clusters."""
+
     help = "Add ordering Key for sub opinions"
 
     def __init__(self, *args, **kwargs):
+        """Build the command."""
         super().__init__(*args, **kwargs)
 
     def valid_actions(self, s):
+        """Parse an action name into its function.
+
+        Raises:
+            argparse.ArgumentTypeError: If the action is unknown.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -239,6 +255,7 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        """Add the skip-until, limit, action, delay, and XML directory options."""
         parser.add_argument(
             "--skip-until",
             help="Specific cluster id to skip until",
@@ -274,6 +291,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen action."""
         super().handle(*args, **options)
         options["action"](options)
 

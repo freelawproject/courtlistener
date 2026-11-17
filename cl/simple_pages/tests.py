@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -188,8 +189,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     async def test_spam_message_is_rejected(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Do we reject it if people put a phone number in the phone_number
-        field?
+        """Do we reject it if people put a phone number in the phone_number field?
 
         We should! The phone_number field is labeled as the Subject field in the
         UI. Anything putting a phone number in here is a bot to be rejected.
@@ -289,7 +289,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
 
 class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
-        """Make sure a page has a valid HTML title"""
+        """Make sure a page has a valid HTML title."""
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -306,9 +306,12 @@ class PageLoadTestMixin(TestCase):
     async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
-        :param reverse_param: Params that can be sent to Django's reverse
-        function to get a URL path.
-        :return: The response object.
+        Args:
+            reverse_param: Params that can be sent to Django's reverse
+                function to get a URL path.
+
+        Returns:
+            The response object.
         """
         path = reverse(**reverse_param)
         r = await self.async_client.get(path)
@@ -418,6 +421,11 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     # (reverse_param, expected WIP template)
     WIP_PAGES: list[tuple[dict[str, Any], str]] = []
 
+    # WIP pages that redirect anonymous visitors to sign in
+    AUTHENTICATED_WIP_PAGES: list[tuple[dict[str, Any], str]] = [
+        ({"viewname": "view_api"}, "wip_profile/api.html"),
+    ]
+
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
         """Returns the legacy template a v2 one replaces, None otherwise."""
@@ -443,6 +451,18 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             except TemplateDoesNotExist:
                 continue
         return None
+
+    def _iter_wip_pages(self) -> Iterator[tuple[dict[str, Any], str]]:
+        """Yields every registered WIP page, anonymous ones first.
+
+        Logs self.client in before yielding AUTHENTICATED_WIP_PAGES, so
+        callers must request each page with self.client as they iterate.
+        """
+        yield from self.WIP_PAGES
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        yield from self.AUTHENTICATED_WIP_PAGES
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -473,7 +493,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     @override_flag(WIP_PROPS["flag"], active=True)
     def test_wip_pages(self) -> None:
         """Do all registered WIP pages load with both redesign flags?"""
-        for reverse_param, wip_template in self.WIP_PAGES:
+        for reverse_param, wip_template in self._iter_wip_pages():
             with self.subTest(
                 "Checking WIP page", reverse_params=reverse_param
             ):
@@ -488,7 +508,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         Each one falls back to its v2_ template, then its legacy one, or is
         a 404 when the page has neither.
         """
-        for reverse_param, wip_template in self.WIP_PAGES:
+        for reverse_param, wip_template in self._iter_wip_pages():
             with self.subTest(
                 "Checking WIP page", reverse_params=reverse_param
             ):
@@ -512,8 +532,7 @@ class NewBaseViewCountTest(TestCase):
     """
 
     async def test_untracked_page_sends_no_view_count(self) -> None:
-        """A v2 page whose view is not decorated carries no label, no endpoint
-        and no store, so the browser makes no request."""
+        """A v2 page whose view is not decorated carries no label, no endpoint and no store, so the browser makes no request."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertTemplateUsed(r, "new_base.html")
         html = r.content.decode()
@@ -832,8 +851,7 @@ class DialogComponentTest(SimpleTestCase):
 
 
 class IconComponentTest(SimpleTestCase):
-    """The c-icon component sizes the icon, picks its variant and sets its
-    accessibility attributes."""
+    """Tests sizing, variant selection and accessibility of c-icon."""
 
     def render(
         self, source: str, context: dict[str, Any] | None = None
@@ -848,27 +866,33 @@ class IconComponentTest(SimpleTestCase):
         return fromstring(html).xpath("//path/@d")
 
     def test_icon_is_hidden_from_assistive_technology_by_default(self) -> None:
-        """An icon without a label is decorative."""
+        """An icon without an aria_label is decorative."""
         icon = fromstring(self.render('<c-icon name="chevron" />'))
         self.assertEqual(icon.get("aria-hidden"), "true")
         self.assertIsNone(icon.get("aria-label"))
 
-    def test_label_gives_the_icon_an_accessible_name(self) -> None:
-        """A labelled icon is named and not hidden."""
+    def test_aria_label_gives_the_icon_an_accessible_name(self) -> None:
+        """An icon with an aria_label is named and not hidden."""
         icon = fromstring(
-            self.render('<c-icon name="chevron" label="Next page" />')
+            self.render('<c-icon name="chevron" aria_label="Next page" />')
         )
         self.assertEqual(icon.get("aria-label"), "Next page")
         self.assertIsNone(icon.get("aria-hidden"))
 
-    def test_bound_label_is_escaped(self) -> None:
-        """A label bound from the context can't break out of its attribute."""
+    def test_bound_aria_label_is_escaped(self) -> None:
+        """An aria_label bound from the context can't break out of its attribute."""
         html = self.render(
-            '<c-icon name="chevron" :label="name" />',
+            '<c-icon name="chevron" :aria_label="name" />',
             {"name": 'A "b" <c> & d'},
         )
         self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
         self.assertNotIn("<c>", html)
+
+    def test_renders_without_surrounding_whitespace(self) -> None:
+        """The icon can sit inline next to text without adding a space."""
+        html = self.render('<c-icon name="chevron" />')
+        self.assertTrue(html.startswith("<svg"), repr(html[:20]))
+        self.assertTrue(html.endswith("</svg>"), repr(html[-20:]))
 
     def test_bound_class_is_escaped(self) -> None:
         """A class bound from the context can't add attributes to the icon."""
@@ -924,8 +948,7 @@ class IconComponentTest(SimpleTestCase):
         )
 
     def test_custom_size_leaves_sizing_to_class(self) -> None:
-        """A custom size sets no size class, so the caller's size can't
-        compete with one."""
+        """A custom size sets no size class, leaving sizing to `class`."""
         icon = fromstring(
             self.render(
                 '<c-icon name="chevron" size="custom" class="size-3" />'

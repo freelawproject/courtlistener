@@ -1,3 +1,5 @@
+"""Import Tennessee workers' compensation board opinions."""
+
 import argparse
 import json
 import logging
@@ -19,15 +21,18 @@ from cl.scrapers.tasks import extract_opinion_content
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion
 
+logger = logging.getLogger(__name__)
+
 
 def make_item(case):
-    """Make an import item for our save everything function
+    """Make an import item for our save everything function.
 
-    :param case: Case data received from the court.
-    :return: Case information.
-    :type: dict
+    Args:
+        case: Case data received from the court.
+
+    Returns:
+        dict: Case information.
     """
-
     judges = case["judge"]
     first_name = judges.split(" ")[0].title()
 
@@ -71,25 +76,25 @@ def import_tn_corpus(
     file: IO,
     ocr_available: bool,
 ) -> None:
-    """Import TN Corpus
+    """Import TN Corpus.
 
-    :param log: Should we view logging info
-    :param skip_until: Label ID, if any, to process first, else False to
-    indicate no skipping.
-    :param file: Location of our overriding data json file
-    :param ocr_available: Whether you can do OCR during the import
-    :return: None
+    Args:
+        log: Should we view logging info
+        skip_until: Label ID, if any, to process first, else False to
+            indicate no skipping.
+        file: Location of our overriding data json file
+        ocr_available: Whether you can do OCR during the import
     """
     ready = False if skip_until else True
 
     if log:
         logging.getLogger().setLevel(logging.INFO)
 
-    logging.info("Starting import")
+    logger.info("Starting import")
     tn_corpus = sorted(json.load(file), key=lambda x: x["label"])
     if not ready:
         case = [x for x in tn_corpus if x["label"] == skip_until][0]
-        logging.info(
+        logger.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
     courts = {
@@ -102,7 +107,7 @@ def import_tn_corpus(
             ready = True
         if not ready:
             continue
-        logging.info(
+        logger.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
         pdf_path = glob(f"{os.path.dirname(file.name)}/{case['label']}/*.pdf")[
@@ -115,7 +120,7 @@ def import_tn_corpus(
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
             op = ops[0]
-            logging.warning(
+            logger.warning(
                 "Document already in database. See: %s at %s",
                 op.get_absolute_url(),
                 op.cluster.case_name,
@@ -141,15 +146,18 @@ def import_tn_corpus(
             opinions[0].pk,
             ocr_available=ocr_available,
         )
-        logging.info(
+        logger.info(
             "Successfully added Tennessee object cluster: %s", cluster.id
         )
 
 
 class Command(VerboseCommand):
+    """Import the Tennessee workers' compensation corpus from a data file."""
+
     help = "Import TN data corpus received from TN Workers Comp boards."
 
     def add_arguments(self, parser):
+        """Add the input file, log, and skip-until options."""
         parser.add_argument(
             "--input-file",
             type=argparse.FileType("r"),
@@ -169,6 +177,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the corpus from the input file."""
         super().handle(*args, **options)
         import_tn_corpus(
             options["log"],

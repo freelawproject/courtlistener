@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Find and clean up duplicated appellate docket entries."""
 
 from datetime import datetime
 
@@ -12,16 +13,14 @@ from cl.search.models import Docket, DocketEntry, RECAPDocument
 def clean_up_duplicate_appellate_entries(
     courts_ids: list[str], after_date: datetime | None, clean: bool
 ) -> None:
-    """Find and clean duplicated appellate entries after courts enabled
-    document numbers.
+    """Find and clean duplicated appellate entries after courts enabled document numbers.
 
-    :param courts_ids: The list of court IDs to search for duplicate entries.
-    :param after_date: Optional. Search for duplicate entries after this date.
-    :param clean: True if a cleanup should be performed, or False to only
-    report how many entries will be cleaned.
-    :return: None
+    Args:
+        courts_ids: The list of court IDs to search for duplicate entries.
+        after_date: Optional. Search for duplicate entries after this date.
+        clean: True if a cleanup should be performed, or False to only
+            report how many entries will be cleaned.
     """
-
     # Default dates when courts enabled document numbers, used to look for
     # duplicates after these dates.
     default_after_date_times = {"ca5": "2023-01-08", "ca11": "2022-10-01"}
@@ -99,12 +98,15 @@ def clean_up_duplicate_appellate_entries(
 
 
 class Command(VerboseCommand):
+    """Find, and optionally clean up, duplicated appellate entries in some courts."""
+
     help = (
         "Find and clean duplicated appellate entries after courts enable "
         "document numbers."
     )
 
     def add_arguments(self, parser):
+        """Add the clean flag and the court and date options."""
         parser.add_argument(
             "--clean",
             action="store_true",
@@ -127,6 +129,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Find duplicated entries in the courts, cleaning them up with ``--clean``."""
         after_date = options["after_date"]
         clean_up_duplicate_appellate_entries(
             options["courts"], after_date, clean=options["clean"]

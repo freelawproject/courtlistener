@@ -1,3 +1,5 @@
+"""Django admin configuration for search alerts, docket alerts, and scheduled hits."""
+
 from django.contrib import admin
 
 from cl.alerts.models import (
@@ -9,6 +11,8 @@ from cl.alerts.models import (
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
+    """Admin for search alerts."""
+
     list_filter = ("rate",)
     list_display = (
         "name",
@@ -20,12 +24,16 @@ class AlertAdmin(admin.ModelAdmin):
 
 
 class AlertInline(admin.TabularInline):
+    """Inline for editing search alerts on a parent object's admin page."""
+
     model = Alert
     extra = 1
 
 
 @admin.register(DocketAlert)
 class DocketAlertAdmin(admin.ModelAdmin):
+    """Admin for docket alerts."""
+
     list_display = (
         "__str__",
         "user",
@@ -40,6 +48,8 @@ class DocketAlertAdmin(admin.ModelAdmin):
 
 
 class DocketAlertInline(admin.TabularInline):
+    """Inline for editing docket alerts on a parent object's admin page."""
+
     model = DocketAlert
     extra = 1
 
@@ -51,6 +61,8 @@ class DocketAlertInline(admin.TabularInline):
 
 @admin.register(ScheduledAlertHit)
 class ScheduledAlertHitAdmin(admin.ModelAdmin):
+    """Admin for search alert hits awaiting a scheduled email."""
+
     list_display = (
         "id",
         "user",
@@ -64,4 +76,5 @@ class ScheduledAlertHitAdmin(admin.ModelAdmin):
     )
 
     def alert_rate(self, obj):
+        """Display the rate of the hit's alert."""
         return obj.alert.rate

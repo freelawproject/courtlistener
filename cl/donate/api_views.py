@@ -1,3 +1,5 @@
+"""REST API endpoint that processes Neon membership webhooks."""
+
 import datetime
 import logging
 from collections import defaultdict
@@ -42,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
+    """A Neon membership webhook payload."""
+
     eventTrigger = serializers.CharField(required=True)
     eventTimestamp = serializers.DateTimeField(required=True)
     data = serializers.DictField()
@@ -50,6 +54,8 @@ class NeonMembershipWebhookSerializer(serializers.Serializer):
 class MembershipWebhookViewSet(
     mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
+    """API endpoint that receives membership webhooks from Neon."""
+
     permission_classes = [AllowNeonWebhook]
     # Neon posts from a few fixed addresses with no API user, so the
     # default anonymous throttles count every webhook it sends against a
@@ -62,8 +68,7 @@ class MembershipWebhookViewSet(
     queryset = NeonMembership.objects.all()
 
     def create(self, request: Request, *args, **kwargs):
-        """
-        Processes membership webhooks received from Neon CRM.
+        """Processes membership webhooks received from Neon CRM.
 
         This method handles POST requests containing JSON data from Neon CRM.
         It extracts relevant information from the data and updates the
@@ -71,6 +76,8 @@ class MembershipWebhookViewSet(
 
         Args:
             request (Request): A request object containing the webhook data.
+            *args: Unused.
+            **kwargs: Unused.
 
         Returns:
             Response: A HttpResponse object with status code 200 if successful,
@@ -98,8 +105,7 @@ class MembershipWebhookViewSet(
         return Response(status=HTTPStatus.CREATED)
 
     def _get_address_from_neon_response(self, addresses: list[dict[str, str]]):
-        """
-        Retrieves an address from the Neon response.
+        """Retrieves an address from the Neon response.
 
         Args:
             addresses: An array of dictionaries representing addresses.
@@ -108,8 +114,7 @@ class MembershipWebhookViewSet(
             A dictionary containing the first address if available, otherwise a defaultdict.
         """
         if not addresses:
-            address = defaultdict(lambda: "")
-            return address
+            return defaultdict(lambda: "")
 
         return {
             # Neon API returns an array of addresses.
@@ -121,8 +126,7 @@ class MembershipWebhookViewSet(
         }
 
     def _get_member_record(self, account_id: str) -> User:
-        """
-        Retrieves a user record associated with a Neon CRM account ID.
+        """Retrieves a user record associated with a Neon CRM account ID.
 
         This method attempts to find a matching Django user in two ways:
 
@@ -190,8 +194,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
-        """
-        Extracts relevant membership information from a Neon webhook payload.
+        """Extracts relevant membership information from a Neon webhook payload.
 
         Args:
             webhook_data (dict[str, str]): The payload received from a Neon
@@ -243,10 +246,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _map_trigger_value(trigger_event: str) -> int:
-        """
-        Maps a string trigger event received from a Neon webhook to the
-        corresponding integer value representing the trigger event type in
-        the NeonWebhookEvent model.
+        """Maps a string trigger event received from a Neon webhook to the corresponding integer value representing the trigger event type in the NeonWebhookEvent model.
 
         Args:
             trigger_event (str): The string representing the trigger event
@@ -351,7 +351,7 @@ class MembershipWebhookViewSet(
             # issues.
             #
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-            return None
+            return
 
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
@@ -384,7 +384,7 @@ class MembershipWebhookViewSet(
                     email["from_email"],
                     [user.email],
                 )
-                return None
+                return
 
             if not user.profile.email_confirmed:
                 if user.profile.stub_account:
@@ -457,3 +457,4 @@ class MembershipWebhookViewSet(
             )
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
+        return None

@@ -1,3 +1,5 @@
+"""Back-scrape oral arguments from court sites over a range."""
+
 import asyncio
 
 from juriscraper.AbstractSite import logger
@@ -11,11 +13,18 @@ from cl.scrapers.utils import save_response
 
 
 class Command(cl_scrape_oral_arguments.Command):
+    """Scrape oral arguments by walking each site's back-scrape iterable."""
+
     def add_arguments(self, parser):
+        """Add the oral argument scraper options plus the back-scrape range options."""
         super().add_arguments(parser)
         add_backscraper_arguments(parser)
 
     async def parse_and_scrape_site(self, mod, options: dict):
+        """Scrape every page of the site's back-scrape iterable as a full back-scrape.
+
+        Waits ``backscrape_wait`` seconds after each page, if set.
+        """
         court_str = mod.__name__.split(".")[-1].split("_")[0]
         logger.info(f'Using court_str: "{court_str}"')
 

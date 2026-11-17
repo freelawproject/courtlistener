@@ -797,7 +797,7 @@ audio_v4_fields.update(
 
 
 class PrayAndPayTestCase(TestCase):
-    """Pray And Pay test case factories"""
+    """Pray And Pay test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -847,7 +847,7 @@ class PrayAndPayTestCase(TestCase):
 
 
 class CourtTestCase(TestCase):
-    """Court test case factories"""
+    """Court test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -869,7 +869,7 @@ class CourtTestCase(TestCase):
 
 
 class PeopleTestCase(CourtTestCase):
-    """People test case factories"""
+    """People test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1015,7 +1015,7 @@ class PeopleTestCase(CourtTestCase):
 
 
 class SearchTestCase(PeopleTestCase):
-    """Search test case factories"""
+    """Search test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1226,7 +1226,7 @@ class SearchTestCase(PeopleTestCase):
 
 
 class RECAPSearchTestCase(TestCase):
-    """RECAP Search test case factories"""
+    """RECAP Search test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1398,7 +1398,7 @@ class SitemapTest(TestCase):
 
 
 class AudioTestCase(TestCase):
-    """Audio test case factories"""
+    """Audio test case factories."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1439,7 +1439,7 @@ class AudioTestCase(TestCase):
 
 
 class AudioESTestCase(TestCase):
-    """Audio test case factories for ES"""
+    """Audio test case factories for ES."""
 
     fixtures = [
         "test_court.json",
@@ -1558,16 +1558,18 @@ def skip_if_common_tests_skipped[S, **P, R](
 def generate_docket_target_sources(
     initial_sources: list[int], incoming_source: int
 ) -> dict[str, str]:
-    """Generates a mapping for testing of docket target sources based on
-    initial sources and an incoming source.
+    """Generates a mapping for testing of docket target sources based on initial sources and an incoming source.
 
-    :param initial_sources: A list of integers representing the initial source
-     values.
-    :param incoming_source: An integer representing the incoming source value
-    to be added to each of the initial sources.
-    :return: A dict mapping from initial source names to target source names,
-    based on the sum of the initial source value and the incoming source value.
-    e.g: {"RECAP": "COLUMBIA_AND_RECAP"}
+    Args:
+        initial_sources: A list of integers representing the initial source
+            values.
+        incoming_source: An integer representing the incoming source value
+            to be added to each of the initial sources.
+
+    Returns:
+        A dict mapping from initial source names to target source names,
+        based on the sum of the initial source value and the incoming source value.
+        e.g: {"RECAP": "COLUMBIA_AND_RECAP"}
     """
     inverse_sources = {
         value: key

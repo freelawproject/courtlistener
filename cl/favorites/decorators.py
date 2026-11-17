@@ -1,3 +1,5 @@
+"""View decorators that set up view tracking in the template context."""
+
 from collections.abc import Coroutine
 from functools import wraps
 from inspect import iscoroutinefunction
@@ -16,9 +18,7 @@ def track_view_counter[
     Request: HttpRequest,
     Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
 ](tracks: str, label_format: str) -> DjangoViewDecorator[P, Request, Response]:
-    """
-    Decorator to injects a tracking label into template responses for event
-    counting (e.g., view tracking).
+    """Decorator to injects a tracking label into template responses for event counting (e.g., view tracking).
 
     This decorator is meant to be used on views that return a
     SimpleTemplateResponse. It will extract a model instance from the response's
@@ -49,9 +49,7 @@ def track_view_counter[
             track_attribute: str,
             template: str,
         ) -> int:
-            """
-            Generates a tracking label string based on a model instance found
-            in the response.
+            """Generates a tracking label string based on a model instance found in the response.
 
             This helper function extracts a model instance from the response's
             context_data using the provided key, then formats a label using the
@@ -72,8 +70,7 @@ def track_view_counter[
                     f"Response context_data is None (attempting to track {track_attribute})"
                 )
             model = response.context_data[track_attribute]
-            label = template % (model.id)
-            return label
+            return template % (model.id)
 
         if iscoroutinefunction(func):
 
