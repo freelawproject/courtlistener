@@ -6509,10 +6509,9 @@ class ExtractStructuredOpinionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
-        with open(
-            CentraliaIngestTest.test_dir / "centralia_payload_multi.json",
-            encoding="utf-8",
-        ) as f:
+        with (
+            CentraliaIngestTest.test_dir / "centralia_payload_multi.json"
+        ).open(encoding="utf-8") as f:
             cls.multi_payload = json.load(f)
 
     def setUp(self) -> None:
