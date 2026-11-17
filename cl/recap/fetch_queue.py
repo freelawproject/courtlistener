@@ -29,12 +29,16 @@ turn, so one user's large batch cannot hold up another user's single request.
                                         courts that don't use the default rate
 """
 
+import logging
 import time
 
 from django.conf import settings
+from redis.exceptions import RedisError
 
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import get_redis_interface, release_redis_lock
+
+logger = logging.getLogger(__name__)
 
 KEY_PREFIX = "recap_fetch"
 
@@ -42,6 +46,11 @@ KEY_PREFIX = "recap_fetch"
 # and allows the next one. Without this, a request lost between Redis and
 # Celery would block its court forever.
 PENDING_TTL_SECONDS = 5 * 60
+
+# How long a court's next key outlives its interval. The key only needs to
+# exist until the interval ends; the margin keeps clock drift between servers
+# from expiring it early.
+NEXT_KEY_GRACE_MS = 60 * 1000
 
 # The daemon renews its heartbeat every cycle, about twice a second. If it
 # goes this long without one, we assume it is down and stop queueing.
@@ -81,6 +90,24 @@ else
 end
 redis.call('SET', KEYS[4], pk, 'EX', tonumber(ARGV[2]))
 return pk
+"""
+
+# Start a court's interval and release it, but only if the request that
+# started is the one the court is waiting on. Requests that didn't come
+# through the queue, or that the court already gave up on, change nothing.
+# The next key expires a little after the interval ends, so idle courts leave
+# nothing behind. Only its value decides when the court is ready.
+#
+# KEYS: the court's pending key, the court's next key
+# ARGV: the PK that started, the time the court may be sent its next request
+#       (ms), how long the next key lives (ms)
+START_SCRIPT = """
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+    return 0
+end
+redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3])
+redis.call('DEL', KEYS[1])
+return 1
 """
 
 
@@ -275,24 +302,56 @@ def get_pending_fetch(court_id: str) -> int | None:
 
 def mark_fetch_started(
     court_id: str, fq_pk: int, now_ms: int | None = None
-) -> None:
+) -> bool:
     """Record that a court's handed-off request has started running.
 
-    The court's interval is counted from this moment.
+    The court's interval is counted from this moment. Nothing happens unless
+    the court is waiting on this exact request, so it is safe to call for
+    any fetch, queued or not, and more than once.
 
     Args:
         court_id: The court the request was sent to.
         fq_pk: The PK of the PacerFetchQueue row that started.
         now_ms: The current time in milliseconds. Only tests should set it.
+
+    Returns:
+        True if the court was waiting on this request and is now released.
     """
     now_ms = _now_ms() if now_ms is None else now_ms
+    interval_ms = get_court_interval_ms(court_id)
     r = get_redis_interface("CACHE")
-    # Order matters: set the next allowed time before releasing the court, so
-    # there is never a moment when the court looks free and unthrottled.
-    r.set(_next_key(court_id), now_ms + get_court_interval_ms(court_id))
-    # Only clear the marker if it still names this request, so a slow caller
-    # cannot release a newer request's hold on the court.
-    release_redis_lock(r, _pending_key(court_id), str(fq_pk))
+    started = r.eval(
+        START_SCRIPT,
+        2,
+        _pending_key(court_id),
+        _next_key(court_id),
+        str(fq_pk),
+        now_ms + interval_ms,
+        interval_ms + NEXT_KEY_GRACE_MS,
+    )
+    return bool(started)
+
+
+def report_fetch_started(court_id: str, fq_pk: int) -> None:
+    """Tell the queue that a fetch task is about to query PACER.
+
+    Fetch tasks call this so their court is released right away. Several of
+    them run inside a database transaction, so the daemon can't see their
+    status change until they finish.
+
+    It never raises: if Redis is unreachable, the daemon still releases the
+    court once it sees the task's status, or after PENDING_TTL_SECONDS.
+
+    Args:
+        court_id: The court the task is querying.
+        fq_pk: The PK of the PacerFetchQueue row the task is processing.
+    """
+    try:
+        mark_fetch_started(court_id, fq_pk)
+    except RedisError:
+        logger.warning(
+            "Unable to tell the fetch queue that request %s started.", fq_pk
+        )
 
 
 def clear_pending_fetch(court_id: str, fq_pk: int) -> None:

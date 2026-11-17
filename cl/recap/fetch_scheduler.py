@@ -148,8 +148,9 @@ def run_dispatch_cycle() -> int:
     """Hand off at most one request per court, for each court that is ready.
 
     A court is ready when its previous request has started and its interval
-    has passed since then. "Started" is read from PostgreSQL: the fetch tasks
-    move the row out of ENQUEUED as their first step.
+    has passed since then. The fetch tasks report their start in Redis (see
+    report_fetch_started). As a fallback, a row that has left ENQUEUED in
+    PostgreSQL also counts as started.
 
     Safe to run from several processes at once.
 

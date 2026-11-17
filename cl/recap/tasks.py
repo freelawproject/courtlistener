@@ -110,6 +110,7 @@ from cl.lib.storage import (
     read_file_bytes,
 )
 from cl.lib.string_diff import find_best_match
+from cl.recap.fetch_queue import report_fetch_started
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
@@ -2104,6 +2105,9 @@ def fetch_pacer_doc_by_rd_base(
         raise self.retry()
 
     async_to_sync(mark_fq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    # This task runs in a transaction, so the scheduler can't see the status
+    # change above until it ends. Release the court in Redis instead.
+    report_fetch_started(rd.docket_entry.docket.court_id, fq.pk)
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -2321,6 +2325,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         raise self.retry()
 
     async_to_sync(mark_fq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    # This task runs in a transaction, so the scheduler can't see the status
+    # change above until it ends. Release the court in Redis instead.
+    report_fetch_started(court_id, fq.pk)
     if not pacer_doc_id:
         msg = f"Unable to get attachment page: Unknown pacer_doc_id for RECAP Document object {rd.pk}"
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
@@ -2766,6 +2773,7 @@ async def fetch_appellate_docket_base(
         raise CourtQueryError(f"Blocked by court: {court_id}")
 
     await mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    await sync_to_async(report_fetch_started)(court_id, fq.pk)
 
     session_data = await get_pacer_cookie_from_cache(fq.user_id)
     if session_data is None:
@@ -2888,6 +2896,7 @@ async def fetch_docket_base(
         raise CourtQueryError(f"Blocked by court: {court_id}")
 
     await mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    await sync_to_async(report_fetch_started)(court_id, fq.pk)
 
     session_data = await get_pacer_cookie_from_cache(fq.user_id)
     if session_data is None:

@@ -19,6 +19,7 @@ from cl.recap.fetch_queue import (
     estimate_delay,
     get_court_interval_ms,
     get_courts_with_waiting_fetches,
+    get_pending_fetch,
     mark_fetch_started,
     pop_next_fetch,
     set_court_rate,
@@ -32,8 +33,8 @@ from cl.recap.fetch_scheduler import (
     schedule_fetch,
 )
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
-from cl.recap.tasks import fetch_docket
-from cl.search.factories import CourtFactory
+from cl.recap.tasks import fetch_docket, fetch_pacer_doc_by_rd
+from cl.search.factories import CourtFactory, RECAPDocumentFactory
 from cl.search.models import Court
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
@@ -165,6 +166,20 @@ class FetchSchedulerRateTest(SchedulerRedisTestCase):
 
         self.assertEqual([pk for pk in results if pk is not None], [1])
         self.assertEqual(results.count(None), 19)
+
+    def test_start_of_an_unqueued_request_changes_nothing(self) -> None:
+        """Fetches that skipped the queue don't hold up or free a court."""
+        enqueue_fetch(COURT, BOB, 1, T0)
+        enqueue_fetch(COURT, BOB, 2, T0)
+        self.assertEqual(pop_next_fetch(COURT, T0), 1)
+
+        self.assertFalse(mark_fetch_started(COURT, 99, T0))
+
+        self.assertEqual(get_pending_fetch(COURT), 1)
+        self.assertIsNone(pop_next_fetch(COURT, T0 + 5000))
+        self.assertTrue(mark_fetch_started(COURT, 1, T0 + 5000))
+        self.assertIsNone(pop_next_fetch(COURT, T0 + 5999))
+        self.assertEqual(pop_next_fetch(COURT, T0 + 6000), 2)
 
 
 @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
@@ -338,6 +353,53 @@ class FetchTaskGuardTest(SchedulerDatabaseTestCase):
         mock_court_accessible.assert_not_called()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+
+
+@mock.patch("cl.recap.tasks.is_pacer_court_accessible", return_value=True)
+class FetchTaskStartTest(SchedulerDatabaseTestCase):
+    """A fetch task frees its court as soon as it starts."""
+
+    def _hand_off(self, fq: PacerFetchQueue) -> None:
+        """Put a request in line and take it out, as the daemon would."""
+        enqueue_fetch(COURT, fq.user_id, fq.pk)
+        self.assertEqual(pop_next_fetch(COURT), fq.pk)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_docket_task_frees_its_court(
+        self,
+        mock_cookies: mock.AsyncMock,
+        mock_court_accessible: mock.MagicMock,
+    ) -> None:
+        """The court is free once the task starts, whatever happens next."""
+        fq = self._make_fq(self.bob)
+        self._hand_off(fq)
+
+        fetch_docket.apply(args=(fq.pk,))
+
+        self.assertIsNone(get_pending_fetch(COURT))
+
+    def test_pdf_task_frees_its_court_inside_its_transaction(
+        self, mock_court_accessible: mock.MagicMock
+    ) -> None:
+        """PostgreSQL won't show the PDF task's status until it commits."""
+        rd = RECAPDocumentFactory(
+            docket_entry__docket__court=Court.objects.get(pk=COURT),
+            is_available=True,
+        )
+        fq = PacerFetchQueueFactory(
+            user=self.bob,
+            request_type=REQUEST_TYPE.PDF,
+            recap_document=rd,
+        )
+        self._hand_off(fq)
+
+        fetch_pacer_doc_by_rd.apply(args=(rd.pk, fq.pk))
+
+        self.assertIsNone(get_pending_fetch(COURT))
 
 
 @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
