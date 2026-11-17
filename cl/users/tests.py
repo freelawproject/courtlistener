@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
@@ -1506,7 +1507,7 @@ class SNSWebhookTest(TestCase):
 
         mock_logger.exception.assert_called_once()
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged when a unexpected bounceSubType event is received."""
         # Trigger a content_rejected event
@@ -1754,7 +1755,7 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned when an unexpected hard bounceSubType event is received. Also checks that if an email address is previously banned avoid creating a new ban object for that email address."""
         # Trigger a suppressed_asset event
@@ -3089,7 +3090,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
         """This test checks if a warning is logged when trying to enqueue a message but the stored message doesn't exist anymore because it was deleted."""
         # Create a backoff event message ID:
@@ -4442,6 +4443,36 @@ class RegisterViewTest(TestCase):
         form = response.context.get("form")
         self.assertIsNotNone(form, "Expected 'form' in template context")
         # The username field should display an error.
+        self.assertIn("username", form.errors)
+
+    async def test_failed_profile_save_does_not_leave_user(self) -> None:
+        """A failed profile save must not leave a user behind.
+
+        A user without a profile can't log in.
+        """
+        data = {
+            "username": "admin3",
+            "email": "admin3@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        with patch.object(
+            UserProfile, "save", side_effect=IntegrityError("profile")
+        ):
+            response = await self.async_client.post(
+                reverse("register"), data, follow=True
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="admin3").aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
         self.assertIn("username", form.errors)
 
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:

@@ -1,4 +1,5 @@
 # type: ignore
+"""Logging settings."""
 
 import environ
 from django.http import UnreadablePostError
@@ -10,6 +11,7 @@ DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
 
 def skip_unreadable_post(record):
+    """Log filter that drops an unreadable POST error unless one was seen in the last minute."""
     if record.exc_info:
         exc_value = record.exc_info[1]
         if isinstance(exc_value, UnreadablePostError):
@@ -19,11 +21,10 @@ def skip_unreadable_post(record):
                 # We've seen this recently; let it through; hitting it a lot
                 # might mean something.
                 return True
-            else:
-                # Haven't seen this recently; cache it with a minute expiry,
-                # and don't let it through.
-                r.set(cache_key, "True", ex=60)
-                return False
+            # Haven't seen this recently; cache it with a minute expiry,
+            # and don't let it through.
+            r.set(cache_key, "True", ex=60)
+            return False
     return True
 
 

@@ -1,3 +1,5 @@
+"""Celery tasks for sending webhook events."""
+
 import json
 
 from elasticsearch.dsl.response import Hit
@@ -160,7 +162,7 @@ def send_search_alert_webhook_es(
             serialized_results = serializer_class(results, many=True).data
         case _:
             # No implemented alert type.
-            return None
+            return
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

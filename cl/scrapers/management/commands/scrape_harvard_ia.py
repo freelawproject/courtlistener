@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Download the Harvard corpus from the Internet Archive."""
 
 import json
 import os
@@ -19,6 +20,8 @@ from cl.lib.utils import human_sort
 
 
 class OptionsType(TypedDict):
+    """The command's options: a reporter and an optional range of volumes."""
+
     reporter: str
     volumes: range | None
 
@@ -59,12 +62,11 @@ def fetch_ia_volumes(
     vol_pattern = "|".join(
         rf"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
-    results = [
+    return [
         res
         for res in results
         if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
-    return results
 
 
 def download_file(ia_key: str, file_name) -> None:
@@ -146,9 +148,12 @@ def get_from_ia(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Download a reporter's Harvard corpus volumes from the Internet Archive to disk."""
+
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        """Add the reporter and volume range options."""
         parser.add_argument(
             "--reporter",
             help="Reporter abbreviation as saved on IA.",
@@ -163,4 +168,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Download the requested volumes."""
         get_from_ia(options)

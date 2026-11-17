@@ -1,3 +1,5 @@
+"""Settings for AWS storage, CloudFront, Lambda, and SES."""
+
 import environ
 
 env = environ.FileAwareEnv()

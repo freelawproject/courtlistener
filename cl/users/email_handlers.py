@@ -1,3 +1,5 @@
+"""Handle email bounces and complaints, and store and filter outgoing emails."""
+
 import logging
 import random
 from collections.abc import Sequence
@@ -29,6 +31,8 @@ from cl.users.models import (
     FailedEmail,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def handle_hard_bounce(
     notification_subtype: str, recipient_emails: list[str]
@@ -55,7 +59,7 @@ def handle_hard_bounce(
     for email in recipient_emails:
         if notification_subtype in unexpected_events:
             # Handle unexpected notification_subtype events, log a warning
-            logging.warning(
+            logger.warning(
                 "Unexpected %s hard bounce for %s", notification_subtype, email
             )
         # After log the event ban the email address
@@ -204,7 +208,7 @@ def handle_soft_bounce(
         else:
             # Handle other unexpected notification_subtype events, like:
             # ContentRejected, log a warning
-            logging.warning(
+            logger.warning(
                 "Unexpected %s soft bounce for %s, message_id: %s",
                 notification_subtype,
                 email,
@@ -506,7 +510,7 @@ def enqueue_email(recipients: list[str], message_id: str) -> None:
     stored, stored_email_pk = is_message_stored(message_id)
 
     if not stored:
-        logging.warning(
+        logger.warning(
             "The message: %s can't be enqueued because it "
             "doesn't exist anymore.",
             message_id,

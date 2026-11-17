@@ -1,3 +1,5 @@
+"""Celery tasks for finding and storing citations and parentheticals."""
+
 import logging
 from http.client import ResponseNotReady
 
@@ -99,13 +101,13 @@ def find_citations_and_parantheticals_for_recap_documents(
         self: The bound Celery task.
         doc_ids: An iterable of search.RECAPDocument PKs
     """
-    documents: QuerySet[RECAPDocument, RECAPDocument] = (
-        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-            ocr_status__in=[
-                RECAPDocument.OCR_UNNECESSARY,
-                RECAPDocument.OCR_COMPLETE,
-            ]
-        )
+    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
+        pk__in=doc_ids
+    ).filter(
+        ocr_status__in=[
+            RECAPDocument.OCR_UNNECESSARY,
+            RECAPDocument.OCR_COMPLETE,
+        ]
     )
 
     for d in documents:
@@ -138,7 +140,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         percolate_opinion: Whether to percolate the related opinion document in
             order to trigger search alerts.
     """
-    opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
+    opinions: QuerySet[Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     ).select_related("cluster")
 
@@ -175,11 +177,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 failed_ids.append(opinion.id)
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
-                logger.error(
+                logger.exception(
                     "Opinion failed: '%s' with %s",
                     opinion.id,
                     str(e),
-                    exc_info=True,
                 )
 
                 # do not retry the whole loop on an unknown exception

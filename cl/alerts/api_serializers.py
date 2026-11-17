@@ -1,3 +1,5 @@
+"""REST API serializers for search and docket alerts."""
+
 from http import HTTPStatus
 from typing import Any
 
@@ -49,6 +51,7 @@ class BroadAlertQueryError(APIException):
     default_code = "broad_alert_query"
 
     def __init__(self, estimated_hits: int, detail: str) -> None:
+        """Build the error from the query's estimated hits and a message."""
         # Typed as dict[str, Any] because, unlike DRF's ErrorDetail-based
         # payloads, this intentionally carries a raw integer for the estimated
         # hits so it isn't coerced into a stringified list.
@@ -62,6 +65,12 @@ class BroadAlertQueryError(APIException):
 class SearchAlertSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for search alerts owned by the requesting user.
+
+    Validation enforces the user's alert quotas and rejects overly broad
+    queries.
+    """
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     alert_type = serializers.CharField(required=False)
 
@@ -276,9 +285,16 @@ class SearchAlertSerializer(
         return representation
 
     def create(self, validated_data):
+        """Create the alert."""
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        """Update the alert.
+
+        Raises:
+            serializers.ValidationError: If the alert type changes in a
+                disallowed way.
+        """
         # On alert updates, validates that the alert_type hasn't changed in a
         # disallowed way.
         alert_type = validated_data.get("alert_type")
@@ -304,6 +320,8 @@ class SearchAlertSerializerModel(
 
 
 class DocketAlertSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
+    """Serializer for docket alerts owned by the requesting user."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:

@@ -1,3 +1,5 @@
+"""Daemon that sends real-time search alerts scheduled by the percolator."""
+
 import time
 
 from django.conf import settings
@@ -10,15 +12,19 @@ from cl.lib.command_utils import VerboseCommand
 
 
 class Command(VerboseCommand):
+    """Periodically send real-time alerts, grouped per user."""
+
     help = """Send real-time alerts scheduled by the Percolator every 5 minutes.
      This process is performed to accumulate alerts that can be grouped into a
      single email if they belong to the same user. """
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the testing-mode flag."""
         parser.add_argument(
             "--testing-mode",
             action="store_true",
@@ -26,6 +32,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Send real-time alerts forever, or once in testing mode."""
         super().handle(*args, **options)
         testing_mode = options.get("testing_mode", False)
         while True:

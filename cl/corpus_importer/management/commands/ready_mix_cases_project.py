@@ -1,3 +1,5 @@
+"""Scrape PACER iquery pages for new cases and index the resulting dockets."""
+
 import json
 import os
 import time
@@ -23,6 +25,8 @@ from cl.search.tasks import index_dockets_in_bulk
 
 
 class OptionsType(TypedDict):
+    """The command's options used by the iquery scraping functions."""
+
     queue: str
     courts: list[str]
     court_type: str
@@ -33,6 +37,11 @@ class OptionsType(TypedDict):
 
 
 def confirm_es_indexing(options):
+    """Re-index bankruptcy dockets filed after January 1, 2020 in chunks.
+
+    Starts from ``pk_offset`` and logs the last processed docket every 1,000
+    dockets.
+    """
     queue = options["queue"]
     chunk_size = options["chunk_size"]
     pk_offset = options["pk_offset"]
@@ -113,7 +122,7 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
     Returns:
         A list of Court IDs.
     """
-    court_ids_to_scrape = (
+    return (
         get_iquery_pacer_courts_to_scrape()
         if court_type == "all"
         else (
@@ -126,7 +135,6 @@ def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
             )
         )
     )
-    return court_ids_to_scrape
 
 
 def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
@@ -391,9 +399,12 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
 
 
 class Command(VerboseCommand):
+    """Run one of the bankruptcy iquery project's tasks."""
+
     help = "Scrape bankruptcy iquery pages sequentially."
 
     def add_arguments(self, parser: CommandParser):
+        """Add the task, court, iteration, threshold, query, indexing, and database options."""
         parser.add_argument(
             "--queue",
             default="batch2",
@@ -477,6 +488,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         r = get_redis_interface("CACHE")
         if options["task"] == "scrape-iquery":
             add_bank_cases_to_cl(options, r)

@@ -1,3 +1,5 @@
+"""Helpers for finding Juriscraper scraper modules."""
+
 import importlib
 import pkgutil
 import re
@@ -9,6 +11,7 @@ from juriscraper.AbstractSite import AbstractSite
 
 
 def walk_juriscraper() -> Iterator[ModuleInfo]:
+    """Iterate over every module and package in Juriscraper, recursively."""
     return pkgutil.walk_packages(
         juriscraper.__path__, f"{juriscraper.__name__}."
     )
@@ -93,10 +96,9 @@ def get_module_by_court_id(court_id: str, module_type: str) -> str:
 
     if len(matches) == 1:
         return matches[0]
-    elif len(matches) == 0:
+    if len(matches) == 0:
         raise ValueError(f"'{court_id}' doesn't match any juriscraper module")
-    else:
-        raise ValueError(
-            f"'{court_id}' matches more than 1 juriscraper module."
-            f"Use a full module path. Matches: '{matches}'"
-        )
+    raise ValueError(
+        f"'{court_id}' matches more than 1 juriscraper module."
+        f"Use a full module path. Matches: '{matches}'"
+    )

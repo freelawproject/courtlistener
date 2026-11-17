@@ -1,3 +1,5 @@
+"""Estimate token counts for the RECAP and case law archives from a sample."""
+
 from math import ceil
 from typing import cast
 
@@ -117,9 +119,12 @@ def compute_avg_from_list(array: list[float]) -> float:
 
 
 class Command(VerboseCommand):
+    """Report sampled token counts for RECAP documents or case law."""
+
     help = "Compute token count for Recap Documents and Caselaw."
 
     def add_arguments(self, parser):
+        """Add the dataset type, sample percentage, and database options."""
         parser.add_argument(
             "--type",
             type=str,
@@ -243,6 +248,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Compute and report the token counts for the chosen dataset.
+
+        Raises:
+            NotImplementedError: If the dataset type isn't supported.
+        """
         percentage = options["percentage"]
         db_connection = options["database"]
         dataset_type = options["type"]

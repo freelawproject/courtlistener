@@ -1,3 +1,5 @@
+"""HTTP request helpers."""
+
 from django.http import HttpRequest
 
 

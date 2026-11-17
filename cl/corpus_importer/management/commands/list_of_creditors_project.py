@@ -1,4 +1,6 @@
 # !/usr/bin/python
+"""Query and store PACER list of creditors reports for cases listed in CSV files."""
+
 import csv
 import itertools
 import os
@@ -16,7 +18,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -24,6 +26,8 @@ CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
+    """The command's options."""
+
     base_path: str
     offset: int
     limit: int
@@ -53,7 +57,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
             "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
             "env vars to continue..."
         )
-        return None
+        return
 
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")
@@ -139,7 +143,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    SessionData(session.cookies, session.proxy_address),
+                    session,
                     court_id,
                     d_number_file_name,
                     docket_number,
@@ -155,9 +159,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Query list of creditors reports for the cases in CSV files."""
+
     help = "Query List of creditors and store the reports."
 
     def add_arguments(self, parser):
+        """Add the offset, limit, base path, files, and queue options."""
         parser.add_argument(
             "--offset",
             type=int,
@@ -195,5 +202,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and save the list of creditors reports."""
         super().handle(*args, **options)
         query_and_save_creditors_data(options)

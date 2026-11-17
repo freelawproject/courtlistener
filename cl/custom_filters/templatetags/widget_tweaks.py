@@ -1,3 +1,5 @@
+"""Template filters for setting form widget attributes, plus a webhook status class filter."""
+
 from django.template import Library
 
 from cl.api.models import WEBHOOK_EVENT_STATUS
@@ -26,6 +28,8 @@ def _process_field_attributes(field, attr, process):
 
 @register.filter("attr")
 def set_attr(field, attr):
+    """Set a widget attribute on the field from an ``"name:value"`` string."""
+
     def process(widget, attrs, attribute, value):
         attrs[attribute] = value
 
@@ -34,6 +38,11 @@ def set_attr(field, attr):
 
 @register.filter
 def append_attr(field, attr):
+    """Append a value to a widget attribute on the field from an ``"name:value"`` string.
+
+    Sets the attribute if it has no existing value.
+    """
+
     def process(widget, attrs, attribute, value):
         if attrs.get(attribute):
             attrs[attribute] += f" {value}"
@@ -47,11 +56,13 @@ def append_attr(field, attr):
 
 @register.filter
 def add_class(field, css_class):
+    """Add a CSS class to the field's widget."""
     return append_attr(field, f"class:{css_class}")
 
 
 @register.filter
 def add_error_class(field, css_class):
+    """Add a CSS class to the field's widget if the field has errors."""
     if hasattr(field, "errors") and field.errors:
         return add_class(field, css_class)
     return field
@@ -59,6 +70,7 @@ def add_error_class(field, css_class):
 
 @register.filter
 def set_data(field, data):
+    """Set a ``data-`` attribute on the field from an ``"name:value"`` string."""
     return set_attr(field, f"data-{data}")
 
 
