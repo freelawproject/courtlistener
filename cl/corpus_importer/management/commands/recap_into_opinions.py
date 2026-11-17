@@ -1,3 +1,5 @@
+"""Import RECAP documents from district and bankruptcy courts as opinions."""
+
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.db.models import Q
@@ -18,20 +20,19 @@ def import_opinions_from_recap(
     db_connection: str = "default",
     skip_citation_finding: bool = True,
 ) -> None:
-    """Import recap documents into opinion db
+    """Import recap documents into opinion db.
 
-    :param jurisdiction: Court Jurisdiction if not FD
-    :param court: Court ID if any
-    :param skip_until: Court ID to re-start at
-    :param total_count: The number of new opinions to add
-    :param queue: The queue to use for celery
-    :param db_connection: The db to use
-    :param skip_citation_finding: if True, the ingestion task will not create
-        a `find_citations_and_parentheticals_for_opinion_by_pks` task.
-        This is helpful to prevent creating too many single-opinion tasks
-        during bulk work
-
-    :return: None
+    Args:
+        jurisdiction: Court Jurisdiction if not FD
+        court_str: Court ID if any
+        skip_until: Court ID to re-start at
+        total_count: The number of new opinions to add
+        queue: The queue to use for celery
+        db_connection: The db to use
+        skip_citation_finding: if True, the ingestion task will not create
+            a `find_citations_and_parentheticals_for_opinion_by_pks` task.
+            This is helpful to prevent creating too many single-opinion tasks
+            during bulk work
     """
     court_query = Court.objects.using(db_connection)
 
@@ -109,12 +110,16 @@ def import_opinions_from_recap(
 
 
 class Command(BaseCommand):
+    """Import RECAP documents into opinions for a jurisdiction or court."""
+
     help = "Import recap documents into opinions"
 
     def __init__(self, *args, **kwargs):
+        """Build the command."""
         super().__init__(*args, **kwargs)
 
     def add_arguments(self, parser):
+        """Add the jurisdiction, court, skip, total, queue, replica, and citation options."""
         parser.add_argument(
             "--jurisdiction",
             help="Select Jurisdiction",
@@ -169,6 +174,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the RECAP documents, skipping citation finding unless ``--find-citations`` is given."""
         jurisdiction = options.get("jurisdiction")
         court = options.get("court")
         skip_until = options.get("skip_until")

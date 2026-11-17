@@ -1,3 +1,5 @@
+"""Types for search models, Elasticsearch documents, and alert percolation."""
+
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -30,6 +32,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocument,
 )
 
 type ESModelType = (
@@ -45,6 +48,7 @@ type ESModelType = (
     | Position
     | Education
     | RECAPDocument
+    | SCOTUSDocument
 )
 
 type ESDocumentType = (
@@ -78,6 +82,7 @@ type ESDictDocument = dict[str, Any]
 
 # Apart from utility, this function ensures that types and names match
 def get_es_document_name_for_type(d: ESDocumentType) -> ESDocumentNameType:
+    """Get the class name of an Elasticsearch document."""
     match d:
         case AudioDocument():
             return "AudioDocument"
@@ -105,6 +110,7 @@ def get_es_document_name_for_type(d: ESDocumentType) -> ESDocumentNameType:
 def get_es_document_type_for_name(
     d: ESDocumentNameType,
 ) -> type[ESDocumentType]:
+    """Get the Elasticsearch document class with the given name."""
     match d:
         case "AudioDocument":
             return AudioDocument
@@ -130,6 +136,8 @@ def get_es_document_type_for_name(
 
 @dataclass
 class SendAlertsResponse:
+    """The alerts a document triggered, with the document's content and model."""
+
     main_alerts_triggered: list[Hit]
     rd_alerts_triggered: list[Hit]
     d_alerts_triggered: list[Hit]
@@ -139,6 +147,8 @@ class SendAlertsResponse:
 
 @dataclass
 class PercolatorResponses:
+    """Percolator query responses for a document and, optionally, its RECAP document and docket alerts."""
+
     main_response: Response
     rd_response: Response | None
     d_response: Response | None
@@ -146,6 +156,8 @@ class PercolatorResponses:
 
 @dataclass
 class SaveESDocumentReturn:
+    """A saved document's ID, content, and app label."""
+
     document_id: str
     document_content: ESDictDocument
     app_label: str
@@ -155,6 +167,8 @@ type SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 
 
 class EventTable(StrEnum):
+    """The model labels of tables whose events trigger re-indexing, plus an empty ``UNDEFINED`` value."""
+
     DOCKET = "search.Docket"
     DOCKET_ENTRY = "search.DocketEntry"
     RECAP_DOCUMENT = "search.RECAPDocument"
@@ -163,6 +177,8 @@ class EventTable(StrEnum):
 
 @dataclass(frozen=True)
 class ESCursor:
+    """The state of an Elasticsearch cursor pagination request."""
+
     search_after: AttrList | None
     reverse: bool
     search_type: str

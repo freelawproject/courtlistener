@@ -1,3 +1,7 @@
+"""Template tag for inlining SVG files."""
+
+from pathlib import Path
+
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
@@ -8,8 +12,7 @@ register = template.Library()
 
 @register.simple_tag()
 def svg(name, **kwargs):
-    """
-    Include an SVG file directly in the template.
+    """Include an SVG file directly in the template.
 
     Usage:
     ```
@@ -34,8 +37,7 @@ def svg(name, **kwargs):
         return ""
 
     try:
-        with open(absolute_path, encoding="utf-8") as file:
-            svg_content = file.read()
+        svg_content = Path(absolute_path).read_text(encoding="utf-8")
 
     except FileNotFoundError:
         if settings.DEBUG:

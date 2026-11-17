@@ -1,3 +1,5 @@
+"""Signal handlers for SSO logins, sign-in auditing and membership changes."""
+
 from datetime import timedelta
 from typing import Any
 

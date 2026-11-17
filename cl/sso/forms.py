@@ -1,3 +1,5 @@
+"""Forms for starting single sign-on."""
+
 from django import forms
 
 

@@ -1,3 +1,5 @@
+"""Views for starting single sign-on."""
+
 from allauth.socialaccount.adapter import get_adapter
 from allauth.socialaccount.providers.base.constants import AuthProcess
 from django.conf import settings

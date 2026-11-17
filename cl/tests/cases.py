@@ -36,9 +36,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class RestartRateLimitMixin:
-    """Restart the rate limiter counter to avoid getting blocked in frontend
-    after tests.
-    """
+    """Restart the rate limiter counter to avoid getting blocked in frontend after tests."""
 
     @classmethod
     def restart_rate_limit(cls):
@@ -172,8 +170,7 @@ class ESIndexTestCase(SimpleTestCase):
     @staticmethod
     def _get_model_classes(model):
         models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        return model_classes
+        return [apps.get_model(m) for m in models]
 
     @staticmethod
     def _get_indices(model):
@@ -280,22 +277,24 @@ class ESIndexTestCase(SimpleTestCase):
         super().tearDown()
 
     def assert_es_feed_content(self, node_tests, response, namespaces):
-        """Common assertion that checks the presence of specified nodes in an
-        ES feed test.
+        """Common assertion that checks the presence of specified nodes in an ES feed test.
 
-        :param node_tests: A list of tuples, each containing an XPath query
-        string and the expected count of nodes.
-        :param response: The HTTP response that contains XML content.
-        :param namespaces: A dictionary of XML namespaces required to parse
-        the XPath expressions.
-        :return: A lxml etree object parsed from the response content.
+        Args:
+            node_tests: A list of tuples, each containing an XPath query
+                string and the expected count of nodes.
+            response: The HTTP response that contains XML content.
+            namespaces: A dictionary of XML namespaces required to parse
+                the XPath expressions.
+
+        Returns:
+            A lxml etree object parsed from the response content.
         """
         xml_tree = etree.fromstring(response.content)
         for test_content, count in node_tests:
             with self.subTest(test_content=test_content):
                 node_count = len(
                     xml_tree.xpath(test_content, namespaces=namespaces)
-                )  # type: ignore
+                )
                 self.assertEqual(
                     node_count,
                     count,
@@ -329,12 +328,11 @@ class CountESTasksTestCase(SimpleTestCase):
         # Call the task
         if immutable_signature:
             return task.s(*args, **kwargs)
-        else:
-            task.apply_async(args=args, kwargs=kwargs)
+        task.apply_async(args=args, kwargs=kwargs)
+        return None
 
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
-
         assert self.task_call_count == expected, (
             f"Expected {expected} task calls, but got {self.task_call_count}"
         )
@@ -441,7 +439,6 @@ class V4SearchAPIAssertions(SimpleTestCase):
 
     def _test_results_ordering(self, test, field, version="v4"):
         """Ensure dockets appear in the response in a specific order."""
-
         with self.subTest(test=test, msg=f"{test['name']}"):
             r = self.client.get(
                 reverse("search-list", kwargs={"version": version}),
@@ -472,9 +469,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
     def _assert_order_in_html(
         self, decoded_content: str, expected_order: list
     ) -> None:
-        """Assert that the expected order of documents appears correctly in the
-        HTML content."""
-
+        """Assert that the expected order of documents appears correctly in the HTML content."""
         for i in range(len(expected_order) - 1):
             self.assertTrue(
                 decoded_content.index(str(expected_order[i]))
@@ -500,9 +495,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
     def _test_page_variables(
         self, response, test_case, current_page, search_type
     ):
-        """Ensure the page variables are the correct ones according to the
-        current page."""
-
+        """Ensure the page variables are the correct ones according to the current page."""
         # Test page
         self.assertEqual(
             len(response.data["results"]),
@@ -574,9 +567,7 @@ class SearchAlertsAssertions:
 
     @staticmethod
     def _extract_cases_from_alert(html_tree, alert_title):
-        """Extract the case elements (h3) under a specific alert (h2) from the
-        HTML tree.
-        """
+        """Extract the case elements (h3) under a specific alert (h2) from the HTML tree."""
         alert_element = html_tree.xpath(
             f"//h2[contains(text(), '{alert_title}')]"
         )
@@ -597,17 +588,15 @@ class SearchAlertsAssertions:
     @staticmethod
     def clean_case_title(case_title):
         """Clean the case text to get the case name to compare it.
-        Input: 1. SUBPOENAS SERVED CASE ()
-        Output: SUBPOENAS SERVED CASE
-        """
 
+        Input: 1. SUBPOENAS SERVED CASE () Output: SUBPOENAS SERVED CASE.
+        """
         # Split the string by the dot and take everything after it.
         parts = case_title.split(".", 1)
         if len(parts) > 1:
             case_title = parts[1].strip()
         # Remove everything from the first open parenthesis to the end
-        case_title = re.split(r"\s*\(", case_title)[0].strip()
-        return case_title
+        return re.split(r"\s*\(", case_title)[0].strip()
 
     def _count_alert_hits_and_child_hits(
         self,
@@ -617,7 +606,8 @@ class SearchAlertsAssertions:
         case_title,
         expected_child_hits,
     ):
-        """Confirm the following assertions for the email alert:
+        """Confirm the following assertions for the email alert.
+
         - An specific alert is included in the email alert.
         - The specified alert contains the expected number of hits.
         - The specified case contains the expected number of child hits.
@@ -665,9 +655,7 @@ class SearchAlertsAssertions:
         case_title,
         expected_child_descriptions,
     ):
-        """Confirm the child hits in a case are the expected ones, comparing
-        their descriptions.
-        """
+        """Confirm the child hits in a case are the expected ones, comparing their descriptions."""
         tree = html.fromstring(html_content)
         # Get the alert cases from the HTML.
         alert_cases = self._extract_cases_from_alert(tree, alert_title)
@@ -706,12 +694,12 @@ class SearchAlertsAssertions:
         expected_child_hits,
         nested_field="recap_documents",
     ):
-        """Confirm the following assertions for the search alert webhook:
+        """Confirm the following assertions for the search alert webhook.
+
         - An specific alert webhook was triggered.
         - The specified alert contains the expected number of hits.
         - The specified case contains the expected number of child hits.
         """
-
         matched_alert_name = None
         matched_case_title = None
         for webhook in webhooks:
@@ -746,13 +734,12 @@ class SearchAlertsAssertions:
         expected_child_ids,
         nested_field="recap_documents",
     ):
-        """Confirm the following assertions for the percolator search alert
-        webhook:
+        """Confirm the following assertions for the percolator search alert webhook.
+
         - The specified alert was triggered the expected number of times.
         - The specified alert contains only 1 hit.
         - If the specified case contains child documents it must be 1.
         """
-
         alert_title_webhooks = 0
         alert_child_hits = 0
         alert_child_ids = set()
@@ -833,9 +820,7 @@ class SearchAlertsAssertions:
     def _assert_timestamp_filter(
         self, html_content, rate, date, sweep_index=False
     ):
-        """Confirm that timestamp filter is properly set in the
-        'View Full Results' URL.
-        """
+        """Confirm that timestamp filter is properly set in the 'View Full Results' URL."""
         view_results_url = html.fromstring(str(html_content)).xpath(
             '//a[text()="View Full Results / Edit this Alert"]/@href'
         )
@@ -851,7 +836,6 @@ class SearchAlertsAssertions:
 
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
-
         # Use localtime() to normalize DST, matching the email template which
         # applies |localtime before |date formatting.
         localized_date = localtime(date_to_compare)
@@ -880,7 +864,6 @@ class SearchAlertsAssertions:
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
         """Confirm if a percolator query matched."""
-
         matched = False
         for hit in response:
             if hit.meta.id == query_id:
@@ -905,11 +888,10 @@ class SearchAlertsAssertions:
         percolator_index, es_document_index, documents_to_percolate = (
             prepare_percolator_content(app_label, document_id)
         )
-        responses = percolate_es_document(
+        return percolate_es_document(
             str(document_id),
             percolator_index,
             es_document_index,
             documents_to_percolate,
             app_label=app_label,
         )
-        return responses

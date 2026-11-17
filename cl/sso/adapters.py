@@ -1,3 +1,5 @@
+"""allauth adapters that keep CourtListener's own account views and SSO linking rules."""
+
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.models import SocialLogin

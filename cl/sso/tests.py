@@ -227,7 +227,7 @@ class FakeIdP:
         self.email = email
         self.token_requests: list[dict[str, Any]] = []
 
-    def __enter__(self) -> "FakeIdP":
+    def __enter__(self) -> FakeIdP:
         return self
 
     def __exit__(self, *args: object) -> None:

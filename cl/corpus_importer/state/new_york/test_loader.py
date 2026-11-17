@@ -1,5 +1,4 @@
-"""Tests for turning a New York Court of Appeals (Court-PASS) scrape run into
-merged dockets.
+"""Tests for turning a New York Court of Appeals (Court-PASS) scrape run into merged dockets.
 
 These cover the reshaping the loader's query does -- nesting files under their
 filing, folding attorney rows into parties, standing a case's date in from its
@@ -58,8 +57,11 @@ PRIVATE_PATH = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_brief_0.pdf"
 def archived(local_path: str) -> tuple[str, str, int, str]:
     """The archive row a jkent run holds for a file it downloaded.
 
-    :param local_path: Where the scraper stored the file.
-    :return: The path, its hash, its size, and the kind of file it is.
+    Args:
+        local_path: Where the scraper stored the file.
+
+    Returns:
+        The path, its hash, its size, and the kind of file it is.
     """
     digest = hashlib.sha256(local_path.encode()).hexdigest()
     return (
@@ -81,13 +83,14 @@ def _run_database(
     is with the `results` and `archived_files` tables rather than with the
     whole schema.
 
-    :param path: Where to write the database.
-    :param rows: The scrape results, as `(result_type, payload)` pairs.
-    :param archive: The archive rows, as `archived` returns them. Defaults to
-        one per downloaded file, which is the invariant a real run holds to:
-        the scraper hashes and measures every file it stores. Pass this to
-        write a run that breaks it, or one whose file has been rescraped and
-        now hashes differently.
+    Args:
+        path: Where to write the database.
+        rows: The scrape results, as `(result_type, payload)` pairs.
+        archive: The archive rows, as `archived` returns them. Defaults to
+            one per downloaded file, which is the invariant a real run holds to:
+            the scraper hashes and measures every file it stores. Pass this to
+            write a run that breaks it, or one whose file has been rescraped and
+            now hashes differently.
     """
     if archive is None:
         archive = [
@@ -236,21 +239,20 @@ class NYCoALoaderTest(TestCase):
         )
 
     def loader(self, **kwargs: Any) -> NYCoACourtPassLoader:
-        """A loader over the test run, keeping a ledger so that its report is
-        filled in from what the merges actually did.
+        """A loader over the test run, keeping a ledger so that its report is filled in from what the merges actually did.
 
         Neither wait sleeps: celery runs eagerly here, so the merges have
         already happened, and extraction is mocked out and never will -- a
         zero `in_flight_time` says exactly that, so the waits reach the
-        stalled exit rather than sitting out the timeout."""
+        stalled exit rather than sitting out the timeout.
+        """
         kwargs.setdefault("run_key", self.key)
         kwargs.setdefault("in_flight_time", 0)
         kwargs.setdefault("verify_timeout", 0)
         return NYCoACourtPassLoader(self.database, **kwargs)
 
     def scrape(self, rows: list[tuple[str, dict]]) -> Any:
-        """The single scrape the loader reads out of a run holding `rows`,
-        whose archive records every file the rows say was downloaded."""
+        """The single scrape the loader reads out of a run holding `rows`, whose archive records every file the rows say was downloaded."""
         _run_database(self.database, rows)
         return self.only_scrape()
 
@@ -259,13 +261,14 @@ class NYCoALoaderTest(TestCase):
         rows: list[tuple[str, dict]],
         archive: list[tuple[str, str, int, str]],
     ) -> Any:
-        """The single scrape the loader reads out of a run whose archive is
-        stated rather than derived, for a run that breaks the invariant the
-        derived one holds to.
+        """The single scrape the loader reads out of a run whose archive is stated rather than derived, for a run that breaks the invariant the derived one holds to.
 
-        :param rows: The scrape results, as `_run_database` takes them.
-        :param archive: The archive rows, as `archived` returns them.
-        :return: The scrape.
+        Args:
+            rows: The scrape results, as `_run_database` takes them.
+            archive: The archive rows, as `archived` returns them.
+
+        Returns:
+            The scrape.
         """
         _run_database(self.database, rows, archive=archive)
         return self.only_scrape()
@@ -273,7 +276,8 @@ class NYCoALoaderTest(TestCase):
     def only_scrape(self) -> Any:
         """The one scrape the run database holds, asserting that it holds one.
 
-        :return: The scrape.
+        Returns:
+            The scrape.
         """
         scrapes = list(NYCoACourtPassLoader(self.database).scrapes())
         self.assertEqual(len(scrapes), 1)
@@ -286,8 +290,10 @@ class NYCoALoaderTest(TestCase):
             loader.load()
 
     def test_nests_files_under_their_filing(self) -> None:
-        """The scraper stores a docket's files in one flat list. Does the
-        loader put each one under the filing it belongs to?"""
+        """The scraper stores a docket's files in one flat list.
+
+        Does the loader put each one under the filing it belongs to?
+        """
         scrape = self.scrape(
             [
                 (
@@ -313,9 +319,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_joins_the_archive_row_onto_the_file(self) -> None:
-        """What the file is and what it hashes to are known only to the
-        download, which the run records apart from the docket. Does the loader
-        put the archive's account of a file onto the file itself?"""
+        """What the file is and what it hashes to are known only to the download, which the run records apart from the docket. Does the loader put the archive's account of a file onto the file itself?"""
         _, digest, size, _ = archived(PRIVATE_PATH)
 
         scrape = self.scrape(
@@ -339,9 +343,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_an_oral_argument_playlist_is_typed_as_one(self) -> None:
-        """Court-PASS publishes recordings as playlists rather than PDFs, and
-        a playlist served as a PDF is one a browser will not play. Is the type
-        taken from the file rather than assumed?"""
+        """Court-PASS publishes recordings as playlists rather than PDFs, and a playlist served as a PDF is one a browser will not play. Is the type taken from the file rather than assumed?"""
         playlist = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_webcast.asx"
 
         scrape = self.scrape(
@@ -359,9 +361,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_a_file_with_no_archive_row_is_left_undescribed(self) -> None:
-        """A downloaded file is always hashed, so a path with no archive row is
-        the run contradicting itself. Does the file merge anyway, with nothing
-        said about bytes nothing accounted for?"""
+        """A downloaded file is always hashed, so a path with no archive row is the run contradicting itself. Does the file merge anyway, with nothing said about bytes nothing accounted for?"""
         scrape = self.scrape_with_archive(
             [
                 (
@@ -387,9 +387,7 @@ class NYCoALoaderTest(TestCase):
     def test_a_file_stored_under_another_extension_is_left_undescribed(
         self,
     ) -> None:
-        """The archive's account of a file and the name it was stored under
-        have to agree, or one of them is wrong about what the file is. Is the
-        type withheld rather than read off the wrong one?"""
+        """The archive's account of a file and the name it was stored under have to agree, or one of them is wrong about what the file is. Is the type withheld rather than read off the wrong one?"""
         logging.disable(logging.NOTSET)
         self.addCleanup(logging.disable)
 
@@ -411,8 +409,10 @@ class NYCoALoaderTest(TestCase):
         self.assertIn("does not end in", logs.output[0])
 
     def test_case_date_filed_is_earliest_filing(self) -> None:
-        """Court-PASS dates no case, only its filings. Does the earliest
-        filing date stand in?"""
+        """Court-PASS dates no case, only its filings.
+
+        Does the earliest filing date stand in?
+        """
         later = ENTRY | {
             "docket_entry_id": "e:respondent-brief:jones:1",
             "date_received": "2024-06-01",
@@ -424,8 +424,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(scrape.date_filed, date(2024, 3, 2))
 
     def test_undated_case_has_no_date_filed(self) -> None:
-        """A case whose filings were all reconstructed from the file list
-        carries no date at all."""
+        """A case whose filings were all reconstructed from the file list carries no date at all."""
         undated = ENTRY | {"date_received": None}
         scrape = self.scrape(
             [("NYCourtPassDocket", _docket(docket_entries=[undated]))]
@@ -434,8 +433,10 @@ class NYCoALoaderTest(TestCase):
         self.assertIsNone(scrape.date_filed)
 
     def test_groups_attorneys_into_parties(self) -> None:
-        """Court-PASS lists attorneys, not parties. Are the attorney rows
-        folded into one party each?"""
+        """Court-PASS lists attorneys, not parties.
+
+        Are the attorney rows folded into one party each?
+        """
         attorneys = [
             {
                 "party_name": "Smith",
@@ -485,9 +486,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_keeps_a_party_no_attorney_appeared_for(self) -> None:
-        """Court-PASS lists a party through its attorneys, and prints one
-        without an attorney of record all the same. Is the party kept, with
-        nobody under it?"""
+        """Court-PASS lists a party through its attorneys, and prints one without an attorney of record all the same. Is the party kept, with nobody under it?"""
         scrape = self.scrape(
             [
                 (
@@ -510,10 +509,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(scrape.parties[0].representatives, [])
 
     def test_reads_a_docket_whose_sections_are_null(self) -> None:
-        """The scraper stores a section it read nothing in as `null`, and
-        SQLite yields a row for that null rather than no rows at all. Is it
-        kept out of the payload, rather than becoming an empty filing,
-        party or issue?"""
+        """The scraper stores a section it read nothing in as `null`, and SQLite yields a row for that null rather than no rows at all. Is it kept out of the payload, rather than becoming an empty filing, party or issue?"""
         scrape = self.scrape(
             [
                 (
@@ -533,10 +529,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(scrape.issues, [])
 
     def test_one_contact_per_attorney(self) -> None:
-        """CourtListener keeps one attorney per name per docket, and Court-PASS
-        can print a different firm for the same attorney on each party it
-        represents. Is one set of details published for all of them, so the
-        merge does not rewrite the row on every scrape?"""
+        """CourtListener keeps one attorney per name per docket, and Court-PASS can print a different firm for the same attorney on each party it represents. Is one set of details published for all of them, so the merge does not rewrite the row on every scrape?"""
         attorneys = [
             {
                 "party_name": "Smith",
@@ -573,10 +566,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_refuses_a_docket_whose_file_list_went_unparsed(self) -> None:
-        """A filing detail page that carried neither the Court's "no files"
-        line nor a file table the scraper could read attests to nothing about
-        the case's filings, and merging its empty file list would prune every
-        document the docket has. Is it refused, and does the rest load?"""
+        """A filing detail page that carried neither the Court's "no files" line nor a file table the scraper could read attests to nothing about the case's filings, and merging its empty file list would prune every document the docket has. Is it refused, and does the rest load?"""
         _run_database(
             self.database,
             [
@@ -598,8 +588,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(Docket.objects.get().docket_number, "APL-2024-00178")
 
     def test_an_unparsed_file_list_names_the_docket_it_lost(self) -> None:
-        """Drift in the file table could cost every docket in a run, and the
-        count alone does not say which. Does the log name the docket?"""
+        """Drift in the file table could cost every docket in a run, and the count alone does not say which. Does the log name the docket?"""
         _run_database(
             self.database,
             [("NYCourtPassDocket", _docket(no_files_for_case=False))],
@@ -618,9 +607,7 @@ class NYCoALoaderTest(TestCase):
         self.assertFalse(Docket.objects.exists())
 
     def test_loads_a_docket_stating_an_uncovered_subcategory(self) -> None:
-        """A subcategory the vocabulary does not cover must not cost the
-        docket. Does the case load, with the issue recorded as unassigned and
-        the Court's own wording kept?"""
+        """A subcategory the vocabulary does not cover must not cost the docket. Does the case load, with the issue recorded as unassigned and the Court's own wording kept?"""
         _run_database(
             self.database,
             [
@@ -659,11 +646,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_loads_a_filing_the_filings_table_never_listed(self) -> None:
-        """A filing the scraper reconstructed from a document states no filing
-        type at all, which is not the same as stating one the vocabulary does
-        not cover. The scraper reports both as `None`, so what separates them by
-        the time the merge stores a code is the raw string the loader hands over
-        beside it: blank for the filing no table row named."""
+        """A filing the scraper reconstructed from a document states no filing type at all, which is not the same as stating one the vocabulary does not cover. The scraper reports both as `None`, so what separates them by the time the merge stores a code is the raw string the loader hands over beside it: blank for the filing no table row named."""
         for label, raw, expected in (
             ("no table row named it", None, UNKNOWN),
             ("named but not covered", "Appellant Sur-Reply Brief", UNASSIGNED),
@@ -699,13 +682,7 @@ class NYCoALoaderTest(TestCase):
                 self.assertEqual(entry.filing_type_raw, raw or "")
 
     def test_the_worker_rebuilds_the_scrape_the_loader_read(self) -> None:
-        """What celery carries is the scrape's own dump, so the worker's
-        `model_validate_json` has to invert `model_dump_json` exactly. The
-        vocabulary fields are where that can fail: an uncovered reading and an
-        unstated one both dump as strings no vocabulary covers, so a
-        vocabulary that could not read its own dump back would silently turn
-        one into the other. Does the worker rebuild the scrape the loader
-        validated?"""
+        """What celery carries is the scrape's own dump, so the worker's `model_validate_json` has to invert `model_dump_json` exactly. The vocabulary fields are where that can fail: an uncovered reading and an unstated one both dump as strings no vocabulary covers, so a vocabulary that could not read its own dump back would silently turn one into the other. Does the worker rebuild the scrape the loader validated?"""
         _run_database(
             self.database,
             [
@@ -760,9 +737,11 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_merges_a_docket_the_court_states_has_no_files(self) -> None:
-        """Court-PASS says outright when a case has no files at all. Is that
-        docket merged, rather than taken for one whose file list went
-        unread?"""
+        """Court-PASS says outright when a case has no files at all.
+
+        Is that docket merged, rather than taken for one whose file list went
+        unread?
+        """
         _run_database(
             self.database,
             [("NYCourtPassDocket", _docket(no_files_for_case=True))],
@@ -775,8 +754,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_collapses_a_file_listed_twice(self) -> None:
-        """Court-PASS sometimes lists one document twice on a filing, once
-        servable and once not. Is the servable copy the one kept?"""
+        """Court-PASS sometimes lists one document twice on a filing, once servable and once not. Is the servable copy the one kept?"""
         sealed = FILE | {"file_index": 1, "available": False}
         scrape = self.scrape(
             [
@@ -792,8 +770,7 @@ class NYCoALoaderTest(TestCase):
         self.assertTrue(attachments[0].available)
 
     def test_one_row_per_docket(self) -> None:
-        """A docket listed at two positions in the search grid is scraped
-        once per position. Is it merged once?"""
+        """A docket listed at two positions in the search grid is scraped once per position. Is it merged once?"""
         _run_database(
             self.database,
             [
@@ -809,9 +786,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_the_last_reading_of_a_docket_is_the_one_kept(self) -> None:
-        """A docket read twice in one run was read twice because the run came
-        back to it, so the later reading is the better one -- and it is the
-        reading the file archive keeps too. Is that the one the query keeps?"""
+        """A docket read twice in one run was read twice because the run came back to it, so the later reading is the better one -- and it is the reading the file archive keeps too. Is that the one the query keeps?"""
         scrape = self.scrape(
             [
                 ("NYCourtPassDocket", _docket(case_name="Smith v. Roe")),
@@ -879,8 +854,10 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_dispatches_extraction_for_the_documents_it_writes(self) -> None:
-        """A merge only records where a document's file is. Is the document
-        handed off for text extraction as the load goes?"""
+        """A merge only records where a document's file is.
+
+        Is the document handed off for text extraction as the load goes?
+        """
         self._run_holding_one_document()
 
         report = self.loader().load()
@@ -916,9 +893,7 @@ class NYCoALoaderTest(TestCase):
         return report.extraction
 
     def test_extraction_that_never_ran_is_reported(self) -> None:
-        """A merge reporting success says extraction was dispatched, not that
-        it ran, and a failed call to the extraction service leaves no other
-        trace. Does the load notice the document sitting there unextracted?"""
+        """A merge reporting success says extraction was dispatched, not that it ran, and a failed call to the extraction service leaves no other trace. Does the load notice the document sitting there unextracted?"""
         self._run_holding_one_document()
 
         extraction = self.extraction_report()
@@ -937,8 +912,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_an_extracted_document_is_not_reported(self) -> None:
-        """The check has to clear once extraction has run, or every load would
-        end by crying wolf. Does a document that came back count as done?"""
+        """The check has to clear once extraction has run, or every load would end by crying wolf. Does a document that came back count as done?"""
         self._run_holding_one_document()
 
         with patch.object(NYCoADocument, "extract", autospec=True) as extract:
@@ -959,9 +933,7 @@ class NYCoALoaderTest(TestCase):
     def test_a_document_extraction_could_not_read_is_counted_apart(
         self,
     ) -> None:
-        """A document extraction ran on and failed is the extraction
-        pipeline's problem, not the load's. Is it kept out of the count of
-        documents extraction never reached?"""
+        """A document extraction ran on and failed is the extraction pipeline's problem, not the load's. Is it kept out of the count of documents extraction never reached?"""
         self._run_holding_one_document()
 
         with patch.object(NYCoADocument, "extract", autospec=True) as extract:
@@ -981,8 +953,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_unextracted_documents_get_their_own_sentry_issue(self) -> None:
-        """Extraction that never ran is a different problem from a merge that
-        failed. Is it filed on its own, under the loader rather than the run?"""
+        """Extraction that never ran is a different problem from a merge that failed. Is it filed on its own, under the loader rather than the run?"""
         self._run_holding_one_document()
         # The test runner disables logging outright for speed, and the error
         # is what carries this to Sentry.
@@ -1001,10 +972,7 @@ class NYCoALoaderTest(TestCase):
         self.assertIn("state_document_download", logs.output[0])
 
     def test_each_phase_waits_on_its_own_clock(self) -> None:
-        """Extraction cannot begin until the merges that write the documents
-        have landed, so one budget shared between the two waits would have a
-        run that spent it all on slow merges report every document as
-        unextracted. Does each phase get its own wait?"""
+        """Extraction cannot begin until the merges that write the documents have landed, so one budget shared between the two waits would have a run that spent it all on slow merges report every document as unextracted. Does each phase get its own wait?"""
         self._run_holding_one_document()
         loader = self.loader()
 
@@ -1020,8 +988,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_extraction_still_running_is_not_called_abandoned(self) -> None:
-        """A run that gives up while extraction is still coming down has found
-        nothing wrong. Is that told apart from extraction that stopped?"""
+        """A run that gives up while extraction is still coming down has found nothing wrong. Is that told apart from extraction that stopped?"""
         self._run_holding_one_document()
 
         extraction = self.extraction_report(
@@ -1037,9 +1004,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_reports_the_files_the_run_moved(self) -> None:
-        """Only the workers see a file move, so a load has no way to know what
-        became of one except by what the merges wrote down. Does the count
-        reach the report?"""
+        """Only the workers see a file move, so a load has no way to know what became of one except by what the merges wrote down. Does the count reach the report?"""
         self._run_holding_one_document()
 
         report = self.loader().load()
@@ -1047,10 +1012,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(report.files, FileTally(moved=1))
 
     def test_reports_the_files_the_run_could_not_move(self) -> None:
-        """A file that never reached the public bucket leaves a document with
-        nothing to serve, which no other count in the report would show. Are
-        the two ways of failing reported apart, so a reader knows whether
-        re-running the load would mend it?"""
+        """A file that never reached the public bucket leaves a document with nothing to serve, which no other count in the report would show. Are the two ways of failing reported apart, so a reader knows whether re-running the load would mend it?"""
         self._run_holding_one_document()
         for outcome, expected in (
             (PublishOutcome.FAILED, FileTally(failed=1)),
@@ -1072,8 +1034,7 @@ class NYCoALoaderTest(TestCase):
                 Docket.objects.all().delete()
 
     def test_unmoved_files_get_their_own_sentry_issue(self) -> None:
-        """A file stuck in the private bucket is a different problem from a
-        merge that failed -- the merge succeeded. Is it filed on its own?"""
+        """A file stuck in the private bucket is a different problem from a merge that failed -- the merge succeeded. Is it filed on its own?"""
         self.publish_outcome = PublishOutcome.FAILED
         self._run_holding_one_document()
         logging.disable(logging.NOTSET)
@@ -1092,8 +1053,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_a_run_that_moved_nothing_reports_no_files(self) -> None:
-        """A docket with no files to move must not read as a run whose files
-        all failed. Is an empty tally left empty?"""
+        """A docket with no files to move must not read as a run whose files all failed. Is an empty tally left empty?"""
         _run_database(self.database, [("NYCourtPassDocket", _docket())])
 
         report = self.loader().load()
@@ -1102,9 +1062,7 @@ class NYCoALoaderTest(TestCase):
         self.assertFalse(report.files)
 
     def test_file_counts_survive_into_a_verify_only_pass(self) -> None:
-        """`--skip-load` reads the ledger and never opens the run database, so
-        anything the merges reported has to be in Redis rather than in the
-        loading process. Are the file counts still there?"""
+        """`--skip-load` reads the ledger and never opens the run database, so anything the merges reported has to be in Redis rather than in the loading process. Are the file counts still there?"""
         self._run_holding_one_document()
         self.loader().load()
 
@@ -1114,9 +1072,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(report.files, FileTally(moved=1))
 
     def test_a_resumed_load_adds_to_the_file_counts_it_left(self) -> None:
-        """A load picked up with `--auto-resume` keeps its predecessor's
-        ledger. Do the file counts add up across the two attempts rather than
-        starting over?"""
+        """A load picked up with `--auto-resume` keeps its predecessor's ledger. Do the file counts add up across the two attempts rather than starting over?"""
         _run_database(
             self.database,
             [
@@ -1166,8 +1122,7 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_a_load_dispatching_no_extraction_checks_none(self) -> None:
-        """Is the extraction check held back for a load that left the work to
-        the sweep, rather than reporting every document as outstanding?"""
+        """Is the extraction check held back for a load that left the work to the sweep, rather than reporting every document as outstanding?"""
         self._run_holding_one_document()
 
         report = self.loader(extract=False).load()
@@ -1176,8 +1131,10 @@ class NYCoALoaderTest(TestCase):
         self.assertIsNone(report.extraction)
 
     def test_skipping_extraction_still_merges(self) -> None:
-        """`extract=False` leaves the work to the sweep. Is the document
-        written all the same, and nothing dispatched?"""
+        """`extract=False` leaves the work to the sweep.
+
+        Is the document written all the same, and nothing dispatched?
+        """
         self._run_holding_one_document()
 
         report = self.loader(extract=False).load()
@@ -1211,8 +1168,7 @@ class NYCoALoaderTest(TestCase):
         self.assertEqual(Docket.objects.count(), 1)
 
     def test_skips_a_docket_with_no_number(self) -> None:
-        """A docket with no number cannot be matched against anything we
-        already hold. Is it skipped rather than merged into nothing?"""
+        """A docket with no number cannot be matched against anything we already hold. Is it skipped rather than merged into nothing?"""
         _run_database(
             self.database,
             [

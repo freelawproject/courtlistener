@@ -1,3 +1,5 @@
+"""Helpers for recording sign-in events."""
+
 import hashlib
 import hmac
 

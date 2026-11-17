@@ -1,3 +1,5 @@
+"""Work out which membership's benefits a person gets."""
+
 from dataclasses import dataclass
 
 from django.contrib.auth.base_user import AbstractBaseUser

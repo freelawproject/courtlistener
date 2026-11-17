@@ -1,3 +1,5 @@
+"""Settings for django-allauth single sign-on."""
+
 import environ
 
 env = environ.FileAwareEnv()

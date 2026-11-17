@@ -1,3 +1,5 @@
+"""Retry failed emails to recipients that have become deliverable again."""
+
 import sys
 from datetime import timedelta
 
@@ -12,8 +14,7 @@ from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
 
 
 def handle_failing_emails() -> int:
-    """Method to look for email addresses that are now deliverable after a
-    backoff event expires and then retry failed email messages periodically.
+    """Method to look for email addresses that are now deliverable after a backoff event expires and then retry failed email messages periodically.
 
     Checks recipients' deliverability:
     It works by looking for backoff events that need to be checked
@@ -39,15 +40,15 @@ def handle_failing_emails() -> int:
     Send failed emails that their status is ENQUEUED_DELIVERY or ENQUEUED.
     And their scheduled next_retry_date is smaller than the current time.
 
-    :param: None
-    :return: The number of failed emails sent.
+    Returns:
+        The number of failed emails sent.
     """
     # Checks recipients' deliverability
     active_backoff_events = EmailFlag.objects.select_for_update().filter(
         flag_type=FLAG_TYPES.BACKOFF,
         checked=None,
         next_retry_date__lte=now()
-        - timedelta(hours=settings.DELIVERABILITY_THRESHOLD),  # type: ignore
+        - timedelta(hours=settings.DELIVERABILITY_THRESHOLD),
     )
     with transaction.atomic():
         for backoff_event in active_backoff_events:
@@ -79,12 +80,12 @@ def handle_failing_emails() -> int:
 
 
 class Command(VerboseCommand):
-    """Command to check email recipients' deliverability and send failed emails
-    periodically."""
+    """Command to check email recipients' deliverability and send failed emails periodically."""
 
     help = "Check email recipients' deliverability and send failed emails."
 
     def handle(self, *args, **options):
+        """Retry the failed emails that are due and report how many were sent."""
         super().handle(*args, **options)
         sys.stdout.write("Sending failed email...")
         email_sent = handle_failing_emails()

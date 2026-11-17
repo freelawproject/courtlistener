@@ -1,0 +1,54 @@
+{
+  "status": "valid",
+  "court_id": "test",
+  "versions": {"centralia": "0.0.5"},
+  "cluster": {
+    "doc_type": "opinion",
+    "case_name": "United States v. Example",
+    "case_name_short": "Example",
+    "docket_number": "23-555",
+    "date_filed": "January 8, 2025",
+    "date_filed_iso": "2025-01-08",
+    "precedential_status": "unpublished",
+    "judges": null,
+    "panel": [],
+    "attorneys": null,
+    "parties": [],
+    "disposition": null,
+    "history": null,
+    "lower_court": null,
+    "lower_court_docket": [],
+    "lower_court_judge": null,
+    "summary": null,
+    "syllabus": null,
+    "headnotes": null
+  },
+  "opinions": [
+    {
+      "order": 1,
+      "type": "per-curiam",
+      "author_name": null,
+      "html": "<div class=\"opinion\"><p>The petition is denied.</p></div>",
+      "text": "The petition is denied."
+    }
+  ],
+  "headmatter": {
+    "rows": [],
+    "by_role": {},
+    "html": "",
+    "html_inline": "<div style=\"text-align:center\">UNITED STATES COURT OF APPEALS</div>",
+    "text": "UNITED STATES COURT OF APPEALS",
+    "untinted": 0,
+    "footnotes": []
+  },
+  "sections": {},
+  "diagnostics": {
+    "status": "valid",
+    "rollout": "released",
+    "scan_pages": [],
+    "text_missing_pages": [],
+    "cid_pages": [],
+    "opinion_count": 1,
+    "warnings": []
+  }
+}

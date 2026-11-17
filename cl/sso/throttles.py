@@ -1,3 +1,5 @@
+"""Keep API rate limits in step with SSO memberships."""
+
 from django.contrib.auth.models import User
 
 from cl.api.utils import apply_membership_throttles, clear_membership_throttles

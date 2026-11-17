@@ -1,9 +1,12 @@
+"""Plain-text SSO emails, in the same shape as cl.users.utils.emails.
+
+Bodies are %-formatted by their callers.
+"""
+
 from django.conf import settings
 
 from cl.lib.types import EmailType
 
-# Plain-text messages for SSO, in the same shape as cl.users.utils.emails.
-# Bodies are %-formatted by their callers.
 emails: dict[str, EmailType] = {
     "account_linked": {
         "subject": "Your CourtListener account now uses %s single sign-on",

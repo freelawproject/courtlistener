@@ -1,3 +1,5 @@
+"""Root URL configuration for CourtListener."""
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -116,4 +118,4 @@ if settings.DEVELOPMENT:
             path("__debug__/", include("debug_toolbar.urls")),
         )
 
-urlpatterns += static("/", document_root=settings.MEDIA_ROOT)  # type: ignore
+urlpatterns += static("/", document_root=settings.MEDIA_ROOT)

@@ -1,3 +1,5 @@
+"""Middleware that re-checks sessions against the SSO policy."""
+
 import time
 from collections.abc import Callable
 from typing import Any

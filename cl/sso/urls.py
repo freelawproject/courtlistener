@@ -1,3 +1,5 @@
+"""URLs for single sign-on, including allauth's provider URLs."""
+
 from allauth.socialaccount import views as socialaccount_views
 from allauth.urls import build_provider_urlpatterns
 from django.urls import URLPattern, URLResolver, include, path

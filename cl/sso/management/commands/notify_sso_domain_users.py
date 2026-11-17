@@ -1,3 +1,5 @@
+"""Email existing users on a domain that now uses single sign-on."""
+
 import argparse
 import logging
 from collections import Counter

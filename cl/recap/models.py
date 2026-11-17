@@ -1,4 +1,7 @@
+"""Models for RECAP uploads, recap.email notifications, PACER fetches, and the FJC IDB."""
+
 import logging
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -15,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class UPLOAD_TYPE:
-    """This enumeration of upload types should be in sync with
-    recap-chrome/src/pacer.js: UPLOAD_TYPES [plural, sic]
-    """
+    """This enumeration of upload types should be in sync with recap-chrome/src/pacer.js: UPLOAD_TYPES [plural, sic]."""
 
     DOCKET = 1
     ATTACHMENT_PAGE = 2
@@ -75,19 +76,22 @@ class PROCESSING_QUEUE_SOURCE:
 
 
 def make_recap_processing_queue_path(instance, filename):
+    """Make a dated upload path under ``recap_processing_queue``."""
     return make_path("recap_processing_queue", filename)
 
 
 def make_recap_data_path(instance, filename):
+    """Make a dated upload path under ``recap-data``."""
     return make_path("recap-data", filename)
 
 
 def make_recap_email_processing_queue_aws_path(instance, filename: str) -> str:
+    """Make an upload path under ``recap-email``."""
     return f"recap-email/{filename}"
 
 
 class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
-    """This is a simple object for holding original HTML content from PACER
+    """This is a simple object for holding original HTML content from PACER.
 
     We use this object to make sure that for every item we receive from users,
     we can go back and re-parse it one day if we have to. This becomes
@@ -119,6 +123,8 @@ class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
 
 
 class PROCESSING_STATUS:
+    """Processing statuses of RECAP queue items."""
+
     ENQUEUED = 1
     SUCCESSFUL = 2
     FAILED = 3
@@ -248,10 +254,9 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return f"ProcessingQueue {self.pk}: {self.court_id} case #{self.pacer_case_id} ({self.get_upload_type_display()})"
-        elif self.upload_type == UPLOAD_TYPE.PDF:
+        if self.upload_type == UPLOAD_TYPE.PDF:
             return f"ProcessingQueue: {self.pk}: {self.court_id}.{self.pacer_case_id or None}.{self.document_number or None}.{self.attachment_number or 0} ({self.get_upload_type_display()})"
-        else:
-            return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
+        return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
     class Meta:
         permissions = (
@@ -260,17 +265,16 @@ class ProcessingQueue(AbstractDateTimeModel):
 
     @property
     def file_contents(self) -> str:
-        with open(self.filepath_local.path) as f:
-            return f.read()
+        """The contents of the uploaded file."""
+        return Path(self.filepath_local.path).read_text()
 
     def print_file_contents(self) -> None:
+        """Print the contents of the uploaded file."""
         print(self.file_contents)
 
 
 class EmailSource:
-    """
-    Possible sources for entries in the email processing queue.
-    """
+    """Possible sources for entries in the email processing queue."""
 
     PACER = 1
     """
@@ -292,24 +296,24 @@ class EmailSource:
 
 
 class EmailProcessingQueue(AbstractDateTimeModel):
-    """
-    Where @recap.email emails go when received by the API
+    """Where @recap.email emails go when received by the API.
 
-    :ivar uploader: The user that sent in the email for processing.
-    :ivar court: The court where the upload was from.
-    :ivar message_id: The S3 message identifier, used to pull the file in the\
-        processing tasks.
-    :ivar destination_emails: The emails that received the notification.
-    :ivar filepath: The S3 filepath to the email and receipt stored as JSON\
-        text.
-    :ivar status_message: Any errors that occurred while processing an item.
-    :ivar recap_documents: Document(s) created from the PACER email, processed\
-        as a function of this queue. Kept for compatibility; use get_related_objects
-        in the future.
-    :ivar source: The source of this email notification.
-    :ivar related_model: The type of model that was created or updated by this
-        email.
-    :ivar object_ids: The PKs of models created or updated by this email.
+    Attributes:
+        uploader: The user that sent in the email for processing.
+        court: The court where the upload was from.
+        message_id: The S3 message identifier, used to pull the file in the\
+            processing tasks.
+        destination_emails: The emails that received the notification.
+        filepath: The S3 filepath to the email and receipt stored as JSON\
+            text.
+        status_message: Any errors that occurred while processing an item.
+        recap_documents: Document(s) created from the PACER email, processed\
+            as a function of this queue. Kept for compatibility; use get_related_objects
+            in the future.
+        source: The source of this email notification.
+        related_model: The type of model that was created or updated by this
+            email.
+        object_ids: The PKs of models created or updated by this email.
     """
 
     uploader = models.ForeignKey(
@@ -379,6 +383,7 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         )
 
     def get_related_objects(self) -> QuerySet | None:
+        """Get the objects the email produced, or None if no related model is set."""
         if not self.related_model:
             logger.warning(
                 "Call to EmailProcessingQueue.get_related_objects() with null related_model."
@@ -392,6 +397,8 @@ class EmailProcessingQueue(AbstractDateTimeModel):
 
 
 class REQUEST_TYPE:
+    """The kinds of PACER fetch requests."""
+
     DOCKET = 1
     PDF = 2
     ATTACHMENT_PAGE = 3
@@ -530,7 +537,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
 
 
 class FjcIntegratedDatabase(AbstractDateTimeModel):
-    """The Integrated Database of PACER data as described here:
+    """The Integrated Database of PACER data, as described at the link below.
 
     https://www.fjc.gov/research/idb
 

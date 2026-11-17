@@ -1,3 +1,5 @@
+"""Template context for the pages allauth's own views render."""
+
 from django.http import HttpRequest
 
 

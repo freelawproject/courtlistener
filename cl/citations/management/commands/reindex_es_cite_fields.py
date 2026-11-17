@@ -1,3 +1,5 @@
+"""Re-index the citation fields of opinion and cluster search documents."""
+
 import time
 from collections.abc import Callable
 
@@ -15,6 +17,8 @@ from cl.search.tasks import (
 
 
 class Command(VerboseCommand):
+    """Update cluster citation counts or opinion cites in Elasticsearch for an ID range."""
+
     help = """Update OpinionClusterDocument.citeCount and OpinionDocument.cites
 
     Useful to re index these fields after Elastic got unsynced from the DB when
@@ -22,6 +26,7 @@ class Command(VerboseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the target field, ID range, and batch size options."""
         parser.add_argument(
             "--reindex-target",
             choices=["citeCount", "cites"],
@@ -47,6 +52,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Re-index the target field for objects in the ID range.
+
+        The range includes ``--start-id`` and excludes ``--end-id``. Only
+        clusters with citations or opinions that cite others are re-indexed.
+
+        Raises:
+            ValueError: If the start or end ID is missing.
+        """
         reindex_target = options["reindex_target"]
         start_id = options["start_id"]
         end_id = options["end_id"]
@@ -76,11 +89,12 @@ class Command(VerboseCommand):
     def update_es_in_batches(
         self, queryset: QuerySet, update_fn: Callable, batch_size: int
     ) -> None:
-        """Batch a queryset and call the updater function over batches
+        """Batch a queryset and call the updater function over batches.
 
-        :param queryset: the queryset to iterate over
-        :param update_fn: a function that takes a list of ids as input
-        :param batch_size: the size of each batch
+        Args:
+            queryset: the queryset to iterate over
+            update_fn: a function that takes a list of ids as input
+            batch_size: the size of each batch
         """
         model_name = queryset.model.__name__
         batch = []
@@ -110,9 +124,10 @@ class Command(VerboseCommand):
 
     @staticmethod
     def update_cite_count(cluster_ids_to_update: list[int]) -> None:
-        """Updates OpinionClusterDocument.citeCount
+        """Updates OpinionClusterDocument.citeCount.
 
-        :param cluster_ids_to_update: cluster ids
+        Args:
+            cluster_ids_to_update: cluster ids
         """
         documents_to_update = build_cite_count_update(cluster_ids_to_update)
         index_documents_in_bulk(documents_to_update)
@@ -123,9 +138,10 @@ class Command(VerboseCommand):
 
     @staticmethod
     def update_cites(opinion_ids: list[int]) -> None:
-        """Updates OpinionDocument.cites
+        """Updates OpinionDocument.cites.
 
-        :param opinion_ids: the opinion ids
+        Args:
+            opinion_ids: the opinion ids
         """
         base_doc = {
             "_op_type": "update",

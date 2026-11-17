@@ -1,3 +1,5 @@
+"""OAuth2 request validator for CourtListener."""
+
 from collections.abc import Callable
 from typing import Any
 
@@ -5,9 +7,7 @@ from oauth2_provider.oauth2_validators import OAuth2Validator
 
 
 class CourtListenerOAuth2Validator(OAuth2Validator):
-    """Adds the standard OIDC ``email`` and ``profile`` claims and limits
-    dynamically registered applications to the ``api`` and ``openid`` scopes.
-    """
+    """Adds the standard OIDC ``email`` and ``profile`` claims and limits dynamically registered applications to the ``api`` and ``openid`` scopes."""
 
     DCR_SCOPES = frozenset({"api", "openid"})
 

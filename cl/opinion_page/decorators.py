@@ -1,3 +1,5 @@
+"""Decorators for views of opinion clusters."""
+
 from collections.abc import Coroutine
 from functools import wraps
 from http import HTTPStatus
@@ -18,8 +20,7 @@ def handle_cluster_redirection[
 ](
     view_func: DjangoViewType[P, Request, Response],
 ) -> DjangoViewType[P, Request, Coroutine[Any, Any, HttpResponse]]:
-    """
-    Redirect from deleted clusters to existing clusters
+    """Redirect from deleted clusters to existing clusters.
 
     Uses the ClusterRedirection table, and only changed the `pk` of the request
     """
@@ -29,8 +30,7 @@ def handle_cluster_redirection[
         request: Request, *args: P.args, **kwargs: P.kwargs
     ) -> HttpResponse:
         try:
-            response = await view_func(request, *args, **kwargs)
-            return response
+            return await view_func(request, *args, **kwargs)
         except Http404 as exc:
             try:
                 redirection = await ClusterRedirection.objects.aget(
