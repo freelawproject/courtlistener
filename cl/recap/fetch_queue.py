@@ -43,6 +43,10 @@ KEY_PREFIX = "recap_fetch"
 # Celery would block its court forever.
 PENDING_TTL_SECONDS = 5 * 60
 
+# The daemon renews its heartbeat every cycle, about twice a second. If it
+# goes this long without one, we assume it is down and stop queueing.
+HEARTBEAT_TTL_SECONDS = 30
+
 # Atomically take the next request for a court, if the court is ready for one.
 # This has to be a script because it reads the court's clock, decides, and
 # then writes. Done as separate commands, two processes could both read the
@@ -118,6 +122,36 @@ def _next_key(court_id: str) -> str:
 def _rates_key() -> str:
     """Return the key of the HASH of per-court rate overrides."""
     return f"{KEY_PREFIX}:rates"
+
+
+def _heartbeat_key() -> str:
+    """Return the key the scheduler daemon keeps alive while it runs."""
+    return f"{KEY_PREFIX}:daemon_heartbeat"
+
+
+def touch_daemon_heartbeat() -> None:
+    """Record that the scheduler daemon is running.
+
+    The daemon calls this on every cycle. The key expires on its own, so a
+    daemon that dies or hangs stops counting as alive after
+    HEARTBEAT_TTL_SECONDS.
+    """
+    get_redis_interface("CACHE").set(
+        _heartbeat_key(), 1, ex=HEARTBEAT_TTL_SECONDS
+    )
+
+
+def daemon_is_alive() -> bool:
+    """Check whether the scheduler daemon has run recently.
+
+    Nothing but the daemon hands queued requests to Celery, so new requests
+    must not be queued while it is down.
+
+    Returns:
+        True if the daemon renewed its heartbeat in the last
+        HEARTBEAT_TTL_SECONDS.
+    """
+    return bool(get_redis_interface("CACHE").exists(_heartbeat_key()))
 
 
 def get_court_interval_ms(court_id: str) -> int:

@@ -11,12 +11,15 @@ import logging
 from datetime import timedelta
 
 from asgiref.sync import async_to_sync
+from django.http import HttpRequest
 from django.utils.timezone import now
 from sentry_sdk import capture_exception
+from waffle import flag_is_active
 
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.recap.fetch_queue import (
     clear_pending_fetch,
+    daemon_is_alive,
     enqueue_fetch,
     estimate_delay,
     get_courts_with_waiting_fetches,
@@ -31,9 +34,10 @@ from cl.recap.utils import get_court_id_from_fetch_queue
 
 logger = logging.getLogger(__name__)
 
-# Waffle switch that sends new Fetch API requests through this waiting room.
-# While it is off, requests go straight to Celery as they did before.
-SCHEDULER_SWITCH = "recap-fetch-scheduler"
+# Waffle flag that sends a user's new Fetch API requests through the waiting
+# room. It is a flag rather than a switch so it can be turned on for a few
+# users first. While it is off, requests go straight to Celery as before.
+SCHEDULER_FLAG = "recap_fetch_scheduler"
 
 # A request that has not started this long after it was made is failed. The
 # user's PACER cookies are cached for an hour and we never store their
@@ -48,6 +52,32 @@ STALE_MESSAGE = (
     "This request waited too long to start and was cancelled before "
     "anything was requested from PACER. Please submit it again."
 )
+
+
+def should_schedule(request: HttpRequest) -> bool:
+    """Decide whether a new Fetch API request goes through the waiting room.
+
+    Requests are only queued while the scheduler daemon is running. If the
+    flag is on but the daemon is down, they go straight to Celery as before,
+    so they don't sit in Redis with nothing to hand them off.
+
+    Args:
+        request: The Django request that is creating the fetch, with its user
+            already authenticated, so the flag can target that user.
+
+    Returns:
+        True if the request should be put in the waiting room.
+    """
+    if not flag_is_active(request, SCHEDULER_FLAG):
+        return False
+    if not daemon_is_alive():
+        logger.warning(
+            "The %s flag is on but the scheduler daemon is not running. "
+            "Sending the request straight to Celery.",
+            SCHEDULER_FLAG,
+        )
+        return False
+    return True
 
 
 def schedule_fetch(fq: PacerFetchQueue) -> float:

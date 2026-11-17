@@ -18,6 +18,7 @@ from django.conf import settings
 from sentry_sdk import capture_exception
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.recap.fetch_queue import touch_daemon_heartbeat
 from cl.recap.fetch_scheduler import fail_stale_fetches, run_dispatch_cycle
 
 # Seconds to wait after one dispatch cycle finishes before starting the next.
@@ -83,6 +84,8 @@ class Command(VerboseCommand):
             and settings.RECAP_FETCH_SCHEDULER_DAEMON_ENABLED
         ):
             try:
+                # The API only queues requests while this heartbeat is fresh.
+                touch_daemon_heartbeat()
                 run_dispatch_cycle()
                 if time.monotonic() >= next_sweep:
                     next_sweep = time.monotonic() + SWEEP_WAIT

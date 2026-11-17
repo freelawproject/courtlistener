@@ -8,7 +8,8 @@ import time_machine
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
-from waffle.testutils import override_switch
+from waffle.models import Flag
+from waffle.testutils import override_flag
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.recap import fetch_queue
@@ -21,9 +22,10 @@ from cl.recap.fetch_queue import (
     mark_fetch_started,
     pop_next_fetch,
     set_court_rate,
+    touch_daemon_heartbeat,
 )
 from cl.recap.fetch_scheduler import (
-    SCHEDULER_SWITCH,
+    SCHEDULER_FLAG,
     STALE_MESSAGE,
     fail_stale_fetches,
     run_dispatch_cycle,
@@ -345,8 +347,13 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
     """The Fetch API queues requests and reports the estimated delay."""
 
     def setUp(self) -> None:
-        """Log Jane in to the API."""
+        """Log Jane in to the API and start the daemon's heartbeat."""
         super().setUp()
+        # Keep the dispatch cycle away from the real fetch tasks.
+        patcher = mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        touch_daemon_heartbeat()
         self.client = APIClient()
         self.client.force_authenticate(self.jane)
         self.url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
@@ -358,13 +365,14 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
             "pacer_password": "secret",
         }
 
-    @override_switch(SCHEDULER_SWITCH, active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_flag_on")
+    @override_flag(SCHEDULER_FLAG, active=True)
     def test_queues_the_request_and_estimates_the_delay(
         self,
         mock_do_pacer_fetch: mock.MagicMock,
         mock_cookies: mock.MagicMock,
     ) -> None:
-        """With the switch on, the request waits and the wait is reported."""
+        """With the flag on, the request waits and the wait is reported."""
         for _ in range(3):
             schedule_fetch(self._make_fq(self.bob))
 
@@ -377,16 +385,57 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
         mock_do_pacer_fetch.assert_not_called()
         self.assertEqual(run_dispatch_cycle(), 1)
 
-    @override_switch(SCHEDULER_SWITCH, active=False)
-    def test_switch_off_keeps_the_old_behavior(
+    @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_flag_off")
+    @override_flag(SCHEDULER_FLAG, active=False)
+    def test_flag_off_keeps_the_old_behavior(
         self,
         mock_do_pacer_fetch: mock.MagicMock,
         mock_cookies: mock.MagicMock,
     ) -> None:
-        """With the switch off, requests go straight to Celery as before."""
+        """With the flag off, requests go straight to Celery as before."""
         response = self.client.post(self.url, self.body, format="json")
 
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertIsNone(response.json()["estimated_execution_delay"])
         mock_do_pacer_fetch.assert_called_once()
         self.assertEqual(get_courts_with_waiting_fetches(), [])
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_no_daemon")
+    @override_flag(SCHEDULER_FLAG, active=True)
+    def test_requests_skip_the_queue_while_the_daemon_is_down(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_cookies: mock.MagicMock,
+    ) -> None:
+        """Nothing would hand a queued request off, so it goes to Celery."""
+        get_redis_interface("CACHE").delete(fetch_queue._heartbeat_key())
+
+        response = self.client.post(self.url, self.body, format="json")
+
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertIsNone(response.json()["estimated_execution_delay"])
+        mock_do_pacer_fetch.assert_called_once()
+        self.assertEqual(get_courts_with_waiting_fetches(), [])
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_per_user")
+    def test_flag_can_target_a_single_user(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_cookies: mock.MagicMock,
+    ) -> None:
+        """Only the users the flag is on for go through the queue."""
+        flag = Flag(name=SCHEDULER_FLAG, everyone=None)
+        flag.save()
+        flag.users.add(self.jane)
+        bob_client = APIClient()
+        bob_client.force_authenticate(self.bob)
+
+        jane_response = self.client.post(self.url, self.body, format="json")
+        bob_response = bob_client.post(self.url, self.body, format="json")
+
+        self.assertIsNotNone(jane_response.json()["estimated_execution_delay"])
+        self.assertIsNone(bob_response.json()["estimated_execution_delay"])
+        mock_do_pacer_fetch.assert_called_once()
+        self.assertEqual(
+            mock_do_pacer_fetch.call_args.args[0].pk, bob_response.json()["id"]
+        )

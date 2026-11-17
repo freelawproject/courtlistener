@@ -15,7 +15,6 @@ from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from waffle import switch_is_active
 
 from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import BigPagination
@@ -33,7 +32,7 @@ from cl.recap.api_serializers import (
     PacerFetchQueueSerializer,
     ProcessingQueueSerializer,
 )
-from cl.recap.fetch_scheduler import SCHEDULER_SWITCH, schedule_fetch
+from cl.recap.fetch_scheduler import schedule_fetch, should_schedule
 from cl.recap.filters import (
     EmailProcessingQueueFilter,
     FjcIntegratedDatabaseFilter,
@@ -200,7 +199,7 @@ class PacerFetchRequestViewSet(
     def perform_create(self, serializer):
         """Save the fetch request for the requesting user and start the fetch."""
         fq = serializer.save(user=self.request.user)
-        if not switch_is_active(SCHEDULER_SWITCH):
+        if not should_schedule(self.request._request):
             do_pacer_fetch(fq)
             return
         # Not a model field: the serializer reads it off the instance so the
