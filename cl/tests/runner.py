@@ -1,12 +1,20 @@
 import logging
 import sys
 import warnings
+from functools import partial
+from typing import Any
+from unittest import TestCase as UnitTestCase
 from unittest import TestLoader
 
 from django.test import SimpleTestCase
-from django.test.runner import DiscoverRunner
+from django.test.runner import (
+    DiscoverRunner,
+    ParallelTestSuite,
+    RemoteTestRunner,
+)
 from override_storage import override_storage
 from xmlrunner import XMLTestRunner
+from xmlrunner.result import _TestInfo, _XMLTestResult
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.tests.cases import (
@@ -40,8 +48,66 @@ class OurCasesTestLoader(TestLoader):
         return super().loadTestsFromTestCase(testCaseClass)
 
 
+class DurationAwareTestInfo(_TestInfo):
+    """A ``_TestInfo`` that prefers the runner-measured test duration."""
+
+    def test_finished(self) -> None:
+        """Finalize timing, overriding xmlrunner's with the measured value."""
+        super().test_finished()
+        if (elapsed := self.test_result.duration) is not None:
+            self.elapsed_time = elapsed
+
+
+class DurationAwareXMLTestResult(_XMLTestResult):
+    """An ``_XMLTestResult`` that writes real per-test times to the XML."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.infoclass = DurationAwareTestInfo
+        self.duration: float | None = None
+
+    def addDuration(self, test: UnitTestCase, elapsed: float) -> None:
+        """Stash the measured duration of the test that just ran.
+
+        ``addDuration()`` always arrives before the matching ``stopTest()``,
+        which is what makes a single slot enough to hold it.
+        """
+        super().addDuration(test, elapsed)
+        self.duration = elapsed
+
+    def stopTest(self, test: UnitTestCase) -> None:
+        """Finalize the test, then drop its duration."""
+        super().stopTest(test)
+        self.duration = None
+
+
+def setup_test_process(enable_logging: bool) -> None:
+    """Configure process-local warnings and logging for tests."""
+    warnings.simplefilter("default")
+    if not enable_logging:
+        logging.disable()
+
+
+class StorageRemoteTestRunner(RemoteTestRunner):
+    """Apply storage overrides inside each worker's test subsuite."""
+
+    def __init__(self, *args, enable_logging=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enable_logging = enable_logging
+
+    def run(self, test):
+        setup_test_process(self.enable_logging)
+        with override_storage():
+            return super().run(test)
+
+
+class StorageParallelTestSuite(ParallelTestSuite):
+    runner_class = StorageRemoteTestRunner
+
+
 class TestRunner(DiscoverRunner):
     test_loader = OurCasesTestLoader()
+    parallel_test_suite = StorageParallelTestSuite
 
     def __init__(self, *args, enable_logging, xml_output=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -82,15 +148,30 @@ class TestRunner(DiscoverRunner):
         # See PR #5888 for more details.
         # parser.set_defaults(buffer=True)
 
-    def get_test_runner_kwargs(self):
+    def build_suite(self, *args, **kwargs):
+        suite = super().build_suite(*args, **kwargs)
+        if isinstance(suite, StorageParallelTestSuite):
+            suite.runner_class = partial(
+                StorageRemoteTestRunner, enable_logging=self.enable_logging
+            )
+        return suite
+
+    def get_test_runner_kwargs(self) -> dict[str, Any]:
         """Build the kwargs for the test runner.
 
-        Adds XMLTestRunner's ``output`` directory when ``--xml-output`` was
-        passed; otherwise returns Django's defaults untouched.
+        Adds XMLTestRunner's ``output`` directory and the result class that
+        gives the report real per-test times when ``--xml-output`` was passed;
+        otherwise returns Django's defaults untouched.
+
+        ``--debug-sql`` and ``--pdb`` pick their own result class, which
+        cannot write XML. Those win, so combining either with ``--xml-output``
+        fails loudly rather than quietly producing untimed reports.
         """
         kwargs = super().get_test_runner_kwargs()
         if self.xml_output:
             kwargs["output"] = self.xml_output
+            if kwargs.get("resultclass") is None:
+                kwargs["resultclass"] = DurationAwareXMLTestResult
         return kwargs
 
     def setup_databases(self, **kwargs):
@@ -104,13 +185,7 @@ class TestRunner(DiscoverRunner):
 
     @override_storage()
     def run_tests(self, *args, **kwargs):
-        # Show all warnings once, especially to show DeprecationWarning
-        # messages which Python ignores by default
-        warnings.simplefilter("default")
-
-        # Disable logs for small performance boost.
-        if not self.enable_logging:
-            logging.disable()
+        setup_test_process(self.enable_logging)
 
         try:
             return super().run_tests(*args, **kwargs)

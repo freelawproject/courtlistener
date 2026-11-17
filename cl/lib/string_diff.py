@@ -1,11 +1,16 @@
+"""Helpers for comparing strings, mainly case names."""
+
 import difflib
 import math
 import re
 import string
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
+from typing import TypedDict
 
 
-def remove_words(phrase):
+def remove_words(phrase: str) -> str:
+    """Strip punctuation and stop words from a phrase, joining the remaining words without spaces."""
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = (
         r"a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
@@ -27,9 +32,9 @@ def remove_words(phrase):
     return "".join(result)
 
 
-def gen_diff_ratio(left, right):
-    """
-    Generates a difference between two strings.
+def gen_diff_ratio(left: str, right: str) -> float:
+    """Generates a difference between two strings.
+
     Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
 
@@ -42,19 +47,28 @@ def gen_diff_ratio(left, right):
     right = remove_words(right)
 
     # compute the difference value
-    diff = difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
-
-    return diff
+    return difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
 
 
-def find_best_match(items, s, case_sensitive=True):
-    """Find the string in the list that is the closest match to the string
+class _BestMatchOutput(TypedDict):
+    match_index: int
+    match_str: str
+    ratio: float
 
-    :param items: The list to search within
-    :param s: The string to attempt to match
-    :param case_sensitive: Whether comparisons should honor case
-    :return dict with the index of the best matching value, its value, and its
-    match ratio.
+
+def find_best_match(
+    items: Sequence[str], s: str, case_sensitive: bool = True
+) -> _BestMatchOutput:
+    """Find the string in the list that is the closest match to the string.
+
+    Args:
+        items: The list to search within
+        s: The string to attempt to match
+        case_sensitive: Whether comparisons should honor case
+
+    Returns:
+        dict with the index of the best matching value, its value, and its
+        match ratio.
     """
     diff_ratios = []
     if not case_sensitive:
@@ -77,7 +91,9 @@ def find_best_match(items, s, case_sensitive=True):
     }
 
 
-def find_confidences(results, case_name):
+def find_confidences(
+    results: Iterable[Mapping], case_name: str
+) -> list[float]:
     """Returns all matches above a threshold.
 
     This is nearly identical to find_best_match, but returns any good matches
@@ -96,8 +112,11 @@ def find_confidences(results, case_name):
 def string_to_vector(text: str) -> Counter:
     """Convert strings to counter dict.
 
-    :param text: Text to vectorize
-    :return: A dictionary of words by count
+    Args:
+        text: Text to vectorize
+
+    Returns:
+        A dictionary of words by count
     """
     WORD = re.compile(r"\w+")
     words = WORD.findall(text)
@@ -124,5 +143,4 @@ def get_cosine_similarity(left_str: str, right_str: str) -> float:
 
     if not denominator:
         return 0.0
-    else:
-        return float(numerator) / denominator
+    return float(numerator) / denominator

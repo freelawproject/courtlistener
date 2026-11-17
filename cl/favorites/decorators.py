@@ -1,14 +1,24 @@
+"""View decorators that set up view tracking in the template context."""
+
+from collections.abc import Coroutine
 from functools import wraps
 from inspect import iscoroutinefunction
+from typing import Any, cast
 
 from asgiref.sync import sync_to_async
+from django.http import HttpResponse
+from django.http.request import HttpRequest
 from django.template.response import SimpleTemplateResponse
 
+from cl.lib.types import DjangoViewDecorator, DjangoViewType
 
-def track_view_counter(tracks=str, label_format=str):
-    """
-    Decorator to injects a tracking label into template responses for event
-    counting (e.g., view tracking).
+
+def track_view_counter[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse | Coroutine[Any, Any, HttpResponse],
+](tracks: str, label_format: str) -> DjangoViewDecorator[P, Request, Response]:
+    """Decorator to injects a tracking label into template responses for event counting (e.g., view tracking).
 
     This decorator is meant to be used on views that return a
     SimpleTemplateResponse. It will extract a model instance from the response's
@@ -31,15 +41,15 @@ def track_view_counter(tracks=str, label_format=str):
                             placeholder for the model's ID (e.g., 'd.%s:view').
     """
 
-    def decorator(func):
+    def decorator(
+        func: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, Response]:
         def _get_label(
             response: SimpleTemplateResponse,
             track_attribute: str,
             template: str,
         ) -> int:
-            """
-            Generates a tracking label string based on a model instance found
-            in the response.
+            """Generates a tracking label string based on a model instance found in the response.
 
             This helper function extracts a model instance from the response's
             context_data using the provided key, then formats a label using the
@@ -55,14 +65,19 @@ def track_view_counter(tracks=str, label_format=str):
             Returns:
                 A formatted tracking label.
             """
+            if response.context_data is None:
+                raise TypeError(
+                    f"Response context_data is None (attempting to track {track_attribute})"
+                )
             model = response.context_data[track_attribute]
-            label = template % (model.id)
-            return label
+            return template % (model.id)
 
         if iscoroutinefunction(func):
 
             @wraps(func)
-            async def inner(request, *args, **kwargs):
+            async def inner(
+                request: Request, *args: P.args, **kwargs: P.kwargs
+            ) -> Response:
                 response = await func(request, *args, **kwargs)
                 if not isinstance(response, SimpleTemplateResponse):
                     return response
@@ -73,12 +88,14 @@ def track_view_counter(tracks=str, label_format=str):
                 response.context_data.update(
                     {"event_label": event_label, "track_events": True}
                 )
-                return response
+                return cast(Response, response)
 
         else:
 
             @wraps(func)
-            def inner(request, *args, **kwargs):
+            def inner(
+                request: Request, *args: P.args, **kwargs: P.kwargs
+            ) -> Response:
                 response = func(request, *args, **kwargs)
                 if not isinstance(response, SimpleTemplateResponse):
                     return response
@@ -89,6 +106,6 @@ def track_view_counter(tracks=str, label_format=str):
                 )
                 return response
 
-        return inner
+        return cast(DjangoViewType[P, Request, Response], inner)
 
     return decorator

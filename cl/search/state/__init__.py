@@ -1,5 +1,3 @@
-"""
-Models and logic unique to state court dockets.
-"""
+"""Models and logic unique to state court dockets."""
 
 __all__ = ["texas", "florida", "new_york"]

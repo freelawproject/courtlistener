@@ -1,3 +1,5 @@
+"""Database queries for table size estimates and citation lookups."""
+
 import natsort
 from django.db import connection
 from django.db.models import Q, QuerySet
@@ -6,6 +8,7 @@ from cl.search.models import Citation, OpinionCluster
 
 
 def get_total_estimate_count(table_name: str) -> int:
+    """Get Postgres's estimate of a public table's row count, or 0 if it has none."""
     full_name = f"public.{table_name}"
     with connection.cursor() as cursor:
         cursor.execute(
@@ -23,9 +26,7 @@ def get_total_estimate_count(table_name: str) -> int:
 async def get_clusters_from_citation_str(
     reporter: str, volume: str, page: str
 ) -> tuple[QuerySet[OpinionCluster] | None, int]:
-    """
-    This function attempts to retrieve opinion clusters related to a citation
-    string.
+    """This function attempts to retrieve opinion clusters related to a citation string.
 
     This helper first tries to find an exact match of the citation string within
     our OpinionCluster records. If no exact match is found, the helper searches
@@ -98,7 +99,8 @@ async def get_clusters_from_citation_str(
             clusters = OpinionCluster.objects.filter(
                 Q(id=possible_match.id),
                 Q(sub_opinions__html_with_citations__contains=f"*{page}")
-                | Q(sub_opinions__xml_harvard__contains=f"*{page}"),
+                | Q(sub_opinions__xml_harvard__contains=f"*{page}")
+                | Q(sub_opinions__xml_scan__contains=f"*{page}"),
             ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
 

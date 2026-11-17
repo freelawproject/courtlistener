@@ -1,7 +1,10 @@
+"""Build and send webhook events to users' endpoints."""
+
 import json
 import random
 
 import requests
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from elasticsearch.dsl.response import Response
 from rest_framework.renderers import JSONRenderer
@@ -36,12 +39,13 @@ def send_webhook_event(
 ) -> None:
     """Send the webhook POST request.
 
-    :param webhook_event: An WebhookEvent to send.
-    :param content_bytes: Optional, the bytes JSON content to send the first time
-    the webhook is sent.
+    Args:
+        webhook_event: An WebhookEvent to send.
+        content_bytes: Optional, the bytes JSON content to send the first time
+            the webhook is sent.
     """
     proxy_server = {
-        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),  # type: ignore
+        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),
     }
     headers = {
         "Content-type": "application/json",
@@ -80,16 +84,15 @@ def send_webhook_event(
         update_webhook_event_after_request(webhook_event, error=error_str)
 
 
-def send_old_alerts_webhook_event(
+async def send_old_alerts_webhook_event(
     webhook: Webhook, report: OldAlertReport
 ) -> None:
-    """Send webhook event for old alerts
+    """Send webhook event for old alerts.
 
-    :param webhook:The Webhook object to send the event to.
-    :param report: A dict containing information about old alerts
-    :return None
+    Args:
+        webhook: The Webhook object to send the event to.
+        report: A dict containing information about old alerts
     """
-
     serialized_very_old_alerts = []
     serialized_disabled_alerts = []
 
@@ -115,20 +118,19 @@ def send_old_alerts_webhook_event(
         post_content,
         accepted_media_type="application/json;",
     )
-    webhook_event = WebhookEvent.objects.create(
+    webhook_event = await WebhookEvent.objects.acreate(
         webhook=webhook,
         content=post_content,
     )
-    send_webhook_event(webhook_event, json_bytes)
+    await sync_to_async(send_webhook_event)(webhook_event, json_bytes)
 
 
-def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
+async def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
     """Send webhook event for processed PacerFetchQueue objects.
 
-    :param fq: The PacerFetchQueue object related to the event.
-    :return None
+    Args:
+        fq: The PacerFetchQueue object related to the event.
     """
-
     # Send webhook event when the fetch task is completed, only send it for
     # successful or failed like statuses.
     if fq.status in [
@@ -137,11 +139,12 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
         PROCESSING_STATUS.INVALID_CONTENT,
         PROCESSING_STATUS.NEEDS_INFO,
     ]:
-        # pyrefly:ignore[missing-attribute]
-        user_webhooks = fq.user.webhooks.filter(
-            event_type=WebhookEventType.RECAP_FETCH, enabled=True
+        user_webhooks = Webhook.objects.filter(
+            user_id=fq.user_id,
+            event_type=WebhookEventType.RECAP_FETCH,
+            enabled=True,
         )
-        for webhook in user_webhooks:
+        async for webhook in user_webhooks:
             payload = PacerFetchQueueSerializer(fq).data
             post_content = {
                 "webhook": generate_webhook_key_content(webhook),
@@ -152,11 +155,11 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
                 post_content,
                 accepted_media_type="application/json;",
             )
-            webhook_event = WebhookEvent.objects.create(
+            webhook_event = await WebhookEvent.objects.acreate(
                 webhook=webhook,
                 content=post_content,
             )
-            send_webhook_event(webhook_event, json_bytes)
+            await sync_to_async(send_webhook_event)(webhook_event, json_bytes)
 
 
 def send_search_alert_webhook(
@@ -164,14 +167,13 @@ def send_search_alert_webhook(
     webhook: Webhook,
     alert: Alert,
 ) -> None:
-    """Send a search alert webhook event containing search results from a
-    search alert object.
+    """Send a search alert webhook event containing search results from a search alert object.
 
-    :param results: The search results returned for this alert.
-    :param webhook: The webhook endpoint object to send the event to.
-    :param alert: The search alert object.
+    Args:
+        results: The search results returned for this alert.
+        webhook: The webhook endpoint object to send the event to.
+        alert: The search alert object.
     """
-
     serialized_alert = SearchAlertSerializerModel(alert).data
     # ES results serialization
     match webhook.version:

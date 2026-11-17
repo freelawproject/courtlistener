@@ -1,3 +1,6 @@
+"""REST API serializers for RECAP uploads, emails, PACER fetches, and the FJC IDB."""
+
+from asgiref.sync import async_to_sync
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -23,6 +26,8 @@ from cl.search.models import Court, Docket, RECAPDocument
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):
+    """Serializer for RECAP uploads, owned by the requesting user."""
+
     # Powers the RECAP upload endpoint
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
@@ -64,6 +69,15 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {"filepath_local": {"write_only": True}}
 
     def validate(self, attrs):
+        """Validate an upload's fields against its upload type and court.
+
+        Raises:
+            ValidationError: If a PACER ID or document or attachment number
+                is the literal ``"undefined"``, the file is too large or
+                isn't a PDF when it should be, the court doesn't fit the
+                upload type, required fields are missing or forbidden ones
+                are set, or the PACER case ID looks like a docket number.
+        """
         for attr_name in [
             "pacer_doc_id",
             "pacer_case_id",
@@ -142,7 +156,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:
             # Appellate court dockets. Is the court valid?
-            if not is_appellate_court(attrs["court"].pk):
+            if not async_to_sync(is_appellate_court)(attrs["court"].pk):
                 raise ValidationError(
                     "{} is not an appellate court ID. Did you mean to use the "
                     "upload_type for district dockets?".format(attrs["court"])
@@ -188,6 +202,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
 
 class EmailProcessingQueueSerializer(serializers.ModelSerializer):
+    """Serializer for recap.email notifications, owned by the requesting user."""
+
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
     )
@@ -215,6 +231,12 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        """Validate the court and the required keys of the mail and receipt.
+
+        Raises:
+            ValidationError: If the court isn't a PACER court, or the mail or
+                receipt is missing a required key.
+        """
         court_id = attrs["court"].pk
         mail = attrs["mail"]
         receipt = attrs["receipt"]
@@ -252,12 +274,15 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Create the queue item without the mail and receipt data."""
         validated_data.pop("mail", None)
         validated_data.pop("receipt", None)
         return super().create(validated_data)
 
 
 class PacerFetchQueueSerializer(serializers.ModelSerializer):
+    """Serializer for PACER fetch requests, assigned to the requesting user."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     court = serializers.PrimaryKeyRelatedField(
         queryset=Court.federal_courts.all(),
@@ -304,6 +329,17 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         return getattr(obj, "estimated_execution_delay", None)
 
     def validate(self, attrs):
+        """Validate a fetch request and check the PACER credentials.
+
+        The PACER username, password, and client code are removed from the
+        validated data.
+
+        Raises:
+            ValidationError: If required fields for the request type are
+                missing, the court is missing or unsupported, the request
+                isn't supported for the court, the PDF is already available,
+                or the PACER login fails.
+        """
         # Validates the input attributes, ensuring the request has all required
         # elements.
         match attrs["request_type"]:
@@ -357,7 +393,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         if (
             attrs.get("pacer_case_id")
             and not attrs.get("docket_number")
-            and is_appellate_court(attrs.get("court").pk)
+            and async_to_sync(is_appellate_court)(attrs.get("court").pk)
         ):
             # The user is trying to purchase an appellate docket using only the
             # PACER case ID, which is not supported.
@@ -369,7 +405,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         court_id = get_court_id_from_fetch_queue(attrs)
         if (
             attrs.get("de_number_end") or attrs.get("de_number_start")
-        ) and is_appellate_court(court_id):
+        ) and async_to_sync(is_appellate_court)(court_id):
             raise ValidationError(
                 "Docket entry filtering by number is not supported for "
                 "appellate courts. Use date range filtering with "
@@ -409,7 +445,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
         # Do the PACER credentials work?
         try:
-            _ = get_or_cache_pacer_cookies(
+            _ = async_to_sync(get_or_cache_pacer_cookies)(
                 attrs["user"].pk,
                 username=attrs.pop("pacer_username"),
                 password=attrs.pop("pacer_password"),
@@ -422,6 +458,8 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
 
 class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for looking up RECAP documents by PACER document ID."""
+
     class Meta:
         model = RECAPDocument
         fields = (
@@ -433,6 +471,8 @@ class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FjcIntegratedDatabaseSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for FJC Integrated Database rows."""
+
     class Meta:
         model = FjcIntegratedDatabase
         fields = "__all__"

@@ -1,3 +1,5 @@
+"""Helpers for notes, prayers, and prayer statistics and emails."""
+
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -46,137 +48,45 @@ NOTEABLE_MODELS: dict[type[models.Model], str] = {
     SCOTUSDocument: "Documents",
 }
 
-# Legacy per-type FK field name for each model that had one before the
-# GenericForeignKey migration (#7725). Lets get_notes_for() fall back to
-# it for notes not yet migrated to content_type/object_id.
-LEGACY_NOTE_FIELDS: dict[type[models.Model], str] = {
-    Docket: "docket_id",
-    OpinionCluster: "cluster_id",
-    Audio: "audio_id",
-    RECAPDocument: "recap_doc_id",
-}
-
-
-def build_dual_read_query(
-    model_class: type[models.Model], object_id: int | str
-) -> Q:
-    """Build a Q object matching a Note on either the new GenericForeignKey
-    shape or the legacy per-type FK shape, for the given noted model.
-    Shared by get_notes_for() and get_note_for_target().
-
-    :param model_class: The model class object_id belongs to.
-    :param object_id: The pk of the noted object.
-    :return: A Q object suitable for Note.objects.filter(...).
-    """
-    content_type = ContentType.objects.get_for_model(model_class)
-    query = Q(content_type=content_type, object_id=object_id)
-
-    legacy_field = LEGACY_NOTE_FIELDS.get(model_class)
-    if legacy_field:
-        query |= Q(**{legacy_field: object_id})
-
-    return query
-
-
-def _find_legacy_target(
-    note: Note,
-) -> tuple[type[models.Model], str] | None:
-    """Find which of Note's 4 legacy per-type FKs is set, if any.
-
-    Shared by resolve_legacy_object() and get_noted_object().
-
-    :param note: A Note instance.
-    :return: (model, field_name) for the one legacy FK that's set, or
-        None if the Note is already in the new content_type/object_id
-        shape (or points nowhere).
-    """
-    for model, field_name in LEGACY_NOTE_FIELDS.items():
-        if getattr(note, f"{field_name}_id") is not None:
-            return model, field_name
-    return None
-
-
-def resolve_legacy_object(note: Note) -> tuple[ContentType, int] | None:
-    """For a Note still in the legacy per-type-FK shape (content_type is
-    null), find which legacy FK is set and return the equivalent
-    (content_type, object_id) pair.
-
-    :param note: A Note instance.
-    :return: (content_type, object_id) if a legacy FK is set, else None.
-    """
-    found = _find_legacy_target(note)
-    if found is None:
-        return None
-
-    model, field_name = found
-    return ContentType.objects.get_for_model(model), getattr(
-        note, f"{field_name}_id"
-    )
-
-
-def get_noted_object(note: Note) -> models.Model | None:
-    """Return the object a Note points to, dual-read aware (#7725).
-
-    :param note: A Note instance.
-    :return: The noted model instance, or None if it points to nothing.
-    """
-    if note.content_object is not None:
-        return note.content_object
-
-    found = _find_legacy_target(note)
-    if found is None:
-        return None
-    return getattr(note, found[1])
-
 
 def get_notes_for(obj: models.Model) -> QuerySet[Note]:
     """Return the Notes attached to a given object, across all users.
 
-    Results include notes not yet migrated to content_type/object_id.
+    Args:
+        obj: A noteable model instance (see NOTEABLE_MODELS).
 
-    :param obj: A noteable model instance (see NOTEABLE_MODELS).
-    :return: A queryset of matching Note rows.
+    Returns:
+        A queryset of matching Note rows.
     """
-    if obj.pk is None:
-        return Note.objects.none()
-
-    return Note.objects.filter(build_dual_read_query(type(obj), obj.pk))
+    content_type = ContentType.objects.get_for_model(type(obj))
+    return Note.objects.filter(content_type=content_type, object_id=obj.pk)
 
 
 def repoint_notes(
     main_object: models.Model, version_object: models.Model
 ) -> None:
-    """Repoint Notes from version_object onto main_object (#7725).
+    """Repoint Notes from version_object onto main_object.
 
     For use when merging two noteable rows into one (e.g.
-    merge_opinion_versions): a Note may be in either shape (dual-read), so
-    the FK-based repointing used for other related models can't be reused
-    as-is here.
+    merge_opinion_versions).
 
     A user who already has a Note on main_object keeps that one; the
     version's Note is left pointed at version_object, to be cleaned up by
-    delete_orphaned_notes when it's deleted - same dedup behavior already
-    used for the legacy-shaped case elsewhere.
+    delete_orphaned_notes when it's deleted.
 
-    :param main_object: The noteable object absorbing version_object's
-        Notes.
-    :param version_object: The noteable object about to be deleted.
-    :return: None
+    Args:
+        main_object: The noteable object absorbing version_object's
+            Notes.
+        version_object: The noteable object about to be deleted.
     """
     existing_user_ids = get_notes_for(main_object).values_list(
         "user_id", flat=True
     )
-    content_type = ContentType.objects.get_for_model(type(main_object))
-    # Clear the legacy FKs too, even for a Note that arrives here already
-    # in the new shape: version_object is about to be deleted, and its
-    # own on_delete=CASCADE would otherwise take a moved Note down with
-    # it if that FK were left pointed at it.
     get_notes_for(version_object).exclude(
         user_id__in=existing_user_ids
     ).update(
-        content_type=content_type,
+        content_type=ContentType.objects.get_for_model(type(main_object)),
         object_id=main_object.pk,
-        **{field: None for field in LEGACY_NOTE_FIELDS.values()},
     )
 
 
@@ -185,28 +95,43 @@ def get_note_for_target(
     object_id: int | str,
     user: AnonymousUser | User,
 ) -> Note | None:
-    """Return the given user's Note for a noted object, identified by its
-    model class and pk, if any.
+    """Return the given user's Note for a noted object, identified by its model class and pk, if any.
 
-    :param model_class: The model class object_id belongs to.
-    :param object_id: The pk of the noted object.
-    :param user: The user requesting their Note, possibly anonymous.
-    :return: The user's Note for the object, or None if anonymous or not
+    Args:
+        model_class: The model class object_id belongs to.
+        object_id: The pk of the noted object.
+        user: The user requesting their Note, possibly anonymous.
+
+    Returns:
+        The user's Note for the object, or None if anonymous or not
         found.
     """
     if not user.is_authenticated:
         return None
 
-    query = build_dual_read_query(model_class, object_id)
-    return Note.objects.filter(query, user=user).first()
+    content_type = ContentType.objects.get_for_model(model_class)
+    return Note.objects.filter(
+        content_type=content_type, object_id=object_id, user=user
+    ).first()
 
 
 async def create_prayer(
-    user: User, recap_document: RECAPDocument
+    user: User,
+    recap_document: RECAPDocument,
+    is_eligible: bool | None = None,
 ) -> Prayer | None:
-    is_user_eligible, _ = await prayer_eligible(user)
+    """Create a waiting prayer for the user on an unavailable document.
 
-    if not is_user_eligible or recap_document.is_available:
+    Returns None when the user reached their daily limit, the document is
+    already available, or the user already prayed for it.
+
+    :param is_eligible: The result of prayer_eligible() when the caller
+        already has it, to avoid querying it twice. Checked here if omitted.
+    """
+    if is_eligible is None:
+        is_eligible, _ = await prayer_eligible(user)
+
+    if not is_eligible or recap_document.is_available:
         return None
 
     new_prayer, created = await Prayer.objects.aget_or_create(
@@ -219,6 +144,11 @@ async def create_prayer(
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
+    """Delete a user's waiting prayer for a document.
+
+    Returns:
+        Whether a prayer was deleted.
+    """
     deleted, _ = await Prayer.objects.filter(
         user=user, recap_document=recap_document, status=Prayer.WAITING
     ).adelete()
@@ -231,11 +161,13 @@ async def get_prayer_counts_in_bulk(
 ) -> dict[int, int]:
     """Retrieve the count of prayers with a status of "WAITING" for a list of recap documents.
 
-    :param recap_documents: A list of RECAPDocument instances to filter prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are the
-    count of "WAITING" prayers for each document.
-    """
+    Args:
+        recap_documents: A list of RECAPDocument instances to filter prayers.
 
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are the
+        count of "WAITING" prayers for each document.
+    """
     prayer_counts = (
         Prayer.objects.filter(
             recap_document__in=recap_documents, status=Prayer.WAITING
@@ -254,10 +186,13 @@ async def get_existing_prayers_in_bulk(
 ) -> dict[int, bool]:
     """Check if prayers exist for a user and a list of recap documents.
 
-    :param user: The user for whom to check prayer existence.
-    :param recap_documents: A list of RECAPDocument instances to check prayers.
-    :return: A dictionary where keys are RECAPDocument IDs and values are True
-     if a prayer exists for the user and RD.
+    Args:
+        user: The user for whom to check prayer existence.
+        recap_documents: A list of RECAPDocument instances to check prayers.
+
+    Returns:
+        A dictionary where keys are RECAPDocument IDs and values are True
+        if a prayer exists for the user and RD.
     """
     existing_prayers = Prayer.objects.filter(
         user=user, recap_document__in=recap_documents
@@ -266,13 +201,14 @@ async def get_existing_prayers_in_bulk(
 
 
 async def get_top_prayers() -> QuerySet[RECAPDocument]:
-    """Retrieve the most desired documents that have open prayers. It first
-    ranks by the number of requests and then by the number of views the particular
-    docket has received.
+    """Retrieve the most desired documents that have open prayers.
 
-    :return: A queryset of RECAPDocuments in descending order of preference.
+    It first ranks by the number of requests and then by the number of views
+    the particular docket has received.
+
+    Returns:
+        A queryset of RECAPDocuments in descending order of preference.
     """
-
     waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
         "recap_document_id"
     )
@@ -290,7 +226,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     )
 
     # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
-    documents = (
+    return (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
         .select_related(
             "docket_entry",
@@ -337,18 +273,21 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         )
     )
 
-    return documents
-
 
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
-    filters = {"prayers__user": user}
-    if status is not None:
-        filters["prayers__status"] = status
+    """Get the documents a user prayed for, most recent prayer first.
 
-    documents = (
-        RECAPDocument.objects.filter(**filters)
+    Optionally only includes prayers with the given status. Each document
+    is annotated with its prayer's status and creation date.
+    """
+    filters = Q(prayers__user=user)
+    if status is not None:
+        filters &= Q(prayers__status=status)
+
+    return (
+        RECAPDocument.objects.filter(filters)
         .select_related(
             "docket_entry",
             "docket_entry__docket",
@@ -386,12 +325,9 @@ async def get_user_prayers(
         .order_by("-prayers__date_created")
     )
 
-    return documents
-
 
 async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
-    """
-    Computes the total cost of a given queryset of Prayer objects.
+    """Computes the total cost of a given queryset of Prayer objects.
 
     Args:
         queryset: A QuerySet of Prayer objects.
@@ -422,6 +358,12 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
+    """Grant a document's waiting prayers and notify the users of all its granted prayers.
+
+    Queues each user's enabled pray-and-pay webhooks, clears the document's
+    availability record, and emails the users. Does nothing if no prayers
+    were waiting.
+    """
     # Update prayers to GRANTED status and check if any were updated
     updated_count = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
@@ -494,6 +436,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
 @dataclass
 class PrayerStats:
+    """Counts and total cost of a set of prayers."""
+
     prayer_count: int
     total_cost: str
     distinct_count: int | None = None
@@ -501,6 +445,7 @@ class PrayerStats:
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
+    """Get the count and total cost of a user's granted prayers, cached for a minute."""
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
@@ -531,6 +476,11 @@ async def get_lifetime_prayer_stats(
 ) -> (
     PrayerStats
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+    """Get stats for all prayers with a status, cached for a minute.
+
+    Includes the number of prayers, distinct documents, distinct users, and
+    the total cost.
+    """
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
@@ -565,6 +515,10 @@ async def get_lifetime_prayer_stats(
 
 
 def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
+    """Email a user that the document they prayed for can't be bought.
+
+    Does nothing if the user has no waiting prayer for the document.
+    """
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")

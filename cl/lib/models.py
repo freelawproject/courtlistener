@@ -1,4 +1,7 @@
+"""Abstract base models and shared models used across apps."""
+
 from abc import abstractmethod
+from pathlib import Path
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -19,6 +22,8 @@ s3_warning_note = (
 
 
 class THUMBNAIL_STATUSES:
+    """Choices for the status of a document's thumbnail."""
+
     NEEDED = 0
     COMPLETE = 1
     FAILED = 2
@@ -30,7 +35,7 @@ class THUMBNAIL_STATUSES:
 
 
 class AbstractDateTimeModel(models.Model):
-    """An abstract base class for most models"""
+    """An abstract base class for most models."""
 
     date_created = models.DateTimeField(
         help_text="The moment when the item was created.",
@@ -49,7 +54,7 @@ class AbstractDateTimeModel(models.Model):
 
 
 class AbstractPDF(models.Model):
-    """An abstract model to hold PDF-related information"""
+    """An abstract model to hold PDF-related information."""
 
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
@@ -124,9 +129,7 @@ class AbstractPDF(models.Model):
 
     @abstractmethod
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        """Return the storage path for this document, or for its thumbnail
-        when `thumbs` is True. Used by the `upload_to` callbacks on
-        `filepath_local` and `thumbnail`.
+        """Return the storage path for this document, or for its thumbnail when `thumbs` is True. Used by the `upload_to` callbacks on `filepath_local` and `thumbnail`.
 
         Django's `ModelBase` is not `ABCMeta`, so the decorator documents the
         contract and lets MyPy enforce it, but nothing stops a subclass at
@@ -136,23 +139,30 @@ class AbstractPDF(models.Model):
 
 
 class AbstractFile(models.Model):
+    """Abstract model for a file attached to any object."""
+
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    # Subclasses define this field with their own storage and upload paths.
+    filepath: models.FileField
 
     class Meta:
         abstract = True
 
     @property
-    def file_contents(self):
-        with open(self.filepath.path) as f:
-            return f.read()
+    def file_contents(self) -> str:
+        """The contents of the file, read from its local path."""
+        return Path(self.filepath.path).read_text()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
+        """Print the contents of the file."""
         print(self.file_contents)
 
 
 class AbstractJSON(AbstractFile):
+    """Abstract model for a LASC JSON file kept in media storage."""
+
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_lasc_json_path,
@@ -166,7 +176,7 @@ class AbstractJSON(AbstractFile):
 
 
 class Note(AbstractDateTimeModel):
-    """An polymorphic field that can be used to add notes to most objects"""
+    """An polymorphic field that can be used to add notes to most objects."""
 
     date_entered = models.DateTimeField(
         help_text="The datetime when the note was entered",

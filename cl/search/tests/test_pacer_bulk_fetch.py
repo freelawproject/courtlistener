@@ -1,12 +1,13 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+import httpx
 import time_machine
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
 from django.utils import timezone
 from django.utils.timezone import now
-from requests import HTTPError
+from httpx import HTTPError
 
 from cl.lib.utils import append_value_in_cache
 from cl.recap.factories import PacerFetchQueueFactory
@@ -23,7 +24,6 @@ from cl.search.management.commands.pacer_bulk_fetch import (
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
-from cl.tests.utils import MockResponse
 from cl.users.factories import UserFactory
 
 
@@ -149,9 +149,7 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """
-        Test that documents are filtered correctly based on page count.
-        """
+        """Test that documents are filtered correctly based on page count."""
         call_command(
             "pacer_bulk_fetch",
             testing=True,
@@ -180,11 +178,7 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """
-        Test that documents already available in CL are skipped
-        (i.e., not enqueued).
-        """
-
+        """Test that documents already available in CL are skipped (i.e., not enqueued)."""
         # Make some documents available
         docs_available_in_cl = []
         for court_idx in range(5):
@@ -239,9 +233,7 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """
-        Test that fetch queues are processed correctly (processing stage).
-        """
+        """Test that fetch queues are processed correctly (processing stage)."""
         successful_fqs = []
         for doc in self.docs[:3]:
             fq = PacerFetchQueueFactory(
@@ -295,9 +287,9 @@ class PacerBulkFetchUnitTest(TestCase):
         self.command.user = self.user
         self.command.options = {
             "testing": True,
-            "min_page_count": 100,
-            "max_page_count": 10_000,
         }
+        self.command.min_page_count = 100
+        self.command.max_page_count = 10_000
         self.command.interval = 2
         self.command.total_launched = 0
         self.command.max_retries = 1
@@ -326,9 +318,9 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test that identify_documents correctly filters documents based on criteria"""
-        self.command.options["min_page_count"] = 200
-        self.command.options["max_page_count"] = 300
+        """Test that identify_documents correctly filters documents based on criteria."""
+        self.command.min_page_count = 200
+        self.command.max_page_count = 300
 
         self.command.identify_documents()
 
@@ -350,10 +342,9 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test that identify_documents correctly filters subdockets"""
-
-        self.command.options["min_page_count"] = 200
-        self.command.options["max_page_count"] = 300
+        """Test that identify_documents correctly filters subdockets."""
+        self.command.min_page_count = 200
+        self.command.max_page_count = 300
         docket_2 = DocketFactory(court=self.court)
         docket_entries = [
             DocketEntryFactory(docket=docket_2) for _ in range(5)
@@ -386,7 +377,7 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test that identify_documents excludes previously processed documents"""
+        """Test that identify_documents excludes previously processed documents."""
         # Set up cache with some "previously processed" documents
         cache_key = mock_fetched_cache_key.return_value
         previously_processed = [(self.docs[0].pk, 1), (self.docs[1].pk, 2)]
@@ -411,7 +402,7 @@ class PacerBulkFetchUnitTest(TestCase):
     def test_should_skip_court_not_in_progress(
         self, mock_failed_docs_cache_key, mock_fetched_cache_key
     ):
-        """Test should_skip when court has no fetch in progress"""
+        """Test should_skip when court has no fetch in progress."""
         self.command.fetches_in_progress = {}
 
         skip_status = self.command.should_skip("ca1")
@@ -426,7 +417,7 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test should_skip under different time conditions"""
+        """Test should_skip under different time conditions."""
         test_cases = [
             {
                 "name": "recent completion",
@@ -468,9 +459,9 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test exclude RECAPDocuments that are likely transcripts"""
-        self.command.options["min_page_count"] = 1000
-        self.command.options["max_page_count"] = 2000
+        """Test exclude RECAPDocuments that are likely transcripts."""
+        self.command.min_page_count = 1000
+        self.command.max_page_count = 2000
 
         # Transcript RDs:
         de_5 = DocketEntryFactory(docket=self.docket, description="")
@@ -523,10 +514,7 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """
-        Test fetch_next_doc_in_court removes a doc from the court and
-        updates fetches_in_progress.
-        """
+        """Test fetch_next_doc_in_court removes a doc from the court and updates fetches_in_progress."""
         court_id = "ca1"
 
         self.command.recap_documents = [self.docs[0]]
@@ -563,7 +551,7 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test fetch_docs_from_pacer when no delays are needed"""
+        """Test fetch_docs_from_pacer when no delays are needed."""
         self.command.courts_with_docs = {
             "ca1": [{"id": doc.pk} for doc in self.docs[:2]]
         }
@@ -584,7 +572,7 @@ class PacerBulkFetchUnitTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Test fetch_docs_from_pacer when no delays are needed"""
+        """Test fetch_docs_from_pacer when no delays are needed."""
         self.command.interval = 2
 
         test_cases = [
@@ -674,9 +662,7 @@ class PacerBulkFetchUnitTest(TestCase):
 
 
 def mock_is_retry_interval_elapsed(date_created, retry_count, time_start):
-    """Mock method to simulate elapsed time for is_retry_interval_elapsed,
-    considering an initial_backoff_time of 2.
-    """
+    """Mock method to simulate elapsed time for is_retry_interval_elapsed, considering an initial_backoff_time of 2."""
     retry_map = {
         0: 3,
         1: 5,
@@ -781,11 +767,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, de_seq_num: (
-            MockResponse(
-                200,
-                b"binary content",
-            ),
+        return_value=(
+            httpx.Response(200, content=b"binary content"),
             "OK",
         ),
     )
@@ -806,10 +789,10 @@ class BulkFetchPacerIntegrationTest(TestCase):
         mock_failed_docs_cache_key,
         mock_fetched_cache_key,
     ):
-        """Integration test for the pacer_bulk_fetch command. RECAP documents
-        that match the conditions should be purchased.
-        """
+        """Integration test for the pacer_bulk_fetch command.
 
+        RECAP documents that match the conditions should be purchased.
+        """
         all_rds = RECAPDocument.objects.all()
         self.assertEqual(
             set(
@@ -870,10 +853,10 @@ class BulkFetchPacerIntegrationTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test pacer_bulk_fetch command aborting mechanism.
-        FQs that run out of retries are aborted and added to the
-        failed_docs set in Redis.
-        """
 
+        FQs that run out of retries are aborted and added to the failed_docs
+        set in Redis.
+        """
         all_rds = RECAPDocument.objects.all()
         self.assertEqual(
             set(
@@ -919,11 +902,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, de_seq_num: (
-            MockResponse(
-                200,
-                None,
-            ),
+        return_value=(
+            httpx.Response(200, content=None),
             "Document is sealed",
         ),
     )
@@ -938,9 +918,9 @@ class BulkFetchPacerIntegrationTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test pacer_bulk_fetch command aborting mechanism.
+
         Failed FQs are aborted and added to the failed_docs set in Redis.
         """
-
         all_rds = RECAPDocument.objects.all()
         self.assertEqual(
             set(
@@ -1006,10 +986,10 @@ class BulkFetchPacerIntegrationTest(TestCase):
         mock_fetched_cache_key,
     ):
         """Test pacer_bulk_fetch command aborting mechanism.
-        FQs that run out of retries are aborted and added to the
-        failed_docs set in Redis.
-        """
 
+        FQs that run out of retries are aborted and added to the failed_docs
+        set in Redis.
+        """
         all_rds = RECAPDocument.objects.all()
         self.assertEqual(
             set(

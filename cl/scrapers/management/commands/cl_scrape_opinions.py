@@ -1,8 +1,11 @@
+"""Scrape and save new opinions from court sites with Juriscraper."""
+
 import signal
 import sys
 import time
 import traceback
 from datetime import date
+from types import ModuleType
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -20,7 +23,6 @@ from cl import settings
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
-from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -31,6 +33,7 @@ from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_child_court,
     get_extension,
+    link_judges,
     make_citation,
     save_response,
     signal_handler,
@@ -52,8 +55,8 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
-    """Set a value for Opinion.ordering_key
+def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
+    """Set a value for Opinion.ordering_key.
 
     To know the relative order inside the cluster, we must know all the
     opinion types. Opinion types have an inherent order given by the first
@@ -62,9 +65,9 @@ def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
     For scraped clusters we may
     - get 2 of one type. For example, 2 concurrences
 
-    :param opinions_content: a list of tuples; where the first element of each
-        tuple is a metadata dict
-    :return None
+    Args:
+        opinions_content: a list of tuples; where the first element of each
+            tuple is a metadata dict
     """
     types = [
         # we are sure the types key exist, since this is a cluster with more
@@ -101,7 +104,8 @@ def make_objects(
     plural names, like in
     `item.get("disposition") or item.get("dispositions", "")`
 
-    :return: the created objects.
+    Returns:
+        the created objects.
     """
     blocked = item["blocked_statuses"]
     if blocked:
@@ -172,6 +176,7 @@ def make_objects(
             url = ""
 
         opinion = Opinion(
+            cluster=cluster,
             type=opinion_metadata.get("types", Opinion.COMBINED),
             sha1=sha1_hash,
             download_url=url,
@@ -191,7 +196,6 @@ def make_objects(
         cf = ContentFile(force_bytes(content))
         extension = get_extension(content)
         file_name = trunc(item["case_names"].lower(), 75) + extension
-        opinion.file_with_date = cluster.date_filed
         opinion.local_path.save(file_name, cf, save=False)
         check_duplicate_ingestion(opinion.local_path.name)
 
@@ -224,42 +228,25 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
-    if cluster.judges:
-        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
-            cluster.judges, docket.court.pk, cluster.date_filed
-        )
-
-        if (
-            len(candidate_judges) == 1
-            and len(opinions) == 1
-            and not opinions[0].author_str
-        ):
-            opinions[0].author = candidate_judges[0]
-        elif len(candidate_judges) > 1:
-            for candidate in candidate_judges:
-                cluster.panel.add(candidate)
-
+    link_judges(cluster, opinions)
     for opinion in opinions:
-        if opinion.author_str:
-            candidate = async_to_sync(lookup_judges_by_messy_str)(
-                opinion.author_str, docket.court.pk, cluster.date_filed
-            )
-            if len(candidate) == 1:
-                opinion.author = candidate[0]
-
         opinion.cluster = cluster
         opinion.save()
 
 
 class Command(ScraperCommand):
+    """Scrape new opinions from one or more courts, once or in a loop."""
+
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
     juriscraper_module_type = "opinions"
     scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
+        """Build the command with the default output streams and colors, ignoring the arguments."""
         super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
+        """Add the daemon, rate, and full crawl options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--daemon",
@@ -297,6 +284,12 @@ class Command(ScraperCommand):
         ocr_available: bool = True,
         backscrape: bool = False,
     ):
+        """Ingest the cases on a parsed site page.
+
+        Stops early if the page hash is unchanged (unless ``full_crawl``) or
+        too many consecutive duplicates are found. The page hash is saved afterwards
+        unless this is a full crawl or a case had bad content.
+        """
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -357,9 +350,10 @@ class Command(ScraperCommand):
         dup_checker,
         next_case_date,
     ) -> list[tuple[dict, bytes, str]]:
-        """Downloads opinions and checks if the content is duplicated
+        """Downloads opinions and checks if the content is duplicated.
 
-        :return: a list of dictionaries containing the binary content and the hash of the content
+        Returns:
+            a list of dictionaries containing the binary content and the hash of the content
         """
         opinions_content = []
         opinions_to_download = []
@@ -443,6 +437,13 @@ class Command(ScraperCommand):
         dup_checker: DupChecker,
         court: Court,
     ):
+        """Save a scraped case's docket, cluster, opinions, and citations, then queue extraction of each opinion.
+
+        Raises:
+            SingleDuplicateError: If an opinion is a duplicate.
+            ConsecutiveDuplicatesError: If the scraper should stop because
+                of duplicates.
+        """
         opinions_content = await self.get_opinions_content(
             item, site, court, dup_checker, next_case_date
         )
@@ -485,11 +486,27 @@ class Command(ScraperCommand):
                 item["case_names"].encode(),
             )
 
-    async def parse_and_scrape_site(self, mod, options: dict):
-        site = await mod.Site(save_response_fn=save_response).parse()
-        await self.scrape_court(site, options["full_crawl"])
+    async def parse_and_scrape_site(
+        self, mod: ModuleType, options: dict[str, Any]
+    ) -> None:
+        """Parse and scrape a court, closing its HTTP client on every exit."""
+        async with mod.Site(save_response_fn=save_response) as site:
+            await site.parse()
+            await self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
+        """Scrape each requested court with an enabled opinion scraper, waiting between courts.
+
+        The wait between enabled courts is ``--rate`` minutes divided by the
+        number of requested courts.
+
+        In daemon mode, loops over the courts until SIGTERM is received.
+        Errors while scraping one court are reported without stopping the
+        others.
+
+        Raises:
+            CommandError: If no scraper modules can be imported.
+        """
         super().handle(*args, **options)
         global die_now
 
@@ -534,12 +551,11 @@ class Command(ScraperCommand):
             if last_court_in_list:
                 if not daemon_mode:
                     break
-                else:
-                    logger.info(
-                        "All jurisdictions done. Looping back to "
-                        "the beginning because daemon mode is enabled."
-                    )
-                    i = 0
+                logger.info(
+                    "All jurisdictions done. Looping back to "
+                    "the beginning because daemon mode is enabled."
+                )
+                i = 0
             else:
                 i += 1
             time.sleep(wait)

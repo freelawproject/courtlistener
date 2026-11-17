@@ -1,5 +1,8 @@
+"""Purchase PACER dockets and attachment pages for labor and N.D. Cal. cases."""
+
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -12,7 +15,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import (
     AIRPLANE_PERSONAL_INJURY,
     AIRPLANE_PRODUCT_LIABILITY,
@@ -88,6 +91,7 @@ TAG_CAND_SAMPLE = "HaWCdtXimxSfAgGKfJRe"
 
 
 def get_nos_700_items():
+    """Get IDB labor cases filed and terminated after January 1, 2009."""
     nos_codes = [
         LABOR_LITIGATION_OTHER,
         LABOR_MANAGEMENT_RELATIONS_ACT,
@@ -97,15 +101,15 @@ def get_nos_700_items():
         FAMILY_AND_MEDICAL_LEAVE_ACT,
         EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT,
     ]
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_cand_items():
+    """Get IDB N.D. Cal. cases of selected natures of suit filed and terminated after January 1, 2009."""
     # See email on 2018-12-05 for details
     nos_codes = {
         # Contract
@@ -178,16 +182,16 @@ def get_cand_items():
         ARBITRATION,
         APA_REVIEW_OR_APPEAL_OF_AGENCY_DECISION,
     }
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         district_id="cand",
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_nos_700_docket_sample(options):
+    """Download the dockets of a random sample of 1,000 labor cases."""
     sample_size = 1000
     items = get_nos_700_items()
     tags = [TAG_NOS_700, TAG_SAMPLE]
@@ -195,12 +199,14 @@ def get_nos_700_docket_sample(options):
 
 
 def get_nos_700_full(options):
+    """Download the dockets of all the labor cases."""
     items = get_nos_700_items()
     tags = [TAG_NOS_700]
     get_dockets(options, items, tags)
 
 
 def get_cand_docket_sample(options):
+    """Download the dockets of a random sample of 654 N.D. Cal. cases."""
     sample_size = 654
     items = get_cand_items()
     tags = [TAG_CAND, TAG_CAND_SAMPLE]
@@ -208,30 +214,30 @@ def get_cand_docket_sample(options):
 
 
 def get_cand_full(options):
+    """Download the dockets of all the N.D. Cal. cases."""
     items = get_cand_items()
     tags = [TAG_CAND]
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0):
+def get_dockets(options, items, tags: list[str], sample_size=0):
     """Download dockets from PACER.
 
-    :param options: Options provided by argparse
-    :param items: Items from our FJC IDB database
-    :param tags: A list of tag names to associate with the purchased content.
-    :param sample_size: The number of items to get. If 0, get them all. Else,
-    get only this many and do it randomly.
+    Args:
+        options: Options provided by argparse
+        items: Items from our FJC IDB database
+        tags: A list of tag names to associate with the purchased content.
+        sample_size: The number of items to get. If 0, get them all. Else,
+            get only this many and do it randomly.
     """
-
     if sample_size > 0:
         items = items.order_by("?")[:sample_size]
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     for i, row in enumerate(items):
         if i < options["offset"]:
             continue
@@ -241,53 +247,51 @@ def get_dockets(options, items, tags, sample_size=0):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         # All tests pass. Get the docket.
         logger.info("Doing row %s: %s", i, row)
 
         throttle.maybe_wait()
-        session_data = SessionData(session.cookies, session.proxy_address)
         params = make_fjc_idb_lookup_params(row)
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=True,
             ).set(queue=q),
         ).apply_async()
 
 
 def get_attachment_pages(options, tag):
+    """Download the attachment pages of tagged RECAP documents whose entries mention attachments."""
     rd_pks = RECAPDocument.objects.filter(
         tags__name=tag, docket_entry__description__icontains="attachment"
     ).values_list("pk", flat=True)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
     get_district_attachment_pages(
         options=options, rd_pks=rd_pks, tag_names=[tag], session=session
     )
 
 
 class Command(VerboseCommand):
+    """Purchase dockets or attachment pages from PACER for the chosen task."""
+
     help = "Purchase dockets and attachment pages from PACER"
 
     allowed_tasks = [
@@ -300,6 +304,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -327,6 +332,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "dockets_nos_700_sample":
             get_nos_700_docket_sample(options)

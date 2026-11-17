@@ -40,6 +40,8 @@ def _request_shutdown(signum: int, _frame: Any) -> None:
 
 
 class Command(VerboseCommand):
+    """Run the RECAP Fetch scheduler until it is told to stop."""
+
     help = (
         "Long-running daemon that hands waiting RECAP Fetch requests to "
         "Celery and fails requests that waited too long to succeed. To stop "
@@ -48,6 +50,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the daemon's command-line options."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -59,6 +62,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Dispatch and sweep in a loop until a signal or the setting stops it."""
         super().handle(*args, **options)
 
         signal.signal(signal.SIGTERM, _request_shutdown)

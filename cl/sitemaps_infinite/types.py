@@ -1,3 +1,5 @@
+"""Types for the state of large sitemap pre-generation."""
+
 from typing import TypedDict
 
 """
@@ -12,8 +14,10 @@ The keys in this TypedDict are:
 
 
 class TaskCursorData(TypedDict):
-    section: str | bytes
-    last_page: int | str
+    """Where the last pre-generation run stopped, so the next can continue."""
+
+    section: str | None
+    last_page: int
     has_next: int
 
 

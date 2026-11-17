@@ -1,8 +1,9 @@
 import json
+from datetime import timedelta
 from http import HTTPStatus
-from pathlib import Path
 from unittest import mock
 
+import httpx
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -35,11 +36,12 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    download_pacer_pdf_and_save_to_pq,
     get_and_copy_recap_attachment_docs,
     mark_pq_successful,
     set_rd_sealed_status,
 )
-from cl.recap.tests.tests import mock_bucket_open
+from cl.recap.tests.tests import TEST_ASSETS_DIR, mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -62,9 +64,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="txwd", jurisdiction="FB")
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
-        with open(
-            test_dir / "recap_mail_custom_receipt.json",
+        with (TEST_ASSETS_DIR / "recap_mail_custom_receipt.json").open(
             encoding="utf-8",
         ) as file:
             recap_mail_receipt = json.load(file)
@@ -135,11 +135,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
 
     async def test_recap_user_cannot_access_recap_email_endpoint(self):
-        """The recap user loaded by the 0002_load_initial_data migration
-        only has has_recap_upload_access and must not be able to GET or
-        POST to the recap-email endpoint, which requires the
-        has_recap_email_upload_access permission instead.
-        """
+        """The recap user loaded by the 0002_load_initial_data migration only has has_recap_upload_access and must not be able to GET or POST to the recap-email endpoint, which requires the has_recap_email_upload_access permission instead."""
 
         def _load_recap_user() -> tuple[User, list[str], str]:
             recap_user = User.objects.get(username="recap")
@@ -182,7 +178,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     return_value=False,
 )
 class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
-    """Test recap email docket alerts"""
+    """Test recap email docket alerts."""
 
     @classmethod
     def setUpTestData(cls):
@@ -206,34 +202,31 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
             enabled=True,
             version=2,
         )
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt.json").open(
                 encoding="utf-8",
             ) as file,
-            open(
-                test_dir / "recap_mail_custom_receipt_2.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_2.json").open(
                 encoding="utf-8",
             ) as file_2,
-            open(
-                test_dir / "recap_mail_custom_receipt_3.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_3.json").open(
                 encoding="utf-8",
             ) as file_3,
-            open(
-                test_dir / "recap_mail_custom_receipt_4.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_4.json").open(
                 encoding="utf-8",
             ) as file_4,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda.json").open(
                 encoding="utf-8",
             ) as file_5,
-            open(
-                test_dir / "recap_mail_custom_receipt_no_re_user.json",
+            (
+                TEST_ASSETS_DIR / "recap_mail_custom_receipt_no_re_user.json"
+            ).open(
                 encoding="utf-8",
             ) as file_6,
-            open(
-                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+            (
+                TEST_ASSETS_DIR
+                / "recap_mail_custom_receipt_multi_nef_jpml.json"
+            ).open(
                 encoding="utf-8",
             ) as file_jpml,
         ):
@@ -389,12 +382,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies that if a new recap.email notification comes in
-        (first time) and the user has the auto-subscribe option enabled, a new
-        DocketAlert subscription is created for that user-case pair and then
-        receives the docket alert email for this case.
-        """
-
+        """This test verifies that if a new recap.email notification comes in (first time) and the user has the auto-subscribe option enabled, a new DocketAlert subscription is created for that user-case pair and then receives the docket alert email for this case."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data, format="json")
@@ -464,12 +452,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies that if two users with the auto-subscribe option
-        enabled are properly subscribed for a case when two recap.email
-        notifications come in, the second notification should be also delivered
-        for the previous user subscribed to the case.
-        """
-
+        """This test verifies that if two users with the auto-subscribe option enabled are properly subscribed for a case when two recap.email notifications come in, the second notification should be also delivered for the previous user subscribed to the case."""
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data_3, format="json")
@@ -604,12 +587,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies that if a new recap.email notification comes in
-        and the user has auto-subscribe option disabled an Unsubscription
-        DocketAlert is created, then send a first user-case email with a
-        subscription link for the case.
-        """
-
+        """This test verifies that if a new recap.email notification comes in and the user has auto-subscribe option disabled an Unsubscription DocketAlert is created, then send a first user-case email with a subscription link for the case."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
@@ -667,13 +645,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test checks if a new recap.email (first time) notification
-        comes in and user has auto-subscribe option disabled, an unsubscription
-        DocketAlert is created then send a first user-case email with a
-        subscription link, it also has to be sent an alert to the previous user
-        subscribed to the case.
-        """
-
+        """This test checks if a new recap.email (first time) notification comes in and user has auto-subscribe option disabled, an unsubscription DocketAlert is created then send a first user-case email with a subscription link, it also has to be sent an alert to the previous user subscribed to the case."""
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data_3, format="json")
@@ -764,11 +736,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that if we receive a notification from a
-        recap.email address that don't exist in DB, we send a notification to
-        admins.
-        """
-
+        """This test verifies that if we receive a notification from a recap.email address that don't exist in DB, we send a notification to admins."""
         # Trigger a new recap.email notification from newuser_2@recap.email
         await self.async_client.post(
             self.path, self.data_no_user, format="json"
@@ -805,12 +773,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies that if we receive two notifications for the same
-        case/document but different users. The first user has auto-subscribe
-        option enabled. When the second notification is received only the
-        second user should be notified.
-        """
-
+        """This test verifies that if we receive two notifications for the same case/document but different users. The first user has auto-subscribe option enabled. When the second notification is received only the second user should be notified."""
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data_3, format="json")
@@ -961,11 +924,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies if a recap.email user with the auto-subscribe
-        option disabled can successfully subscribe to a case from the
-        subscription link contained within the first user-case email.
-        """
-
+        """This test verifies if a recap.email user with the auto-subscribe option disabled can successfully subscribe to a case from the subscription link contained within the first user-case email."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
@@ -1031,10 +990,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies if a recap.email user can successfully
-        unsubscribe to a case from the unsubscription link.
-        """
-
+        """This test verifies if a recap.email user can successfully unsubscribe to a case from the unsubscription link."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data, format="json")
@@ -1125,12 +1081,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies if a user can successfully unsubscribe from a
-        case using the email unsubscription link, the user won't longer receive
-        more notifications for this case, we also send an unsubscription
-        confirmation email to the user.
-        """
-
+        """This test verifies if a user can successfully unsubscribe from a case using the email unsubscription link, the user won't longer receive more notifications for this case, we also send an unsubscription confirmation email to the user."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
@@ -1284,10 +1235,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """This test verifies if the unsubscription/subscription fails if a bot
-        tries to unsubscribe/subscribe from/to a docket alert.
-        """
-
+        """This test verifies if the unsubscription/subscription fails if a bot tries to unsubscribe/subscribe from/to a docket alert."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data, format="json")
@@ -1354,8 +1302,8 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -1364,9 +1312,9 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
     async def test_new_recap_email_with_attachments(
@@ -1380,12 +1328,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_webhook_post,
         mock_att_response,
     ):
-        """This test verifies that if a recap.email notification with
-        attachments comes in we can get the main document and all its
-        attachments. The docket alert and webhook should be sent with all the
-        recap documents.
-        """
-
+        """This test verifies that if a recap.email notification with attachments comes in we can get the main document and all its attachments. The docket alert and webhook should be sent with all the recap documents."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data_4, format="json")
@@ -1555,10 +1498,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pdf,
         mock_webhook_post,
     ):
-        """This test checks if the content extraction of a PDF obtained from
-        recap.email is successfully performed..
-        """
-
+        """This test checks if the content extraction of a PDF obtained from recap.email is successfully performed.."""
         # Trigger a new recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data, format="json")
 
@@ -1595,11 +1535,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pdf,
         mock_webhook_post,
     ):
-        """Confirm the notification PDF is copied into a matched
-        RECAPDocument that already existed without a document, e.g., created
-        first by the RSS scraper while the recap.email task was queued.
-        """
-
+        """Confirm the notification PDF is copied into a matched RECAPDocument that already existed without a document, e.g., created first by the RSS scraper while the recap.email task was queued."""
         notification_data = RECAPEmailNotificationDataFactory(
             appellate=False,
             contains_attachments=False,
@@ -1678,11 +1614,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pdf,
         mock_webhook_post,
     ):
-        """Confirm no PQ deletion error is logged when the matched
-        RECAPDocument already got the document from another source, since
-        deleting the redundant download is expected, not a loss.
-        """
-
+        """Confirm no PQ deletion error is logged when the matched RECAPDocument already got the document from another source, since deleting the redundant download is expected, not a loss."""
         notification_data = RECAPEmailNotificationDataFactory(
             appellate=False,
             contains_attachments=False,
@@ -1763,10 +1695,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
     ):
-        """This test verifies that if a new NDA recap.email notification comes
-        in we can parse it properly.
-        """
-
+        """This test verifies that if a new NDA recap.email notification comes in we can parse it properly."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_5, format="json")
 
@@ -1814,12 +1743,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that if a new nda recap.email notification comes
-        in (first time) and the user has the auto-subscribe option enabled, a
-        new DocketAlert subscription is created for that user-case pair and
-        then receives the docket alert email for this case.
-        """
-
+        """This test verifies that if a new nda recap.email notification comes in (first time) and the user has the auto-subscribe option enabled, a new DocketAlert subscription is created for that user-case pair and then receives the docket alert email for this case."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
         await self.async_client.post(self.path, self.data_5, format="json")
@@ -1890,12 +1814,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
     ):
-        """This test verifies that if a new nda recap.email notification comes
-        in and the user has auto-subscribe option disabled an Unsubscription
-        DocketAlert is created, then send a first user-case email with a
-        subscription link for the case.
-        """
-
+        """This test verifies that if a new nda recap.email notification comes in and the user has auto-subscribe option disabled an Unsubscription DocketAlert is created, then send a first user-case email with a subscription link for the case."""
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
@@ -1937,15 +1856,15 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("jpml_85001321035.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("jpml_85001321035.html", "r", True)
         ),
     )
     @mock.patch(
@@ -1964,11 +1883,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_att_response,
         mock_webhook_response,
     ):
-        """This test verifies that if a new multi docket nef recap.email
-        notification comes in we can parse it properly. Send docket alerts and
-        webhooks for each case.
-        """
-
+        """This test verifies that if a new multi docket nef recap.email notification comes in we can parse it properly. Send docket alerts and webhooks for each case."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         # Multi Docket NEF.
         await self.async_client.post(
@@ -2134,10 +2049,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_get_document_number_appellate,
         mock_is_pacer_doc_sealed,
     ):
-        """Can we add docket entries from a recap email notification that don't
-        contain a valid magic number?
-        """
-
+        """Can we add docket entries from a recap email notification that don't contain a valid magic number?"""
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
             side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
@@ -2218,10 +2130,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
     ):
-        """This test checks if we can mark as sealed a NDA document when the
-        download is not available through the magic link.
-        """
-
+        """This test checks if we can mark as sealed a NDA document when the download is not available through the magic link."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_5, format="json")
 
@@ -2249,9 +2158,9 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(
-            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(
+            200, content=mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
     async def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
@@ -2265,11 +2174,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_webhook_post,
         mock_att_response,
     ):
-        """This test verifies if a recap.email notification with attachments
-        comes in and the documents are not available from the magic link,
-        documents are mark as sealed.
-        """
-
+        """This test verifies if a recap.email notification with attachments comes in and the documents are not available from the magic link, documents are mark as sealed."""
         # Trigger a new recap.email notification
         await self.async_client.post(self.path, self.data_4, format="json")
 
@@ -2315,10 +2220,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_webhook_post,
         mock_is_pacer_doc_sealed,
     ):
-        """This test checks if a document without magic number that is not
-        available on PACER is marked as sealed.
-        """
-
+        """This test checks if a document without magic number that is not available on PACER is marked as sealed."""
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
             side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
@@ -2355,10 +2257,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_docket_entry_sealed,
         mock_webhook_post,
     ):
-        """Can we add docket entries from a minute entry recap email
-        notification?
-        """
-
+        """Can we add docket entries from a minute entry recap email notification?"""
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
             side_effect=lambda x, y: (self.minute_entry_data, "HTML"),
@@ -2420,9 +2319,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks if a docket entry without attachments that is
-        sealed on PACER is ignored.
-        """
+        """This test checks if a docket entry without attachments that is sealed on PACER is ignored."""
         mock_docket_entry_sealed.return_value = True
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=False,
@@ -2505,9 +2402,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks if a docket entry with attachments that is
-        sealed on PACER is ignored.
-        """
+        """This test checks if a docket entry with attachments that is sealed on PACER is ignored."""
         mock_docket_entry_sealed.return_value = True
 
         email_data = RECAPEmailNotificationDataFactory(
@@ -2600,11 +2495,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks whether a document with attachments that is sealed
-        on PACER is properly ingested. If the attachment page is also
-        unavailable, the attachments are not merged.
-        """
-
+        """This test checks whether a document with attachments that is sealed on PACER is properly ingested. If the attachment page is also unavailable, the attachments are not merged."""
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=True,
             appellate=False,
@@ -2668,10 +2559,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks whether a document with attachments that is sealed
-        on PACER are properly ingested when the attachment page is available.
-        """
-
+        """This test checks whether a document with attachments that is sealed on PACER are properly ingested when the attachment page is available."""
         att_data = AppellateAttachmentPageFactory(
             attachments=[
                 AppellateAttachmentFactory(
@@ -2759,10 +2647,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """Can we add docket entries from a multi-nef minute entry recap email
-        notification?
-        """
-
+        """Can we add docket entries from a multi-nef minute entry recap email notification?"""
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
             side_effect=lambda x, y: (
@@ -2806,11 +2691,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_docket_entry_sealed,
         mock_webhook_post,
     ):
-        """Can we avoid fetching the PDF and attachment page for bankruptcy
-        emails with a bad short pacer_doc_id while still merging the entries
-        and sending alerts?
-        """
-
+        """Can we avoid fetching the PDF and attachment page for bankruptcy emails with a bad short pacer_doc_id while still merging the entries and sending alerts?"""
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=True,
             appellate=False,
@@ -2902,10 +2783,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """Can we properly merge an ACMS NDA notification and retrieve the
-        missing metadata, such pacer_case_id from AcmsCaseSearch
-        """
-
+        """Can we properly merge an ACMS NDA notification and retrieve the missing metadata, such pacer_case_id from AcmsCaseSearch."""
         email_data = email_data = self.acms_email_data.copy()
         email_data["dockets"][0]["docket_entries"][0]["document_number"] = "10"
         with mock.patch(
@@ -2975,11 +2853,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """Can we properly merge an ACMS NDA notification and retrieve the
-        missing metadata, such as the document_number and pacer_case_id from
-        the PDF and the AcmsCaseSearch.
-        """
-
+        """Can we properly merge an ACMS NDA notification and retrieve the missing metadata, such as the document_number and pacer_case_id from the PDF and the AcmsCaseSearch."""
         email_data = self.acms_email_data.copy()
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
@@ -3042,10 +2916,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
-        """Can we properly merge an ACMS NDA notification that doesn't include
-        a document_number, either in the notification or the PDF?
-        """
-
+        """Can we properly merge an ACMS NDA notification that doesn't include a document_number, either in the notification or the PDF?"""
         email_data = email_data = self.acms_email_data.copy()
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
@@ -3091,7 +2962,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
 
 
 class GetAndCopyRecapAttachments(TestCase):
-    """Test the get_and_copy_recap_attachment_docs method"""
+    """Test the get_and_copy_recap_attachment_docs method."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3140,10 +3011,7 @@ class GetAndCopyRecapAttachments(TestCase):
             cls.rds_att.append(rd_att_2)
 
     def test_copy_pdf_attachments_from_pqs(self):
-        """This test verifies that we can properly copy a PDF attachment from a
-        PQ object to its corresponding RECAPDocument.
-        """
-
+        """This test verifies that we can properly copy a PDF attachment from a PQ object to its corresponding RECAPDocument."""
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
 
@@ -3218,11 +3086,7 @@ class GetAndCopyRecapAttachments(TestCase):
         mock_cookie,
         mock_download,
     ):
-        """This test verifies that we can properly save a PDF attachment from a
-        magic link, store it in a PQ object and finally copy the PDF
-        attachment from the PQ object to its corresponding RECAPDocument.
-        """
-
+        """This test verifies that we can properly save a PDF attachment from a magic link, store it in a PQ object and finally copy the PDF attachment from the PQ object to its corresponding RECAPDocument."""
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
         get_and_copy_recap_attachment_docs(
@@ -3272,11 +3136,7 @@ class GetAndCopyRecapAttachments(TestCase):
         mock_cookie,
         mock_download,
     ):
-        """A PQ from a previous notification whose file was already deleted
-        shouldn't be reused for a pre-existing attachment RD. A fresh download
-        must be performed instead of wrongly marking the RD as sealed.
-        """
-
+        """A PQ from a previous notification whose file was already deleted shouldn't be reused for a pre-existing attachment RD. A fresh download must be performed instead of wrongly marking the RD as sealed."""
         rd_att = self.rds_att[0]
         # Simulate a PQ consumed by a previous notification: marked
         # successful and its file already deleted.
@@ -3328,8 +3188,7 @@ class GetAndCopyRecapAttachments(TestCase):
     side_effect=lambda x: "Cookie",
 )
 class GetDocumentNumberForAppellateDocuments(TestCase):
-    """Test if we can get the PACER document number for appellate documents
-    either from the PDF document or the download confirmation page."""
+    """Test if we can get the PACER document number for appellate documents either from the PDF document or the download confirmation page."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3337,22 +3196,17 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         cls.court_ca11 = CourtFactory(id="ca11", jurisdiction="F")
         cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
         cls.court_ca8 = CourtFactory(id="ca8", jurisdiction="F")
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt_nda.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda.json").open(
                 encoding="utf-8",
             ) as nda_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca11.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca11.json").open(
                 encoding="utf-8",
             ) as ca11_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca2.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca2.json").open(
                 encoding="utf-8",
             ) as ca2_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca8.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca8.json").open(
                 encoding="utf-8",
             ) as ca8_file,
         ):
@@ -3390,10 +3244,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open("nda_document.pdf", "rb", True),
+                content=mock_bucket_open("nda_document.pdf", "rb", True),
             ),
             "OK",
         ),
@@ -3406,10 +3260,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_cookies_cache,
         mock_download_pacer_pdf,
     ):
-        """This test verifies if we can get the PACER document number for
-        appellate documents from the PDF document.
-        """
-
+        """This test verifies if we can get the PACER document number for appellate documents from the PDF document."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca9, format="json")
 
@@ -3428,10 +3279,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open(
+                content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
                 ),
             ),
@@ -3451,10 +3302,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies if we can get the PACER document number for
-        appellate documents from the download confirmation page.
-        """
-
+        """This test verifies if we can get the PACER document number for appellate documents from the download confirmation page."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca11, format="json")
 
@@ -3475,10 +3323,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(
+        return_value=(
+            httpx.Response(
                 200,
-                mock_bucket_open(
+                content=mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
                 ),
             ),
@@ -3498,11 +3346,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies if we can get the PACER document number for
-        appellate documents from the download confirmation page if getting it
-        from the PDF document fails.
-        """
-
+        """This test verifies if we can get the PACER document number for appellate documents from the download confirmation page if getting it from the PDF document fails."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca2, format="json")
 
@@ -3521,8 +3365,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3539,11 +3383,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if we can't get the document number from the PDF
-        document or the download confirmation page. The RECAP document is added
-        with an empty document number.
-        """
-
+        """This test checks if we can't get the document number from the PDF document or the download confirmation page. The RECAP document is added with an empty document number."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca8, format="json")
 
@@ -3560,8 +3400,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b""),
+        return_value=(
+            httpx.Response(200, content=b""),
             "OK",
         ),
     )
@@ -3578,10 +3418,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that if we receive two notifications for the same
-        case/document but different users the docket entry is not duplicated.
-        """
-
+        """This test verifies that if we receive two notifications for the same case/document but different users the docket entry is not duplicated."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca11, format="json")
 
@@ -3610,7 +3447,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
+        return_value=(
             None,
             "Document not available from magic link.",
         ),
@@ -3628,10 +3465,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if the PDF document is not available the
-        document number is obtained from download confirmation page.
-        """
-
+        """This test checks if the PDF document is not available the document number is obtained from download confirmation page."""
         # Trigger a new nda recap.email notification from testing_1@recap.email
         await self.async_client.post(self.path, self.data_ca2, format="json")
 
@@ -3664,12 +3498,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pdf_by_magic_number,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that merging an NDA recap.email notification
-        into a Docket/DocketEntry/RECAPDocument already created by a
-        different source (e.g. the extension) updates the existing records
-        instead of creating duplicates.
-        """
-
+        """This test verifies that merging an NDA recap.email notification into a Docket/DocketEntry/RECAPDocument already created by a different source (e.g. the extension) updates the existing records instead of creating duplicates."""
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=False,
             appellate=True,
@@ -3762,13 +3591,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pdf_by_magic_number,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that get_document_number_for_appellate logs
-        an alert when the ca8/cadc confirmation page returns a
-        regular-looking (short) document number, signaling that the court
-        may have switched to standard docket numbering and may no longer
-        need the confirmation-page-first handling.
-        """
-
+        """This test verifies that get_document_number_for_appellate logs an alert when the ca8/cadc confirmation page returns a regular-looking (short) document number, signaling that the court may have switched to standard docket numbering and may no longer need the confirmation-page-first handling."""
         await self.async_client.post(self.path, self.data_ca8, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
@@ -3784,13 +3607,13 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         )
 
 
-def mock_method_set_rd_sealed_status(
+async def mock_method_set_rd_sealed_status(
     rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
 ) -> None:
     if rd.document_type == RECAPDocument.PACER_DOCUMENT:
-        set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
-        return
-    return set_rd_sealed_status(rd, magic_number, potentially_sealed)
+        await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
+        return None
+    return await set_rd_sealed_status(rd, magic_number, potentially_sealed)
 
 
 @mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
@@ -3811,17 +3634,18 @@ def mock_method_set_rd_sealed_status(
     return_value=False,
 )
 class RecapEmailContentReplication(TestCase):
-    """Test recap email docket alerts"""
+    """Test recap email docket alerts."""
 
     @classmethod
     def setUpTestData(cls):
         cls.user_profile = UserProfileWithParentsFactory()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
 
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+            (
+                TEST_ASSETS_DIR
+                / "recap_mail_custom_receipt_multi_nef_jpml.json"
+            ).open(
                 encoding="utf-8",
             ) as file_jpml,
         ):
@@ -3880,14 +3704,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_nef_subdocket_replication_no_att(
         self,
@@ -3900,9 +3724,7 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm that the main PDF is properly replicated from a simple NEF
-        notification to subdockets for notifications that don't contain attachments.
-        """
+        """Confirm that the main PDF is properly replicated from a simple NEF notification to subdockets for notifications that don't contain attachments."""
         # Create two Subdockets and RDs no mentioned in the email notification.
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
@@ -4026,14 +3848,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_source_field_set_for_email_and_replication_pqs(
         self,
@@ -4046,11 +3868,7 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """The PQ created directly from a recap.email notification
-        must be tagged EMAIL, while the PQ created for a subdocket
-        case that wasn't mentioned in the notification must be tagged
-        REPLICATION.
-        """
+        """The PQ created directly from a recap.email notification must be tagged EMAIL, while the PQ created for a subdocket case that wasn't mentioned in the notification must be tagged REPLICATION."""
         # Create a subdocket and RD not mentioned in the email notification.
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
@@ -4105,14 +3923,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_multi_nef_subdocket_replication(
         self,
@@ -4125,10 +3943,7 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm the main PDF and the related attachment data and attachment
-        PDF are properly replicated from a multi-nef notification to subdockets.
-        """
-
+        """Confirm the main PDF and the related attachment data and attachment PDF are properly replicated from a multi-nef notification to subdockets."""
         # Create two Subdockets and RDs no mentioned in the email notification.
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
@@ -4314,14 +4129,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_avoid_triggering_replication_for_minute_entries(
         self,
@@ -4334,10 +4149,7 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm that the replicate_recap_email_to_subdockets method is not
-        called for email notifications with minute entries.
-        """
-
+        """Confirm that the replicate_recap_email_to_subdockets method is not called for email notifications with minute entries."""
         minute_entry_data = RECAPEmailDocketEntryDataFactory(
             pacer_magic_num=None,
             document_number=None,
@@ -4415,10 +4227,7 @@ class RecapEmailContentReplication(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks whether a document with attachments that is sealed
-        and the attachment page is also unavailable no replication is triggered.
-        """
-
+        """This test checks whether a document with attachments that is sealed and the attachment page is also unavailable no replication is triggered."""
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=True,
             appellate=False,
@@ -4468,8 +4277,8 @@ class RecapEmailContentReplication(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
@@ -4479,7 +4288,7 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.set_rd_sealed_status",
-        side_effect=mock_method_set_rd_sealed_status,
+        wraps=mock_method_set_rd_sealed_status,
     )
     async def test_replication_sealed_document_with_no_sealed_attachments(
         self,
@@ -4492,10 +4301,7 @@ class RecapEmailContentReplication(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks whether a document with attachments that is sealed
-        on PACER are properly ingested when the attachment page is available.
-        """
-
+        """This test checks whether a document with attachments that is sealed on PACER are properly ingested when the attachment page is available."""
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
                 court=self.court_canb,
@@ -4586,10 +4392,7 @@ class RecapEmailContentReplication(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks whether a document with attachments that is sealed
-        and the attachment page is also unavailable no replication is triggered.
-        """
-
+        """This test checks whether a document with attachments that is sealed and the attachment page is also unavailable no replication is triggered."""
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
                 court=self.court_canb,
@@ -4680,9 +4483,7 @@ class RecapEmailContentReplication(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
     ):
-        """This test checks if a docket entry is sealed on PACER subdockets
-        replication is not triggered.
-        """
+        """This test checks if a docket entry is sealed on PACER subdockets replication is not triggered."""
         mock_docket_entry_sealed.return_value = True
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=True,
@@ -4725,14 +4526,14 @@ class RecapEmailContentReplication(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d, e, a: (
-            MockResponse(200, b"Hello World"),
+        return_value=(
+            httpx.Response(200, content=b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
-        "cl.recap.tasks.requests.get",
-        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+        "cl.recap.tasks.httpx.AsyncClient.get",
+        return_value=httpx.Response(200, content=b"Att content."),
     )
     async def test_recap_email_avoid_replication_on_pdf_available(
         self,
@@ -4745,9 +4546,7 @@ class RecapEmailContentReplication(TestCase):
         mock_bucket_open,
         mock_enqueue_alert,
     ):
-        """Confirm that replication for RDs where the PDF is already available
-        is omitted.
-        """
+        """Confirm that replication for RDs where the PDF is already available is omitted."""
         # Create two Subdockets and RDs no mentioned in the email notification.
         de_1 = await sync_to_async(DocketEntryFactory)(
             docket=await sync_to_async(DocketFactory)(
@@ -4820,4 +4619,142 @@ class RecapEmailContentReplication(TestCase):
             await all_pqs_created.acount(),
             1,
             msg="Wrong number of ProcessingQueues.",
+        )
+
+
+class DownloadPacerPdfAndSaveToPQTest(TestCase):
+    """Tests for how download_pacer_pdf_and_save_to_pq reuses PQ rows when several notifications for the same document are processed."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="dcd", jurisdiction="FD")
+        cls.user = User.objects.get(username="recap-email")
+
+    def setUp(self) -> None:
+        self.cutoff = now() - timedelta(minutes=1)
+
+    def _download(self, magic_number: str | None) -> ProcessingQueue:
+        """Run download_pacer_pdf_and_save_to_pq for the test document."""
+        pq = download_pacer_pdf_and_save_to_pq(
+            self.court.pk,
+            SessionData(cookies={}),
+            self.cutoff,
+            magic_number,
+            "291053",
+            "045012335794",
+            self.user.pk,
+            False,
+        )
+        if pq.filepath_local:
+            self.addCleanup(pq.filepath_local.delete, save=False)
+        return pq
+
+    @mock.patch("cl.recap.tasks.download_pdf_by_magic_number")
+    def test_magic_number_retries_pq_failed_without_one(
+        self, mock_download
+    ) -> None:
+        """A notification with a magic number must download into a PQ that failed because another notification had no magic number (#7940). Otherwise the failed PQ plus the magic number marks it as sealed."""
+        mock_download.return_value = (MockResponse(200, b"%PDF-1.4"), "")
+
+        pq_no_magic = self._download(None)
+        self.assertEqual(pq_no_magic.status, PROCESSING_STATUS.FAILED)
+        mock_download.assert_not_called()
+
+        pq_magic = self._download("37784612")
+        mock_download.assert_called_once()
+        self.assertEqual(pq_magic.pk, pq_no_magic.pk)
+        self.assertNotEqual(pq_magic.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(pq_magic.error_message, "")
+        self.assertTrue(pq_magic.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_failed_magic_download_keeps_pq_failed(
+        self, mock_download
+    ) -> None:
+        """If the retried download also fails, the PQ stays failed with the new error so the document can still be treated as sealed."""
+        self._download(None)
+        pq = self._download("37784612")
+
+        mock_download.assert_called_once()
+        self.assertEqual(pq.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(
+            pq.error_message, "Document not available from magic link."
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        # The free look was already used by the first attempt.
+        return_value=(None, "Document not available from magic link."),
+    )
+    def test_retry_prefers_pq_with_pdf_over_failed_pq(
+        self, mock_download
+    ) -> None:
+        """A retried task must reuse its own PQ that holds the PDF, not an older failed one.
+
+        Two notifications processed at once can each create a PQ: one fails
+        without a magic number, the other stores the PDF. If the second task
+        is retried before its RD save commits, picking the failed PQ would
+        retry a free look that's already used up and mark the document as
+        sealed.
+        """
+        failed_pq = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            status=PROCESSING_STATUS.FAILED,
+            error_message="No magic number available to download the document.",
+        )
+        pq_with_pdf = ProcessingQueue.objects.create(
+            uploader=self.user,
+            pacer_doc_id="045012335794",
+            pacer_case_id="291053",
+            court=self.court,
+            upload_type=UPLOAD_TYPE.PDF,
+            source=PROCESSING_QUEUE_SOURCE.EMAIL,
+        )
+        pq_with_pdf.filepath_local.save(
+            "test.pdf", ContentFile(b"%PDF-1.4"), save=True
+        )
+        self.addCleanup(pq_with_pdf.filepath_local.delete, save=False)
+        self.assertLess(failed_pq.pk, pq_with_pdf.pk)
+
+        pq = self._download("37784612")
+
+        self.assertEqual(pq.pk, pq_with_pdf.pk)
+        mock_download.assert_not_called()
+        failed_pq.refresh_from_db()
+        self.assertEqual(failed_pq.status, PROCESSING_STATUS.FAILED)
+
+    def test_duplicate_pqs_reuse_oldest(self) -> None:
+        """Concurrent notifications can each create a PQ row.
+
+        Lookups must reuse the oldest one instead of raising
+        MultipleObjectsReturned.
+        """
+        pqs = [
+            ProcessingQueue.objects.create(
+                uploader=self.user,
+                pacer_doc_id="045012335794",
+                pacer_case_id="291053",
+                court=self.court,
+                upload_type=UPLOAD_TYPE.PDF,
+                source=PROCESSING_QUEUE_SOURCE.EMAIL,
+            )
+            for _ in range(2)
+        ]
+
+        pq = self._download(None)
+
+        self.assertEqual(pq.pk, min(p.pk for p in pqs))
+        self.assertEqual(
+            ProcessingQueue.objects.filter(
+                pacer_doc_id="045012335794"
+            ).count(),
+            2,
         )

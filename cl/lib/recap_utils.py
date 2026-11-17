@@ -1,3 +1,5 @@
+"""Helpers for RECAP file names, storage paths, and Internet Archive URLs."""
+
 import logging
 import re
 from collections.abc import Sequence
@@ -6,7 +8,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
@@ -15,7 +17,8 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 UNDATED_PATH_SEGMENT = "undated"
 
 
-def get_bucket_name(court, pacer_case_id):
+def get_bucket_name(court: str, pacer_case_id: str | int | None) -> str:
+    """Make a case's Internet Archive bucket name, prefixed with ``dev`` in debug mode."""
     bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
@@ -25,8 +28,11 @@ def get_bucket_name(court, pacer_case_id):
 def format_path_date(value: date | None) -> str:
     """Render a filing date as a storage path segment.
 
-    :param value: The filing date, or None when the entry is undated.
-    :return: The ISO date (YYYY-MM-DD), or `UNDATED_PATH_SEGMENT` when None.
+    Args:
+        value: The filing date, or None when the entry is undated.
+
+    Returns:
+        The ISO date (YYYY-MM-DD), or `UNDATED_PATH_SEGMENT` when None.
     """
     return value.isoformat() if value else UNDATED_PATH_SEGMENT
 
@@ -45,13 +51,16 @@ def make_recap_style_path(
 
         recap/gov.uscourts.<court_id>.<docket_id>/gov.uscourts.<court_id>.<docket_id>.<segments...><ext>
 
-    :param court_id: The court the docket belongs to.
-    :param docket_id: The CourtListener docket id.
-    :param segments: The dot-separated segments that follow the bucket name in
-        the filename, e.g. the filing date and document number.
-    :param ext: The file extension, including the leading dot.
-    :param thumbs: Whether to build the thumbnail path instead.
-    :return: The path, relative to the bucket root.
+    Args:
+        court_id: The court the docket belongs to.
+        docket_id: The CourtListener docket id.
+        segments: The dot-separated segments that follow the bucket name in
+            the filename, e.g. the filing date and document number.
+        ext: The file extension, including the leading dot.
+        thumbs: Whether to build the thumbnail path instead.
+
+    Returns:
+        The path, relative to the bucket root.
     """
     root = "recap-thumbnails" if thumbs else "recap"
     bucket = get_bucket_name(court_id, docket_id)
@@ -70,10 +79,13 @@ def scotus_document_number_segments(
     segment and a missing attachment number becomes `0`. Either is unexpected
     for SCOTUS documents, so both are logged as errors for follow-up.
 
-    :param document_number: The document number on the SCOTUS docket page.
-    :param attachment_number: The attachment number on the SCOTUS docket page.
-    :param document_pk: The SCOTUSDocument pk, for the log message.
-    :return: The two segments, document number first.
+    Args:
+        document_number: The document number on the SCOTUS docket page.
+        attachment_number: The attachment number on the SCOTUS docket page.
+        document_pk: The SCOTUSDocument pk, for the log message.
+
+    Returns:
+        The two segments, document number first.
     """
     if document_number is None:
         logger.error(
@@ -93,7 +105,8 @@ def scotus_document_number_segments(
     ]
 
 
-def get_docketxml_url(court, pacer_case_id):
+def get_docketxml_url(court: str, pacer_case_id: str) -> str:
+    """Make the download URL of a case's docket XML."""
     return "{}/{}/{}".format(
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
@@ -101,7 +114,7 @@ def get_docketxml_url(court, pacer_case_id):
     )
 
 
-def get_docketxml_url_from_path(path):
+def get_docketxml_url_from_path(path: str) -> str:
     """Similar to above, but uses path of single file to figure out the rest.
 
     E.g. this:
@@ -115,30 +128,38 @@ def get_docketxml_url_from_path(path):
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{filename}"
 
 
-def get_ia_document_url_from_path(path, document_number, attachment_number):
+def get_ia_document_url_from_path(
+    path: str, document_number: int, attachment_number: int
+) -> str:
     """Make an IA URL based on the download path of an item."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{BASE_DOWNLOAD_URL}/{bucket}/{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_local_document_url_from_path(path, document_number, attachment_number):
+def get_local_document_url_from_path(
+    path: str, document_number: int, attachment_number: int
+) -> str:
     """Make a path to a local copy of a PDF."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
     return f"{bucket}.{document_number}.{attachment_number}.pdf"
 
 
-def get_pdf_url(court, pacer_case_id, filename):
+def get_pdf_url(court: str, pacer_case_id: str, filename: str) -> str:
+    """Make the download URL of a file in a case's bucket."""
     return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
-def get_docket_filename(court, pacer_case_id, ext):
+def get_docket_filename(
+    court: str, pacer_case_id: str | None, ext: str
+) -> str:
+    """Make a case's docket file name with the given extension."""
     return ".".join(
         [
             "gov",
             "uscourts",
-            str(court),
+            court,
             str(pacer_case_id),
             f"docket.{ext}",
         ]
@@ -146,13 +167,17 @@ def get_docket_filename(court, pacer_case_id, ext):
 
 
 def get_document_filename(
-    court, pacer_case_id, document_number, attachment_number
-):
+    court: str,
+    pacer_case_id: str | None,
+    document_number: str,
+    attachment_number: int | None,
+) -> str:
+    """Make a document's PDF file name, using 0 when there is no attachment number."""
     return ".".join(
         [
             "gov",
             "uscourts",
-            str(court),
+            court,
             str(pacer_case_id),
             str(document_number),
             str(attachment_number or 0),
@@ -161,17 +186,22 @@ def get_document_filename(
     )
 
 
-PAGINATION_RE = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
-PAGINATION_COLON_RE = re.compile(r"\bPage:\s*\d+\b", re.I)
-PAGINATION_PAGE_ID_RE = re.compile(r"\bPageID\s+#:\s*\d+\b", re.I)
-PAGINATION_OF = re.compile(r"^\d+\s+of\s+\d+$", re.I)
+PAGINATION_RE: re.Pattern[str] = re.compile(r"\b(?:Page|Pg)\s+\d+", re.I)
+PAGINATION_COLON_RE: re.Pattern[str] = re.compile(r"\bPage:\s*\d+\b", re.I)
+PAGINATION_PAGE_ID_RE: re.Pattern[str] = re.compile(
+    r"\bPageID\s+#:\s*\d+\b", re.I
+)
+PAGINATION_OF: re.Pattern[str] = re.compile(r"^\d+\s+of\s+\d+$", re.I)
 
 
 def is_page_line(line: str) -> bool:
     """Detect if a line is a page-number marker.
 
-    :param line: A single textual line extracted from a PDF.
-    :return: True if the line matches "Page X of Y" or "Page: X"; False otherwise.
+    Args:
+        line: A single textual line extracted from a PDF.
+
+    Returns:
+        True if the line matches "Page X of Y" or "Page: X"; False otherwise.
     """
     return bool(
         PAGINATION_RE.search(line)
@@ -184,9 +214,12 @@ def is_page_line(line: str) -> bool:
 def is_doc_common_header(line: str) -> bool:
     """Identify common header/footer lines that should be ignored.
 
-    :param line: A line extracted from a PDF.
-    :return: True if the line is empty, begins with common header starters, or
-    matches pagination, filing, date/time, or "Received" patterns. False otherwise.
+    Args:
+        line: A line extracted from a PDF.
+
+    Returns:
+        True if the line is empty, begins with common header starters, or
+        matches pagination, filing, date/time, or "Received" patterns. False otherwise.
     """
     bad_starters = (
         "Appellate",
@@ -221,7 +254,7 @@ def is_doc_common_header(line: str) -> bool:
     return False
 
 
-def needs_ocr(content, page_count: int | None = None) -> bool:
+def needs_ocr(content: str, page_count: int | None = None) -> bool:
     """Determines if OCR is needed for a PACER PDF.
 
     Every document in PACER (pretty much) has the case number written on the
@@ -266,9 +299,12 @@ def needs_ocr(content, page_count: int | None = None) -> bool:
     As a fallback it removes these common headers so that if no text remains,
     we can be sure that the PDF needs OCR.
 
-    :param content: The text content to check if OCR is needed.
-    :param page_count: The number of pages of the document.
-    :return: True if OCR is needed, False otherwise.
+    Args:
+        content: The text content to check if OCR is needed.
+        page_count: The number of pages of the document.
+
+    Returns:
+        True if OCR is needed, False otherwise.
     """
     lines = (ln.strip() for ln in content.splitlines())
     in_page = False

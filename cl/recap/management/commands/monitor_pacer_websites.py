@@ -1,3 +1,6 @@
+"""Check whether PACER websites are reachable from our server and log failures."""
+
+from collections.abc import Iterable
 from http import HTTPStatus
 
 import requests
@@ -12,26 +15,31 @@ from cl.search.models import Court
 
 @retry(requests.RequestException, tries=2, backoff=1)
 def check_and_log_url(session: requests.Session, url: str, timeout: int = 10):
-    """Check if a URL is accessible by sending it a GET request
+    """Check if a URL is accessible by sending it a GET request.
 
-    :param session: A requests.Session object
-    :param url: The URL to check
-    :param timeout: How long to wait for the website to respond
-    :return requests.Response object for the query, assuming it doesn't time
-    out
+    Args:
+        session: A requests.Session object
+        url: The URL to check
+        timeout: How long to wait for the website to respond
+
+    Returns:
+        requests.Response object for the query, assuming it doesn't time
+        out
     """
     return session.get(url, timeout=timeout, verify=False)
 
 
 def check_if_global_outage(session, url, timeout=5):
-    """Use our lambda proxy to see if it's actually down for me or if it's
-    down for everybody
+    """Use our lambda proxy to see if it's actually down for me or if it's down for everybody.
 
-    :param session: A requests.Session object
-    :param url: A URL to check
-    :param timeout: The amount of time the *proxy* should wait (this function
-    will wait a little longer)
-    :return True if unavailable to our proxy, else False.
+    Args:
+        session: A requests.Session object
+        url: A URL to check
+        timeout: The amount of time the *proxy* should wait (this function
+            will wait a little longer)
+
+    Returns:
+        True if unavailable to our proxy, else False.
     """
     api_url = settings.AWS_LAMBDA_PROXY_URL
     response = session.get(
@@ -49,18 +57,19 @@ def check_if_global_outage(session, url, timeout=5):
     return response
 
 
-def make_simple_url(court) -> str:
+def make_simple_url(court: Court) -> str:
+    """Make the URL of a court's PACER website."""
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
-    else:
-        return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
+    return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
 
 
 def down_for_only_me(session: requests.Session, url: str) -> bool:
-    """Check if a URL is down just our server, or globally
+    """Check if a URL is down just our server, or globally.
 
-    :return: True if the url is only down for me, or False if entirely up or
-    entirely down.
+    Returns:
+        True if the url is only down for me, or False if entirely up or
+        entirely down.
     """
     try:
         check_and_log_url(session, url)
@@ -76,15 +85,15 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
         if j["status_code"] is not None:
             # Down from our server, but up from our proxy. Yikes!
             return True
-        else:
-            # Down from our server, and down from our proxy. OK.
-            return False
+        # Down from our server, and down from our proxy. OK.
+        return False
 
     # Up from our server. OK.
     return False
 
 
-def iterate_and_log_courts(courts):
+def iterate_and_log_courts(courts: Iterable[Court]):
+    """Log an error for each court whose website is down only for us, after three tries."""
     session = requests.Session()
     for court in courts:
         url = make_simple_url(court)
@@ -110,12 +119,15 @@ def iterate_and_log_courts(courts):
 
 
 class Command(VerboseCommand):
+    """Check every PACER court's website and log the ones down only for us."""
+
     help = (
         "Monitor PACER websites and write errors to our logs. Because we "
         "use Sentry, errors in logs will surface as emails to admins."
     )
 
     def handle(self, *args, **options):
+        """Check the websites of all PACER courts."""
         super().handle(*args, **options)
         courts = Court.federal_courts.all_pacer_courts()
         iterate_and_log_courts(courts)

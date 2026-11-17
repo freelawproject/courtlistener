@@ -31,6 +31,7 @@ import logging
 import time
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.utils.timezone import now
 from sentry_sdk import capture_exception
@@ -359,7 +360,7 @@ def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
     except Exception as e:
         logger.exception("Unable to send fetch request %s to Celery.", fq_pk)
         capture_exception(e)
-        mark_fq_status(
+        async_to_sync(mark_fq_status)(
             fq,
             "We were unable to schedule this request. Please submit it again.",
             PROCESSING_STATUS.FAILED,
@@ -476,6 +477,6 @@ def fail_stale_fetches() -> int:
         failed += 1
         fq.status = PROCESSING_STATUS.FAILED
         fq.message = STALE_MESSAGE
-        send_recap_fetch_webhooks(fq)
+        async_to_sync(send_recap_fetch_webhooks)(fq)
         remove_fetch(get_court_id_from_fetch_queue(fq), fq.user_id, fq.pk)
     return failed

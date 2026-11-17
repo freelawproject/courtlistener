@@ -1,5 +1,4 @@
-"""Factories used for testing functionality related to New York Court of
-Appeals state data."""
+"""Factories used for testing functionality related to New York Court of Appeals state data."""
 
 import random
 from datetime import timedelta
@@ -27,6 +26,8 @@ from cl.search.state.new_york.vocabularies import (
 
 
 class NYCoADocketMetadataFactory(DjangoModelFactory):
+    """Make New York Court of Appeals docket metadata on a new docket."""
+
     docket = SubFactory(DocketFactory)
     decision_date = Faker("date")
     official_citation = Faker("text", max_nb_chars=25)
@@ -37,6 +38,8 @@ class NYCoADocketMetadataFactory(DjangoModelFactory):
 
 
 class NYCoADocketIssueFactory(DjangoModelFactory):
+    """Make a confession of judgment issue on new docket metadata."""
+
     metadata = SubFactory(NYCoADocketMetadataFactory)
     category = IssueCategory.JUDGMENTS.code
     subcategory = IssueSubcategory.CONFESSION_OF_JUDGMENT.code
@@ -48,6 +51,8 @@ class NYCoADocketIssueFactory(DjangoModelFactory):
 
 
 class NYCoADocketEntryFactory(DjangoModelFactory):
+    """Make an appellant brief docket entry on a new docket."""
+
     docket = SubFactory(DocketFactory)
     docket_entry_id = Sequence(lambda n: f"e:appellant-brief:smith:{n + 1}")
     entry_index = Sequence(lambda n: n)
@@ -66,9 +71,9 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     )
 
     @post_generation
-    def party(obj, create, extracted, **kwargs):
-        """Attach a filing party tied to the entry's docket, since
-        PartyFactory's default attorney requires a docket."""
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def party(obj: NYCoADocketEntry, create, extracted, **kwargs):
+        """Attach a filing party tied to the entry's docket, since PartyFactory's default attorney requires a docket."""
         if not create:
             return
         obj.party = extracted or PartyFactory(docket=obj.docket)
@@ -79,6 +84,8 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
 
 
 class NYCoADocumentFactory(DjangoModelFactory):
+    """Make a PDF document on a new docket entry."""
+
     docket_entry = SubFactory(NYCoADocketEntryFactory)
     file_name = Sequence(lambda n: f"SmithvJones-app-Smith-brf-{n + 1}.pdf")
     content_type = "application/pdf"

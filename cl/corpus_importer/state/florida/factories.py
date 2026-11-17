@@ -25,11 +25,13 @@ from juriscraper.state.florida.docket_entries import (
 from juriscraper.state.florida.documents import FloridaDocument
 from juriscraper.state.florida.parties import FloridaParty, PartyType
 
+from cl.tests.providers import LegalProvider
+
+Faker.add_provider(LegalProvider)
+
 
 class _PydanticConstructFactory(Factory):
-    """Builds Pydantic models via ``model_construct`` so factories can use
-    field names directly even though the upstream models declare
-    ``validation_alias``\\es matching the Florida API payload shape."""
+    r"""Builds Pydantic models via ``model_construct`` so factories can use field names directly even though the upstream models declare ``validation_alias``\\es matching the Florida API payload shape."""
 
     class Meta:
         abstract = True
@@ -44,6 +46,8 @@ class _PydanticConstructFactory(Factory):
 
 
 class FloridaOriginatingCaseFactory(_PydanticConstructFactory):
+    """Make a scraped Florida originating case from a circuit or county court."""
+
     class Meta:
         model = FloridaOriginatingCase
 
@@ -56,6 +60,8 @@ class FloridaOriginatingCaseFactory(_PydanticConstructFactory):
 
 
 class FloridaDocketTransferFactory(_PydanticConstructFactory):
+    """Make an inbound appeal transfer from a Florida circuit or county court."""
+
     class Meta:
         model = DocketTransfer
 
@@ -72,6 +78,8 @@ class FloridaDocketTransferFactory(_PydanticConstructFactory):
 
 
 class FloridaRepresentativeFactory(_PydanticConstructFactory):
+    """Make a scraped Florida party representative."""
+
     class Meta:
         model = FloridaPartyRepresentative
 
@@ -82,6 +90,8 @@ class FloridaRepresentativeFactory(_PydanticConstructFactory):
 
 
 class FloridaCasePartyFactory(_PydanticConstructFactory):
+    """Make a scraped Florida party with one representative."""
+
     class Meta:
         model = FloridaParty
 
@@ -104,6 +114,8 @@ class FloridaCasePartyFactory(_PydanticConstructFactory):
 
 
 class FloridaDocumentFactory(_PydanticConstructFactory):
+    """Make a scraped Florida PDF document."""
+
     class Meta:
         model = FloridaDocument
 
@@ -126,6 +138,8 @@ class FloridaDocumentFactory(_PydanticConstructFactory):
 
 
 class FloridaCaseActorFactory(_PydanticConstructFactory):
+    """Make a scraped Florida case actor."""
+
     class Meta:
         model = FloridaCaseActor
 
@@ -134,6 +148,8 @@ class FloridaCaseActorFactory(_PydanticConstructFactory):
 
 
 class FloridaDocketEntryFactory(_PydanticConstructFactory):
+    """Make a scraped Florida docket entry with no submitters or attachments."""
+
     class Meta:
         model = FloridaDocketEntry
 
@@ -154,6 +170,8 @@ class FloridaDocketEntryFactory(_PydanticConstructFactory):
 
 
 class FloridaCaseFactory(_PydanticConstructFactory):
+    """Make a scraped Florida appellate case with one each of originating case, transfer, entry, and party."""
+
     class Meta:
         model = FloridaCase
 

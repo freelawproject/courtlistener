@@ -1,15 +1,28 @@
+"""Helpers for stub accounts, deleting users' data, and account emails."""
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from rest_framework.authtoken.models import Token
 
 from cl.alerts.models import AlertEvent, DocketAlertEvent
-from cl.api.models import WebhookHistoryEvent
-from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
+from cl.api.models import (
+    APIThrottleEvent,
+    WebhookHistoryEvent,
+)
+from cl.favorites.models import (
+    DocketTagEvent,
+    NoteEvent,
+    PrayerEvent,
+    UserTagEvent,
+)
 from cl.lib.crypto import md5
 from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
 from cl.users.models import (
+    UserGroupsEvent,
+    UserPermissionsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
@@ -21,17 +34,18 @@ def create_stub_account(
     user_data: dict[str, str],
     profile_data: dict[str, str],
 ) -> tuple[User, UserProfile]:
-    """Create a minimal user account in CL
+    """Create a minimal user account in CL.
 
     This can be helpful when receiving anonymous donations, payments from
     external applications like XERO, etc.
 
-    :param user_data: Generally cleaned data from a cl.users.forms.UserForm
-    :type user_data: dict
-    :param profile_data: Generally cleaned data from a
-    cl.users.forms.ProfileForm
-    :type profile_data: dict
-    :return: A tuple of a User and UserProfile objects
+    Args:
+        user_data: Generally cleaned data from a cl.users.forms.UserForm
+        profile_data: Generally cleaned data from a
+            cl.users.forms.ProfileForm
+
+    Returns:
+        A tuple of a User and UserProfile objects
     """
     with transaction.atomic():
         email = user_data["email"]
@@ -62,8 +76,11 @@ def create_stub_account(
 def convert_to_stub_account(user: User) -> User:
     """Set all fields to as blank as possible.
 
-    :param user: The user to operate on.
-    :return: The new user object.
+    Args:
+        user: The user to operate on.
+
+    Returns:
+        The new user object.
     """
     user.first_name = "Deleted"
     user.last_name = ""
@@ -100,31 +117,48 @@ def convert_to_stub_account(user: User) -> User:
 
 
 def delete_user_assets(user: User) -> None:
-    """Delete any associated data from a user account and profile"""
+    """Delete any associated data from a user account and profile.
 
+    This removes the user's live assets (alerts, notes, prayers, API
+    credentials, etc.) and then purges the pghistory event rows that reference
+    them, so the deletion itself leaves no trace in the history tables. The
+    user and profile rows are not deleted here; `convert_to_stub_account`
+    blanks those afterwards.
+
+    Args:
+        user: The user whose assets should be deleted.
+    """
     # Store user_tags before deleting the user-related objects.
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
     user.alerts.all().delete()
-    user.webhooks.all().delete()
+    user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
-    user.notes.all().delete()
-    user_tags.delete()
-    user.search_queries.all().delete()
     user.emails.all().delete()
+    user.events.all().delete()
+    user.notes.all().delete()
+    user.prayers.all().delete()
     user.scotus_maps.all().delete()
+    user.search_queries.all().delete()
+    Token.objects.filter(user=user).delete()
+    user_tags.delete()
+    user.webhooks.all().delete()
     # Donations are financial records we need to keep, so disable the
     # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
-    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
     AlertEvent.objects.filter(user_id=user.pk).delete()
-    NoteEvent.objects.filter(user_id=user.pk).delete()
-    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    APIThrottleEvent.objects.filter(user_id=user.pk).delete()
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
     DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    PrayerEvent.objects.filter(user_id=user.pk).delete()
+    UserGroupsEvent.objects.filter(user_id=user.pk).delete()
+    UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
@@ -410,8 +444,11 @@ def is_search_history_on_cached(user_pk: int) -> bool:
     Cached for five minutes, so changes may take that long to apply. Intended
     for the API; website requests should read the profile directly.
 
-    :param user_pk: The primary key of the user.
-    :return: True if the user's search queries should be saved.
+    Args:
+        user_pk: The primary key of the user.
+
+    Returns:
+        True if the user's search queries should be saved.
     """
     return UserProfile.objects.values_list(
         "save_query_history", flat=True

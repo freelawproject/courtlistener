@@ -1,3 +1,5 @@
+"""Authentication backend and sign-in form that accept a username or email."""
+
 import re
 from typing import Any
 
@@ -26,7 +28,7 @@ MAX_EMAIL_CANDIDATES = 3
 # The loosest test that still tells an address from a username: something, an
 # "@", and a domain with a dot in it. Anything stricter risks turning away an
 # address that an older validator once let into auth_user.
-LOOKS_LIKE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+LOOKS_LIKE_EMAIL: re.Pattern[str] = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def accounts_for_email(email: str) -> QuerySet[User]:
@@ -37,8 +39,11 @@ def accounts_for_email(email: str) -> QuerySet[User]:
     accounts an address refers to. Callers add their own ordering, limits and
     further filters.
 
-    :param email: The submitted address.
-    :return: A queryset of the accounts holding that address.
+    Args:
+        email: The submitted address.
+
+    Returns:
+        A queryset of the accounts holding that address.
     """
     return (
         filter_by_email(User.objects.all(), email)
@@ -75,7 +80,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
         request: HttpRequest | None,
         username: str | None = None,
         password: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> User | None:
         """Find the account the submitted credentials belong to.
 
@@ -85,11 +90,15 @@ class EmailOrUsernameModelBackend(ModelBackend):
         the email candidates anyway, so registering a username equal to
         somebody's address can't lock that person out of email sign-in.
 
-        :param request: The request being authenticated, if there is one.
-        :param username: What the person typed in the identifier field: a
-        username, an email address, or a User (whose str() is its username).
-        :param password: The submitted password.
-        :return: The matching User, or None if the credentials match nothing.
+        Args:
+            request: The request being authenticated, if there is one.
+            username: What the person typed in the identifier field: a
+                username, an email address, or a User (whose str() is its username).
+            password: The submitted password.
+            **kwargs: Unused.
+
+        Returns:
+            The matching User, or None if the credentials match nothing.
         """
         if username is None:
             username = kwargs.get(User.USERNAME_FIELD)
@@ -139,8 +148,11 @@ class EmailOrUsernameModelBackend(ModelBackend):
     def _get_by_username(self, identifier: str) -> User | None:
         """Look an account up by exact username.
 
-        :param identifier: The submitted identifier.
-        :return: The account with that username, or None.
+        Args:
+            identifier: The submitted identifier.
+
+        Returns:
+            The account with that username, or None.
         """
         try:
             return User.objects.get_by_natural_key(identifier)
@@ -160,11 +172,14 @@ class EmailOrUsernameModelBackend(ModelBackend):
         turn "you never confirmed your address" into a generic "wrong
         credentials", which is less helpful than what people get today.
 
-        :param identifier: The submitted identifier.
-        :param exclude: An account already checked by username, if any, so we
-        don't verify the same password against the same account twice.
-        :return: The candidate accounts, confirmed ones first and, within
-        that, most recently used first.
+        Args:
+            identifier: The submitted identifier.
+            exclude: An account already checked by username, if any, so we
+                don't verify the same password against the same account twice.
+
+        Returns:
+            The candidate accounts, confirmed ones first and, within
+            that, most recently used first.
         """
         # Only an address has candidates, and the query is worth skipping for
         # anything else. This also keeps an empty identifier from matching
@@ -191,8 +206,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
-    """Your average form, but with an additional tweak to ensure that only
-    users with confirmed email addresses can log in.
+    """Your average form, but with an additional tweak to ensure that only users with confirmed email addresses can log in.
 
     This is needed because we create stub accounts for people that donate and
     don't already have accounts. Without this check, people could sign up for
@@ -204,7 +218,8 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     limit by spreading its guesses across many IPs.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form."""
         super().__init__(*args, **kwargs)
 
     def clean(self) -> dict[str, Any]:
@@ -223,9 +238,12 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         the window: it ends a fixed time after the first attempt in it either
         way, so nobody can hold an account's owner out by continuing to guess.
 
-        :return: The form's cleaned data.
-        :raises forms.ValidationError: If the credentials are wrong, the
-        identifier is over its limit, or the user isn't allowed to log in.
+        Returns:
+            The form's cleaned data.
+
+        Raises:
+            forms.ValidationError: If the credentials are wrong, the
+                identifier is over its limit, or the user isn't allowed to log in.
         """
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
@@ -250,20 +268,21 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         return self.cleaned_data
 
     def confirm_login_allowed(self, user: AbstractBaseUser) -> None:
-        """Make sure the user is active and has a confirmed email address
+        """Make sure the user is active and has a confirmed email address.
 
         If the given user cannot log in, this method should raise a
         ``forms.ValidationError``.
 
         If the given user may log in, this method should return None.
         """
-        if not user.is_active:  # type: ignore
+        if not user.is_active:
             raise forms.ValidationError(
                 self.error_messages["inactive"],
                 code="inactive",
             )
 
-        if not user.profile.email_confirmed:  # type: ignore
+        # pyrefly: ignore[missing-attribute]
+        if not user.profile.email_confirmed:
             raise forms.ValidationError(
                 'Please <a href="{}">validate your email address</a> to '
                 "log in.".format(reverse("email_confirmation_request"))

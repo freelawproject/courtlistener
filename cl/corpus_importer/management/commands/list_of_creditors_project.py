@@ -1,10 +1,14 @@
 # !/usr/bin/python
+"""Query and store PACER list of creditors reports for cases listed in CSV files."""
+
 import csv
 import itertools
 import os
 import re
+from pathlib import Path
 from typing import TypedDict, cast
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.bulk_utils import make_bankr_docket_number
@@ -15,7 +19,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import log_into_pacer
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -23,6 +27,8 @@ CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
+    """The command's options."""
+
     base_path: str
     offset: int
     limit: int
@@ -33,32 +39,33 @@ class OptionsType(TypedDict):
 def enqueue_get_list_of_creditors(
     court_id: str, d_number_file_name: str
 ) -> bool:
-    """Get list of creditors semaphore"""
+    """Get list of creditors semaphore."""
     key = make_list_of_creditors_key(court_id, d_number_file_name)
     return create_redis_semaphore("CACHE", key, ttl=60 * 60)
 
 
 def query_and_save_creditors_data(options: OptionsType) -> None:
-    """Queries and parses claims activity for a list of courts and a specified
-     date range.
+    """Queries and parses claims activity for a list of courts and a specified date range.
 
-    :param options: The options of the command.
-    :return: None, output files are stored in disk.
+    Args:
+        options: The options of the command.
+
+    Returns:
+        None, output files are stored in disk.
     """
-
     if CLIENT_PACER_USERNAME == "" or CLIENT_PACER_PASSWORD == "":
         logger.info(
             "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
             "env vars to continue..."
         )
-        return None
+        return
 
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")
-    base_path = options["base_path"]
+    base_path = Path(options["base_path"])
     csv_files = []
     for file in options["files"]:
-        f = open(f"{base_path}/{file}", encoding="utf-8")
+        f = (base_path / file).open(encoding="utf-8")
         reader = csv.DictReader(f)
         match = regex.search(file)
         if match:
@@ -69,11 +76,11 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
         else:
             raise ValueError(f"Bad file name {file}")
 
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
-    session.login()
     throttle = CeleryThrottle(queue_name=q)
+    reports_path = Path(settings.MEDIA_ROOT) / "list_of_creditors" / "reports"
     completed = 0
     for i, rows in enumerate(
         itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
@@ -99,31 +106,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
             )
             d_number_file_name = docket_number.replace(":", "-")
 
-            # Check if the reports directory already exists
-            html_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports"
-            )
-            if not os.path.exists(html_path):
-                # Create the directory if it doesn't exist
-                os.makedirs(html_path)
+            court_id_path = reports_path / court_id
+            court_id_path.mkdir(parents=True, exist_ok=True)
 
-            # Check if the court_id directory already exists
-            court_id_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports", court_id
-            )
-            if not os.path.exists(court_id_path):
-                # Create the court_id if it doesn't exist
-                os.makedirs(court_id_path)
+            html_file = court_id_path / f"{court_id}-{d_number_file_name}.html"
 
-            html_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "list_of_creditors",
-                "reports",
-                court_id,
-                f"{court_id}-{d_number_file_name}.html",
-            )
-
-            if os.path.exists(html_file):
+            if html_file.exists():
                 logger.info(
                     f"The report {html_file} already exist court: {court_id}"
                 )
@@ -138,11 +126,11 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    SessionData(session.cookies, session.proxy_address),
+                    session,
                     court_id,
                     d_number_file_name,
                     docket_number,
-                    html_file,
+                    str(html_file),
                     i,
                     row,
                 ).set(queue=q).apply_async()
@@ -154,9 +142,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Query list of creditors reports for the cases in CSV files."""
+
     help = "Query List of creditors and store the reports."
 
     def add_arguments(self, parser):
+        """Add the offset, limit, base path, files, and queue options."""
         parser.add_argument(
             "--offset",
             type=int,
@@ -194,5 +185,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and save the list of creditors reports."""
         super().handle(*args, **options)
         query_and_save_creditors_data(options)

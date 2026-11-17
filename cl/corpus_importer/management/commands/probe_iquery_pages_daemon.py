@@ -1,7 +1,11 @@
+"""Daemon that probes PACER courts for new cases via iquery pages."""
+
+from __future__ import annotations
+
 import time
 
 from django.conf import settings
-from redis import ConnectionError
+from redis import ConnectionError, Redis
 
 from cl.corpus_importer.tasks import probe_or_scrape_iquery_pages
 from cl.corpus_importer.utils import (
@@ -15,19 +19,27 @@ from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 def enqueue_iquery_probe(court_id: str) -> bool:
     """Get iquery forward probing semaphore.
 
-    :param court_id: The identifier for the court.
-    :return: A boolean indicating if the semaphore was successfully created.
+    Args:
+        court_id: The identifier for the court.
+
+    Returns:
+        A boolean indicating if the semaphore was successfully created.
     """
     key = make_iquery_probing_key(court_id)
     return create_redis_semaphore("CACHE", key, ttl=60 * 10)
 
 
-def get_latest_pacer_case_id_for_courts(court_ids: list[str], r) -> dict:
+def get_latest_pacer_case_id_for_courts(
+    court_ids: list[str], r: Redis[str]
+) -> dict[str, int]:
     """Return the latest pacer_case_id for each given court from Redis.
 
-    :param court_ids: List of court IDs to fetch the latest pacer_case_id for.
-    :param r: The redis connection to use.
-    :return: A dict mapping each court_id to its latest pacer_case_id.
+    Args:
+        court_ids: List of court IDs to fetch the latest pacer_case_id for.
+        r: The redis connection to use.
+
+    Returns:
+        A dict mapping each court_id to its latest pacer_case_id.
     """
     latest_case_ids = {}
     for court_id in court_ids:
@@ -40,6 +52,8 @@ def get_latest_pacer_case_id_for_courts(court_ids: list[str], r) -> dict:
 
 
 class Command(VerboseCommand):
+    """Continually queue iquery probing for each PACER court."""
+
     help = """Run the iquery pages probing daemon.
 
 The goal of this daemon is to ensure that we always have every case in PACER.
@@ -66,10 +80,12 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
 """
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the testing-iterations option."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -79,6 +95,11 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         )
 
     def handle(self, *args, **options):
+        """Queue probing for each court not already being probed or waiting.
+
+        Runs while the daemon is enabled in settings, stopping after
+        ``--testing-iterations`` iterations when that is set.
+        """
         super().handle(*args, **options)
 
         testing_iterations = options["testing_iterations"]
@@ -106,8 +127,17 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
                         # No other probing being conducted for the court.
                         # Enqueue it.
                         latest_know_case_id_db = latest_case_ids.get(court_id)
+                        latest_know_case_id_db_str = (
+                            None
+                            if latest_know_case_id_db is None
+                            else str(latest_know_case_id_db)
+                        )
                         probe_or_scrape_iquery_pages.apply_async(
-                            args=(court_id, latest_know_case_id_db, testing),
+                            args=(
+                                court_id,
+                                latest_know_case_id_db_str,
+                                testing,
+                            ),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )
                         logger.info(

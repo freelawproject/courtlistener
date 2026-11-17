@@ -1,3 +1,5 @@
+"""REST API serializers for oral argument audio."""
+
 from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
 from cl.api.utils import (
@@ -15,8 +17,10 @@ class AudioSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for oral argument audio, linking its docket and panel."""
+
     absolute_url = CharField(source="get_absolute_url", read_only=True)
-    panel: HyperlinkedRelatedField = HyperlinkedRelatedField(
+    panel = HyperlinkedRelatedField(
         many=True,
         view_name="person-detail",
         queryset=Person.objects.all(),
@@ -24,7 +28,7 @@ class AudioSerializer(
     )
     # This seems unnecessary and it serializes the same data either way. But
     # when this is not here, the API does a query that pulls back ALL dockets.
-    docket: HyperlinkedRelatedField = HyperlinkedRelatedField(
+    docket = HyperlinkedRelatedField(
         many=False,
         view_name="docket-detail",
         queryset=Docket.objects.all(),

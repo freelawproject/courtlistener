@@ -1,3 +1,5 @@
+"""Views for simple pages such as about, help, contact, and component demos."""
+
 import logging
 import re
 from datetime import date
@@ -24,6 +26,7 @@ from cl.disclosures.models import (
 )
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
+from cl.opinion_page.forms_v2 import DocketEntryFilterForm
 from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
@@ -32,15 +35,17 @@ logger = logging.getLogger(__name__)
 
 
 async def about(request: HttpRequest) -> HttpResponse:
-    """Loads the about page"""
+    """Loads the about page."""
     return TemplateResponse(request, "about.html", {"private": False})
 
 
 async def help_home(request: HttpRequest) -> HttpResponse:
+    """Render the help home page."""
     return TemplateResponse(request, "help/index.html", {"private": False})
 
 
 async def broken_email_help(request: HttpRequest) -> HttpResponse:
+    """Render the help page for broken email."""
     return TemplateResponse(
         request,
         "help/broken_email_help.html",
@@ -49,14 +54,17 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
 
 
 async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
-    """Get stats on the disclosure data
+    """Get stats on the disclosure data.
 
     Attempt the cache if possible.
 
-    :param bust_cache: If True, skip the cache and recompute fresh counts,
-        e.g. when a caller's own cache was just busted and needs this data
-        to actually be current rather than up to a week stale.
-    :return: A dict mapping item types to their counts.
+    Args:
+        bust_cache: If True, skip the cache and recompute fresh counts,
+            e.g. when a caller's own cache was just busted and needs this data
+            to actually be current rather than up to a week stale.
+
+    Returns:
+        A dict mapping item types to their counts.
     """
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
@@ -89,9 +97,7 @@ async def contact(
     template_data: dict[str, ContactForm | str | bool] | None = None,
     initial: dict[str, str] | None = None,
 ) -> HttpResponse:
-    """This is a fairly run-of-the-mill contact form, except that it can be
-    overridden in various ways so that its logic can be called from other
-    functions.
+    """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its logic can be called from other functions.
 
     We also use a field called phone_number in place of the subject field to
     defeat spam.
@@ -135,7 +141,7 @@ async def contact(
                     "email_confirmed": profile.email_confirmed,
                 }
 
-            create_zoho_desk_ticket.delay(
+            await sync_to_async(create_zoho_desk_ticket.delay)(
                 subject=cd["phone_number"],
                 name=cd["name"],
                 email=account_email if is_authenticated else cd["email"],
@@ -165,14 +171,18 @@ async def contact(
 
 
 async def contact_thanks(request: HttpRequest) -> HttpResponse:
+    """Render the page thanking the user for contacting us."""
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
+    """Respond with the Web of Trust site verification token."""
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
 async def components(request: HttpRequest) -> HttpResponse:
+    """Render a demo page of UI components with mock data."""
+
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
         PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT
@@ -329,16 +339,6 @@ async def components(request: HttpRequest) -> HttpResponse:
         def end_index(self) -> int:
             return self.number * self.paginator.per_page
 
-    class MockFieldValue:
-        value = None
-
-    class MockDocketFilterForm:
-        errors: dict[str, list[str]] = {}
-        filed_after = MockFieldValue()
-        filed_before = MockFieldValue()
-        entry_gte = MockFieldValue()
-        entry_lte = MockFieldValue()
-
     class MockCourt:
         FEDERAL_APPELLATE = Court.FEDERAL_APPELLATE
         jurisdiction = Court.FEDERAL_DISTRICT
@@ -356,6 +356,13 @@ async def components(request: HttpRequest) -> HttpResponse:
                 return "https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl"
             raise AttributeError(name)
 
+    # Bound to a value below entry_gte's minimum so the library can show the
+    # error state; is_valid() runs validation and fills the field's errors.
+    demo_invalid_filter_form = DocketEntryFilterForm({"entry_gte": "-1"})
+    demo_invalid_filter_form.is_valid()
+    demo_disabled_filter_form = DocketEntryFilterForm(initial={"entry_gte": 5})
+    demo_disabled_filter_form.fields["entry_gte"].disabled = True
+
     return TemplateResponse(
         request,
         "components.html",
@@ -366,7 +373,9 @@ async def components(request: HttpRequest) -> HttpResponse:
             "docket_source": docket_entry_sources.RECAP,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
-            "demo_filter_form": MockDocketFilterForm(),
+            "demo_filter_form": DocketEntryFilterForm(),
+            "demo_invalid_filter_form": demo_invalid_filter_form,
+            "demo_disabled_filter_form": demo_disabled_filter_form,
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {

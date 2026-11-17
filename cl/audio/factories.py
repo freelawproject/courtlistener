@@ -1,3 +1,5 @@
+"""Factories for oral argument audio."""
+
 from factory import Faker, SelfAttribute, SubFactory, post_generation
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice
@@ -8,6 +10,11 @@ from cl.search.factories import DocketFactory
 
 
 class AudioFactory(DjangoModelFactory):
+    """Make an Audio without a docket.
+
+    Its files are only created when requested.
+    """
+
     class Meta:
         model = Audio
 
@@ -24,7 +31,9 @@ class AudioFactory(DjangoModelFactory):
     """
 
     @post_generation
-    def local_path_mp3(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def local_path_mp3(self: Audio, create, extracted, **kwargs):
+        """Set the MP3 file if one was passed or file parameters were given."""
         if extracted:
             self.local_path_mp3 = extracted
         elif kwargs:
@@ -37,7 +46,9 @@ class AudioFactory(DjangoModelFactory):
             self.local_path_mp3 = FileField().evaluate(None, None, kwargs)
 
     @post_generation
-    def local_path_original_file(self, create, extracted, **kwargs):
+    # pyrefly:ignore[invalid-annotation] factory_boy passes the model instance
+    def local_path_original_file(self: Audio, create, extracted, **kwargs):
+        """Set the original file if one was passed or file parameters were given."""
         if extracted:
             self.local_path_original_file = extracted
         elif kwargs:
@@ -56,6 +67,6 @@ class AudioFactory(DjangoModelFactory):
 
 
 class AudioWithParentsFactory(AudioFactory):
-    """Make an Audio with Docket parents"""
+    """Make an Audio with Docket parents."""
 
     docket = SubFactory(DocketFactory, case_name=SelfAttribute("..case_name"))

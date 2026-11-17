@@ -1,12 +1,23 @@
+"""Helpers for data migrations."""
+
+from collections.abc import Iterable
+
+from django.apps.registry import Apps
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.management import create_permissions
 from django.core.management import call_command
 from django.core.serializers import base, python
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 
-def load_migration_fixture(apps, schema_editor, fixture, app_label):
+def load_migration_fixture(
+    apps: Apps,
+    schema_editor: BaseDatabaseSchemaEditor,
+    fixture: str,
+    app_label: str,
+) -> None:
     """Load a fixture during a migration.
 
     This is a rather un-fun utility to load a fixture during a migration. It
@@ -18,13 +29,15 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
 
     https://stackoverflow.com/a/39743581/64911
 
-    :param apps: Apps at the state of the migration.
-    :param schema_editor: The schema at the time of the migration.
-    :param fixture: A path to the fixture to be loaded.
-    :param app_label: The app label the fixture should be loaded into.
-    :return: None
+    Args:
+        apps: Apps at the state of the migration.
+        schema_editor: The schema at the time of the migration.
+        fixture: A path to the fixture to be loaded.
+        app_label: The app label the fixture should be loaded into.
     """
-    # Save the old _get_model_from_node() function
+    # Save the old _get_model_from_node() function. django-stubs omit this
+    # private method.
+    # pyrefly: ignore[missing-attribute]
     old_get_model = python.Deserializer._get_model_from_node
 
     # Define new _get_model_from_node() function here, which utilizes the apps
@@ -51,7 +64,14 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
         python.Deserializer._get_model_from_node = staticmethod(old_get_model)
 
 
-def make_new_user(apps, schema_editor, username, email, permission_codenames):
+def make_new_user(
+    apps: Apps,
+    schema_editor: BaseDatabaseSchemaEditor,
+    username: str,
+    email: str,
+    permission_codenames: Iterable[str],
+) -> None:
+    """Create a user with an unusable password, a confirmed profile, and the given permissions."""
     User = apps.get_model(
         "auth",
         "User",
@@ -72,6 +92,10 @@ def make_new_user(apps, schema_editor, username, email, permission_codenames):
     # Give the user permissions
     # https://stackoverflow.com/a/41564061/64911
     for app_config in apps.get_app_configs():
+        # create_permissions() skips apps without a models module, which
+        # includes every app in historical migration state. Any truthy value
+        # gets past that check.
+        # pyrefly: ignore[bad-assignment]
         app_config.models_module = True
         create_permissions(app_config, verbosity=0)
         app_config.models_module = None

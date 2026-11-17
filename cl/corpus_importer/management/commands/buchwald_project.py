@@ -1,6 +1,9 @@
+"""Find and download Judge Buchwald's SDNY cases."""
+
 import os
 from argparse import RawTextHelpFormatter
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -13,7 +16,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import log_into_pacer
 from cl.search.models import Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -24,19 +27,16 @@ BUCKWALD_TAG = "GhkcARCmMnPeDrXqqKTX"
 
 
 def add_all_nysd_to_cl(options):
-    """Alas, there's only one way to get all the cases about a particular
-    judge: Get all the cases in the entire jurisdiction. We do that here using
-    the iquery.pl endpoint.
+    """Alas, there's only one way to get all the cases about a particular judge: Get all the cases in the entire jurisdiction. We do that here using the iquery.pl endpoint.
 
     Once added to the DB we'll ensure they're tagged. In the next step, we'll
     download all the tagged items.
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
 
     # IDs obtained by binary search of docket numbers on PACER website.
     earliest_id = 405990
@@ -50,29 +50,25 @@ def add_all_nysd_to_cl(options):
         if pacer_case_id % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
         make_docket_by_iquery.apply_async(
-            args=("nysd", pacer_case_id, "default", [NYSD_TAG]),
+            args=("nysd", str(pacer_case_id), "default", [NYSD_TAG]),
             queue=q,
         )
 
 
 def get_dockets(options):
-    """Get the dockets by the particular judge now that we have run iquery
-    for all of the cases in the jurisdiction, and now that we have
-    """
+    """Get the dockets by the particular judge now that we have run iquery for all of the cases in the jurisdiction, and now that we have."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = ProxyPacerSession(
+    session = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
 
     buchwald_id = 450
     ds = (
@@ -92,10 +88,9 @@ def get_dockets(options):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = ProxyPacerSession(
+            session = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
 
         throttle.maybe_wait()
         logger.info("%s: Doing docket with pk: %s", i, d.pk)
@@ -103,21 +98,19 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                session_data=SessionData(
-                    session.cookies, session.proxy_address
-                ),
+                session_data=session,
                 docket_pk=d.pk,
                 tag_names=[BUCKWALD_TAG],
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=False,
             ).set(queue=q),
         ).apply_async()
 
 
 class Command(VerboseCommand):
+    """Run the Buchwald project's iquery or docket download task."""
+
     help = """Get all relevant cases by a Judge Buchwald in SDNY
 
 1. Start with the earliest case in 2013 (13-cv-00001, pacer_case_id 405990)
@@ -139,11 +132,13 @@ Limitations:
 """
 
     def create_parser(self, *args, **kwargs):
+        """Create a parser that keeps the help text's formatting."""
         parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -171,6 +166,7 @@ Limitations:
         )
 
     def handle(self, *args, **options):
+        """Run the ``iquery`` or ``dockets`` task, printing a message for unknown tasks."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "iquery":
             # Run iquery for all of the cases in the district during the time

@@ -1,3 +1,5 @@
+"""Django admin configuration for users, their profiles, emails, and history events."""
+
 from typing import cast
 
 from django.apps import apps
@@ -56,15 +58,22 @@ def _is_complete_email(value: str) -> bool:
 
 
 class TokenInline(admin.StackedInline):
+    """Inline for a user's API token."""
+
     model = Token
 
 
 class UserProfileInline(admin.StackedInline):
+    """Inline for a user's profile."""
+
     model = UserProfile
 
 
 class CustomUserChangeForm(UserChangeForm):
+    """User change form that loads permissions with their content types."""
+
     def __init__(self, *args, **kwargs):
+        """Build the form, selecting permissions' content types in one query."""
         super().__init__(*args, **kwargs)
         # Ensure user_permissions field uses an optimized queryset
         if "user_permissions" in self.fields:
@@ -79,6 +88,8 @@ admin.site.unregister(User)
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
+    """Admin for users, with their profile, membership, API, and alert data inline."""
+
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
     change_form_template = "admin/change_form_with_custom_links.html"
     readonly_fields = ("api_calls_count",)
@@ -128,10 +139,13 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 
         Domain or partial terms keep the default icontains search.
 
-        :param request: The current HTTP request.
-        :param queryset: The changelist queryset to filter.
-        :param search_term: The raw string typed into the search box.
-        :return: Two-tuple of the filtered queryset and whether the caller
+        Args:
+            request: The current HTTP request.
+            queryset: The changelist queryset to filter.
+            search_term: The raw string typed into the search box.
+
+        Returns:
+            Two-tuple of the filtered queryset and whether the caller
             needs to de-duplicate the results.
         """
         term = search_term.strip()
@@ -143,8 +157,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         description="Refresh API throttles from active Neon membership"
     )
     def refresh_api_throttles(self, request, queryset):
-        """Resync MEMBERSHIP-source API throttles for the selected users
-        from each user's current active Neon membership.
+        """Resync MEMBERSHIP-source API throttles for the selected users from each user's current active Neon membership.
 
         MANUAL-source throttles are never touched (the helper only
         manages MEMBERSHIP rows).
@@ -188,6 +201,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
             )
 
     def api_calls_count(self, obj):
+        """Display the user's total API usage, or 0 for an unsaved user."""
         if obj.id is None:
             # New user, no API usage, bail.
             return 0
@@ -240,8 +254,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         Links are only returned for records we have a Neon ID for, so users
         without a Neon account or membership get no link.
 
-        :param user_id: The pk of the user whose admin page is being rendered.
-        :return: Zero, one, or two links to the Neon admin site.
+        Args:
+            user_id: The pk of the user whose admin page is being rendered.
+
+        Returns:
+            Zero, one, or two links to the Neon admin site.
         """
         base_url = settings.NEON_ADMIN_URL.rstrip("/")
         links: list[AdminLink] = []
@@ -275,15 +292,19 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 
     @admin.display(description="Email Confirmed?")
     def get_email_confirmed(self, obj):
+        """Display whether the user's email is confirmed."""
         return obj.profile.email_confirmed
 
     @admin.display(description="Stub Account?")
     def get_stub_account(self, obj):
+        """Display whether the user is a stub account."""
         return obj.profile.stub_account
 
 
 @admin.register(EmailFlag)
 class EmailFlagAdmin(admin.ModelAdmin):
+    """Admin for flags on email addresses."""
+
     search_fields = ("email_address",)
     list_filter = ("flag_type", "notification_subtype")
     list_display = (
@@ -301,6 +322,8 @@ class EmailFlagAdmin(admin.ModelAdmin):
 
 @admin.register(EmailSent)
 class EmailSentAdmin(admin.ModelAdmin):
+    """Admin for stored sent emails."""
+
     search_fields = ("to",)
     list_display = (
         "to",
@@ -317,6 +340,8 @@ class EmailSentAdmin(admin.ModelAdmin):
 
 @admin.register(FailedEmail)
 class FailedEmailAdmin(admin.ModelAdmin):
+    """Admin for emails that failed to send."""
+
     search_fields = ("recipient",)
     list_display = (
         "recipient",
@@ -332,6 +357,8 @@ class FailedEmailAdmin(admin.ModelAdmin):
 
 
 class BaseUserEventAdmin(admin.ModelAdmin):
+    """Admin for history events with every field read-only, newest first."""
+
     ordering = ("-pgh_created_at",)
     # Define common attributes to be extended:
     common_list_display = ("get_pgh_created", "get_pgh_label")
@@ -344,24 +371,29 @@ class BaseUserEventAdmin(admin.ModelAdmin):
 
     @admin.display(ordering="pgh_created_at", description="Event triggered")
     def get_pgh_created(self, obj):
+        """Display when the event was triggered."""
         return obj.pgh_created_at
 
     @admin.display(ordering="pgh_label", description="Event label")
     def get_pgh_label(self, obj):
+        """Display the event's label."""
         return obj.pgh_label
 
     def get_readonly_fields(self, request, obj=None):
+        """Make every field read-only."""
         return [field.name for field in self.model._meta.get_fields()]
 
 
 @admin.register(UserProxyEvent)
 class UserProxyEventAdmin(BaseUserEventAdmin):
+    """Admin for user history events, searchable by email and username."""
+
     search_help_text = "Search UserProxyEvents by pgh_obj, email, or username."
     search_fields = BaseUserEventAdmin.common_search_fields + (
         "email",
         "username",
     )
-    list_display = BaseUserEventAdmin.list_display + (
+    list_display = BaseUserEventAdmin.common_list_display + (
         "email",
         "username",
     )
@@ -369,6 +401,8 @@ class UserProxyEventAdmin(BaseUserEventAdmin):
 
 @admin.register(UserProfileEvent)
 class UserProfileEventAdmin(BaseUserEventAdmin):
+    """Admin for user profile history events, searchable by username."""
+
     search_help_text = "Search UserProxyEvents by pgh_obj or username."
     search_fields = BaseUserEventAdmin.common_search_fields + (
         "user__username",

@@ -1,9 +1,15 @@
+"""Choices for where a docket's data came from."""
+
+
 class DocketSources:
+    """The sources of a docket's data, alone or combined."""
+
     _RECAP_SOURCES_CACHE = None
     _NON_RECAP_SOURCES_CACHE = None
     _NON_SCRAPER_SOURCES_CACHE = None
     _NON_COLUMBIA_SOURCES_CACHE = None
     _NON_HARVARD_SOURCES_CACHE = None
+    _NON_SCANNING_PROJECT_SOURCES_CACHE = None
     _NON_IDB_SOURCES_CACHE = None
     _NON_ANON_2020_SOURCES_CACHE = None
 
@@ -1181,17 +1187,16 @@ class DocketSources:
     def generate_source_group(
         cls, base_source: str, exclude: bool = False
     ) -> list[int]:
-        """Generate a group of source IDs based on the inclusion or exclusion
-        of a base source, selecting those that either include or exclude the
-        specified base source in their names, as determined by the "exclude"
-        parameter.
+        """Generate a group of source IDs based on the inclusion or exclusion of a base source, selecting those that either include or exclude the specified base source in their names, as determined by the "exclude" parameter.
 
-        :param base_source: The base source name to include or exclude.
-        :param exclude: A flag indicating whether to exclude "True" or include
-         "False "the base source.
-        :return: A list of source IDs that match the filtering criteria.
+        Args:
+            base_source: The base source name to include or exclude.
+            exclude: A flag indicating whether to exclude "True" or include
+                "False "the base source.
+
+        Returns:
+            A list of source IDs that match the filtering criteria.
         """
-
         dict_sources = {
             key: value
             for key, value in DocketSources.__dict__.items()
@@ -1213,6 +1218,7 @@ class DocketSources:
 
     @classmethod
     def RECAP_SOURCES(cls) -> list[int]:
+        """Sources that include RECAP."""
         if cls._RECAP_SOURCES_CACHE is None:
             cls._RECAP_SOURCES_CACHE = cls.generate_source_group(
                 "RECAP", exclude=False
@@ -1221,6 +1227,7 @@ class DocketSources:
 
     @classmethod
     def NON_RECAP_SOURCES(cls) -> list[int]:
+        """Sources that don't include RECAP."""
         if cls._NON_RECAP_SOURCES_CACHE is None:
             cls._NON_RECAP_SOURCES_CACHE = cls.generate_source_group(
                 "RECAP", exclude=True
@@ -1229,6 +1236,7 @@ class DocketSources:
 
     @classmethod
     def NON_SCRAPER_SOURCES(cls) -> list[int]:
+        """Sources that don't include the scraper."""
         if cls._NON_SCRAPER_SOURCES_CACHE is None:
             cls._NON_SCRAPER_SOURCES_CACHE = cls.generate_source_group(
                 "SCRAPER", exclude=True
@@ -1237,6 +1245,7 @@ class DocketSources:
 
     @classmethod
     def NON_COLUMBIA_SOURCES(cls) -> list[int]:
+        """Sources that don't include Columbia."""
         if cls._NON_COLUMBIA_SOURCES_CACHE is None:
             cls._NON_COLUMBIA_SOURCES_CACHE = cls.generate_source_group(
                 "COLUMBIA", exclude=True
@@ -1245,6 +1254,7 @@ class DocketSources:
 
     @classmethod
     def NON_HARVARD_SOURCES(cls) -> list[int]:
+        """Sources that don't include Harvard."""
         if cls._NON_HARVARD_SOURCES_CACHE is None:
             cls._NON_HARVARD_SOURCES_CACHE = cls.generate_source_group(
                 "HARVARD", exclude=True
@@ -1252,7 +1262,17 @@ class DocketSources:
         return cls._NON_HARVARD_SOURCES_CACHE
 
     @classmethod
+    def NON_SCANNING_PROJECT_SOURCES(cls) -> list[int]:
+        """Sources that don't include the scanning project."""
+        if cls._NON_SCANNING_PROJECT_SOURCES_CACHE is None:
+            cls._NON_SCANNING_PROJECT_SOURCES_CACHE = (
+                cls.generate_source_group("SCANNING_PROJECT", exclude=True)
+            )
+        return cls._NON_SCANNING_PROJECT_SOURCES_CACHE
+
+    @classmethod
     def NON_IDB_SOURCES(cls) -> list[int]:
+        """Sources that don't include the IDB."""
         if cls._NON_IDB_SOURCES_CACHE is None:
             cls._NON_IDB_SOURCES_CACHE = cls.generate_source_group(
                 "IDB", exclude=True
@@ -1261,6 +1281,7 @@ class DocketSources:
 
     @classmethod
     def NON_ANON_2020_SOURCES(cls) -> list[int]:
+        """Sources that don't include the 2020 anonymous import."""
         if cls._NON_ANON_2020_SOURCES_CACHE is None:
             cls._NON_ANON_2020_SOURCES_CACHE = cls.generate_source_group(
                 "ANON_2020", exclude=True
@@ -1269,13 +1290,16 @@ class DocketSources:
 
     @classmethod
     def merge_sources(cls, source1: int, source2: int) -> int:
-        """If one source is included in the other; take the max. If not, sum
+        """If one source is included in the other; take the max. If not, sum.
 
         Use this to merge sources when merging dockets
 
-        :param source1: a DocketSource
-        :param source2: other DocketSource
-        :return: a Docket source which merges the input docket sources
+        Args:
+            source1: a DocketSource
+            source2: other DocketSource
+
+        Returns:
+            a Docket source which merges the input docket sources
         """
         if source1 == source2:
             return source1

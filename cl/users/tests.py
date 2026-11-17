@@ -6,6 +6,7 @@ from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -14,7 +15,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache as django_cache
@@ -24,6 +25,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
@@ -34,11 +36,12 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from lxml.html import fromstring
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -53,6 +56,7 @@ from cl.api.factories import (
 )
 from cl.api.models import (
     APIThrottle,
+    APIThrottleEvent,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -68,18 +72,25 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import NoteFactory, UserTagFactory
+from cl.favorites.factories import (
+    NoteFactory,
+    PrayerFactory,
+    UserTagFactory,
+)
 from cl.favorites.models import (
     DocketTag,
     DocketTagEvent,
     Note,
     NoteEvent,
+    Prayer,
+    PrayerEvent,
     UserTag,
     UserTagEvent,
 )
 from cl.lib.AuthenticationBackend import MAX_EMAIL_CANDIDATES
 from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.ratelimiter import (
     FAILED_LOGIN_LIMIT,
     FAILED_LOGIN_WINDOW,
@@ -87,10 +98,7 @@ from cl.lib.ratelimiter import (
     make_failed_login_key,
 )
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    SimpleUserDataMixin,
-    UserProfileWithParentsFactory,
-)
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -99,6 +107,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
+from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -138,6 +147,7 @@ from cl.users.models import (
     EmailFlag,
     EmailSent,
     FailedEmail,
+    UserGroupsEvent,
     UserProfile,
     UserProfileBarMembershipEvent,
     UserProfileEvent,
@@ -147,6 +157,22 @@ from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
+
+TEST_ASSETS_DIR = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+
+
+def load_test_asset(file_name: str) -> Any:
+    """Load a JSON file from this app's test assets.
+
+    Args:
+        file_name: The name of the file in the test assets directory.
+
+    Returns:
+        The parsed JSON object.
+    """
+    return json.loads(
+        (TEST_ASSETS_DIR / file_name).read_text(encoding="utf-8")
+    )
 
 
 class UserTest(LiveServerTestCase):
@@ -327,7 +353,7 @@ class UserTest(LiveServerTestCase):
 
 class UserDataTest(LiveServerTestCase):
     async def test_signing_in(self) -> None:
-        """Can we create a user on the backend then sign them in"""
+        """Can we create a user on the backend then sign them in."""
         params = {"username": "pandora", "password": "password"}
         await sync_to_async(UserProfileWithParentsFactory.create)(
             user__username=params["username"],
@@ -383,15 +409,13 @@ class UserDataTest(LiveServerTestCase):
                     )
 
     async def test_confirming_an_email_address(self) -> None:
-        """Tests whether we can confirm the case where an email is associated
-        with a single account.
-        """
+        """Tests whether we can confirm the case where an email is associated with a single account."""
         # Update the expiration since the fixture has one some time ago.
         up = await sync_to_async(UserProfileWithParentsFactory.create)(
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -411,10 +435,57 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_unknown_or_used_key_explains_what_happened(self) -> None:
+        """Does an unknown or already-used key get a helpful message?
+
+        Once a key is spent it is blanked, so a used key looks the same as one
+        that never existed. The page should say so rather than just "invalid".
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        url = reverse("email_confirm", args=[up.activation_key])
+        await self.async_client.post(url)  # Spends the key.
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = await getattr(self.async_client, method)(url)
+                self.assertEqual(r.status_code, 200)
+                content = r.content.decode()
+                self.assertIn("Confirmation Link Not Found", content)
+                self.assertIn("may have already been used", content)
+
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
-        """Test the trickier case when an email is associated with many accounts"""
+        """Test the trickier case when an email is associated with many accounts."""
         # Update the accounts to have keys that are not expired.
         ups = await sync_to_async(UserProfileWithParentsFactory.create_batch)(
             3,
@@ -422,7 +493,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -444,10 +515,7 @@ class UserDataTest(LiveServerTestCase):
             self.assertEqual(up.activation_key, "")
 
     def test_get_welcome_email_recipients(self) -> None:
-        """This test verifies that we can get the welcome email recipients
-        properly, users that signed up in the last 24 hours.
-        """
-
+        """This test verifies that we can get the welcome email recipients properly, users that signed up in the last 24 hours."""
         # Create a new user.
         UserProfileWithParentsFactory.create(email_confirmed=False)
         time_now = datetime.now()
@@ -466,6 +534,64 @@ class UserDataTest(LiveServerTestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
 @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
+    @override_flag("use_new_design", True)
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_api_page_renders_profile_shell(self) -> None:
+        """Does the WIP API page render the shell with Developer Tools active?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+        response = self.client.get(reverse("view_api"))
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        html = fromstring(response.content.decode())
+        profile_nav = html.xpath("//nav[@aria-label='Profile navigation']")
+        self.assertEqual(len(profile_nav), 1)
+
+        nav = profile_nav[0]
+        nav_labels = [
+            link.text_content().strip() for link in nav.xpath(".//a")
+        ]
+        self.assertEqual(
+            nav_labels,
+            [
+                "Alerts",
+                "Notes",
+                "Tags",
+                "Developer Tools",
+                "Prayers",
+                "Your Support",
+                "Account",
+            ],
+        )
+        self.assertEqual(len(nav.xpath(".//li[@aria-hidden='true']")), 1)
+
+        active_links = nav.xpath(".//a[@aria-current='page']")
+        self.assertEqual(len(active_links), 1)
+        self.assertEqual(
+            active_links[0].text_content().strip(), "Developer Tools"
+        )
+
+        heading = html.xpath("//h1")
+        self.assertEqual(len(heading), 1)
+        self.assertEqual(heading[0].text_content().strip(), "Developer Tools")
+
+        sign_out_form = nav.xpath(
+            ".//form[@method='post' and @action=$url]",
+            url=reverse("sign-out"),
+        )
+        self.assertEqual(len(sign_out_form), 1)
+        self.assertEqual(
+            sign_out_form[0].xpath("normalize-space(.//button)"), "Sign out"
+        )
+        # The shell renders with `only`, so the token must be passed in
+        csrf_token = sign_out_form[0].xpath(
+            "string(.//input[@name='csrfmiddlewaretoken']/@value)"
+        )
+        self.assertTrue(csrf_token)
+
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
@@ -648,10 +774,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_nuke_user_history_objects_assets_deleting_account(
         self,
     ) -> None:
-        """Are user related history objects properly removed when deleting the
-        user account?
-        """
-
+        """Are user related history objects properly removed when deleting the user account?"""
         user_1 = await sync_to_async(UserProfileWithParentsFactory)()
         user_2 = await sync_to_async(UserProfileWithParentsFactory)()
         docket = await sync_to_async(DocketFactory)()
@@ -700,11 +823,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(await docket_alert_events.acount(), 1)
 
     async def test_nuke_user_tag_and_docket_tag_history_objects(self) -> None:
-        """Are user_tag and docket_tag history objects properly removed when
-        deleting the user account?  This is different from the previous test
-        since docket_tag is no directly related to the user.
-        """
-
+        """Are user_tag and docket_tag history objects properly removed when deleting the user account?  This is different from the previous test since docket_tag is no directly related to the user."""
         docket_1 = await sync_to_async(DocketFactory)()
         docket_2 = await sync_to_async(DocketFactory)()
         user_1 = await sync_to_async(UserProfileWithParentsFactory)()
@@ -762,22 +881,21 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
 
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:
-        """Deleting an account hard-deletes the user's logged data and the
-        PII left behind in the pghistory event tables, keeps (but disables)
-        donation records, and leaves a second user's data untouched.
-        """
+        """Deleting an account hard-deletes the user's logged data, API credentials and the PII left behind in the pghistory event tables, keeps (but disables) donation records, and leaves a second user's data untouched."""
         victim = UserProfileWithParentsFactory()
         bystander = UserProfileWithParentsFactory()
 
         # Edit tracked fields to generate UserProfile/UserProxy history, and
-        # associate a bar membership to generate barmembership history.
+        # associate a bar membership and a group to generate m2m history.
         bar = BarMembership.objects.create(barMembership="CA")
+        group = Group.objects.create(name="some-group")
         for profile in (victim, bystander):
             profile.user.first_name = "Real Name"
             profile.user.save()
             profile.employer = "Real Employer"
             profile.save()
             profile.barmembership.add(bar)
+            profile.user.groups.add(group)
 
             # Usage logs and assets tied to each user.
             SearchQuery.objects.create(
@@ -799,14 +917,26 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 stripe_customer_id="cus_test",
             )
 
-            legacy_note = NoteFactory(user=profile.user)
-            legacy_note.notes = "edited"
-            legacy_note.save()
-            gfk_note = NoteFactory.for_object(
-                RECAPDocumentFactory(), user=profile.user
+            for note in (
+                NoteFactory(user=profile.user),
+                NoteFactory(
+                    content_object=RECAPDocumentFactory(), user=profile.user
+                ),
+            ):
+                note.notes = "edited"
+                note.save()
+
+            # Prayers, throttle overrides and stats events, edited so that
+            # each one also leaves pghistory rows behind.
+            prayer = PrayerFactory(user=profile.user, status=Prayer.WAITING)
+            prayer.status = Prayer.GRANTED
+            prayer.save()
+            throttle = APIThrottleFactory(user=profile.user, rate="10/min")
+            throttle.rate = "20/min"
+            throttle.save()
+            StatsEvent.objects.create(
+                user=profile.user, description="Did something"
             )
-            gfk_note.notes = "edited"
-            gfk_note.save()
 
         # Sanity check: the victim's history and assets exist before deletion.
         self.assertTrue(
@@ -824,6 +954,16 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(
             NoteEvent.objects.filter(user_id=victim.user.pk).exists()
         )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=victim.user).exists())
 
         # Delete the victim's account.
         self.assertTrue(
@@ -842,6 +982,12 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
         self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
         self.assertFalse(Note.objects.filter(user=victim.user).exists())
+        self.assertFalse(Prayer.objects.filter(user=victim.user).exists())
+        self.assertFalse(StatsEvent.objects.filter(user=victim.user).exists())
+
+        # API credentials and per-user rate limit overrides are revoked.
+        self.assertFalse(Token.objects.filter(user=victim.user).exists())
+        self.assertFalse(APIThrottle.objects.filter(user=victim.user).exists())
 
         # The PII left behind in the event tables is purged.
         self.assertFalse(
@@ -857,6 +1003,15 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         )
         self.assertFalse(
             NoteEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            PrayerEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            APIThrottleEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserGroupsEvent.objects.filter(user_id=victim.user.pk).exists()
         )
 
         # Donations are financial records: kept, but disabled.
@@ -878,6 +1033,23 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 pgh_obj_id=bystander.user.pk
             ).exists()
         )
+        self.assertTrue(Prayer.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            StatsEvent.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(Token.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            APIThrottle.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(
+            PrayerEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            APIThrottleEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserGroupsEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
         self.assertTrue(
             UserProfileBarMembershipEvent.objects.filter(
                 userprofile_id=bystander.pk
@@ -898,7 +1070,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
 
     async def test_redirect_to_search_alerts_if_no_alerts(self):
-        """Tests redirection to search alerts when a user has no alerts"""
+        """Tests redirection to search alerts when a user has no alerts."""
         # Create a user profile with no associated alerts
         user_with_no_alert = await sync_to_async(
             UserProfileWithParentsFactory
@@ -1055,11 +1227,57 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                     else:
                         self.assertEqual(vals["direction"], "up")
 
+    def test_recap_search_url_uses_document_id_not_docket_entry_id(
+        self,
+    ) -> None:
+        """Does the "Search Notes" link for RECAP documents key off the document's own id, not its parent DocketEntry's? RECAPDocument and DocketEntry have independent pk sequences, so using the wrong field would silently pull results from the wrong docket whenever the two happen to collide."""
+        profile = UserProfileWithParentsFactory()
+        rd = RECAPDocumentFactory()
+        NoteFactory(content_object=rd, user=profile.user)
+
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+        r = self.client.get(reverse("profile_notes"))
+        self.assertEqual(
+            r.context["recap_search_url"],
+            f"/?type=r&q=xxx AND id:({rd.pk})",
+        )
+
+    def test_recap_search_url_matches_scotus_documents_by_uid(self) -> None:
+        """SCOTUS documents have no ES id, so the "Search Notes" link for documents matches them by uid, alongside RECAP documents by id."""
+        court = CourtFactory(id="scotus", jurisdiction="F")
+        sd = SCOTUSDocumentFactory(docket_entry__docket__court=court)
+        sd_2 = SCOTUSDocumentFactory(docket_entry__docket__court=court)
+        rd = RECAPDocumentFactory()
+        cases = [
+            ([sd], f"/?type=r&q=xxx AND uid:(scotus_{sd.pk})"),
+            (
+                [rd, sd, sd_2],
+                f"/?type=r&q=xxx AND (id:({rd.pk}) OR "
+                f"uid:(scotus_{sd.pk} OR scotus_{sd_2.pk}))",
+            ),
+        ]
+        for noted, expected in cases:
+            with self.subTest(noted=[type(d).__name__ for d in noted]):
+                profile = UserProfileWithParentsFactory()
+                for document in noted:
+                    NoteFactory(content_object=document, user=profile.user)
+                self.assertTrue(
+                    self.client.login(
+                        username=profile.user.username, password="password"
+                    )
+                )
+
+                r = self.client.get(reverse("profile_notes"))
+
+                self.assertEqual(r.context["recap_search_url"], expected)
+
 
 class NotesPageDeadLinkTest(TestCase):
-    """A noted object with no page of its own yet must not render as a
-    dead link on the profile Notes page.
-    """
+    """A noted object with no page of its own yet must not render as a dead link on the profile Notes page."""
 
     def test_note_with_no_absolute_url_renders_without_a_dead_link(
         self,
@@ -1072,8 +1290,8 @@ class NotesPageDeadLinkTest(TestCase):
             docket_entry=entry, attachment_number=None
         )
         self.assertEqual(document.get_absolute_url(), "")
-        note = NoteFactory.for_object(
-            document, user=user.user, name="edge case note"
+        note = NoteFactory(
+            content_object=document, user=user.user, name="edge case note"
         )
 
         self.assertTrue(
@@ -1087,8 +1305,7 @@ class NotesPageDeadLinkTest(TestCase):
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
-    """
-    Tests for issue #724 to block people with bad disposable email addresses.
+    """Tests for issue #724 to block people with bad disposable email addresses.
 
     https://github.com/freelawproject/courtlistener/issues/724
     """
@@ -1201,40 +1418,25 @@ class LiveUserTest(BaseSeleniumTest):
 class SNSWebhookTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
-            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
-        ):
-            cls.soft_bounce_asset = json.load(general_soft_bounce)
-            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
-            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.suppressed_asset = json.load(suppressed_bounce)
-            cls.no_failed_bounce_asset = json.load(no_bounce)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.soft_bounce_cnt_rejected_asset = load_test_asset(
+            "cnt_rejected_bounce.json"
+        )
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.suppressed_asset = load_test_asset("suppressed_bounce.json")
+        cls.no_failed_bounce_asset = load_test_asset("no_bounce.json")
 
     def send_signal(self, test_asset, event_name, signal) -> None:
-        """Function to dispatch signal that mocks a SNS notification event
-        :param test_asset: the json object that contains notification
-        :param event_name: the signal event name
-        :param signal: the signal corresponding to the event
-        :return: None
+        """Function to dispatch signal that mocks a SNS notification event.
+
+        Args:
+            test_asset: the json object that contains notification
+            event_name: the signal event name
+            signal: the signal corresponding to the event
         """
         # Prepare parameters
         message = json.loads(test_asset["Message"])
@@ -1252,9 +1454,7 @@ class SNSWebhookTest(TestCase):
 
     @mock.patch("cl.users.signals.handle_hard_bounce")
     def test_hard_bounce_signal(self, mock_hard_bounce) -> None:
-        """This test checks if handle_hard_bounce function is called
-        when a hard bounce event is received
-        """
+        """This test checks if handle_hard_bounce function is called when a hard bounce event is received."""
         # Trigger a hard bounce event
         self.send_signal(
             self.hard_bounce_asset, "bounce", signals.bounce_received
@@ -1264,9 +1464,7 @@ class SNSWebhookTest(TestCase):
 
     @mock.patch("cl.users.signals.handle_soft_bounce")
     def test_soft_bounce_signal_failed(self, mock_soft_bounce) -> None:
-        """This test checks if handle_soft_bounce function is called
-        when a failed soft bounce event is received
-        """
+        """This test checks if handle_soft_bounce function is called when a failed soft bounce event is received."""
         # Trigger a soft bounce event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1276,9 +1474,7 @@ class SNSWebhookTest(TestCase):
 
     @mock.patch("cl.users.signals.handle_soft_bounce")
     def test_soft_bounce_signal_not_failed(self, mock_soft_bounce) -> None:
-        """This test checks if handle_soft_bounce function is not called
-        when a not failed soft bounce event is received
-        """
+        """This test checks if handle_soft_bounce function is not called when a not failed soft bounce event is received."""
         # Trigger a soft bounce event for a no failed action
         self.send_signal(
             self.no_failed_bounce_asset, "bounce", signals.bounce_received
@@ -1288,9 +1484,7 @@ class SNSWebhookTest(TestCase):
 
     @mock.patch("cl.users.signals.handle_complaint")
     def test_complaint_signal(self, mock_complaint) -> None:
-        """This test checks if handle_complaint function is called
-        when a complaint event is received
-        """
+        """This test checks if handle_complaint function is called when a complaint event is received."""
         # Trigger a complaint event
         self.send_signal(
             self.complaint_asset, "complaint", signals.complaint_received
@@ -1314,11 +1508,9 @@ class SNSWebhookTest(TestCase):
 
         mock_logger.exception.assert_called_once()
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
-        """This test checks if a warning is logged when a
-        unexpected bounceSubType event is received
-        """
+        """This test checks if a warning is logged when a unexpected bounceSubType event is received."""
         # Trigger a content_rejected event
         self.send_signal(
             self.soft_bounce_cnt_rejected_asset,
@@ -1334,10 +1526,7 @@ class SNSWebhookTest(TestCase):
         )
 
     def test_handle_soft_bounce_create_back_off(self) -> None:
-        """This test checks if a back_off event is created for
-        an email address if it doesn't exist previously when a
-        backoff type soft bounce is received
-        """
+        """This test checks if a back_off event is created for an email address if it doesn't exist previously when a backoff type soft bounce is received."""
         email_backoff_exists = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
@@ -1357,10 +1546,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_backoff_exists, True)
 
     def test_handle_soft_bounce_waiting_back_off(self) -> None:
-        """This test checks if a back_off event exists for
-        an email address and is under waiting period,
-        backoff event is not updated
-        """
+        """This test checks if a back_off event exists for an email address and is under waiting period, backoff event is not updated."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1396,10 +1582,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(next_retry_date_before, next_retry_date_after)
 
     def test_handle_soft_bounce_not_waiting_back_off(self) -> None:
-        """This test checks if a back_off event exists for
-        an email address and is not under waiting period and,
-        max_retry has not been reached, backoff event is updated
-        """
+        """This test checks if a back_off event exists for an email address and is not under waiting period and, max_retry has not been reached, backoff event is updated."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1434,10 +1617,7 @@ class SNSWebhookTest(TestCase):
         self.assertNotEqual(next_retry_date_before, next_retry_date_after)
 
     def test_handle_soft_bounce_max_retry_reached(self) -> None:
-        """This test checks if a back_off event exists for
-        an email address and if is not under waiting period and if
-        max_retry has been reached, email address is banned
-        """
+        """This test checks if a back_off event exists for an email address and if is not under waiting period and if max_retry has been reached, email address is banned."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1488,9 +1668,7 @@ class SNSWebhookTest(TestCase):
         )
 
     def test_handle_soft_bounce_compute_waiting_period(self) -> None:
-        """This test checks if the exponential waiting period
-        is computed properly
-        """
+        """This test checks if the exponential waiting period is computed properly."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1533,12 +1711,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
     def test_restart_backoff_event_after_threshold_bounce(self) -> None:
-        """This test checks if we properly delete or update a backoff event
-        when a new bounce notification comes in. If the bounce event comes in
-        before BACKOFF_THRESHOLD hours since the last retry, the backoff event
-        is updated. Otherwise, the backoff event is restarted.
-        """
-
+        """This test checks if we properly delete or update a backoff event when a new bounce notification comes in. If the bounce event comes in before BACKOFF_THRESHOLD hours since the last retry, the backoff event is updated. Otherwise, the backoff event is restarted."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1583,13 +1756,9 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
-        """This test checks if a warning is logged and email address is banned
-        when an unexpected hard bounceSubType event is received.
-        Also checks that if an email address is previously banned avoid
-        creating a new ban object for that email address
-        """
+        """This test checks if a warning is logged and email address is banned when an unexpected hard bounceSubType event is received. Also checks that if an email address is previously banned avoid creating a new ban object for that email address."""
         # Trigger a suppressed_asset event
         self.send_signal(
             self.suppressed_asset,
@@ -1626,11 +1795,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_ban_count, 1)
 
     def test_handle_hard_bounce(self) -> None:
-        """This test checks if an email address is banned
-        when a hard bounce event is received.
-        Also checks that if an email address is previously banned avoid to
-        create a new ban register for that email address
-        """
+        """This test checks if an email address is banned when a hard bounce event is received. Also checks that if an email address is previously banned avoid to create a new ban register for that email address."""
         # Trigger a hard_bounce event
         self.send_signal(
             self.hard_bounce_asset,
@@ -1668,12 +1833,7 @@ class SNSWebhookTest(TestCase):
         )
 
     def test_handle_complaint(self) -> None:
-        """This test checks if an email address is banned
-        when a complaint event is received.
-        Also checks that if an email address is previously banned avoid to
-        create a new ban register for that email address
-        """
-
+        """This test checks if an email address is banned when a complaint event is received. Also checks that if an email address is previously banned avoid to create a new ban register for that email address."""
         # Trigger a complaint event
         self.send_signal(
             self.complaint_asset, "complaint", signals.complaint_received
@@ -1710,9 +1870,7 @@ class SNSWebhookTest(TestCase):
         "cl.users.management.commands.cl_retry_failed_email.schedule_failed_email"
     )
     def test_check_recipient_deliverability(self, mock_schedule) -> None:
-        """This test checks if schedule_failed_email function is called
-        if recipient's deliverability is proven.
-        """
+        """This test checks if schedule_failed_email function is called if recipient's deliverability is proven."""
         # Trigger soft bounce event to create backoff event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1764,10 +1922,7 @@ class SNSWebhookTest(TestCase):
         "cl.users.management.commands.cl_retry_failed_email.schedule_failed_email"
     )
     def test_check_recipient_deliverability_fails(self, mock_schedule) -> None:
-        """This test checks if the backoff event it's not deleted and
-        schedule_failed_email function is not called if recipient's
-        deliverability is not proven.
-        """
+        """This test checks if the backoff event it's not deleted and schedule_failed_email function is not called if recipient's deliverability is not proven."""
         # Trigger soft bounce event to create backoff event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -1808,10 +1963,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_backoff_event[0].checked, None)
 
     def test_update_ban_object(self) -> None:
-        """This test checks if an email ban object is updated when receiving
-        a new ban notification, e.g: complaint -> hard bounce
-        """
-
+        """This test checks if an email ban object is updated when receiving a new ban notification, e.g: complaint -> hard bounce."""
         # Trigger a complaint event
         self.send_signal(
             self.complaint_asset, "complaint", signals.complaint_received
@@ -1856,38 +2008,25 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
-            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
-            cls.complaint_asset = json.load(complaint)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_asset_2 = load_test_asset("general_soft_bounce_2.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.complaint_asset = load_test_asset("complaint.json")
 
-        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
-        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.attachment_150 = TEST_ASSETS_DIR / "file_sample_150kB.pdf"
+        cls.attachment_500 = TEST_ASSETS_DIR / "file_example_500kB.pdf"
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
-        """Function to dispatch signal that mocks a SNS notification event
-        :param test_asset: the json object that contains notification
-        :param event_name: the signal event name
-        :param signal: the signal corresponding to the event
-        :return: None
+        """Function to dispatch signal that mocks a SNS notification event.
+
+        Args:
+            test_asset: the json object that contains notification
+            event_name: the signal event name
+            signal: the signal corresponding to the event
         """
         # Prepare parameters
         message = json.loads(test_asset["Message"])
@@ -1904,9 +2043,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal.send(**signal_kwargs)
 
     def test_send_mail_function(self) -> None:
-        """This test checks if Django send_mail() works properly using the
-        custom email backend, the email should be stored automatically.
-        """
+        """This test checks if Django send_mail() works properly using the custom email backend, the email should be stored automatically."""
         send_mail(
             subject="This is the subject",
             message="Body goes here",
@@ -1982,10 +2119,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         mock_client.send_raw_email.assert_called_once()
 
     def test_email_message_class(self) -> None:
-        """This test checks if Django EmailMessage class works properly using
-        the custom email backend, the email should be stored automatically.
-        """
-
+        """This test checks if Django EmailMessage class works properly using the custom email backend, the email should be stored automatically."""
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -2035,11 +2169,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(html_body, "")
 
     def test_multialternative_email(self) -> None:
-        """This test checks if Django EmailMultiAlternatives class works
-        properly sending html and plain versions using the custom backend
-        email,the email should be stored automatically.
-        """
-
+        """This test checks if Django EmailMultiAlternatives class works properly sending html and plain versions using the custom backend email,the email should be stored automatically."""
         msg = EmailMultiAlternatives(
             subject="This is the subject",
             body="Body goes here 世界 ñ ⚖️",
@@ -2091,11 +2221,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>\n")
 
     def test_multialternative_only_plain_email(self) -> None:
-        """This test checks if Django EmailMultiAlternatives class works
-        properly sending plain version using the custom backend
-        email,the email should be stored automatically.
-        """
-
+        """This test checks if Django EmailMultiAlternatives class works properly sending plain version using the custom backend email,the email should be stored automatically."""
         msg = EmailMultiAlternatives(
             subject="This is the subject",
             body="Body goes here",
@@ -2131,11 +2257,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(html_body, "")
 
     def test_multialternative_only_html_email(self) -> None:
-        """This test checks if Django EmailMultiAlternatives class works
-        properly sending html version using the custom backend
-        email,the email should be stored automatically.
-        """
-
+        """This test checks if Django EmailMultiAlternatives class works properly sending html version using the custom backend email,the email should be stored automatically."""
         msg = EmailMultiAlternatives(
             subject="This is the subject",
             body="<p>Body goes here</p>",
@@ -2168,10 +2290,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(html_body, "<p>Body goes here</p>\n")
 
     def test_sending_email_with_attachment(self) -> None:
-        """This test checks if Django EmailMessage class works
-        properly sending a message with an attachment using the custom
-        email backend.
-        """
+        """This test checks if Django EmailMessage class works properly sending a message with an attachment using the custom email backend."""
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -2193,10 +2312,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(len(message_sent.attachments), 1)
 
     def test_link_user_to_email(self) -> None:
-        """This test checks if a User is properly linked to a stored Email
-        is created, we search for the user by email address if found it's
-        assigned.
-        """
+        """This test checks if a User is properly linked to a stored Email is created, we search for the user by email address if found it's assigned."""
         # Get user factory
         user_email = self.user
 
@@ -2215,10 +2331,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email[0].user_id, user_email.id)
 
     def test_sending_to_banned_email(self) -> None:
-        """This test checks if an email address is banned and we try to send
-        it an email, the message is discarded and not stored.
-        """
-
+        """This test checks if an email address is banned and we try to send it an email, the message is discarded and not stored."""
         # Trigger a hard_bounce event
         self.send_signal(
             self.hard_bounce_asset,
@@ -2253,10 +2366,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 0)
 
     def test_sending_email_within_back_off(self) -> None:
-        """This test checks if an email address is under a backoff waiting
-        period and we try to send it an email, the message is stored but
-        not sent.
-        """
+        """This test checks if an email address is under a backoff waiting period and we try to send it an email, the message is stored but not sent."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -2285,10 +2395,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_compose_message_from_db(self) -> None:
-        """This test checks if we can compose and send a new message based on
-        a stored message.
-        """
-
+        """This test checks if we can compose and send a new message based on a stored message."""
         msg = EmailMultiAlternatives(
             subject="This is the subject",
             body="Body goes here",
@@ -2356,10 +2463,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
 
     def test_normalize_addresses(self) -> None:
-        """Test if the normalize_addresses function parses and normalizes
-        properly different combinations of list recipients, returns a list of
-        normalized email addresses.
-        """
+        """Test if the normalize_addresses function parses and normalizes properly different combinations of list recipients, returns a list of normalized email addresses."""
         test_cases = (
             (
                 [
@@ -2409,13 +2513,11 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             self.assertEqual(normalized_emails, result)
 
     def test_sending_multiple_recipients_email(self) -> None:
-        """Test if we can send a message to multiple recipients, bcc, cc, and
-        reply_to email addresses.
+        """Test if we can send a message to multiple recipients, bcc, cc, and reply_to email addresses.
 
         We should store recipients, bcc, cc, and reply_to as a list of
         normalized email addresses.
         """
-
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -2493,10 +2595,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         )
 
     def test_sending_multiple_recipients_banned_email(self) -> None:
-        """When sending an email to multiple recipients we verify if each
-        recipient is not banned, we remove the banned email addresses from
-        the list of recipients to avoid sending email to those addresses
-        """
+        """When sending an email to multiple recipients we verify if each recipient is not banned, we remove the banned email addresses from the list of recipients to avoid sending email to those addresses."""
         # Trigger a hard_bounce event
         self.send_signal(
             self.hard_bounce_asset,
@@ -2543,9 +2642,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 1)
 
     def test_sending_multiple_recipients_all_banned(self) -> None:
-        """When sending an email to multiple recipients and all of them are
-        banned, we discard the message, we don't send and store it.
-        """
+        """When sending an email to multiple recipients and all of them are banned, we discard the message, we don't send and store it."""
         # Trigger a hard_bounce event
         self.send_signal(
             self.hard_bounce_asset,
@@ -2574,11 +2671,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 0)
 
     def test_sending_multiple_recipients_within_backoff(self) -> None:
-        """When sending an email to multiple recipients, if we detect an email
-        address that is under a backoff waiting period we should eliminate
-        that address from the recipient list to avoid sending to it
-        and queue for sending later.
-        """
+        """When sending an email to multiple recipients, if we detect an email address that is under a backoff waiting period we should eliminate that address from the recipient list to avoid sending to it and queue for sending later."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -2614,10 +2707,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 1)
 
     def test_sending_multiple_recipients_all_within_backoff(self) -> None:
-        """When sending an email to multiple recipients, if we detect that all
-        email addresses are under a backoff waiting period we don't send the
-        message, we should store the message.
-        """
+        """When sending an email to multiple recipients, if we detect that all email addresses are under a backoff waiting period we don't send the message, we should store the message."""
         # Trigger first backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -2644,10 +2734,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 1)
 
     def call_bcc_random(self, message, bcc_rate, iterations) -> int:
-        """This function simulates n (iterations) calls to the add_bcc_random
-        function and returns a counter_bcc that represents the number of
-        messages that are bcc'ed.
-        """
+        """This function simulates n (iterations) calls to the add_bcc_random function and returns a counter_bcc that represents the number of messages that are bcc'ed."""
         counter_bcc = 0
         for i in range(iterations):
             message = add_bcc_random(message, bcc_rate)
@@ -2658,10 +2745,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         return counter_bcc
 
     def average_bcc_random(self, message, bcc_rate, iterations) -> int:
-        """This function simulates 50 calls to the call_bcc_random
-        function and returns the average number of times that add_bcc_random
-        returned True.
-        """
+        """This function simulates 50 calls to the call_bcc_random function and returns the average number of times that add_bcc_random returned True."""
         total = 0
         for _ in range(50):
             val = self.call_bcc_random(message, bcc_rate, iterations)
@@ -2670,14 +2754,12 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         return int(round(average))
 
     def test_add_bcc_random(self) -> None:
-        """Test the add_bcc_random function to verify if it produces the
-        expected results based on the bcc_rate provided.
+        """Test the add_bcc_random function to verify if it produces the expected results based on the bcc_rate provided.
 
         We use call_bcc_random(bcc_rate, iterations) function with a bcc_rate
         to simulate n calls of the add_bcc_random function, this functions
         returns the total number of times that add_bcc_random returned True
         """
-
         # Test different BCC rates
         # No messages are BCC'ed
         zero_bcc_rate = 0
@@ -2722,10 +2804,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
     @override_settings(EMAIL_BCC_COPY_RATE=1)
     def test_add_bcc_to_emails(self) -> None:
-        """This test checks if bcc is added to the message when we use a
-        EMAIL_BCC_COPY_RATE = 1, all messages should be bcc'ed
-        """
-
+        """This test checks if bcc is added to the message when we use a EMAIL_BCC_COPY_RATE = 1, all messages should be bcc'ed."""
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -2773,10 +2852,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
     @override_settings(EMAIL_BCC_COPY_RATE=0)
     def test_avoid_add_bcc_to_emails(self) -> None:
-        """This test checks if bcc is not added to the message when we use a
-        EMAIL_BCC_COPY_RATE = 0, no messages should be bcc'ed
-        """
-
+        """This test checks if bcc is not added to the message when we use a EMAIL_BCC_COPY_RATE = 0, no messages should be bcc'ed."""
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -2823,7 +2899,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     )
     @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
     def test_redis_email_counter(self, mock_prefix) -> None:
-        """Test logic to count the number of emails sent by the app"""
+        """Test logic to count the number of emails sent by the app."""
         self.restart_sent_email_quota("test-email-counter")
         for i in range(23):
             email = EmailMessage(
@@ -2848,7 +2924,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         EMAIL_EMERGENCY_THRESHOLD=5,
     )
     def test_daily_quota_emergency_brake(self, mock_prefix) -> None:
-        """Test email daily quota emergency brake"""
+        """Test email daily quota emergency brake."""
         self.restart_sent_email_quota("test-emergency-break")
         # Send 5 emails independently.
         for i in range(5):
@@ -2943,10 +3019,7 @@ class DeleteOldEmailsTest(TestCase):
         cls.msg2.save()
 
     def test_delete_old_emails(self):
-        """This test checks if delete_old_emails function works properly
-        it should delete only emails older than the specified number of days.
-        """
-
+        """This test checks if delete_old_emails function works properly it should delete only emails older than the specified number of days."""
         stored_email = EmailSent.objects.all()
         # Before deleting emails there should be 3 stored emails
         self.assertEqual(stored_email.count(), 3)
@@ -2969,25 +3042,19 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-        ):
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_with_id_asset = load_test_asset(
+            "soft_bounce_msg_id.json"
+        )
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
-        """Function to dispatch signal that mocks a SNS notification event
-        :param test_asset: the json object that contains notification
-        :param event_name: the signal event name
-        :param signal: the signal corresponding to the event
-        :return: None
+        """Function to dispatch signal that mocks a SNS notification event.
+
+        Args:
+            test_asset: the json object that contains notification
+            event_name: the signal event name
+            signal: the signal corresponding to the event
         """
         # Prepare parameters
         message = json.loads(test_asset["Message"])
@@ -3003,13 +3070,9 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
-        """This test checks if a warning is logged when trying to enqueue a
-        message but the stored message doesn't exist anymore because it was
-        deleted.
-        """
-
+        """This test checks if a warning is logged when trying to enqueue a message but the stored message doesn't exist anymore because it was deleted."""
         # Create a backoff event message ID:
         # 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
         self.send_signal(
@@ -3026,10 +3089,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         )
 
     def test_compose_message_from_db_retrieve_user_email(self) -> None:
-        """This test checks if we can compose an email object from the stored
-        message, and also verify if we can retrieve the updated user email
-        address in case it has changed.
-        """
+        """This test checks if we can compose an email object from the stored message, and also verify if we can retrieve the updated user email address in case it has changed."""
         # Get user factory
         user_email = self.user
 
@@ -3081,11 +3141,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
 
     def test_compose_message_from_db_no_cl_user(self) -> None:
-        """This test checks if we can compose a message from the stored message
-        and check if the message doesn't have a related user we send it to the
-        message's original recipient.
-        """
-
+        """This test checks if we can compose a message from the stored message and check if the message doesn't have a related user we send it to the message's original recipient."""
         email = EmailMessage(
             "This is the subject",
             "Body goes here",
@@ -3112,11 +3168,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(message_sent.to, ["anon_address@courtlistener.com"])
 
     def test_enqueue_email_backoff_event(self) -> None:
-        """This test checks if an email is properly enqueued when the
-        recipient's email address is under a backoff event waiting period and
-        we send more messages to the user.
-        """
-
+        """This test checks if an email is properly enqueued when the recipient's email address is under a backoff event waiting period and we send more messages to the user."""
         # Create a backoff event for bounce@simulator.amazonses.com
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -3180,10 +3232,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(failed_email[0].stored_email.pk, stored_email[1].pk)
 
     def test_enqueue_email_soft_bounce(self) -> None:
-        """This test checks if we can queue a message properly after receiving
-        a soft bounce notification.
-        """
-
+        """This test checks if we can queue a message properly after receiving a soft bounce notification."""
         # Send a message
         email = EmailMessage(
             "This is the subject",
@@ -3253,9 +3302,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(failed_email[0].stored_email.pk, stored_emails[1].pk)
 
     def test_enqueue_email_soft_bounce_duplicates(self) -> None:
-        """This test checks if we receive a bounce event for the same message
-        two or more times, we avoid duplicating FailedEmail objects.
-        """
+        """This test checks if we receive a bounce event for the same message two or more times, we avoid duplicating FailedEmail objects."""
         # Send a message
         email = EmailMessage(
             "This is the subject",
@@ -3303,11 +3350,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(failed_email.count(), 1)
 
     def test_enqueue_email_after_check_deliverability(self) -> None:
-        """This test checks if after a successful deliverability recipient's
-        check WAITING failed messages are properly scheduled to be retried. And
-        we can send it.
-        """
-
+        """This test checks if after a successful deliverability recipient's check WAITING failed messages are properly scheduled to be retried. And we can send it."""
         # Create a backoff event for bounce@simulator.amazonses.com
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -3409,7 +3452,6 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
     def test_retry_datetime(self) -> None:
         """This test checks that retry times are properly computed."""
-
         # Send a message
         email = EmailMessage(
             "This is the subject",
@@ -3510,37 +3552,24 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
-            cls.mail_box_full_soft_bounce_asset = json.load(
-                mail_box_full_soft_bounce
-            )
-            cls.msg_large_bounce_asset = json.load(msg_large_bounce)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.no_email_hard_bounce_asset = load_test_asset(
+            "no_email_hard_bounce.json"
+        )
+        cls.mail_box_full_soft_bounce_asset = load_test_asset(
+            "mail_box_full_soft_bounce.json"
+        )
+        cls.msg_large_bounce_asset = load_test_asset("msg_large_bounce.json")
         cls.user = UserFactory()
 
     async def send_signal(self, test_asset, event_name, signal) -> None:
-        """Function to dispatch signal that mocks a SNS notification event
-        :param test_asset: the json object that contains notification
-        :param event_name: the signal event name
-        :param signal: the signal corresponding to the event
-        :return: None
+        """Function to dispatch signal that mocks a SNS notification event.
+
+        Args:
+            test_asset: the json object that contains notification
+            event_name: the signal event name
+            signal: the signal corresponding to the event
         """
         # Prepare parameters
         message = json.loads(test_asset["Message"])
@@ -3557,10 +3586,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         await sync_to_async(signal.send)(**signal_kwargs)
 
     async def test_multiple_bounce_subtypes(self) -> None:
-        """This test checks if we can assign properly the bounce subtype for
-        EmailFlag objects
-        """
-
+        """This test checks if we can assign properly the bounce subtype for EmailFlag objects."""
         # Trigger a hard bounce notification event
         await self.send_signal(
             self.no_email_hard_bounce_asset, "bounce", signals.bounce_received
@@ -3591,11 +3617,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         )
 
     async def test_broken_email_address_banner(self) -> None:
-        """This test checks if soft and hard bounces events properly trigger a
-        broken email address banner, a Permanent broken email address banner
-        overrides a previous Transient broken banner.
-        """
-
+        """This test checks if soft and hard bounces events properly trigger a broken email address banner, a Permanent broken email address banner overrides a previous Transient broken banner."""
         path = reverse("show_results")
         # An anonymous user should never see the broken email banner.
         r = await self.async_client.get(path)
@@ -3606,7 +3628,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3648,16 +3670,13 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
     async def test_broken_email_banner_complaint(self) -> None:
-        """This test checks if a complaint notification properly triggers a
-        Permanent broken email banner.
-        """
-
+        """This test checks if a complaint notification properly triggers a Permanent broken email banner."""
         path = reverse("show_results")
         user = self.user
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3679,19 +3698,14 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
     async def test_broken_email_address_banner_first_permanent(self) -> None:
-        """This test checks if a Permanent broken email event comes first than
-        Transient broken email event, Permanent banner will be prioritized,
-        also checks if users change their email address the email broken banner
-        should disappear.
-        """
-
+        """This test checks if a Permanent broken email event comes first than Transient broken email event, Permanent banner will be prioritized, also checks if users change their email address the email broken banner should disappear."""
         path = reverse("show_results")
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3734,7 +3748,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         # email error.
         user.email = "new@simulator.amazonses.com"
         await user.asave()
-        login = await self.async_client.alogin(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
 
@@ -3743,10 +3757,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
     async def test_broken_email_banner_backoff_expired(self) -> None:
-        """This test checks if once a backoff event expires it deactivates the
-        Transient broken email banner.
-        """
-
+        """This test checks if once a backoff event expires it deactivates the Transient broken email banner."""
         path = reverse("show_results")
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
@@ -3786,9 +3797,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
 
 
 class MockResponse:
-    """
-    A class to Mock API response
-    """
+    """A class to Mock API response."""
 
     def __init__(self, json_data, status_code):
         self.json_data = json_data
@@ -3832,7 +3841,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_make_an_webhook(self) -> None:
         """Can we make a webhook?"""
-
         # Make a webhook
         webhooks = Webhook.objects.all()
         response = await self.make_a_webhook(self.client)
@@ -3846,7 +3854,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_make_an_http_webhook_fails(self) -> None:
         """Can we avoid creating an HTTP webhook endpoint?"""
-
         # Make a webhook
         webhooks = Webhook.objects.all()
         response = await self.make_a_webhook(
@@ -3858,7 +3865,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_list_users_webhooks(self) -> None:
         """Can we list user's own webhooks?"""
-
         # Make a webhook for user_1
         await self.make_a_webhook(self.client)
 
@@ -3872,9 +3878,9 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_delete_webhook(self) -> None:
         """Can we delete a webhook?
+
         Avoid users from deleting other users' webhooks.
         """
-
         # Make two webhooks for user_1
         await self.make_a_webhook(
             self.client, event_type=WebhookEventType.DOCKET_ALERT
@@ -3910,9 +3916,9 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_webhook_detail(self) -> None:
         """Can we get the details of a webhook?
+
         Avoid users from getting other users' webhooks.
         """
-
         # Make one webhook for user_1
         await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
@@ -3933,7 +3939,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_webhook_update(self) -> None:
         """Can we update a webhook?"""
-
         # Make one webhook for user_1
         await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
@@ -3971,7 +3976,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_send_webhook_test(self) -> None:
         """Can we send a test webhook event?"""
-
         # Make one webhook for user_1
         await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
@@ -4025,7 +4029,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_send_webhook_test_all_types(self) -> None:
         """Can we send a webhook test event for all webhook types?"""
-
         test_cases = {
             f"{event_type.label} - {version.label}": {
                 "event_type": event_type,
@@ -4073,7 +4076,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
-
         da_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_2,
             event_type=WebhookEventType.DOCKET_ALERT,
@@ -4118,7 +4120,6 @@ class WebhooksHTMXTests(APITestCase):
 
     async def test_get_available_webhook_versions(self) -> None:
         """Can we get users available versions for a webhook event type?"""
-
         await sync_to_async(WebhookFactory)(
             user=self.user_2,
             event_type=WebhookEventType.DOCKET_ALERT,
@@ -4187,9 +4188,7 @@ class NeonAccountCreationTest(TestCase):
     async def test_can_send_email_for_multiple_neon_accounts(
         self, mock_neon_client
     ) -> None:
-        """Tests whether we can send the email notification when multiple
-        neon accounts are found
-        """
+        """Tests whether we can send the email notification when multiple neon accounts are found."""
         # mock the search_account_by_email method to return array with two elements
         mock_neon_client.return_value.search_account_by_email.return_value = [
             {},
@@ -4201,7 +4200,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4227,10 +4226,7 @@ class NeonAccountCreationTest(TestCase):
     async def test_can_update_profile_with_neon_data(
         self, mock_neon_client
     ) -> None:
-        """Tests whether we can use the existing neon account to set
-        the neon_account_id in the user's profile.
-        """
-
+        """Tests whether we can use the existing neon account to set the neon_account_id in the user's profile."""
         # mock the search_account_by_email method to return array with one element
         mock_neon_client.return_value.search_account_by_email.return_value = [
             {"Account ID": "1256"}
@@ -4241,7 +4237,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4255,10 +4251,7 @@ class NeonAccountCreationTest(TestCase):
         self.assertEqual(up.neon_account_id, "1256")
 
     async def test_can_create_neon_account(self, mock_neon_client) -> None:
-        """Tests whether we can create a new neon account after we
-        confirm the email address
-        """
-
+        """Tests whether we can create a new neon account after we confirm the email address."""
         # mock the search_account_by_email method to return am empty array
         mock_neon_client.return_value.search_account_by_email.return_value = []
 
@@ -4270,7 +4263,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4298,7 +4291,7 @@ class NeonAccountUpdateTest(TestCase):
     async def test_can_call_update_task_when_account_id_found(
         self, update_account_mock, create_account_mock
     ) -> None:
-        """Tests whether we use the update task when the account has a neon_account_id"""
+        """Tests whether we use the update task when the account has a neon_account_id."""
         self.up.neon_account_id = "12345"
         await self.up.asave()
 
@@ -4320,7 +4313,7 @@ class NeonAccountUpdateTest(TestCase):
     async def test_can_call_create_task_when_no_account_id_found(
         self, update_account_mock, create_account_mock
     ) -> None:
-        """Tests whether we use the create task when the account does not have a neon_account_id"""
+        """Tests whether we use the create task when the account does not have a neon_account_id."""
         await self.client.alogin(username="pandora", password="password")
         r = await self.client.post(
             reverse("view_settings"),
@@ -4390,9 +4383,9 @@ class RegisterViewTest(TestCase):
 
     async def test_register_rejects_homoglyph_username(self) -> None:
         """Register a user with an invalid username containing a homoglyph.
+
         It must be rejected:
         """
-
         invalid_username = "adm" + "\u0456" + "n2"
         data = {
             "username": invalid_username,
@@ -4418,6 +4411,36 @@ class RegisterViewTest(TestCase):
         # The username field should display an error.
         self.assertIn("username", form.errors)
 
+    async def test_failed_profile_save_does_not_leave_user(self) -> None:
+        """A failed profile save must not leave a user behind.
+
+        A user without a profile can't log in.
+        """
+        data = {
+            "username": "admin3",
+            "email": "admin3@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        with patch.object(
+            UserProfile, "save", side_effect=IntegrityError("profile")
+        ):
+            response = await self.async_client.post(
+                reverse("register"), data, follow=True
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="admin3").aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        self.assertIn("username", form.errors)
+
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:
         """Is the activation key a high-entropy CSPRNG token?
 
@@ -4437,9 +4460,7 @@ class RegisterViewTest(TestCase):
     async def test_claiming_a_stub_account_issues_a_fresh_unguessable_key(
         self,
     ) -> None:
-        """Claiming a donor stub account via register() must update the
-        activation key. See GHSA-638g-xf9h-6qcg.
-        """
+        """Claiming a donor stub account via register() must update the activation key. See GHSA-638g-xf9h-6qcg."""
         _, stub_profile = await sync_to_async(create_stub_account)(
             {
                 "email": "donor@example.com",
@@ -4493,12 +4514,7 @@ class RegisterViewTest(TestCase):
 
     @staticmethod
     def normalize_page(content: bytes) -> bytes:
-        """Mask the parts of a rendered page that legitimately differ between
-        two otherwise identical responses: the per-response CSP nonce and the
-        analytics snippet that base.html includes at random one time in ten.
-        Whitespace is collapsed because that snippet's template block leaves
-        different whitespace behind depending on whether it rendered.
-        """
+        """Mask the parts of a rendered page that legitimately differ between two otherwise identical responses: the per-response CSP nonce and the analytics snippet that base.html includes at random one time in ten. Whitespace is collapsed because that snippet's template block leaves different whitespace behind depending on whether it rendered."""
         content = re.sub(rb'nonce="[^"]*"', b'nonce=""', content)
         content = re.sub(
             rb"<script\s+defer\s+data-domain=.*?</script>",
@@ -4511,9 +4527,7 @@ class RegisterViewTest(TestCase):
     async def test_taken_email_is_indistinguishable_from_a_fresh_signup(
         self,
     ) -> None:
-        """Registering with an address that already has an account must
-        return exactly what a successful registration returns, create no
-        account, and tell only the address owner by email.
+        """Registering with an address that already has an account must return exactly what a successful registration returns, create no account, and tell only the address owner by email.
 
         See issue #7854. "This email is already in use" would let anyone test
         whether an address has a CourtListener account.
@@ -4579,8 +4593,7 @@ class RegisterViewTest(TestCase):
     async def test_email_shaped_usernames_are_rejected_regardless(
         self,
     ) -> None:
-        """A username shaped like an email address is refused with the same
-        format error whether or not it matches an existing account's email.
+        """A username shaped like an email address is refused with the same format error whether or not it matches an existing account's email.
 
         Refusing only the addresses that have accounts, however the error is
         worded, would tell the registrant that the address has an account.
@@ -4619,8 +4632,7 @@ class RegisterViewTest(TestCase):
     async def test_an_at_sign_alone_does_not_make_a_username_an_email(
         self,
     ) -> None:
-        """A username with an "@" but no domain is not email-shaped and is
-        still allowed."""
+        """A username with an "@" but no domain is not email-shaped and is still allowed."""
         response = await self.async_client.post(
             reverse("register"),
             self.registration_data("mal@ory", "mallory@example.com"),
@@ -4632,9 +4644,7 @@ class RegisterViewTest(TestCase):
         )
 
     async def test_refused_duplicate_still_hashes_a_password(self) -> None:
-        """The refused path must pay for a password hash like the real signup
-        does, or response time alone would tell an observer which path ran.
-        """
+        """The refused path must pay for a password hash like the real signup does, or response time alone would tell an observer which path ran."""
         await sync_to_async(UserProfileWithParentsFactory.create)(
             user__email="taken@example.com"
         )
@@ -4649,10 +4659,7 @@ class RegisterViewTest(TestCase):
         )
 
     async def test_stub_lookup_ignores_surrounding_whitespace(self) -> None:
-        """An address with stray whitespace must still find the stub account,
-        or the form's stripped-address duplicate check would see that stub as
-        somebody else's account and refuse the claim.
-        """
+        """An address with stray whitespace must still find the stub account, or the form's stripped-address duplicate check would see that stub as somebody else's account and refuse the claim."""
         stub_user, _ = await sync_to_async(create_stub_account)(
             {
                 "email": "donor@example.com",
@@ -4683,9 +4690,7 @@ class RegisterViewTest(TestCase):
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,
     ) -> None:
-        """Claiming a donor stub account binds the form to the account that
-        already holds the address, so it must upgrade the stub rather than be
-        refused as a duplicate."""
+        """Claiming a donor stub account binds the form to the account that already holds the address, so it must upgrade the stub rather than be refused as a duplicate."""
         stub_user, _ = await sync_to_async(create_stub_account)(
             {
                 "email": "donor@example.com",
@@ -4737,9 +4742,11 @@ class RegisterViewTest(TestCase):
     async def test_both_outcomes_enqueue_mail_instead_of_sending_it(
         self, new_account_mock: MagicMock, existing_account_mock: MagicMock
     ) -> None:
-        """Neither outcome may send mail synchronously in the view. A fresh
-        signup that sent two emails inline while a refused duplicate sent one
-        would be distinguishable by response time alone."""
+        """Neither outcome may send mail synchronously in the view.
+
+        A fresh signup that sent two emails inline while a refused duplicate
+        sent one would be distinguishable by response time alone.
+        """
         email = "timing@example.com"
         mail.outbox.clear()
 
@@ -4762,8 +4769,7 @@ class RegisterViewTest(TestCase):
 
 
 class DuplicateEmailSettingsTest(TestCase):
-    """Users who already hold an address on more than one account exist and
-    must keep working until those duplicates are cleaned up."""
+    """Users who already hold an address on more than one account exist and must keep working until those duplicates are cleaned up."""
 
     def setUp(self) -> None:
         self.client = AsyncClient()
@@ -4778,9 +4784,7 @@ class DuplicateEmailSettingsTest(TestCase):
         )
 
     async def test_existing_duplicate_can_still_save_settings(self) -> None:
-        """Regression test: the registration form's uniqueness check must
-        not leak into UserForm, or a user whose address is shared with another
-        account could never save their settings page. See issue #7854."""
+        """Regression test: the registration form's uniqueness check must not leak into UserForm, or a user whose address is shared with another account could never save their settings page. See issue #7854."""
         self.assertTrue(
             await self.client.alogin(username="pandora", password="password")
         )
@@ -5448,14 +5452,17 @@ class AccountBuildingMixin:
     ) -> User:
         """Build an account.
 
-        :param username: The account's username.
-        :param email: The account's email address.
-        :param password: The plaintext password to set.
-        :param last_login: When the account last signed in, or None for never.
-        :param is_active: Whether the account is active.
-        :param email_confirmed: Whether its address has been confirmed.
-        :param stub_account: Whether it's a stub, as donations create.
-        :return: The new User.
+        Args:
+            username: The account's username.
+            email: The account's email address.
+            password: The plaintext password to set.
+            last_login: When the account last signed in, or None for never.
+            is_active: Whether the account is active.
+            email_confirmed: Whether its address has been confirmed.
+            stub_account: Whether it's a stub, as donations create.
+
+        Returns:
+            The new User.
         """
         return UserProfileWithParentsFactory.create(
             user__username=username,
@@ -5479,9 +5486,12 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
     def sign_in(self, identifier: str, password: str) -> HttpResponse:
         """POST the sign-in form.
 
-        :param identifier: What to put in the username field.
-        :param password: What to put in the password field.
-        :return: The view's response.
+        Args:
+            identifier: What to put in the username field.
+            password: What to put in the password field.
+
+        Returns:
+            The view's response.
         """
         return self.client.post(
             reverse("sign-in"),
@@ -5491,18 +5501,15 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
     def assert_signed_in_as(self, user: User) -> None:
         """Assert the test client's session belongs to the given account.
 
-        :param user: The account the client should be signed in as.
-        :return: None
+        Args:
+            user: The account the client should be signed in as.
         """
         self.assertEqual(
             self.client.session.get("_auth_user_id"), str(user.pk)
         )
 
     def assert_not_signed_in(self) -> None:
-        """Assert the test client has no session.
-
-        :return: None
-        """
+        """Assert the test client has no session."""
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_signing_in_with_an_email_address(self) -> None:
@@ -5521,9 +5528,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
                 self.assert_signed_in_as(user)
 
     def test_the_password_picks_between_duplicate_accounts(self) -> None:
-        """When two accounts share an address, does the submitted password
-        decide which one the person reaches?
-        """
+        """When two accounts share an address, does the submitted password decide which one the person reaches?"""
         shared = "both@example.com"
         older = self.make_user(
             "older", shared, "older-password", last_login=now()
@@ -5542,8 +5547,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
                 self.assert_signed_in_as(user)
 
     def test_the_most_recently_used_account_wins_a_tie(self) -> None:
-        """When two accounts share an address *and* a password, does the one
-        used most recently win?
+        """When two accounts share an address *and* a password, does the one used most recently win?
 
         That's the account the duplicate-account merge keeps as primary, so a
         person's experience won't change when their accounts are merged.
@@ -5561,8 +5565,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         )
 
     def test_a_confirmed_account_beats_an_unconfirmed_one(self) -> None:
-        """When both a confirmed and an unconfirmed account match, does the
-        confirmed one win, even though it was used less recently?
+        """When both a confirmed and an unconfirmed account match, does the confirmed one win, even though it was used less recently?
 
         The confirmed account signs its owner in; the unconfirmed one can only
         tell them to go confirm their address. Prefer the one that works.
@@ -5584,9 +5587,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assert_signed_in_as(confirmed)
 
     def test_an_unconfirmed_account_is_told_to_confirm(self) -> None:
-        """Does an unconfirmed account with the right password still get the
-        "validate your email address" message rather than a generic error?
-        """
+        """Does an unconfirmed account with the right password still get the "validate your email address" message rather than a generic error?"""
         user = self.make_user(
             "unconfirmed", "unconfirmed@example.com", email_confirmed=False
         )
@@ -5596,9 +5597,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assertContains(response, "validate your email address")
 
     def test_a_shadowing_username_cannot_reach_the_address_owner(self) -> None:
-        """Can somebody who registers a username equal to another person's
-        email address get into that person's account?
-        """
+        """Can somebody who registers a username equal to another person's email address get into that person's account?"""
         victim = self.make_user(
             "victim", "victim@example.com", "victim-password"
         )
@@ -5619,8 +5618,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assert_not_signed_in()
 
     def test_a_shadowing_username_cannot_lock_the_owner_out(self) -> None:
-        """Does the person whose address was taken as somebody else's username
-        still get to sign in with that address?
+        """Does the person whose address was taken as somebody else's username still get to sign in with that address?
 
         This is the other half of the shadowing problem: without the
         fall-through from a failed username match to the email candidates, the
@@ -5637,9 +5635,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assert_signed_in_as(victim)
 
     def test_every_failure_gives_the_same_error(self) -> None:
-        """Do all the ways of failing look alike, so the form can't be used to
-        find out whether an account exists?
-        """
+        """Do all the ways of failing look alike, so the form can't be used to find out whether an account exists?"""
         user = self.make_user("taylor", "taylor@example.com")
         self.make_user("shared-one", "shared@example.com")
         self.make_user("shared-two", "shared@example.com")
@@ -5665,10 +5661,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assertEqual(len(errors), 1, msg=f"Got varying errors: {errors}")
 
     def test_only_the_first_few_duplicates_are_checked(self) -> None:
-        """Is the candidate loop capped, so that piling accounts onto one
-        address can't turn a single POST into an unbounded number of password
-        hashes?
-        """
+        """Is the candidate loop capped, so that piling accounts onto one address can't turn a single POST into an unbounded number of password hashes?"""
         shared = "crowded@example.com"
         # One more account than the cap allows, each used less recently than
         # the last, so the final one is the one that falls off the end.
@@ -5693,8 +5686,7 @@ class EmailOrUsernameSignInTest(AccountBuildingMixin, TestCase):
         self.assert_signed_in_as(beyond_the_cap)
 
     def test_planted_accounts_cannot_crowd_out_a_confirmed_one(self) -> None:
-        """Can somebody take away a person's email sign-in by pointing enough
-        accounts at their address?
+        """Can somebody take away a person's email sign-in by pointing enough accounts at their address?
 
         They must not be able to. Registration doesn't yet refuse a second
         account per address, and changing an address on the settings page
@@ -5758,8 +5750,11 @@ class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
     def request_reset(self, email: str) -> HttpResponse:
         """POST the password reset form.
 
-        :param email: The address to request a reset for.
-        :return: The view's response.
+        Args:
+            email: The address to request a reset for.
+
+        Returns:
+            The view's response.
         """
         return self.client.post(reverse("password_reset"), {"email": email})
 
@@ -5769,7 +5764,8 @@ class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
         Derived from the URLconf rather than written out, so the assertions
         below follow the route if it ever moves.
 
-        :return: The path a reset link starts with.
+        Returns:
+            The path a reset link starts with.
         """
         return reverse(
             "confirm_password",
@@ -5777,17 +5773,15 @@ class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
         ).split("UID")[0]
 
     def assert_reset_link_sent(self) -> None:
-        """Assert exactly one mail went out and it carries a reset token.
-
-        :return: None
-        """
+        """Assert exactly one mail went out and it carries a reset token."""
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(self.reset_link_stem(), mail.outbox[0].body)
 
     def assert_one_email_without_reset_link(self) -> str:
         """Assert exactly one mail went out and carries no reset token.
 
-        :return: The body of that mail, for further assertions.
+        Returns:
+            The body of that mail, for further assertions.
         """
         self.assertEqual(len(mail.outbox), 1)
         body = mail.outbox[0].body
@@ -5830,8 +5824,7 @@ class PasswordResetConfirmedEmailTest(AccountBuildingMixin, TestCase):
     def test_a_repointed_address_cannot_ride_along_with_the_owner(
         self,
     ) -> None:
-        """When the address's owner has an account of their own, does the
-        reset reach only theirs?
+        """When the address's owner has an account of their own, does the reset reach only theirs?
 
         The nastier version of the attack above. Here the request does produce
         a reset link, legitimately, for the victim's own account — so "no link
@@ -5917,9 +5910,12 @@ class PasswordConfirmFormTest(TestCase):
     def confirm(self, user: User, password: str) -> PasswordConfirmForm:
         """Submit the guard as the given user.
 
-        :param user: The signed-in account being re-prompted.
-        :param password: The password they typed.
-        :return: The bound form.
+        Args:
+            user: The signed-in account being re-prompted.
+            password: The password they typed.
+
+        Returns:
+            The bound form.
         """
         request = self.factory.post("/")
         request.user = user
@@ -5948,8 +5944,7 @@ class PasswordConfirmFormTest(TestCase):
         self.assertFalse(self.confirm(user, "a-guess").is_valid())
 
     def test_another_persons_password_does_not_pass(self) -> None:
-        """Can somebody whose username is another person's email address clear
-        the guard with that person's password?
+        """Can somebody whose username is another person's email address clear the guard with that person's password?
 
         They must not be able to. The guard re-prompts for *this* account, so
         it doesn't matter that authenticate() also resolves addresses.
@@ -6024,15 +6019,16 @@ class FailedSignInThrottleTest(TestCase):
     def get_failure_count(self, identifier: str) -> int:
         """Read an identifier's current failed sign-in count.
 
-        :param identifier: The identifier to look up.
-        :return: The number of failures counted against it.
+        Args:
+            identifier: The identifier to look up.
+
+        Returns:
+            The number of failures counted against it.
         """
         return get_ratelimit_cache().get(make_failed_login_key(identifier), 0)
 
     def test_repeated_failures_throttle_the_account(self) -> None:
-        """Do repeated failures against one account get throttled, even when
-        each attempt comes from a different IP?
-        """
+        """Do repeated failures against one account get throttled, even when each attempt comes from a different IP?"""
         first_failure = self.sign_in(
             self.user.username, "wrong-password", ip="198.51.100.1"
         )
@@ -6055,9 +6051,7 @@ class FailedSignInThrottleTest(TestCase):
         )
 
     def test_a_successful_sign_in_resets_the_counter(self) -> None:
-        """Does signing in wipe the slate, so that fumbling a password, getting
-        it right, then fumbling again doesn't add up to a throttle?
-        """
+        """Does signing in wipe the slate, so that fumbling a password, getting it right, then fumbling again doesn't add up to a throttle?"""
         for _ in range(FAILED_LOGIN_LIMIT - 1):
             self.sign_in(self.user.username, "wrong-password")
         self.assertEqual(
@@ -6098,9 +6092,7 @@ class FailedSignInThrottleTest(TestCase):
         )
 
     def test_case_and_whitespace_variants_share_a_counter(self) -> None:
-        """Can an attacker get a fresh counter by shifting the case of the
-        identifier or padding it with whitespace?
-        """
+        """Can an attacker get a fresh counter by shifting the case of the identifier or padding it with whitespace?"""
         for _ in range(FAILED_LOGIN_LIMIT):
             self.sign_in(self.user.username.upper(), "wrong-password")
 
@@ -6135,3 +6127,82 @@ class FailedSignInThrottleTest(TestCase):
             )
             self.sign_in(self.user.username, "a-good-password")
             self.assertIn("_auth_user_id", self.client.session)
+
+
+class AlertsPageMembershipNudgeTest(TestCase):
+    """Non-members are offered more alerts on their profile's alerts pages."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        AlertFactory(user=cls.user)
+        DocketAlertWithParentsFactory(user=cls.user)
+
+    def setUp(self) -> None:
+        self.client.force_login(self.user)
+
+    def test_non_member_is_offered_more_alerts(self) -> None:
+        """Both alert pages mention what members get and link to join."""
+        expected = {
+            "profile_search_alerts": "Members get more search alerts",
+            "profile_docket_alerts": "Members get unlimited docket alerts",
+        }
+        for viewname, nudge in expected.items():
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertContains(response, nudge)
+                self.assertContains(response, ">Join FLP</a>")
+
+    def test_member_is_not_offered_more_alerts(self) -> None:
+        """Members already get the benefit, so don't ask them to join."""
+        NeonMembershipFactory(user=self.user)
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+                self.assertNotContains(response, "Members get")
+
+    def test_member_is_thanked_on_docket_alerts_page(self) -> None:
+        """Members see a thank-you where non-members see the nudge."""
+        NeonMembershipFactory(user=self.user)
+        response = self.client.get(reverse("profile_docket_alerts"))
+        self.assertContains(
+            response, "As a member you get unlimited docket alerts. Thanks!"
+        )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipHeaderLinkTest")
+class MembershipHeaderLinkTest(TestCase):
+    """The header's donate slot should make sense for members and non-members."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.url = reverse("help_home")
+
+    def test_anonymous_user_sees_join_flp(self) -> None:
+        """Anonymous visitors are invited to join."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_non_member_sees_join_flp(self) -> None:
+        """Signed-in users without a membership are still invited to join."""
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")
+
+    def test_active_member_sees_membership_link(self) -> None:
+        """Members get a link to their membership page, not a join button."""
+        NeonMembershipFactory(user=self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Join FLP")
+        self.assertContains(response, "&nbsp;Membership</a>")
+
+    def test_lapsed_member_sees_join_flp(self) -> None:
+        """A membership that is no longer active shouldn't hide the join link."""
+        NeonMembershipFactory(
+            user=self.user, payment_status=MembershipPaymentStatus.FAILED
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Join FLP")

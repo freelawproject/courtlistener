@@ -12,6 +12,7 @@ from .project.security import *
 from .project.sitemaps import *
 from .project.testing import *
 from .project.users import *
+from .third_party.allauth import *
 from .third_party.aws import *
 from .third_party.celery import *
 from .third_party.elasticsearch import *

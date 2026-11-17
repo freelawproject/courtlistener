@@ -1,4 +1,7 @@
+"""Models for SCOTUS network visualizations and their JSON versions."""
+
 import json
+from typing import Any
 
 import networkx
 from django.contrib.auth.models import User
@@ -19,6 +22,8 @@ from cl.visualizations.network_utils import (
 
 
 class SCOTUSMap(AbstractDateTimeModel):
+    """A user's network visualization of citations between two Supreme Court cases."""
+
     user = models.ForeignKey(
         User,
         help_text="The user that owns the visualization",
@@ -89,12 +94,13 @@ class SCOTUSMap(AbstractDateTimeModel):
     __original_deleted = None
 
     def __init__(self, *args, **kwargs):
+        """Build the visualization, remembering whether it was deleted."""
         super().__init__(*args, **kwargs)
         self.__original_deleted = self.deleted
 
     @property
     def json(self):
-        """Returns the most recent version"""
+        """Returns the most recent version."""
         try:
             # Imagine that you cache a viz, then delete it from disk if that
             # happens, you will still think the viz exists (it's in the cache),
@@ -113,7 +119,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         hops_taken=0,
         max_nodes=70,
     ):
-        """Recursively build a networkx graph
+        """Recursively build a networkx graph.
 
         Process is:
          - Work backwards through the authorities for self.cluster_end and all
@@ -167,15 +173,16 @@ class SCOTUSMap(AbstractDateTimeModel):
         shortest routes and avoiding unneeded graph traversal. For example, it's
         quite possible to traverse
 
-        :param parent_authority: The starting point for the recursion. At first,
-        this will be self.cluster_end, but in recursive calls, it will be the
-        child of the current parent.
-        :param visited_nodes: A dict of nodes that have already been visited.
-        :param good_nodes: A dict of nodes that have been identified as good.
-        :param hops_taken: The number of hops taken so far, from
-        self.cluster_end
-        :param max_hops: The maximum degree of separation for the network.
-        :param max_nodes: The maximum number of nodes a network can contain.
+        Args:
+            parent_authority: The starting point for the recursion. At first,
+                this will be self.cluster_end, but in recursive calls, it will be the
+                child of the current parent.
+            visited_nodes: A dict of nodes that have already been visited.
+            good_nodes: A dict of nodes that have been identified as good.
+            hops_taken: The number of hops taken so far, from
+                self.cluster_end
+            max_hops: The maximum degree of separation for the network.
+            max_nodes: The maximum number of nodes a network can contain.
         """
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
@@ -271,7 +278,7 @@ class SCOTUSMap(AbstractDateTimeModel):
 
     async def to_json(self, g):
         """Make a JSON representation of a NetworkX graph of the data."""
-        j = {
+        j: dict[str, Any] = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
                 "from Free Law Project",
@@ -311,10 +318,11 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{getattr(self, 'pk', None)}: {self.title}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the visualization's embedded page."""
         return reverse("view_embedded_visualization", kwargs={"pk": self.pk})
 
     def make_title(self):
-        """Make a title for the network
+        """Make a title for the network.
 
         Title tries to use the shortest possible case name from the starting
         and ending clusters plus the number of degrees.
@@ -331,6 +339,13 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{get_best_case_name(self.cluster_start)} ({self.cluster_start.date_filed.year}) to {get_best_case_name(self.cluster_end)} ({self.cluster_end.date_filed.year})"
 
     def save(self, update_fields=None, *args, **kwargs):
+        """Save the visualization, filling in derived fields.
+
+        Makes a title if there is none, sets the publish and delete dates
+        when those flags are first set, and makes a slug on the first save.
+        When ``update_fields`` is given, the title, publish date, and creation
+        date are always updated too.
+        """
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
         if not self.title:

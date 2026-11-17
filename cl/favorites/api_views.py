@@ -1,3 +1,5 @@
+"""REST API viewsets for tags, prayers, and event counters."""
+
 from http import HTTPStatus
 
 from django.db import transaction
@@ -24,6 +26,8 @@ from cl.lib.bot_detector import is_bot
 
 
 class UserTagViewSet(ModelViewSet):
+    """API endpoint for tags, readable when published and writable by their owner."""
+
     # get_queryset() below returns every published tag (not just the
     # requester's own) so that reads work, but that same queryset backs
     # update/destroy's get_object() lookup. Without an object-level
@@ -56,6 +60,7 @@ class UserTagViewSet(ModelViewSet):
     ]
 
     def get_queryset(self):
+        """Get published tags and, for authenticated users, their own tags."""
         q = Q(published=True)
         if self.request.user.is_authenticated:
             q |= Q(user=self.request.user)
@@ -63,6 +68,8 @@ class UserTagViewSet(ModelViewSet):
 
 
 class DocketTagViewSet(ModelViewSet):
+    """API endpoint for tags applied to dockets."""
+
     permission_classes = [IsAuthenticated, IsTagOwner, V3APIPermission]
     throttle_classes = [TagRateThrottle]
     serializer_class = DocketTagSerializer
@@ -74,6 +81,7 @@ class DocketTagViewSet(ModelViewSet):
     cursor_ordering_fields = ["id"]
 
     def get_queryset(self):
+        """Get docket tags whose tag is the user's own or published."""
         return DocketTag.objects.filter(
             Q(tag__user=self.request.user) | Q(tag__published=True)
         )
@@ -95,10 +103,7 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
     http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
-        """
-        Return a list of all the open prayers
-        for the currently authenticated user.
-        """
+        """Return a list of all the open prayers for the currently authenticated user."""
         user = self.request.user
         return Prayer.objects.filter(
             user=user, status=Prayer.WAITING
@@ -106,14 +111,15 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
 
 
 class EventCounterViewset(CreateModelMixin, GenericViewSet):
+    """API endpoint that increments counters for view events."""
+
     serializer_class = EventCountSerializer
     permission_classes = (permissions.AllowAny,)
     authentication_classes = []
     throttle_classes = [EventCounterThrottle]
 
     def create(self, request, *args, **kwargs):
-        """
-        Handle a POST request to increment event counters based on their label.
+        """Handle a POST request to increment event counters based on their label.
 
         This method validates incoming request data, retrieves or creates a
         GenericCount record for the specified label, and atomically increments
@@ -138,6 +144,7 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
                 )
             )
             initial_count = counter_record.value
+            # pyrefly:ignore[bad-assignment] Hopefully fixed in a future version
             counter_record.value = F("value") + 1
             counter_record.save(update_fields=["value"])
 

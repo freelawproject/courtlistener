@@ -1,14 +1,36 @@
+"""Shared options, checkpoints, and response caching for state scraper commands."""
+
+import asyncio
+import hashlib
 import re
-from abc import ABC
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import lru_cache
+from pathlib import Path
 from typing import ClassVar
 
+import botocore.exceptions
+from asgiref.sync import sync_to_async
 from django.core.management import CommandError
 from django.core.management.base import BaseCommand, CommandParser
+from httpx import Response
+from juriscraper.state.florida import FloridaScraper
+from juriscraper.state.florida.courts import FloridaCourtID
+from juriscraper.state.RequestManager import (
+    ExponentialBackoff,
+    RequestHandler,
+    RequestManager,
+    ScheduledRequest,
+)
 from redis import Redis
 
+from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.storage import S3GlacierInstantRetrievalStorage
+from cl.scrapers.tasks import save_response_to_s3
 
 
 def _parse_date(date_str: str) -> date:
@@ -44,24 +66,30 @@ def _make_case_number_key(case_number: str) -> str:
 
 
 class ScraperCheckpointTracker:
+    """Store a scraper's resume date in Redis."""
+
     def __init__(self, key: str, *, redis: Redis | None = None):
+        """Track the checkpoint for ``key``, using the cache Redis unless one is given."""
         self.autoresume_key: str = f"scraper:{key}:end-date"
         self.redis: Redis = redis or get_redis_interface("CACHE")
 
     def get(self) -> date | None:
+        """Get the saved checkpoint date, or None if there isn't one."""
         stored_values = self.redis.hgetall(self.autoresume_key)
         if not stored_values:
             return None
         stored_checkpoint = stored_values.get("checkpoint")
         if not stored_checkpoint:
             return None
-        latest_checkpoint = datetime.strptime(
+        if isinstance(stored_checkpoint, bytes):
+            stored_checkpoint = stored_checkpoint.decode()
+        return datetime.strptime(
             stored_checkpoint,
             "%Y-%m-%d",
         ).date()
-        return latest_checkpoint
 
     def set(self, checkpoint: date) -> None:
+        """Save the checkpoint date and the time it was saved, expiring after four weeks."""
         pipe = self.redis.pipeline()
         pipe.hgetall(self.autoresume_key)
         log_info: Mapping[str | bytes, int | str] = {
@@ -73,11 +101,15 @@ class ScraperCheckpointTracker:
         pipe.execute()
 
 
-class StateBackScrapeCommand(ABC, BaseCommand):
+class StateBackScrapeCommand(BaseCommand):
+    """Base command for back-scraping state courts over a range."""
+
     checkpoint_tracker: ClassVar[ScraperCheckpointTracker]
     date_range_required: ClassVar[bool] = True
 
     def add_arguments(self, parser: CommandParser):
+        """Add the back-scrape range, courts, and auto-resume options."""
+        super().add_arguments(parser)
         parser.add_argument(
             "--backscrape-start",
             dest="backscrape_start",
@@ -103,5 +135,276 @@ class StateBackScrapeCommand(ABC, BaseCommand):
             "--auto-resume",
             default=False,
             action="store_true",
-            help="Auto resume the command using the last end-date stored in redis. ",
+            help="Auto resume the command using the last end-date stored in redis.",
         )
+
+
+class StatePollCommand(BaseCommand):
+    """Base command for continuously polling state courts."""
+
+    def add_arguments(self, parser: CommandParser):
+        """Add the polling delay, backfill days, and courts options."""
+        super().add_arguments(parser)
+        parser.add_argument(
+            "--polling-delay",
+            type=int,
+            default=60,
+            help="Minutes to sleep between poll cycles.",
+        )
+        parser.add_argument(
+            "--case-backfill-days",
+            type=int,
+            default=1,
+            help="Number of days to look back for backfill.",
+        )
+        parser.add_argument(
+            "--courts",
+            default=None,
+            help=(
+                "Comma-separated list of court IDs to poll (e.g., texas_cossup,texas_coa01)."
+            ),
+        )
+
+
+FL_COURT_ID_MAP: dict[str, FloridaCourtID] = {
+    "fla": FloridaCourtID.SUPREME_COURT,
+    "fladistctapp1": FloridaCourtID.FIRST_COA,
+    "fladistctapp2": FloridaCourtID.SECOND_COA,
+    "fladistctapp3": FloridaCourtID.THIRD_COA,
+    "fladistctapp4": FloridaCourtID.FOURTH_COA,
+    "fladistctapp5": FloridaCourtID.FIFTH_COA,
+    "fladistctapp6": FloridaCourtID.SIXTH_COA,
+}
+
+
+class FLScrapeCommand(BaseCommand):
+    """Base command for scraping Florida appellate courts."""
+
+    def add_arguments(self, parser: CommandParser):
+        """Add the rate limit, retry, archiving, cache, and queue options."""
+        super().add_arguments(parser)
+        parser.add_argument(
+            "--rps",
+            type=float,
+            default=2.5,
+            help="Requests per second limit for the scraper.",
+        )
+        parser.add_argument(
+            "--max-retries",
+            dest="max_retries",
+            type=int,
+            default=3,
+            help="Maximum number of retries for failed requests.",
+        )
+        parser.add_argument(
+            "--backoff",
+            type=float,
+            default=2.0,
+            help="Base time to wait before retrying failed requests.",
+        )
+        parser.add_argument(
+            "--backoff-growth",
+            dest="backoff_growth",
+            type=float,
+            default=2.0,
+            help="Growth factor for the delay between retries.",
+        )
+        parser.add_argument(
+            "--archive-responses",
+            action="store_true",
+            default=False,
+            help="If set the scraper will archive responses to S3.",
+        )
+        parser.add_argument(
+            "--use-cache",
+            action="store_true",
+            help="If set the scraper will load responses archived in S3 instead of re-requesting them. Useful when re-ingesting after a parsing fix or running a second pass with the --full-scrape option.",
+        )
+        parser.add_argument(
+            "--queue",
+            default="celery",
+            help="The celery queue to dispatch S3 archive tasks to.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            dest="throttle_min_items",
+            type=int,
+            default=50,
+            help="CeleryThrottle min queue depth; the throttle keeps the "
+            "queue between this and 2x this value.",
+        )
+
+    def parse_court_ids(self, courts: str | None) -> list[FloridaCourtID]:
+        """Parse a comma-separated list of court IDs, defaulting to all Florida courts."""
+        if courts is None:
+            courts = ""
+        court_ids = [
+            FL_COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
+        ]
+        if not court_ids:
+            logger.warning("No courts specified. Defaulting to all courts.")
+            court_ids = list(FL_COURT_ID_MAP.values())
+        return court_ids
+
+    def throttle_scraper_and_cache(
+        self,
+        rps: float,
+        max_retries: int,
+        backoff: float,
+        backoff_growth: float,
+        use_cache: bool,
+        archive_responses: bool,
+        queue: str,
+        throttle_min_items: int,
+        s3_base: Path,
+    ) -> tuple[CeleryThrottle, FloridaScraper, S3Cache]:
+        """Initializes a celery queue throttle and Florida scraper with the given parameters and returns them."""
+        throttle = CeleryThrottle(
+            queue_name=queue, min_items=throttle_min_items
+        )
+
+        cache = S3Cache(
+            base=s3_base,
+            save=archive_responses,
+            load=use_cache,
+            throttle=throttle,
+            queue_name=queue,
+        )
+
+        scraper = FloridaScraper(
+            rps=rps,
+            retry=ExponentialBackoff(
+                max_retries=max_retries,
+                backoff=backoff,
+                backoff_growth=backoff_growth,
+            ),
+            handlers=[cache],
+        )
+
+        return throttle, scraper, cache
+
+
+@dataclass
+class S3Cache(RequestHandler):
+    """Handler to use S3 as a (successful) response cache.
+
+    Attributes:
+        base: The prefix where cached values are stored
+        save: Whether to archive responses
+        load: Whether to intercept requests and load responses from S3 if available
+        throttle: The celery throttle to use when adding responses to the queue
+        queue_name: The celery queue to dispatch archive tasks to
+        storage: The S3 storage backend to use for archiving and retrieval
+    """
+
+    base: Path
+    save: bool
+    load: bool
+    throttle: CeleryThrottle
+    queue_name: str
+    storage: S3GlacierInstantRetrievalStorage = field(
+        default_factory=S3GlacierInstantRetrievalStorage
+    )
+
+    @retry(
+        (
+            botocore.exceptions.HTTPClientError,
+            botocore.exceptions.ConnectionError,
+        ),
+        delay=1,
+        backoff=2,
+    )
+    @lru_cache(512)
+    def s3_key_exists(self, key: str) -> bool:
+        """Cached check for whether a key exists in S3 with retries.
+
+        Allows us to avoid an extra `storage.exists` call when `save` and
+        `load` are both enabled.
+        """
+        if self.storage.exists(key):
+            return True
+        return False
+
+    def make_s3_key(self, request: ScheduledRequest) -> str:
+        """Make the S3 key for a request from its URL path and a hash of its method, path, and parameters."""
+        url_path = request.url.path.lower().strip("/")
+        url_params = "&".join(
+            [f"{k}={v}" for k, v in sorted(request.url.params.items())]
+        )
+        method = request.method.upper()
+        request_hash = hashlib.sha1(
+            f"{method}|{url_path}|{url_params}".encode()
+        ).hexdigest()
+        return str(self.base / url_path / request_hash)
+
+    def load_from_s3(self, request: ScheduledRequest) -> Response | None:
+        """Load a request's archived response, or None if it isn't archived or fails to load."""
+        key = self.make_s3_key(request)
+
+        try:
+            if not self.s3_key_exists(key):
+                logger.info("Did not find %s in S3", request.url.path.lower())
+                return None
+
+            logger.info("Loading %s from S3", request.url.path.lower())
+
+            with self.storage.open(key, "rb") as f:
+                return Response(200, content=f.read())
+        except Exception:
+            logger.exception(
+                "Failed to load response from archive for %s",
+                request.url.path.lower(),
+            )
+            return None
+
+    def save_to_s3(
+        self, request: ScheduledRequest, response: Response
+    ) -> None:
+        """Queue a task to archive a response.
+
+        Skipped when loading from the archive is enabled and the response is
+        already archived. Errors while checking or queuing are logged rather
+        than raised.
+        """
+        key = self.make_s3_key(request)
+        try:
+            # Don't try to cache responses that we pulled from the cache
+            if self.load and self.s3_key_exists(key):
+                return
+            self.throttle.maybe_wait()
+            save_response_to_s3.si(key, response.content).set(
+                queue=self.queue_name
+            ).apply_async()
+        except Exception:
+            logger.exception(
+                "Failed to queue archive response for %s", request.url
+            )
+
+    async def before_send(
+        self, manager: RequestManager, request: ScheduledRequest
+    ) -> None:
+        """When loading is enabled, answer the request from the archive if it is there."""
+        if not self.load:
+            return
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(None, self.load_from_s3, request)
+        if response:
+            request.response.set_result(response)
+
+    async def listen(self, manager: RequestManager, request: ScheduledRequest):
+        """When saving is enabled, archive the request's response once it arrives."""
+        if not self.save:
+            return
+
+        try:
+            response = await request.response
+        except Exception:
+            logger.exception(
+                "Cache listener failed to get response for %s", request.url
+            )
+            return
+
+        await sync_to_async(self.save_to_s3)(request, response)
+
+    def __hash__(self) -> int:
+        return hash(id(self))

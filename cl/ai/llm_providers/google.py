@@ -1,10 +1,11 @@
+"""Google Gemini batch API wrapper and its request and result types."""
+
 import json
 import logging
 import mimetypes
-import os
 import tempfile
 from datetime import date
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from google import genai
 from google.genai import types
@@ -31,6 +32,52 @@ SUPPORTED_GEMINI_MODELS: dict[str, date | None] = {
 }
 
 
+class BatchTask(TypedDict):
+    """Input for one request in a batch.
+
+    ``input_file_path`` is uploaded to the Google File Service, and
+    ``input_text`` is sent inline. Both may be given, and both are placed
+    before the user prompt.
+    """
+
+    llm_key: str
+    input_file_path: NotRequired[str]
+    input_text: NotRequired[str]
+
+
+class BatchContent(TypedDict):
+    """A user turn in a batch request.
+
+    Narrows the SDK's ``ContentDict``, whose fields are all optional, to the
+    fields that are always populated here.
+    """
+
+    parts: list[types.PartDict]
+    role: str
+
+
+class BatchRequestBody(TypedDict):
+    """The ``GenerateContentRequest`` body of a batch input file line.
+
+    Unlike the SDK's ``InlinedRequestDict``, which targets inline batches,
+    this is the REST request shape that file-based batches expect, where
+    ``cached_content`` sits beside ``contents`` rather than under ``config``.
+    """
+
+    contents: list[BatchContent]
+    cached_content: NotRequired[str]
+
+
+class BatchRequest(TypedDict):
+    """A single line of a batch input JSONL file.
+
+    ``key`` is echoed back on the matching result line.
+    """
+
+    key: str
+    request: BatchRequestBody
+
+
 class ProcessedResult(TypedDict):
     """Structure for processed batch result."""
 
@@ -50,8 +97,7 @@ class _ResponseValidator:
 
     @staticmethod
     def normalize_response(result: dict) -> dict:
-        """
-        Normalize batch or single response to consistent format.
+        """Normalize batch or single response to consistent format.
 
         Batch responses wrap the actual response in a "response" field:
         {"key": "...", "response": {"candidates": [...]}}
@@ -61,8 +107,11 @@ class _ResponseValidator:
 
         This method extracts the inner response for consistent parsing.
 
-        :param result: Response dict from Google GenAI API
-        :return: The normalized response dict (without batch wrapper)
+        Args:
+            result: Response dict from Google GenAI API
+
+        Returns:
+            The normalized response dict (without batch wrapper)
         """
         if "response" in result:
             # Batch response - unwrap it
@@ -72,13 +121,15 @@ class _ResponseValidator:
 
     @staticmethod
     def get_text(result: dict) -> str | None:
-        """
-        Extracts the text content from a successful result.
+        """Extracts the text content from a successful result.
 
         Works with both batch and single API responses.
 
-        :param result: A dict from Google GenAI API (batch or single)
-        :return: The extracted text, or None if not found.
+        Args:
+            result: A dict from Google GenAI API (batch or single)
+
+        Returns:
+            The extracted text, or None if not found.
         """
         try:
             normalized = _ResponseValidator.normalize_response(result)
@@ -88,13 +139,15 @@ class _ResponseValidator:
 
     @staticmethod
     def get_error(result: dict) -> str | None:
-        """
-        Extracts the error message from a failed result.
+        """Extracts the error message from a failed result.
 
         Works with both batch and single API responses.
 
-        :param result: A dict from Google GenAI API (batch or single)
-        :return: A formatted error string, or a default error message.
+        Args:
+            result: A dict from Google GenAI API (batch or single)
+
+        Returns:
+            A formatted error string, or a default error message.
         """
         if "error" in result:
             error = result["error"]
@@ -103,20 +156,20 @@ class _ResponseValidator:
 
 
 class GoogleGenAIBatchWrapper:
-    """
-    A stateless wrapper for Google GenAI batch operations, decoupled from Django.
-    """
+    """A stateless wrapper for Google GenAI batch operations, decoupled from Django."""
 
     def __init__(self, api_key: str, model_name: str | None = None):
-        """
-        Initializes the Google GenAI client.
+        """Initializes the Google GenAI client.
 
-        :param api_key: The Google API key (required, no fallback).
-        :param model_name: Optional model name. When provided, it is
-            validated and stored for later use by ``execute_batch`` and
-            ``get_or_create_cache``.
-        :raises ValueError: If the API key is not provided or the model
-            is invalid.
+        Args:
+            api_key: The Google API key (required, no fallback).
+            model_name: Optional model name. When provided, it is
+                validated and stored for later use by ``execute_batch`` and
+                ``get_or_create_cache``.
+
+        Raises:
+            ValueError: If the API key is not provided or the model
+                is invalid.
         """
         if not api_key:
             raise ValueError("API key is required for GoogleGenAIBatchWrapper")
@@ -133,9 +186,12 @@ class GoogleGenAIBatchWrapper:
         Logs a warning when the model has no announced shutdown date,
         prompting the caller to verify manually.
 
-        :param model: The Gemini model name to validate.
-        :raises ValueError: If the model is not supported or past its
-            shutdown date.
+        Args:
+            model: The Gemini model name to validate.
+
+        Raises:
+            ValueError: If the model is not supported or past its
+                shutdown date.
         """
         if model not in SUPPORTED_GEMINI_MODELS:
             raise ValueError(
@@ -164,16 +220,20 @@ class GoogleGenAIBatchWrapper:
         cache_display_name: str,
         cache_ttl: str = "3600s",
     ) -> str:
-        """
-        Retrieves an existing cache by display name, or creates a new one.
+        """Retrieves an existing cache by display name, or creates a new one.
 
         Requires ``model_name`` to have been set at construction time.
 
-        :param system_prompt: The system prompt text to cache.
-        :param cache_display_name: The human-readable name for the cache.
-        :param cache_ttl: TTL for cache
-        :return: The full resource name of the valid cache.
-        :raises ValueError: If ``model_name`` was not provided at init.
+        Args:
+            system_prompt: The system prompt text to cache.
+            cache_display_name: The human-readable name for the cache.
+            cache_ttl: TTL for cache
+
+        Returns:
+            The full resource name of the valid cache.
+
+        Raises:
+            ValueError: If ``model_name`` was not provided at init.
         """
         if not self.model_name:
             raise ValueError(
@@ -183,10 +243,10 @@ class GoogleGenAIBatchWrapper:
 
         for cache in self.client.caches.list():
             if cache.display_name == cache_display_name:
-                logger.info(f"Found existing cache: {cache_display_name}")
+                logger.info("Found existing cache: %s", cache_display_name)
                 return cache.name
 
-        logger.info(f"Creating new cache: {cache_display_name}")
+        logger.info("Creating new cache: %s", cache_display_name)
         cached_content = self.client.caches.create(
             model=self.model_name,
             config=types.CreateCachedContentConfig(
@@ -197,31 +257,28 @@ class GoogleGenAIBatchWrapper:
                 ttl=cache_ttl,
             ),
         )
-        logger.info(f"Cache created successfully: {cache_display_name}")
+        logger.info("Cache created successfully: %s", cache_display_name)
         return cached_content.name
 
     def prepare_batch_requests(
-        self, tasks_data: list[dict[str, Any]], user_prompt: str
-    ) -> list[dict]:
-        """
-        Prepares request dictionaries for a batch job from raw task data.
+        self, tasks_data: list[BatchTask], user_prompt: str
+    ) -> list[BatchRequest]:
+        """Prepares batch input lines for a batch job from task data.
 
         For each task, it uploads its input file (if provided) to the Google
         File Service and constructs the request payload.
 
-        :param tasks_data: A list of dictionaries, where each dict represents a task.
-                           Each dict must have an 'llm_key', and either an
-                           'input_file_path' or 'input_text'.
-        :param user_prompt: The user prompt text to be appended to each request.
-        :return: A list of request dictionaries ready for JSONL formatting.
-        """
-        batch_requests = []
-        for task_data in tasks_data:
-            llm_key = task_data.get("llm_key")
-            if not llm_key:
-                continue
+        Args:
+            tasks_data: The tasks to build requests for.
+            user_prompt: The user prompt text to be appended to each request.
 
-            parts = []
+        Returns:
+            A list of batch requests ready for JSONL formatting.
+        """
+        batch_requests: list[BatchRequest] = []
+        for task_data in tasks_data:
+            llm_key = task_data["llm_key"]
+            parts: list[types.PartDict] = []
             if file_path := task_data.get("input_file_path"):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
@@ -247,32 +304,41 @@ class GoogleGenAIBatchWrapper:
 
             parts.append({"text": user_prompt})
 
-            request_dict = {
-                "key": llm_key,
-                "request": {"contents": [{"parts": parts, "role": "user"}]},
-            }
-            batch_requests.append(request_dict)
+            batch_requests.append(
+                {
+                    "key": llm_key,
+                    "request": {
+                        "contents": [{"parts": parts, "role": "user"}]
+                    },
+                }
+            )
         return batch_requests
 
     def execute_batch(
         self,
-        requests: list[dict],
+        requests: list[BatchRequest],
         system_prompt: str | None = None,
         cache_display_name: str | None = "cl-default-cache",
         batch_display_name: str | None = "CourtListener Batch Job",
     ) -> str:
-        """
-        Creates and executes a batch job with Google GenAI. If a system prompt
-        is provided, it will be cached and applied to all requests in the batch.
+        """Creates and executes a batch job with Google GenAI.
+
+        If a system prompt is provided, it will be cached and applied to all
+        requests in the batch.
 
         Requires ``model_name`` to have been set at construction time.
 
-        :param requests: A list of prepared request dictionaries.
-        :param system_prompt: The system prompt text to use for this batch.
-        :param cache_display_name: An optional, stable name for the system prompt cache.
-        :param batch_display_name: An optional display name for the job in the Google Cloud console.
-        :return: The unique name (ID) of the created batch job.
-        :raises ValueError: If ``model_name`` was not provided at init.
+        Args:
+            requests: Batch requests from ``prepare_batch_requests``.
+            system_prompt: The system prompt text to use for this batch.
+            cache_display_name: An optional, stable name for the system prompt cache.
+            batch_display_name: An optional display name for the job in the Google Cloud console.
+
+        Returns:
+            The unique name (ID) of the created batch job.
+
+        Raises:
+            ValueError: If ``model_name`` was not provided at init.
         """
         if not self.model_name:
             raise ValueError(
@@ -290,22 +356,18 @@ class GoogleGenAIBatchWrapper:
         jsonl_content = "\n".join(json.dumps(req) for req in requests)
 
         with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, suffix=".jsonl"
+            mode="w+", delete_on_close=False, suffix=".jsonl"
         ) as temp_f:
             temp_f.write(jsonl_content)
             temp_f.flush()
-            temp_file_path = temp_f.name
 
-        try:
             jsonl_file = self.client.files.upload(
-                file=temp_file_path,
+                file=temp_f.name,
                 config=types.UploadFileConfig(
                     display_name=batch_display_name,
                     mime_type="application/jsonl",
                 ),
             )
-        finally:
-            os.remove(temp_file_path)
 
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
 
@@ -317,21 +379,27 @@ class GoogleGenAIBatchWrapper:
         return job.name
 
     def get_job(self, batch_id: str) -> types.BatchJob:
-        """
-        Retrieves the full BatchJob object, including its status, from Google.
+        """Retrieves the full BatchJob object, including its status, from Google.
 
-        :param batch_id: The unique name (ID) of the batch job.
-        :return: The Google GenAI BatchJob object.
+        Args:
+            batch_id: The unique name (ID) of the batch job.
+
+        Returns:
+            The Google GenAI BatchJob object.
         """
         return self.client.batches.get(name=batch_id)
 
     def download_results(self, job: types.BatchJob) -> str:
-        """
-        Downloads the result file of a completed job and returns its raw content.
+        """Downloads the result file of a completed job and returns its raw content.
 
-        :param job: A completed Google GenAI BatchJob object.
-        :return: The raw JSONL content of the result file as a string.
-        :raises ValueError: If the job has not succeeded.
+        Args:
+            job: A completed Google GenAI BatchJob object.
+
+        Returns:
+            The raw JSONL content of the result file as a string.
+
+        Raises:
+            ValueError: If the job has not succeeded.
         """
         if job.state not in DOWNLOADABLE_JOB_STATES:
             raise ValueError(
@@ -344,37 +412,37 @@ class GoogleGenAIBatchWrapper:
         )
 
     def process_results(self, jsonl_content: str) -> list[ProcessedResult]:
-        """
-        Parses a raw JSONL result string and validates each line item.
+        """Parses a raw JSONL result string and validates each line item.
 
-        :param jsonl_content: The raw JSONL content from a completed batch job.
-        :return: A list of structured dictionaries, one for each task result,
+        Args:
+            jsonl_content: The raw JSONL content from a completed batch job.
+
+        Returns:
+            A list of structured dictionaries, one for each task result,
                  containing the key, status, content, and any error messages.
         """
         if not jsonl_content or not jsonl_content.strip():
             return []
 
-        processed_results = []
         results = [
             json.loads(line)
             for line in jsonl_content.splitlines()
             if line.strip()
         ]
 
-        for result in results:
+        def process_result(result: dict) -> ProcessedResult:
             key = result.get("key")
             text = _ResponseValidator.get_text(result)
 
             status = "SUCCEEDED" if text else "FAILED"
-            processed_results.append(
-                {
-                    "key": key,
-                    "status": status,
-                    "content": text,
-                    "error_message": None
-                    if status == "SUCCEEDED"
-                    else _ResponseValidator.get_error(result),
-                    "raw_result": result,
-                }
-            )
-        return processed_results
+            return {
+                "key": key,
+                "status": status,
+                "content": text,
+                "error_message": None
+                if status == "SUCCEEDED"
+                else _ResponseValidator.get_error(result),
+                "raw_result": result,
+            }
+
+        return [process_result(result) for result in results]

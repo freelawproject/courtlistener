@@ -1,3 +1,5 @@
+"""REST API viewsets for looking up citations."""
+
 from http import HTTPStatus
 
 from asgiref.sync import async_to_sync
@@ -28,6 +30,8 @@ from cl.search.selectors import get_clusters_from_citation_str
 
 
 class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
+    """API endpoint that finds the opinion clusters for citations."""
+
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated, V3APIPermission]
@@ -35,6 +39,11 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     citation_list: list[FullCaseCitation | ShortCaseCitation] = []
 
     def validate_request_data(self, request: Request):
+        """Validate the request's data and return it.
+
+        Raises:
+            ValidationError: If the request's data is invalid.
+        """
         # Perform object level validations before extracting citations
         citation_serializer = CitationAPIRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
@@ -42,6 +51,11 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         return citation_serializer.validated_data
 
     def create(self, request: Request, *args, **kwargs):
+        """Look up the citations in the request's text, or its single reporter citation.
+
+        Citations past ``MAX_CITATIONS_PER_REQUEST`` get a 429 status
+        instead of being looked up.
+        """
         citations = []
         data = self.validate_request_data(request)
         text = data.get("text", None)
@@ -131,8 +145,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     def _citation_handler(
         self, request: Request, reporter: str, volume: str, page: str
     ) -> CitationAPIResponse:
-        """
-        This method retrieves opinion clusters that match a citation string.
+        """This method retrieves opinion clusters that match a citation string.
 
         Args:
             request (Request): The HTTP object containing information
@@ -192,11 +205,8 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[str], volume: str, page: str
-    ) -> tuple[
-        QuerySet[OpinionCluster, OpinionCluster] | None, int, list[str]
-    ]:
-        """
-        Retrieves opinion clusters associated with a list of reporter slugs.
+    ) -> tuple[QuerySet[OpinionCluster] | None, int, list[str]]:
+        """Retrieves opinion clusters associated with a list of reporter slugs.
 
         This method takes a list of reporter variations (as slugs) and attempts
         to find all associated opinion clusters.
@@ -224,7 +234,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
                 reporter, volume, page
             )
 
-            if not _count:
+            if opinions is None or not _count:
                 continue
 
             clusters = clusters | opinions if clusters else opinions
@@ -233,12 +243,10 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _format_cluster_response(
         self,
-        clusters: QuerySet[OpinionCluster, OpinionCluster],
+        clusters: QuerySet[OpinionCluster],
         cluster_count: int,
     ) -> CitationAPIResponse:
-        """
-        Enhances the provided cluster queryset and formats the data
-        for the response.
+        """Enhances the provided cluster queryset and formats the data for the response.
 
         Args:
             request (Request): The HTTP request object.

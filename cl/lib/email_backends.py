@@ -1,3 +1,5 @@
+"""Email backend that filters, stores, and rate-limits outgoing messages."""
+
 import time
 from collections.abc import Sequence
 
@@ -24,21 +26,21 @@ from cl.users.email_handlers import (
 
 def get_email_prefix() -> str:
     """Simple helper for getting the prefix for the email counter.
+
     Useful for mocking the logger.
     """
     return "email"
 
 
 def incr_email_counters(pipe: Pipeline) -> None:
-    """increments the temporary counter and adds a new
-    element to the sorted set once it reaches the value of
-    the EMAILS_TEMP_COUNTER setting.
+    """Increments the temporary counter and adds a new element to the sorted set once it reaches the value of the EMAILS_TEMP_COUNTER setting.
 
     Args:
         pipe (Pipeline): A pipeline object.
     """
     prefix = get_email_prefix()
-    temp_counter = int(pipe.get(f"{prefix}:temp_counter") or 0)  # type: ignore
+    # pyrefly: ignore[bad-argument-type]
+    temp_counter = int(pipe.get(f"{prefix}:temp_counter") or 0)
     pipe.multi()
     if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
         current_time = time.time_ns()
@@ -51,11 +53,11 @@ def incr_email_counters(pipe: Pipeline) -> None:
 
 
 def get_attempts_in_window(r: Redis) -> int:
-    """
-    Returns the number of elements stored in the set. This method
-    check the current time, and shave off any attempts in the sorted set
-    that are outside of our window, then check the cardinality of the
-    sorted set
+    """Returns the number of elements stored in the set.
+
+    This method check the current time, and shave off any attempts in the
+    sorted set that are outside of our window, then check the cardinality of
+    the sorted set.
 
     Args:
         r (Redis): The Redis DB connection interface.
@@ -100,9 +102,9 @@ def get_email_count(r: Redis) -> int:
 
 
 def check_emergency_brake(r: Redis) -> None:
-    """
-    Checks the emails sent in the last 24 hours. Raises ValueError
-    if our threshold is exceeded.
+    """Checks the emails sent in the last 24 hours.
+
+    Raises ValueError if our threshold is exceeded.
 
     AWS SES uses a sliding window to calculate our email sending quota.
     When it runs out, we cannot recover without waiting ~24 hours, so
@@ -144,8 +146,7 @@ def check_emergency_brake(r: Redis) -> None:
 
 
 class EmailBackend(BaseEmailBackend):
-    """This is a custom email backend to handle sending an email with some
-    extra functions before the email is sent.
+    """This is a custom email backend to handle sending an email with some extra functions before the email is sent.
 
     It is necessary to set the following settings:
     BASE_BACKEND: The base email backend to use to send emails, in our case:
@@ -164,71 +165,78 @@ class EmailBackend(BaseEmailBackend):
         self,
         email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
     ) -> int:
+        """Store and send messages through the base backend.
+
+        Banned recipients are dropped, and recipients under a backoff period
+        get the message queued instead of sent.
+
+        Returns:
+            The number of messages sent.
+        """
         if not email_messages:
             return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).
         base_backend = settings.BASE_BACKEND
-        connection = get_connection(base_backend)
-        connection.open()
-        r = get_redis_interface("CACHE")
-        msg_count = 0
-        for email_message in email_messages:
-            original_recipients = normalize_addresses(email_message.to)
-            recipient_list = []
+        with get_connection(base_backend) as connection:
+            r = get_redis_interface("CACHE")
+            msg_count = 0
+            for email_message in email_messages:
+                original_recipients = normalize_addresses(email_message.to)
+                recipient_list = []
 
-            # Verify a recipient's email address is banned.
-            for email_address in original_recipients:
-                if is_not_email_banned(email_address):
-                    recipient_list.append(email_address)
+                # Verify a recipient's email address is banned.
+                for email_address in original_recipients:
+                    if is_not_email_banned(email_address):
+                        recipient_list.append(email_address)
 
-            # If all recipients are banned, the message is discarded
-            if not recipient_list:
-                continue
+                # If all recipients are banned, the message is discarded
+                if not recipient_list:
+                    continue
 
-            email = email_message
+                email = email_message
 
-            # Verify if email addresses are under a backoff waiting period
-            final_recipient_list = []
-            backoff_recipient_list = []
-            for email_address in recipient_list:
-                if under_backoff_waiting_period(email_address):
-                    # If an email address is under a waiting period
-                    # add to a backoff recipient list to queue the message
-                    backoff_recipient_list.append(email_address)
-                else:
-                    # If an email address is not under a waiting period
-                    # add to the final recipients list
-                    final_recipient_list.append(email_address)
+                # Verify if email addresses are under a backoff waiting period
+                final_recipient_list = []
+                backoff_recipient_list = []
+                for email_address in recipient_list:
+                    if under_backoff_waiting_period(email_address):
+                        # If an email address is under a waiting period
+                        # add to a backoff recipient list to queue the message
+                        backoff_recipient_list.append(email_address)
+                    else:
+                        # If an email address is not under a waiting period
+                        # add to the final recipients list
+                        final_recipient_list.append(email_address)
 
-            # check the emergency brake before sending an email
-            check_emergency_brake(r)
-            # Store message in DB and obtain the unique
-            # message_id to add in headers to identify the message
-            stored_id = store_message(email_message)
+                # check the emergency brake before sending an email
+                check_emergency_brake(r)
+                # Store message in DB and obtain the unique
+                # message_id to add in headers to identify the message
+                stored_id = store_message(email_message)
 
-            if backoff_recipient_list:
-                # Enqueue message for recipients under a waiting backoff period
-                enqueue_email(backoff_recipient_list, stored_id)
+                if backoff_recipient_list:
+                    # Enqueue message for recipients under a waiting backoff period
+                    enqueue_email(backoff_recipient_list, stored_id)
 
-            # Add header with unique message_id to identify message
-            email.extra_headers["X-CL-ID"] = stored_id
-            # Use base backend connection to send the message
-            email.connection = connection
+                # Add header with unique message_id to identify message
+                email.extra_headers["X-CL-ID"] = stored_id
+                # Use base backend connection to send the message
+                email.connection = connection
 
-            # Call add_bcc_random function to BCC the message based on the
-            # EMAIL_BCC_COPY_RATE set
-            email = add_bcc_random(email, settings.EMAIL_BCC_COPY_RATE)
+                # Call add_bcc_random function to BCC the message based on the
+                # EMAIL_BCC_COPY_RATE set
+                email = add_bcc_random(email, settings.EMAIL_BCC_COPY_RATE)
 
-            # If we have recipients to send the message to, we send it.
-            if final_recipient_list:
-                # Update message with the final recipient list
-                email.to = final_recipient_list
-                email.send()
-                # update the counters
-                prefix = get_email_prefix()
-                r.transaction(incr_email_counters, f"{prefix}:temp_counter")
-                msg_count += 1
+                # If we have recipients to send the message to, we send it.
+                if final_recipient_list:
+                    # Update message with the final recipient list
+                    email.to = final_recipient_list
+                    email.send()
+                    # update the counters
+                    prefix = get_email_prefix()
+                    r.transaction(
+                        incr_email_counters, f"{prefix}:temp_counter"
+                    )
+                    msg_count += 1
 
-        # Close base backend connection
-        connection.close()
         return msg_count

@@ -1,3 +1,5 @@
+"""Import SCOTUS dockets from S3 using an inventory CSV."""
+
 import csv
 import time
 
@@ -18,15 +20,20 @@ from cl.lib.indexing_utils import (
 
 def compose_redis_key() -> str:
     """Compose a Redis key for SCOTUS importer log.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "scotus_docket_import:log"
 
 
 class Command(VerboseCommand):
+    """Queue the download and ingestion of the SCOTUS dockets in an S3 inventory."""
+
     help = "Import SCOTUS dockets from S3 using an inventory CSV."
 
     def add_arguments(self, parser):
+        """Add the inventory, queue, throttling, delay, and resume options."""
         parser.add_argument(
             "--inventory-file",
             required=True,
@@ -75,6 +82,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Queue a download-then-ingest chain for each inventory row.
+
+        Starts at ``--start-row``, or at the last logged row with
+        ``--auto-resume``. Progress is logged every 100 rows.
+        """
         super().handle(*args, **options)
 
         retrieval_queue = options["retrieval_queue"]
@@ -95,7 +107,7 @@ class Command(VerboseCommand):
             queue_name=ingesting_queue,
         )
 
-        with open(inventory_path) as f:
+        with inventory_path.open() as f:
             reader = csv.reader(f)
             for row_idx, row in enumerate(reader):
                 if row_idx < start_row:

@@ -1,3 +1,5 @@
+"""Helpers for looking up courts and their minimal data."""
+
 import logging
 from dataclasses import dataclass
 
@@ -6,21 +8,24 @@ from django.core.cache import cache
 
 from cl.search.models import Court
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def get_cache_key_for_court_list() -> str:
-    """
-    Returns the cache key used to store the list of courts. This method
-    allows predictable cache isolation during testing.
+    """Returns the cache key used to store the list of courts.
 
-    :return: The cache key, which is currently "minimal-court-list".
+    This method allows predictable cache isolation during testing.
+
+    Returns:
+        The cache key, which is currently "minimal-court-list".
     """
     return "minimal-court-list"
 
 
 @dataclass
 class MinimalCourtData:
+    """A court's ID, short name, usage, and parent court."""
+
     pk: str
     short_name: str
     in_use: bool
@@ -28,16 +33,15 @@ class MinimalCourtData:
 
 
 def get_minimal_list_of_courts() -> list[MinimalCourtData]:
-    """
-    Retrieves a list of courts with essential information.
+    """Retrieves a list of courts with essential information.
 
     It uses a cache to store and retrieve this data, reducing db load.
 
     The cache is set to expire after 24 hours.
 
-    :return: A list of MinimalCourtData objects
+    Returns:
+        A list of MinimalCourtData objects
     """
-
     data = cache.get(get_cache_key_for_court_list())
     if data is not None:
         return data
@@ -52,34 +56,30 @@ def get_minimal_list_of_courts() -> list[MinimalCourtData]:
 
 
 def get_active_court_from_cache() -> list[MinimalCourtData]:
-    """
-    Retrieves a list of active courts from the cached court data.
+    """Retrieves a list of active courts from the cached court data.
 
-    :return: A list of MinimalCourtData objects representing active courts.
+    Returns:
+        A list of MinimalCourtData objects representing active courts.
     """
     courts = get_minimal_list_of_courts()
     return [c for c in courts if c.in_use]
 
 
 def get_court_parent_ids(courts: list[MinimalCourtData]) -> set[str]:
-    """
-    Extracts the unique parent court IDs from a list of court objects.
+    """Extracts the unique parent court IDs from a list of court objects.
 
-    :return: A set containing the unique parent court IDs, excluding None
+    Returns:
+        A set containing the unique parent court IDs, excluding None
         values.
     """
-    court_ids = {
-        court.parent_court_id for court in courts if court.parent_court_id
-    }
-    return court_ids
+    return {court.parent_court_id for court in courts if court.parent_court_id}
 
 
 def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
-    """
-    Recursively finds all child court IDs for a given list of court IDs, using
-    a cached list of courts.
+    """Recursively finds all child court IDs for a given list of court IDs, using a cached list of courts.
 
-    :return: A set containing the original court IDs and all their descendant
+    Returns:
+        A set containing the original court IDs and all their descendant
         court IDs.
     """
     if not court_ids:
@@ -128,12 +128,14 @@ def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
 def find_court_object_by_name(
     lower_court_name: str, bankruptcy: bool | None = None
 ) -> Court | None:
-    """Find a court by name using courts-db and return a Court object if it’s
-    found and unique. Log an error if it is not found or if it is ambiguous.
+    """Find a court by name using courts-db and return a Court object if it’s found and unique. Log an error if it is not found or if it is ambiguous.
 
-    :param lower_court_name: The name of the lower court to look for.
-    :param bankruptcy: Are we looking for a bankruptcy court?
-    :return: The lower court if found, else None.
+    Args:
+        lower_court_name: The name of the lower court to look for.
+        bankruptcy: Are we looking for a bankruptcy court?
+
+    Returns:
+        The lower court if found, else None.
     """
     if not lower_court_name:
         return None

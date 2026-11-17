@@ -1,12 +1,18 @@
+"""Helpers for docket numbers, upload paths, validation, and CSV export of models."""
+
+from __future__ import annotations
+
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.db.models import Field, Model
+from django.utils.safestring import SafeString
 from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
@@ -17,14 +23,25 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes
 
+if TYPE_CHECKING:
+    from cl.audio.models import Audio
+    from cl.lasc.models import LASCJSON
+    from cl.search.models import (
+        Docket,
+        Opinion,
+        OpinionCluster,
+        RECAPDocument,
+    )
+
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
+    """Check if a string starts with a district or appellate bankruptcy docket number."""
     pattern = rf"{dist_d_num_regex}|{appellate_bankr_d_num_regex}"
     if re.match(pattern, value):
         return True
@@ -32,8 +49,7 @@ def is_docket_number(value: str) -> bool:
 
 
 def clean_docket_number(docket_number: str | None) -> str:
-    """Clean a docket number and returns the actual docket_number if is a
-    valid docket number and if there is only one valid docket number.
+    """Clean a docket number and returns the actual docket_number if is a valid docket number and if there is only one valid docket number.
 
     Converts docket numbers like:
 
@@ -45,9 +61,12 @@ def clean_docket_number(docket_number: str | None) -> str:
     Nos. 212-213 -> "" no valid docket number
     Nos. 17-11426, 15-11166 -> "" multiple valid docket numbers
 
-    :param docket_number: The docket number to clean.
-    :return: The cleaned docket number or an empty string if no valid docket
-    number is found.
+    Args:
+        docket_number: The docket number to clean.
+
+    Returns:
+        The cleaned docket number or an empty string if no valid docket
+        number is found.
     """
     if docket_number is None:
         return ""
@@ -71,8 +90,7 @@ def clean_docket_number(docket_number: str | None) -> str:
 
 
 def clean_scotus_docket_number(docket_number: str | None) -> str:
-    """Clean a SCOTUS docket number, prioritizing the NN-NNNN format over the
-    NNA format.
+    """Clean a SCOTUS docket number, prioritizing the NN-NNNN format over the NNA format.
 
     SCOTUS docket numbers can appear in formats like:
         No. 01-8148         -> 01-8148
@@ -83,8 +101,11 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     When multiple numbers of the same type are found, the lexicographically
     smallest one is selected to ensure deterministic behavior.
 
-    :param docket_number: The docket number to clean.
-    :return: The cleaned docket number or an empty string.
+    Args:
+        docket_number: The docket number to clean.
+
+    Returns:
+        The cleaned docket number or an empty string.
     """
     if not docket_number:
         return ""
@@ -116,6 +137,12 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
 
 
 def make_appellate_bankr_number_core(cleaned_docket_number: str) -> str | None:
+    """Make the core of an appellate or bankruptcy docket number.
+
+    Returns:
+        The two-digit year followed by the case number padded to six digits,
+        or None if the docket number doesn't match.
+    """
     bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
     if bankr_m:
         # Pad to six characters because some courts have a LOT of bankruptcies
@@ -139,10 +166,13 @@ def make_docket_number_core(docket_number: str | None) -> str:
     Changes here should be reflected in the RECAP extension's
     makeDocketNumberCore function.
 
-    :param docket_number: A docket number to condense
-    :return empty string if no change possible, or the condensed version if it
-    worked. Note that all values returned are strings. We cannot return an int
-    because that'd strip leading zeroes, which we need.
+    Args:
+        docket_number: A docket number to condense
+
+    Returns:
+        empty string if no change possible, or the condensed version if it
+        worked. Note that all values returned are strings. We cannot return an int
+        because that'd strip leading zeroes, which we need.
     """
     if docket_number is None:
         return ""
@@ -162,28 +192,30 @@ def make_docket_number_core(docket_number: str | None) -> str:
 def is_texas_court(court_id: str) -> bool:
     """Check if the given court_id belongs to a Texas state court.
 
-    :param court_id: The CourtListener court_id to check.
-    :return: True if the court is a Texas state court.
+    Args:
+        court_id: The CourtListener court_id to check.
+
+    Returns:
+        True if the court is a Texas state court.
     """
     return (
         court_id == "tex"
         or court_id == "texcrimapp"
-        or court_id.startswith("txctapp")
-        or court_id.startswith("texdistct")
-        or court_id.startswith("texcrimdistct")
-        or court_id.startswith("texctyct")
+        or court_id.startswith(
+            ("txctapp", "texdistct", "texcrimdistct", "texctyct")
+        )
     )
 
 
 def normalize_texas_appellate_docket_number(docket_number: str) -> str:
-    """Normalizes a Texas appellate docket number pulled from the Appellate
-    Case Information table. Returns the original docket number with normalized
-    dashes and converted to lowercase if it can't be normalized into an
-    appellate docket number.
+    """Normalizes a Texas appellate docket number pulled from the Appellate Case Information table. Returns the original docket number with normalized dashes and converted to lowercase if it can't be normalized into an appellate docket number.
 
-    :param docket_number: The docket number to clean.
-    :return: The cleaned docket number."""
+    Args:
+        docket_number: The docket number to clean.
 
+    Returns:
+        The cleaned docket number.
+    """
     docket_number = normalize_dashes(docket_number.lower().strip())
     cr_ending = docket_number.endswith("cr")
     cv_ending = docket_number.endswith("cv")
@@ -212,16 +244,18 @@ def normalize_texas_appellate_docket_number(docket_number: str) -> str:
 
 
 def clean_texas_docket_number(docket_number: str | None) -> str:
-    """Clean a Texas docket number by extracting the valid docket number
-    from potentially dirty input using Juriscraper's regex patterns.
+    """Clean a Texas docket number by extracting the valid docket number from potentially dirty input using Juriscraper's regex patterns.
 
     Converts inputs like:
 
         Case Number: 04-97-00972-CV -> 04-97-00972-CV
         04-97-00972-CV -> 04-97-00972-CV
 
-    :param docket_number: The docket number to clean.
-    :return: The cleaned docket number or empty string if no valid match.
+    Args:
+        docket_number: The docket number to clean.
+
+    Returns:
+        The cleaned docket number or empty string if no valid match.
     """
     if not docket_number:
         return ""
@@ -272,9 +306,12 @@ def make_texas_docket_number_core(docket_number: str | None) -> str:
     docket numbers, but they need to be normalized differently so we need a
     separate method.
 
-    :param docket_number: The docket number to normalize.
-    :return: The normalized docket number, or empty string if no valid
-    docket number is found.
+    Args:
+        docket_number: The docket number to normalize.
+
+    Returns:
+        The normalized docket number, or empty string if no valid
+        docket number is found.
     """
     if docket_number is None:
         return ""
@@ -292,10 +329,13 @@ def make_scotus_docket_number_core(docket_number: str | None) -> str:
 
     Prioritizes the NN-NNNN format over the NNA format when both are present.
 
-    :param docket_number: The docket number to condense.
-    :return: empty string if no change possible, or the condensed version if it
-    worked. Note that all values returned are strings. We cannot return an int
-    because that'd strip leading zeroes, which we need.
+    Args:
+        docket_number: The docket number to condense.
+
+    Returns:
+        empty string if no change possible, or the condensed version if it
+        worked. Note that all values returned are strings. We cannot return an int
+        because that'd strip leading zeroes, which we need.
     """
     if not docket_number:
         return ""
@@ -324,31 +364,36 @@ def make_path(root: str, filename: str) -> str:
     )
 
 
-def _make_llm_file_path(root: str, instance, filename: str) -> str:
-    """Make a file path for LLM related uploads
+def _make_llm_file_path(root: str, instance: Model, filename: str) -> str:
+    """Make a file path for LLM related uploads.
 
     Falls back to uuid4 when instance.pk is None (unsaved instance)
 
-    :param root: The root directory for the file path.
-    :param instance: The model instance.
-    :param filename: The original filename.
-    :returns: The generated file path.
+    Args:
+        root: The root directory for the file path.
+        instance: The model instance.
+        filename: The original filename.
+
+    Returns:
+        The generated file path.
     """
     ext = Path(filename).suffix
     name = instance.pk or uuid4().hex
     return make_path(root, f"{name}{ext}")
 
 
-make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
-make_llm_request_response_file_path = partial(
+make_llm_task_input_file_path: partial[str] = partial(
+    _make_llm_file_path, "llm-tasks"
+)
+make_llm_request_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-requests"
 )
-make_llm_task_response_file_path = partial(
+make_llm_task_response_file_path: partial[str] = partial(
     _make_llm_file_path, "llm-tasks/responses"
 )
 
 
-def make_lasc_path(instance, filename):
+def make_lasc_path(instance: LASCJSON, filename: str) -> str:
     """Make a simple path for uploaded files.
 
     Start with the `root` node, and use the current date as the subdirectories.
@@ -358,7 +403,7 @@ def make_lasc_path(instance, filename):
     )
 
 
-def make_recap_path(instance, filename):
+def make_recap_path(instance: Docket, filename: str) -> str:
     """Make a path to a good location on the local system for RECAP files.
 
     This dumps them all into the same directory, which seems to be OK, at least
@@ -367,8 +412,10 @@ def make_recap_path(instance, filename):
     return f"recap/{get_valid_filename(filename)}"
 
 
-def base_recap_path(instance, filename, base_dir):
-    """Make a filepath, accepting an extra parameter for the base directory
+def base_recap_path(
+    instance: RECAPDocument, filename: str, base_dir: str
+) -> str:
+    """Make a filepath, accepting an extra parameter for the base directory.
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
@@ -390,7 +437,9 @@ class SupportsPdfPath(Protocol):
     document -- so the contract is a Protocol rather than the base class.
     """
 
-    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str: ...
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Get the storage path for a PDF, or for its thumbnail if ``thumbs`` is set."""
+        ...
 
 
 def make_pdf_path(
@@ -405,48 +454,61 @@ def make_pdf_path(
     return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
-def make_json_path(instance, filename):
+def make_json_path(instance: Model, filename: str) -> str:
+    """`upload_to` callback for JSON files, dated under ``json-data``."""
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_path("json-data", filename)
 
 
-def make_lasc_json_path(instance, filename):
+def make_lasc_json_path(instance: LASCJSON, filename: str) -> str:
+    """`upload_to` callback for LASC JSON files."""
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_lasc_path(instance, filename)
 
 
 def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
+    """`upload_to` callback for PDF thumbnails."""
     return make_pdf_path(instance, filename, thumbs=True)
 
 
-def make_upload_path(instance, filename):
-    """Return a string like pdf/2010/08/13/foo_v._var.pdf
+def make_upload_path(
+    instance: Audio | Opinion | OpinionCluster, filename: str
+) -> str:
+    """Return a string like pdf/2010/08/13/foo_v._var.pdf.
 
     This function requires that when you save an item you provide an attribute
     called file_with_date on the object. That date will be used to place the
     item in the correct location on disk.
     """
-    try:
-        # Cannot do proper type checking here because of circular import
-        # problems when importing Audio, Document, etc.
+    if hasattr(instance, "file_with_date"):
         d = instance.file_with_date
-    except AttributeError:
+    else:
         from cl.audio.models import Audio
         from cl.search.models import Opinion, OpinionCluster
 
         if isinstance(instance, Audio):
             d = instance.docket.date_argued
+            if d is None:
+                raise TypeError(
+                    "Cannot save audio with null docket.date_argued and no file_with_date attribute"
+                )
         elif isinstance(instance, Opinion):
             d = instance.cluster.date_filed
         elif isinstance(instance, OpinionCluster):
             d = instance.date_filed
+        else:
+            raise TypeError(
+                f"{instance.__class__!r} is not supported by make_upload_path without a file_with_date attribute"
+            )
 
     return f"{filename.split('.')[-1]}/{d.year}/{d.month:02d}/{d.day:02d}/{get_valid_filename(filename)}"
 
 
-def validate_partial_date(instance, fields):
+def validate_partial_date[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
     """Ensure that partial dates make sense.
 
     Validates that:
@@ -486,9 +548,10 @@ def validate_partial_date(instance, fields):
             )
 
 
-def validate_is_not_alias(instance, fields):
-    """Ensure that an alias to an object is not being used instead of the object
-    itself.
+def validate_is_not_alias[M: Model](
+    instance: M, fields: Iterable[str]
+) -> None:
+    """Ensure that an alias to an object is not being used instead of the object itself.
 
     Requires that the object have an is_alias property or attribute.
     """
@@ -503,17 +566,15 @@ def validate_is_not_alias(instance, fields):
             )
 
 
-def validate_has_full_name(instance):
-    """This ensures that blank values are not passed to the first and last name
-    fields. Normally this can be done by the DB layer, but people could still
-    pass blank strings through, and this blocks even that.
-    """
+def validate_has_full_name(instance: Any) -> None:
+    """This ensures that blank values are not passed to the first and last name fields. Normally this can be done by the DB layer, but people could still pass blank strings through, and this blocks even that."""
     if not all([instance.name_first, instance.name_last]):
         raise ValidationError("Both first and last names are required.")
 
 
-def validate_nomination_fields_ok(instance):
-    """Validate a few things:
+def validate_nomination_fields_ok(instance: Any) -> None:
+    """Validate the following date rules.
+
     - date_nominated and date_elected cannot both have values
     - if nominated, then date_elected not complete and vice versa.
     """
@@ -538,7 +599,7 @@ def validate_nomination_fields_ok(instance):
             )
 
 
-def validate_supervisor(instance):
+def validate_supervisor(instance: Any) -> None:
     """Ensure that the supervisor field makes sense.
 
     - Supervisors can only be judges.
@@ -563,8 +624,8 @@ def validate_supervisor(instance):
         )
 
 
-def validate_all_or_none(instance, fields):
-    """Ensure that all fields are complete or that none are complete"""
+def validate_all_or_none(instance: Any, fields: Sequence[str]) -> None:
+    """Ensure that all fields are complete or that none are complete."""
     num_fields = len(fields)
     completed_fields = sum(
         1 for f in fields if getattr(instance, f) or getattr(instance, f) == 0
@@ -579,7 +640,7 @@ def validate_all_or_none(instance, fields):
         )
 
 
-def validate_exactly_n(instance, n, fields):
+def validate_exactly_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that exactly n of the fields has a value."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields != n:
@@ -589,7 +650,7 @@ def validate_exactly_n(instance, n, fields):
         )
 
 
-def validate_at_most_n(instance, n, fields):
+def validate_at_most_n(instance: Any, n: int, fields: Iterable[str]) -> None:
     """Ensure that at most n fields are complete."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
@@ -599,7 +660,7 @@ def validate_at_most_n(instance, n, fields):
         )
 
 
-def validate_not_all(instance, fields):
+def validate_not_all(instance: Any, fields: Sequence[str]) -> None:
     """Make sure that all of the passed fields are not complete."""
     num_fields = len(fields)
     num_completed_fields = sum(1 for f in fields if getattr(instance, f))
@@ -610,11 +671,11 @@ def validate_not_all(instance, fields):
         )
 
 
-def make_choices_group_lookup(c):
-    """Invert a choices variable in a model to get the group name for a
-    tuple.
-    """
-    d = {}
+def make_choices_group_lookup[K, V](
+    c: Iterable[tuple[K, V | list[Sequence[K]] | tuple[Sequence[K]]]],
+) -> dict[K, K | V]:
+    """Invert a choices variable in a model to get the group name for a tuple."""
+    d: dict[K, K | V] = {}
     for choice, value in c:
         if isinstance(value, (list | tuple)):
             for t in value:
@@ -624,9 +685,10 @@ def make_choices_group_lookup(c):
     return d
 
 
-def invert_choices_group_lookup(c):
+def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
     """Invert a choices variable in a model to get the key from the value.
-    (key:, 'value') -> {'value': key}
+
+    (key:, 'value') -> {'value': key}.
     """
     d = {}
     for choice, value in c:
@@ -634,52 +696,26 @@ def invert_choices_group_lookup(c):
     return d
 
 
-def flatten_choices(self):
-    """Flattened version of choices tuple on a model or form field
-
-    Important helper when you have named groups in your choices that you need
-    to have flattened.
-    """
-    flat = []
-    for choice, value in self.choices:
-        if isinstance(value, (list | tuple)):
-            flat.extend(value)
-        else:
-            flat.append((choice, value))
-    return flat
-
-
-def choices_to_csv(obj, field_name):
+def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:
     """Produce a CSV of possible choices for a field on an object.
 
-    :param obj: The object type you want to inspect
-    :param field_name: The field on the object you want to get the choices for
-    :return s: A comma-separated list of possible values for the field
+    Args:
+        obj: The object type you want to inspect
+        field_name: The field on the object you want to get the choices for
+
+    Returns:
+        s: A comma-separated list of possible values for the field
     """
     field = obj._meta.get_field(field_name)
-    flat_choices = flatten_choices(field)
+    if not isinstance(field, Field):
+        raise TypeError(f"{field_name} is not a concrete field")
     # Get the second value in the choices tuple
-    choice_values = [t for s, t in flat_choices]
+    choice_values = [t for s, t in field.flatchoices]
     return oxford_join(choice_values, conjunction="or", separator=";")
 
 
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, "auto_now"):
-                field.auto_now = False
-            if hasattr(field, "auto_now_add"):
-                field.auto_now_add = False
-
-
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
-    """Make an originating docket number for an appellate case into a link (MVP version)
+    """Make an originating docket number for an appellate case into a link (MVP version).
 
     **NOTE: These links are presented to users and should be subject to strict security checks.**
 
@@ -697,9 +733,12 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     This is all quite unlikely, but we can ensure it doesn't happen by being strict about
     the inputs our regular expressions capture.
 
-    :param agency: The administrative agency the case originated from
-    :param og_docket_number: The docket number where the case was originally heard.
-    :returns: A linkified version of the docket number for the user to click on, or the original if no link can be made.
+    Args:
+        agency: The administrative agency the case originated from
+        og_docket_number: The docket number where the case was originally heard.
+
+    Returns:
+        A linkified version of the docket number for the user to click on, or the original if no link can be made.
     """
     # Simple pattern for Federal Register citations
     fr_match = re.search(
@@ -752,30 +791,52 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 
 class CSVExportMixin:
+    """Export model rows to CSV.
+
+    Subclasses list their fields in csv_columns, or override get_csv_columns
+    and get_column_function.
+    """
+
+    # The fields exported to CSV, in order.
+    csv_columns: list[str] = []
+
     def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
         """Get list of column names required in a csv file.
-        If get column name is True. It will add class name to attribute
 
-        :param: get_column_name: bool. Whether add class name to attr name
+        If get column name is True. It will add class name to attribute.
 
-        :return: list of attrs of class to get into csv file"""
-        raise NotImplementedError(
-            "Subclass must implement get_csv_columns method"
-        )
+        Args:
+            get_column_name: bool. Whether add class name to attr name
+
+        Returns:
+            list of attrs of class to get into csv file
+        """
+        if not self.csv_columns:
+            raise NotImplementedError(
+                "Subclass must set csv_columns or implement get_csv_columns"
+            )
+        columns = list(self.csv_columns)
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
 
     def get_column_function(self) -> dict[str, Callable[[str], str]]:
-        """Get dict of attrs: function to apply on field value if it needs
-        to be pre-processed before being add to csv
+        """Get dict of attrs: function to apply on field value if it needs to be pre-processed before being add to csv.
 
-        returns: dict -- > {attr1: function}"""
-        raise NotImplementedError(
-            "Subclass must implement get_column_fuction method"
-        )
+        returns: dict -- > {attr1: function}
+        """
+        if not self.csv_columns:
+            raise NotImplementedError(
+                "Subclass must set csv_columns or implement get_column_function"
+            )
+        return {}
 
     def to_csv_row(self) -> list[str]:
         """Get fields in model based on attrs column names.
-        Apply function to attr value if required.
-        Return list of modified values for csv row"""
+
+        Apply function to attr value if required. Return list of modified
+        values for csv row.
+        """
         row = []
         functions = self.get_column_function()
         columns = self.get_csv_columns(get_column_name=False)
@@ -790,4 +851,5 @@ class CSVExportMixin:
         return row
 
     def add_class_name(self, attribute_name: str) -> str:
+        """Prefix an attribute name with the lowercased class name and an underscore."""
         return f"{self.__class__.__name__.lower()}_{attribute_name}"

@@ -1,4 +1,7 @@
+"""Estimate token counts for the RECAP and case law archives from a sample."""
+
 from math import ceil
+from typing import cast
 
 import nh3
 from django.contrib.humanize.templatetags.humanize import intword
@@ -13,9 +16,7 @@ from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
 def get_recap_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[RECAPDocument]:
-    """
-    Creates a queryset that retrieves a random sample of RECAPDocuments from
-    the database.
+    """Creates a queryset that retrieves a random sample of RECAPDocuments from the database.
 
     This function utilizes the TABLESAMPLE SYSTEM clause within a raw SQL query
     to efficiently retrieve a random subset of RECAPDocuments from the database.
@@ -30,6 +31,7 @@ def get_recap_random_dataset(
     Returns:
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
+    # TODO: Statically guarantee output will have non-null page count
     return RECAPDocument.objects.using(db_connection).raw(
         f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
         "where is_available= True and plain_text <> '' and page_count > 0"
@@ -39,9 +41,7 @@ def get_recap_random_dataset(
 def get_opinions_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[Opinion]:
-    """
-    Creates a queryset that retrieves a random sample of Opinions from the
-    database.
+    """Creates a queryset that retrieves a random sample of Opinions from the database.
 
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
@@ -58,8 +58,7 @@ def get_opinions_random_dataset(
 
 
 def get_clean_opinion_text(opinion: Opinion) -> str:
-    """
-    Extracts and cleans the opinion text from a provided Opinion object.
+    """Extracts and cleans the opinion text from a provided Opinion object.
 
     This function attempts to retrieve the opinion text from various source
     fields within the Opinion object, prioritizing HTML formats with citations
@@ -69,6 +68,7 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
         - html_columbia
         - html_lawbox
         - xml_harvard
+        - xml_scan
         - html_anon_2020
         - html
 
@@ -92,6 +92,8 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
         text = opinion.html_lawbox
     elif opinion.xml_harvard:
         text = opinion.xml_harvard
+    elif opinion.xml_scan:
+        text = opinion.xml_scan
     elif opinion.html_anon_2020:
         text = opinion.html_anon_2020
     elif opinion.html:
@@ -104,8 +106,7 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
 
 
 def compute_avg_from_list(array: list[float]) -> float:
-    """
-    Computes the average of a list of numbers.
+    """Computes the average of a list of numbers.
 
     Args:
         array (list[float]): A list containing numeric values.
@@ -118,9 +119,12 @@ def compute_avg_from_list(array: list[float]) -> float:
 
 
 class Command(VerboseCommand):
+    """Report sampled token counts for RECAP documents or case law."""
+
     help = "Compute token count for Recap Documents and Caselaw."
 
     def add_arguments(self, parser):
+        """Add the dataset type, sample percentage, and database options."""
         parser.add_argument(
             "--type",
             type=str,
@@ -150,9 +154,7 @@ class Command(VerboseCommand):
     def _compute_case_law_token_count(
         self, percentage: float, db_connection: str
     ):
-        """
-        Computes and reports token counts for Caselaw dataset.
-        """
+        """Computes and reports token counts for Caselaw dataset."""
         opinion_queryset = get_opinions_random_dataset(
             percentage, db_connection
         )
@@ -195,9 +197,7 @@ class Command(VerboseCommand):
     def _compute_recap_token_count(
         self, percentage: float, db_connection: str
     ):
-        """
-        Computes and reports token counts for RECAP Documents.
-        """
+        """Computes and reports token counts for RECAP Documents."""
         rd_queryset = get_recap_random_dataset(percentage, db_connection)
 
         token_count = []
@@ -207,9 +207,12 @@ class Command(VerboseCommand):
         for document in rd_queryset.iterator():
             count = get_token_count_from_string(document.plain_text)
             token_count.append(count)
-            tokens_per_page.append(count / document.page_count)
+            # The way the get_recap_random_dataset query is set up, this cast is fine, but there should be a way to statically guarantee it
+            tokens_per_page.append(count / cast(int, document.page_count))
             word_count = len(document.plain_text.split())
-            words_per_page.append(ceil(word_count / document.page_count))
+            words_per_page.append(
+                ceil(word_count / cast(int, document.page_count))
+            )
 
         self.stdout.write("Computing averages.")
         sample_size = len(token_count)
@@ -245,6 +248,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Compute and report the token counts for the chosen dataset.
+
+        Raises:
+            NotImplementedError: If the dataset type isn't supported.
+        """
         percentage = options["percentage"]
         db_connection = options["database"]
         dataset_type = options["type"]

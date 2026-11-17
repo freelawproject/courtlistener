@@ -1,3 +1,5 @@
+"""Factories for dicts of case law, free opinion, and case query data."""
+
 import string
 
 import factory
@@ -6,14 +8,20 @@ from factory.fuzzy import FuzzyText
 
 
 class CitationFactory(factory.DictFactory):
+    """Make a citation dict."""
+
     cite = Faker("citation")
 
 
 class CaseLawCourtFactory(factory.DictFactory):
+    """Make a case law court dict."""
+
     name = Faker("court_name")
 
 
 class CaseBodyFactory(factory.DictFactory):
+    """Make a case body dict holding a fixed one-opinion XML case body."""
+
     data = (
         '<casebody firstpage="1" lastpage="2">\n <otherdate '
         'id="Ail">March 3, 2009.</otherdate>  <opinion '
@@ -23,6 +31,8 @@ class CaseBodyFactory(factory.DictFactory):
 
 
 class CaseLawFactory(factory.DictFactory):
+    """Make a case law dict with two citations, a court, and a case body."""
+
     citations = factory.List(
         [factory.SubFactory(CitationFactory) for _ in range(2)]
     )
@@ -37,6 +47,8 @@ class CaseLawFactory(factory.DictFactory):
 
 
 class FreeOpinionRowDataFactory(factory.DictFactory):
+    """Make a dict of data for a row of a PACER free opinions report."""
+
     case_name = Faker("case_name")
     cause = Faker("text", max_nb_chars=8)
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
@@ -51,6 +63,8 @@ class FreeOpinionRowDataFactory(factory.DictFactory):
 
 
 class CaseQueryDataFactory(factory.DictFactory):
+    """Make a dict of fake PACER case query data."""
+
     assigned_to_str = Faker("name_female")
     case_name = Faker("case_name")
     case_name_raw = Faker("case_name")

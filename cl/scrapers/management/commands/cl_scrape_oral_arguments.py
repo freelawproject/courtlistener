@@ -1,5 +1,7 @@
+"""Scrape and save new oral argument audio from court sites with Juriscraper."""
+
 from datetime import date
-from typing import Any
+from typing import Any, TypedDict
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
@@ -29,11 +31,21 @@ from cl.search.models import Court, Docket
 cnt = CaseNameTweaker()
 
 
+class _OAItemDict(TypedDict):
+    docket: Docket
+    audio_file: Audio
+
+
 @transaction.atomic
 def save_everything(
-    items: dict[str, Docket | Audio],
+    items: _OAItemDict,
     backscrape: bool = False,
 ) -> None:
+    """Save a scraped docket and its audio file, then add the matching judges to the panel.
+
+    SCOTUS panels come from the justices sitting on the argument date;
+    other panels are looked up from the audio's judges string.
+    """
     docket, af = items["docket"], items["audio_file"]
     docket.save()
     af.docket = docket
@@ -58,6 +70,14 @@ def make_objects(
     sha1_hash: str,
     content: bytes,
 ) -> tuple[Docket, Audio]:
+    """Build a docket and an unsaved audio file from a scraped item.
+
+    The docket is updated or created, and the audio's content is stored in
+    its original file field without saving the audio.
+
+    Returns:
+        The docket and the audio file.
+    """
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -81,6 +101,7 @@ def make_objects(
     )
 
     audio_file = Audio(
+        docket=docket,
         judges=item.get("judges", ""),
         source=item.get("cluster_source") or ClusterSources.COURT_WEBSITE,
         case_name=item["case_names"],
@@ -96,13 +117,14 @@ def make_objects(
     if extension not in [".mp3", ".wma"]:
         extension = f".{item['download_urls'].lower().rsplit('.', 1)[1]}"
     file_name = trunc(item["case_names"].lower(), 75) + extension
-    audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
     check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file
 
 
 class Command(cl_scrape_opinions.Command):
+    """Scrape new oral arguments from one or more courts, once or in a loop."""
+
     scrape_target_descr = "oral arguments"
     juriscraper_module_type = "oral_args"
 
@@ -116,6 +138,13 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
+        """Download, save, and queue processing of a scraped oral argument.
+
+        Raises:
+            SingleDuplicateError: If the audio is a duplicate.
+            ConsecutiveDuplicatesError: If the scraper should stop because
+                of duplicates.
+        """
         content = await site.download_content(
             item["download_urls"], media_root=settings.MEDIA_ROOT
         )

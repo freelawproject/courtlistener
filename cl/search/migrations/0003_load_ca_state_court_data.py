@@ -1,18 +1,16 @@
-# -*- coding: utf-8 -*-
 
 
 import sys
 
-from django.db import migrations, models
+from django.db import migrations
 
 from cl.lib.migration_utils import load_migration_fixture
 
 
 def load_fixture(apps, schema_editor):
     if 'test' in sys.argv:
-        return None
-    else:
-        fixture = 'cal_state_court_data'
+        return
+    fixture = 'cal_state_court_data'
     load_migration_fixture(apps, schema_editor, fixture, 'search')
 
 

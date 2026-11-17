@@ -1,11 +1,16 @@
 import datetime
 import pickle
+import tempfile
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
+from pathlib import Path
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
+import httpx
 import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
@@ -13,14 +18,14 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.http import HttpResponse
+from django.db import models
+from django.http import Http404, HttpResponse
 from django.template.response import TemplateResponse
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
-from requests import Request
 from requests.cookies import RequestsCookieJar
 from waffle.testutils import override_flag
 
@@ -31,7 +36,12 @@ from cl.lib.courts import (
     lookup_child_courts_cache,
 )
 from cl.lib.date_time import midnight_pt
-from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
+from cl.lib.decorators import (
+    _memory_cache,
+    clear_tiered_cache,
+    document_model,
+    tiered_cache,
+)
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.file_validation import (
     PDF_HEADER_SEARCH_BYTES,
@@ -42,10 +52,12 @@ from cl.lib.file_validation import (
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
+    WIP_PROPS,
     IncrementalNewTemplateMiddleware,
 )
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
+    choices_to_csv,
     clean_docket_number,
     clean_scotus_docket_number,
     clean_texas_docket_number,
@@ -66,7 +78,6 @@ from cl.lib.pacer import (
     normalize_us_state,
 )
 from cl.lib.pacer_session import (
-    InsecureCookieJar,
     ProxyPacerSession,
     SessionData,
     get_or_cache_pacer_cookies,
@@ -77,7 +88,9 @@ from cl.lib.ratelimiter import parse_rate
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
+    create_redis_semaphore,
     get_redis_interface,
+    hset_if_lock_held,
     release_redis_lock,
 )
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
@@ -88,18 +101,19 @@ from cl.lib.utils import (
     check_for_proximity_tokens,
     check_unbalanced_parenthesis,
     check_unbalanced_quotes,
+    glob_files,
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
 )
 from cl.people_db.models import Role
-from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.models import UPLOAD_TYPE, FjcIntegratedDatabase, PacerHtmlFiles
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
 
 
@@ -235,7 +249,7 @@ class TestPacerSessionUtils(TestCase):
         key = r.keys(session_key % "test_user_new_cookie")
         if key:
             r.delete(*key)
-        self.test_cookies = RequestsCookieJar()
+        self.test_cookies = httpx.Cookies()
         self.test_cookies.set("PacerSession", "this-is-a-test")
         r.set(
             session_key % "test_user_new_format",
@@ -267,7 +281,7 @@ class TestPacerSessionUtils(TestCase):
             self.test_cookies,
             "http://proxy_1:9090",
         )
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_cookie", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 1)
@@ -277,7 +291,7 @@ class TestPacerSessionUtils(TestCase):
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
         """Can we parse the dataclass from cache properly?"""
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_format", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 0)
@@ -295,7 +309,7 @@ class TestPacerSessionUtils(TestCase):
 
         # Attempts to get almost expired cookies with the new format from cache
         # Expects refresh.
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_new_format_almost_expired",
             username="test",
             password="password",
@@ -304,62 +318,104 @@ class TestPacerSessionUtils(TestCase):
         self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
-    def test_proxy_session_keeps_secure_cookies_set_by_responses(self):
-        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
-        session = ProxyPacerSession(
-            cookies=self.test_cookies, proxy="http://proxy_1:9090"
-        )
-        self.assertIs(type(session.cookies), InsecureCookieJar)
 
-        # PACER refreshes its session cookie with the Secure flag. Simulate
-        # that, then check it's still sent on the next http:// request.
-        session.cookies.set(
-            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
-        )
-        request = session.prepare_request(
-            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
-        )
-        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+@override_settings(EGRESS_PROXY_HOSTS=["http://proxy_1:9090"])
+class TestPacerCookieTransport(SimpleTestCase):
+    """Check PACER proxy cookies and cache serialization without services."""
+
+    async def test_proxy_session_keeps_secure_cookies_set_by_responses(
+        self,
+    ) -> None:
+        """Does ProxyPacerSession keep sending cookies PACER marks Secure?"""
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            """Refresh the session cookie before redirecting to a document."""
+            self.assertEqual(request.url.scheme, "http")
+            self.assertEqual(request.headers["X-WhSentry-TLS"], "true")
+            if request.url.path == "/start":
+                return httpx.Response(
+                    HTTPStatus.FOUND,
+                    headers={
+                        "Location": "https://ecf.miwd.uscourts.gov/doc1/1",
+                        "Set-Cookie": (
+                            "NextGenCSO=refreshed; Domain=.uscourts.gov; "
+                            "Path=/; Secure"
+                        ),
+                    },
+                )
+            self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+            return httpx.Response(HTTPStatus.OK)
+
+        async with ProxyPacerSession(
+            proxy="http://proxy_1:9090",
+            mounts={"http://": httpx.MockTransport(respond)},
+        ) as session:
+            response = await session.get(
+                "https://ecf.miwd.uscourts.gov/start", auto_login=False
+            )
+            self.assertEqual(len(response.history), 1)
+            await session.post(
+                "https://ecf.miwd.uscourts.gov/doc1/1", auto_login=False
+            )
 
     @patch.object(ProxyPacerSession, "_prepare_login_request")
-    def test_proxy_session_keeps_insecure_jar_after_login(
-        self, mock_login_request
-    ):
-        """Does login() keep the InsecureCookieJar it replaces?"""
-        mock_login_request.return_value = MagicMock(
-            status_code=HTTPStatus.OK,
-            json=lambda: {"loginResult": "0", "nextGenCSO": "token"},
+    async def test_proxy_session_keeps_cookies_after_login(
+        self, mock_login_request: mock.AsyncMock
+    ) -> None:
+        """Does async login leave cookies usable by proxy-rewritten requests?"""
+        mock_login_request.return_value = httpx.Response(
+            HTTPStatus.OK,
+            json={"loginResult": "0", "nextGenCSO": "token"},
         )
-        session = ProxyPacerSession(
+        async with ProxyPacerSession(
             username="test", password="password", proxy="http://proxy_1:9090"
-        )
-        # juriscraper's login() assigns a brand-new plain RequestsCookieJar.
-        session.login()
-        self.assertIs(type(session.cookies), InsecureCookieJar)
+        ) as session:
+            await session.login()
+            mock_login_request.assert_awaited_once()
+            request = session.build_request(
+                "POST", "http://ecf.miwd.uscourts.gov/doc1/1"
+            )
+            self.assertIn("NextGenCSO=token", request.headers["Cookie"])
 
-        session.cookies.set(
-            "NextGenCSO", "refreshed", domain=".uscourts.gov", secure=True
+    def test_session_data_pickles_without_project_classes(self) -> None:
+        """Can HTTPX cookies round-trip through the Redis pickle format?"""
+        response = httpx.Response(
+            HTTPStatus.OK,
+            request=httpx.Request("GET", "https://ecf.miwd.uscourts.gov/"),
+            headers={
+                "Set-Cookie": "NextGenCSO=x; Domain=.uscourts.gov; Path=/; Secure"
+            },
         )
-        request = session.prepare_request(
-            Request("POST", "http://ecf.miwd.uscourts.gov/doc1/1")
-        )
-        self.assertIn("NextGenCSO=refreshed", request.headers["Cookie"])
+        session_data = SessionData(response.cookies, "http://proxy_1:9090")
 
-    def test_session_data_pickles_without_project_classes(self):
-        """Does SessionData pickle without referencing InsecureCookieJar?"""
-        jar = InsecureCookieJar()
-        jar.set("NextGenCSO", "x", domain=".uscourts.gov", secure=True)
-        session_data = SessionData(jar, "http://proxy_1:9090")
-
-        self.assertIs(type(session_data.cookies), RequestsCookieJar)
-        self.assertNotIn(b"InsecureCookieJar", pickle.dumps(session_data))
-        cookie = next(iter(session_data.cookies))
+        pickled = pickle.dumps(session_data)
+        self.assertNotIn(b"InsecureCookieJar", pickled)
+        restored = pickle.loads(pickled)
+        self.assertIs(type(restored.cookies), httpx.Cookies)
+        self.assertEqual(restored.proxy_address, "http://proxy_1:9090")
+        cookie = next(iter(restored.cookies.jar))
         self.assertEqual(cookie.value, "x")
+        self.assertEqual(cookie.domain, ".uscourts.gov")
+        self.assertEqual(cookie.path, "/")
         self.assertFalse(cookie.secure)
 
-    def test_session_data_accepts_missing_cookies(self):
+    def test_session_data_restores_legacy_cookie_jar(self) -> None:
+        """Can cached Requests cookies still be used after the migration?"""
+        jar = RequestsCookieJar()
+        jar.set("NextGenCSO", "legacy", domain=".uscourts.gov", secure=True)
+        session_data = SessionData(None)
+        session_data.__setstate__(
+            {"cookies": jar, "proxy_address": "http://proxy_1:9090"}
+        )
+        self.assertIsInstance(session_data.cookies, httpx.Cookies)
+        restored = pickle.loads(pickle.dumps(session_data))
+        cookie = next(iter(restored.cookies.jar))
+        self.assertEqual(cookie.value, "legacy")
+        self.assertFalse(cookie.secure)
+
+    def test_session_data_accepts_missing_cookies(self) -> None:
         """Can SessionData still be built without cookies?"""
-        session_data = SessionData(None, None)
+        session_data = pickle.loads(pickle.dumps(SessionData(None)))
         self.assertIsNone(session_data.cookies)
         self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
@@ -455,7 +511,7 @@ class TestStringUtils(SimpleTestCase):
 
 
 class TestModelHelpers(TestCase):
-    """Test the model_utils helper functions"""
+    """Test the model_utils helper functions."""
 
     fixtures = ["test_court.json"]
 
@@ -602,11 +658,7 @@ class TestModelHelpers(TestCase):
                 )
 
     def test_avoid_generating_docket_number_core(self) -> None:
-        """Can we avoid generating docket_number_core when the docket number
-        format doesn't match a valid format or if a string contains more than
-        one docket number?
-        """
-
+        """Can we avoid generating docket_number_core when the docket number format doesn't match a valid format or if a string contains more than one docket number?"""
         # Not valid docket number formats for district, bankruptcy or appellate
         self.assertEqual(make_docket_number_core("Nos. C 123-80-123-82"), "")
         self.assertEqual(make_docket_number_core("Nos. C 123-80-123"), "")
@@ -656,7 +708,6 @@ class TestModelHelpers(TestCase):
 
     def test_is_docket_number(self) -> None:
         """Test is_docket_number method correctly detects a docket number."""
-
         self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
         self.assertEqual(is_docket_number("1:21-cv-1234"), True)
         self.assertEqual(is_docket_number("1:21-bk-1234"), True)
@@ -669,10 +720,7 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21"), False)
 
     def test_making_scotus_docket_number_core(self) -> None:
-        """Test make_scotus_docket_number_core method correctly creates
-        docket number core for scotus dockets.
-        """
-
+        """Test make_scotus_docket_number_core method correctly creates docket number core for scotus dockets."""
         test_cases = [
             # None or empty inputs
             (None, ""),
@@ -709,9 +757,7 @@ class TestModelHelpers(TestCase):
     def test_making_scotus_docket_number_core_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple docket numbers of the same type log a
-        warning and return the lexicographically smallest match.
-        """
+        """Test that multiple docket numbers of the same type log a warning and return the lexicographically smallest match."""
         warning_cases = [
             ("No. 01A578 01A576", "01A00576"),
             ("No. 01-8149 01-8148", "01008148"),
@@ -760,8 +806,7 @@ class TestModelHelpers(TestCase):
     def test_clean_scotus_docket_number_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple same-type docket numbers log a warning and
-        return the lexicographically smallest match."""
+        """Test that multiple same-type docket numbers log a warning and return the lexicographically smallest match."""
         warning_cases = [
             ("No. 01A578 01A576", "01a576"),
             ("No. 01-8149 01-8148", "01-8148"),
@@ -792,7 +837,7 @@ class S3PrivateUUIDStorageTest(TestCase):
 
 
 class TestMimeLookup(SimpleTestCase):
-    """Test the Mime type lookup function(s)"""
+    """Test the Mime type lookup function(s)."""
 
     def test_unsupported_extension_returns_octetstream(self) -> None:
         """For a bad extension, do we return the proper default?"""
@@ -807,7 +852,7 @@ class TestMimeLookup(SimpleTestCase):
             )
 
     def test_known_good_mimetypes(self) -> None:
-        """For known good mimetypes, make sure we return the right value"""
+        """For known good mimetypes, make sure we return the right value."""
         tests = {
             "mp3/2015/1/1/something_v._something_else.mp3": "audio/mpeg",
             "doc/2015/1/1/voutila_v._bonvini.doc": "application/msword",
@@ -1448,13 +1493,13 @@ class TestDateTimeHelpers(SimpleTestCase):
         # Date in PSD time -8 hours UTC offset
         pst_date = datetime.date(2023, 1, 3)
         pst_date_time = midnight_pt(pst_date)
-        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pst_utc_offset_hours, -8.0)
 
         # Date in PDT time -7 hours UTC offset
         pdt_date = datetime.date(2023, 5, 3)
         pdt_date_time = midnight_pt(pdt_date)
-        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pdt_utc_offset_hours, -7.0)
 
 
@@ -1507,10 +1552,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             self.assertEqual(ouput_str, test["output"])
 
     def test_check_and_sanitize_queries_bad_syntax(self) -> None:
-        """Tests for methods that check and sanitize queries with a bad search
-        syntax.
-        """
-
+        """Tests for methods that check and sanitize queries with a bad search syntax."""
         # Check for bad proximity tokens.
         tests = [
             {
@@ -1789,7 +1831,6 @@ class TestRedisUtils(SimpleTestCase):
 
     def test_redis_lock(self) -> None:
         """Test acquiring and releasing a Redis lock."""
-
         lock_key = "test_lock"
         r = get_redis_interface("CACHE")
         identifier = acquire_redis_lock(r, lock_key, 2000)
@@ -1797,6 +1838,57 @@ class TestRedisUtils(SimpleTestCase):
 
         result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
+
+    def test_redis_semaphore_has_single_winner(self) -> None:
+        """Concurrent callers get exactly one winner, and the key keeps its TTL.
+
+        Each round releases many threads at once with a barrier so their
+        Redis calls interleave. A check-then-set implementation lets several
+        of them win.
+        """
+        key = "test_semaphore"
+        threads = 16
+        r = get_redis_interface("CACHE")
+        self.addCleanup(r.delete, key)
+
+        barrier = threading.Barrier(threads)
+
+        def contend(_: int) -> bool:
+            barrier.wait()
+            return create_redis_semaphore(r, key, ttl=60)
+
+        with ThreadPoolExecutor(max_workers=threads) as pool:
+            for round_number in range(20):
+                r.delete(key)
+                winners = sum(pool.map(contend, range(threads)))
+                self.assertEqual(winners, 1, msg=f"round {round_number}")
+        self.assertGreater(r.ttl(key), 0)
+
+    def test_hset_if_lock_held(self) -> None:
+        """Writes apply only while the caller still holds the lock."""
+        lock_key = "test_fenced_lock"
+        hash_name = "test_fenced_hash"
+        r = get_redis_interface("CACHE")
+        r.delete(lock_key, hash_name)
+        self.addCleanup(r.delete, lock_key, hash_name)
+
+        identifier = acquire_redis_lock(r, lock_key, 60_000)
+        self.assertTrue(
+            hset_if_lock_held(
+                r,
+                lock_key,
+                identifier,
+                [(hash_name, "a", 2), (hash_name, "b", 3)],
+            )
+        )
+        self.assertEqual(r.hgetall(hash_name), {"a": "2", "b": "3"})
+
+        # Simulate the lease expiring and another process taking the lock.
+        r.set(lock_key, "someone-else")
+        self.assertFalse(
+            hset_if_lock_held(r, lock_key, identifier, [(hash_name, "a", 1)])
+        )
+        self.assertEqual(r.hget(hash_name, "a"), "2")
 
 
 class TestLinkifyOrigDocketNumber(SimpleTestCase):
@@ -1895,8 +1987,15 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 )
 
 
+class TestChoicesToCsv(SimpleTestCase):
+    def test_choices_to_csv_lists_model_field_choices(self):
+        """Are a model field's choice labels joined into a CSV?"""
+        csv = choices_to_csv(FjcIntegratedDatabase(), "origin")
+        self.assertTrue(csv.startswith("Original Proceeding; Removed"), csv)
+
+
 class TestAddSqlComment(SimpleTestCase):
-    """Test the add_sql_comment function"""
+    """Test the add_sql_comment function."""
 
     def test_no_metadata_returns_unchanged_sql(self) -> None:
         """Does an empty meta dict return the original SQL unchanged?"""
@@ -1972,7 +2071,7 @@ class TestAddSqlComment(SimpleTestCase):
 
 
 class TestQueryWrapper(TestCase):
-    """Test the QueryWrapper class"""
+    """Test the QueryWrapper class."""
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2096,7 +2195,7 @@ class TestQueryWrapper(TestCase):
 
 
 class TestSqlCommenterMiddleware(TestCase):
-    """Integration tests for SqlCommenter middleware"""
+    """Integration tests for SqlCommenter middleware."""
 
     class MockResolverMatch:
         def __init__(self, view_name="test-view"):
@@ -2157,7 +2256,7 @@ class TestSqlCommenterMiddleware(TestCase):
 @override_settings(CHARS_THRESHOLD_OCR_PER_PAGE=50)
 class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
-        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598
+        """Test needs_ocr function with multi-line headers from cacb example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2186,7 +2285,7 @@ Desc
         )
 
     def test_needs_ocr_cacd_example(self):
-        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598
+        """Test needs_ocr function with multi-line headers from cacd example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2229,8 +2328,7 @@ Case
         )
 
     def test_needs_ocr_msnd_example(self):
-        """Test needs_ocr function with multi-line headers from msnd example
-        provided in issue #598
+        """Test needs_ocr function with multi-line headers from msnd example provided in issue #598.
 
         This text contains headers like 'Case...', 'Doc...Filed...',
         'Main Document', and 'Desc'. The function should recognize these
@@ -2384,10 +2482,11 @@ Line 3
         )
 
     def test_needs_ocr_under_threshold_page_colon(self):
-        """Test the original scenario where only 'Case...' lines and
-        'Page: Y' lines are present and good content between pages lines is
-        present. Should return True (needs OCR).
-        Example: https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
+        """Test the original scenario with 'Case...' and 'Page: Y' lines.
+
+        Only 'Case...' lines and 'Page: Y' lines are present and good content
+        between pages lines is present. Should return True (needs OCR). Example:
+        https://storage.courtlistener.com/recap/gov.uscourts.ca1.08-9007.00105928542.0.pdf
         """
         header_text = """
 Case: 08-9007   Document: 00115928542   Page: 1   Date Filed: 07/30/2009   Entry ID: 5364336
@@ -2417,8 +2516,7 @@ Case: 08-9007   Document: 00115928542   Page: 3   Date Filed: 07/30/2009   Entry
         )
 
     def test_needs_ocr_small_text_no_header(self):
-        """Test needs_ocr function when the document has minimal text and no
-        meaningful headers.
+        """Test needs_ocr function when the document has minimal text and no meaningful headers.
 
         When the average number of characters per page
         is below CHARS_THRESHOLD_OCR_PER_PAGE, the function should return True,
@@ -2457,10 +2555,11 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
         )
 
     def test_needs_ocr_caeb(self):
-        """Test needs_ocr function with multi-line headers from caeb
-        Example: https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
-        """
+        """Test needs_ocr function with multi-line headers from caeb.
 
+        Example:
+        https://storage.courtlistener.com/recap/gov.uscourts.caeb.656273/gov.uscourts.caeb.656273.19.0.pdf
+        """
         # Date includes year with 4 digits.
         caeb_text = """
     Filed 11/02/21   Case 21-23295                Doc 19
@@ -2490,14 +2589,13 @@ Case No. 1:22-cv-00369-NYW-TPO   Document 1   filed 02/09/22   USDC Colorado   p
         )
 
     def test_needs_ocr_pawd(self):
-        """Test needs_ocr function with multi-line headers from pawd
+        """Test needs_ocr function with multi-line headers from pawd.
 
         In this case, the content belongs to a seal whose character count is
         below CHARS_THRESHOLD_OCR_PER_PAGE.
 
         Example: https://storage.courtlistener.com/recap/gov.uscourts.pawb.358488/gov.uscourts.pawb.358488.28.0.pdf
         """
-
         caeb_text = """
         Case 18-24646-CMB   Doc 28   Filed 06/13/19 Entered 06/13/19 15:56:16   Desc Main
                                  Document     Page 1 of 1
@@ -2586,7 +2684,7 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
 
 
 class TestS3CacheHelpers(TestCase):
-    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py."""
 
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_get_s3_cache_returns_fallback_in_development(self) -> None:
@@ -2876,7 +2974,7 @@ class TieredCacheTest(SimpleTestCase):
         @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_nothing() -> None:
             self.call_count += 1
-            return None
+            return
 
         self.assertIsNone(get_nothing())
         self.assertEqual(self.call_count, 1)
@@ -2919,13 +3017,17 @@ class TieredCacheTest(SimpleTestCase):
 class IncrementalNewTemplateMiddlewareTest(TestCase):
     """Template swapping for pages that are mid-redesign."""
 
-    def process(self, template_name: str) -> TemplateResponse:
+    def process(
+        self, template_name: str, headers: dict[str, str] | None = None
+    ) -> TemplateResponse:
         """Runs an unrendered TemplateResponse through the middleware.
 
-        :param template_name: The template the view would have rendered.
+        Args:
+            template_name: The template the view would have rendered.
+            headers: Request headers, such as the ones htmx sends.
         """
         middleware = IncrementalNewTemplateMiddleware(lambda request: None)
-        request = RequestFactory().get("/")
+        request = RequestFactory().get("/", headers=headers)
         response = TemplateResponse(request, template_name, {})
         return middleware.process_template_response(request, response)
 
@@ -2974,6 +3076,119 @@ class IncrementalNewTemplateMiddlewareTest(TestCase):
         )
         self.assertNotIn("search_form", response.context_data or {})
 
+    def test_template_selection_by_flags(self) -> None:
+        """Does each mix of templates and flags pick the right template?
+
+        No WIP template exists in the repo yet, and the ones that do are
+        renamed to v2_ once finished, so the template lookup is stubbed to
+        decide which versions of the page exist in each case.
+        """
+        prefix = WIP_PROPS["prefix"]
+        legacy, v2, wip = "foo.html", "v2_foo.html", f"{prefix}foo.html"
+        # (templates that exist, use_new_design, WIP flag, expected template)
+        # An expected template of None means the middleware raises Http404.
+        cases: list[tuple[set[str], bool, bool, str | None]] = [
+            # Legacy + WIP: only both flags reach the WIP template.
+            ({legacy, wip}, True, True, wip),
+            ({legacy, wip}, True, False, legacy),
+            ({legacy, wip}, False, True, legacy),
+            ({legacy, wip}, False, False, legacy),
+            # WIP-only: there's no template to fall back to.
+            ({wip}, True, True, wip),
+            ({wip}, True, False, None),
+            ({wip}, False, True, None),
+            ({wip}, False, False, None),
+            # WIP wins over v2 for opted-in visitors only.
+            ({legacy, v2, wip}, True, True, wip),
+            ({legacy, v2, wip}, True, False, v2),
+            # v2 pages ignore the WIP flag.
+            ({legacy, v2}, True, True, v2),
+            ({legacy, v2}, False, True, legacy),
+            ({v2}, False, True, v2),
+        ]
+        for existing, new_design, wip_design, expected in cases:
+            with (
+                self.subTest(
+                    existing=sorted(existing),
+                    use_new_design=new_design,
+                    wip_flag=wip_design,
+                ),
+                override_flag("use_new_design", active=new_design),
+                override_flag(WIP_PROPS["flag"], active=wip_design),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    side_effect=existing.__contains__,
+                ),
+            ):
+                if expected is None:
+                    with self.assertRaises(Http404):
+                        self.process(legacy)
+                    continue
+                response = self.process(legacy)
+                self.assertEqual(response.template_name, expected)
+                # Only a swapped full page renders the new header and its
+                # search form; a page left on legacy isn't handed one.
+                self.assertEqual(
+                    "search_form" in (response.context_data or {}),
+                    expected != legacy,
+                )
+
+    @override_flag(WIP_PROPS["flag"], True)
+    def test_v2_page_unaffected_by_wip_flag(self) -> None:
+        """Does a real v2 page still get its v2 template with both flags on?"""
+        response = self.process("homepage.html")
+        self.assertEqual(response.template_name, "v2_homepage.html")
+
+    def test_htmx_partial_follows_the_design_header(self) -> None:
+        """A flagged htmx request gets the partial for the page that sent it.
+
+        Flagged users can still be on legacy pages, whose htmx code expects
+        the legacy partial back. Only v2 pages send the design header.
+        """
+        cases = [
+            (
+                "v2 page",
+                {"X-CL-Design": "v2"},
+                f"{V2_PARTIALS_PREFIX}foo/button.html",
+            ),
+            ("legacy page", {}, "includes/foo/button.html"),
+        ]
+        for page, design_header, expected in cases:
+            with (
+                self.subTest(page=page),
+                patch.object(
+                    IncrementalNewTemplateMiddleware,
+                    "template_exists",
+                    return_value=True,
+                ),
+            ):
+                response = self.process(
+                    "includes/foo/button.html",
+                    headers={"HX-Request": "true", **design_header},
+                )
+                self.assertEqual(response.template_name, expected)
+
+    @override_flag("use_new_design", False)
+    def test_htmx_design_header_wins_over_the_flag(self) -> None:
+        """An unflagged htmx request from a v2 page still gets the v2 partial.
+
+        v2-only pages are served to everyone, so the header, not the flag,
+        says which partial the page can use.
+        """
+        with patch.object(
+            IncrementalNewTemplateMiddleware,
+            "template_exists",
+            return_value=True,
+        ):
+            response = self.process(
+                "includes/foo/button.html",
+                headers={"HX-Request": "true", "X-CL-Design": "v2"},
+            )
+        self.assertEqual(
+            response.template_name, f"{V2_PARTIALS_PREFIX}foo/button.html"
+        )
+
 
 class FilterByEmailTest(TestCase):
     """Tests for the shared address matcher.
@@ -2993,8 +3208,11 @@ class FilterByEmailTest(TestCase):
     def matched(self, email: str) -> list[str]:
         """Run the matcher and report who it found.
 
-        :param email: The address to match.
-        :return: The usernames of the matching accounts.
+        Args:
+            email: The address to match.
+
+        Returns:
+            The usernames of the matching accounts.
         """
         return list(
             filter_by_email(User.objects.all(), email).values_list(
@@ -3074,3 +3292,85 @@ class RatelimitedViewTest(SimpleTestCase):
             cast(HttpResponse, response).status_code,
             HTTPStatus.TOO_MANY_REQUESTS,
         )
+
+
+class DocumentModelTest(SimpleTestCase):
+    """Does @document_model copy Google-style attribute docs onto fields?"""
+
+    def test_attributes_section_populates_field_docs(self) -> None:
+        """Each documented field gets its whitespace-normalized description."""
+
+        @document_model
+        class Documented(models.Model):
+            """A model documented in the project's docstring convention.
+
+            Attributes:
+                name: The name of the thing.
+                notes: Free-form notes that wrap
+                    onto a second line.
+            """
+
+            name = models.TextField()
+            notes = models.TextField()
+
+            class Meta:
+                app_label = "search"
+                abstract = True
+
+        expected = {
+            "name": "The name of the thing.",
+            "notes": "Free-form notes that wrap onto a second line.",
+        }
+        fields = {f.name: f for f in Documented._meta.local_fields}
+        for field_name, doc in expected.items():
+            with self.subTest(field=field_name):
+                self.assertEqual(fields[field_name].help_text, doc)
+                self.assertEqual(fields[field_name].db_comment, doc)
+
+
+class TestGlobFiles(SimpleTestCase):
+    """`glob_files` must match what `glob.glob` returned."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        for name in (
+            "a.json",
+            ".hidden.json",
+            "sub/b.json",
+            "sub/deep/c.json",
+            ".dot/d.json",
+            "sub/.dot/e.json",
+        ):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+
+    def matches(self, pattern: str, recursive: bool = False) -> set[str]:
+        return {
+            str(p.relative_to(self.root))
+            for p in glob_files(self.root, pattern, recursive=recursive)
+        }
+
+    def test_wildcards_skip_hidden_files_and_directories(self) -> None:
+        """Wildcards do not match names beginning with a dot."""
+        with self.subTest("file"):
+            self.assertEqual(self.matches("*.json"), {"a.json"})
+        with self.subTest("directory"):
+            self.assertEqual(self.matches("*/*.json"), {"sub/b.json"})
+
+    def test_explicit_dot_is_matched(self) -> None:
+        """A pattern that names a hidden entry literally still matches it."""
+        self.assertEqual(self.matches(".dot/*.json"), {".dot/d.json"})
+        self.assertEqual(self.matches(".*.json"), {".hidden.json"})
+
+    def test_double_star_only_recurses_when_recursive(self) -> None:
+        """`**` acts like `*` unless `recursive` is set, as in `glob.glob`."""
+        with self.subTest(recursive=False):
+            self.assertEqual(self.matches("**/*.json"), {"sub/b.json"})
+        with self.subTest(recursive=True):
+            self.assertEqual(
+                self.matches("**/*.json", recursive=True),
+                {"a.json", "sub/b.json", "sub/deep/c.json"},
+            )

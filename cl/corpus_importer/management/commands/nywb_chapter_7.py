@@ -1,7 +1,10 @@
+"""Purchase W.D.N.Y. Chapter 7 bankruptcy dockets and petitions listed in a CSV."""
+
 import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 
 from cl.corpus_importer.bulk_utils import (
@@ -14,7 +17,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession, SessionData
+from cl.lib.pacer_session import log_into_pacer
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", "UNKNOWN!")
@@ -24,15 +27,14 @@ TAG_PETITIONS = 'nywb-bankr-ch7-petitions-round-2"'
 
 
 def get_dockets(options):
-    """Download the dockets described in the CSV"""
+    """Download the dockets described in the CSV."""
     f = options["file"]
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = ProxyPacerSession(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    pacer_session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -40,17 +42,12 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = ProxyPacerSession(
+            session_data = async_to_sync(log_into_pacer)(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
-        session_data = SessionData(
-            pacer_session.cookies,
-            pacer_session.proxy_address,
-        )
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
@@ -66,18 +63,18 @@ def get_dockets(options):
                 court_id="nywb",
                 session_data=session_data,
                 tag_names=[TAG],
-                **{
-                    "doc_num_start": 1,
-                    "doc_num_end": 1,
-                    "show_parties_and_counsel": False,
-                    "show_terminated_parties": False,
-                    "show_list_of_member_cases": False,
-                },
+                doc_num_start=1,
+                doc_num_end=1,
+                show_parties_and_counsel=False,
+                show_terminated_parties=False,
+                show_list_of_member_cases=False,
             ).set(queue=q),
         ).apply_async()
 
 
 class Command(VerboseCommand):
+    """Purchase dockets or petitions from PACER for the cases in a CSV."""
+
     help = "Purchase dockets and bankruptcy filings from PACER"
 
     allowed_tasks = [
@@ -86,6 +83,7 @@ class Command(VerboseCommand):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, file, and task options."""
         parser.add_argument(
             "--queue",
             default="batch0",
@@ -119,6 +117,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the task chosen with ``--task``."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "get_dockets":
             get_dockets(options)

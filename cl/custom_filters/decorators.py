@@ -1,12 +1,20 @@
+"""Decorators for checking a view's honeypot field."""
+
+from collections.abc import Callable
 from functools import wraps
+from typing import overload
 
 from django.conf import settings
+from django.http.request import HttpRequest
+from django.http.response import HttpResponse
 from django.shortcuts import render
+
+from cl.lib.types import DjangoViewType
 
 
 def honeypot_equals(val):
-    """
-    Default verifier used if HONEYPOT_VERIFIER is not specified.
+    """Default verifier used if HONEYPOT_VERIFIER is not specified.
+
     Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
     """
     expected = getattr(settings, "HONEYPOT_VALUE", "")
@@ -16,8 +24,7 @@ def honeypot_equals(val):
 
 
 def verify_honeypot_value(request, field_name):
-    """
-    Verify that request.POST[field_name] is a valid honeypot.
+    """Verify that request.POST[field_name] is a valid honeypot.
 
     Ensures that the field exists and passes verification according to
     HONEYPOT_VERIFIER.
@@ -32,32 +39,68 @@ def verify_honeypot_value(request, field_name):
                 {"fieldname": field},
                 status=400,
             )
+    return None
 
 
-def check_honeypot(func=None, field_name=None):
-    """
-    Check request.POST for valid honeypot field.
+@overload
+def check_honeypot[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse,
+](
+    func: DjangoViewType[P, Request, Response], /, field_name: str | None = ...
+) -> DjangoViewType[P, Request, HttpResponse]: ...
+@overload
+def check_honeypot[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse,
+](
+    func: None = ..., /, field_name: str | None = ...
+) -> Callable[
+    [DjangoViewType[P, Request, Response]],
+    DjangoViewType[P, Request, HttpResponse],
+]: ...
+def check_honeypot[
+    **P,
+    Request: HttpRequest,
+    Response: HttpResponse,
+](
+    func: DjangoViewType[P, Request, Response] | None = None,
+    /,
+    field_name: str | None = None,
+) -> (
+    DjangoViewType[P, Request, HttpResponse]
+    | Callable[
+        [DjangoViewType[P, Request, Response]],
+        DjangoViewType[P, Request, HttpResponse],
+    ]
+):
+    """Check request.POST for valid honeypot field.
 
     Takes an optional field_name that defaults to HONEYPOT_FIELD_NAME if
     not specified.
     """
-    # hack to reverse arguments if called with str param
-    if isinstance(func, str):
-        func, field_name = field_name, func
 
-    def decorated(func):
-        def inner(request, *args, **kwargs):
+    def decorated(
+        func: DjangoViewType[P, Request, Response],
+    ) -> DjangoViewType[P, Request, HttpResponse]:
+        @wraps(func)
+        def inner(
+            request: Request, *args: P.args, **kwargs: P.kwargs
+        ) -> HttpResponse:
             response = verify_honeypot_value(request, field_name)
             if response:
                 return response
-            else:
-                return func(request, *args, **kwargs)
+            return func(request, *args, **kwargs)
 
-        return wraps(func)(inner)
+        return inner
 
     if func is None:
 
-        def decorator(func):
+        def decorator(
+            func: DjangoViewType[P, Request, Response],
+        ) -> DjangoViewType[P, Request, HttpResponse]:
             return decorated(func)
 
         return decorator

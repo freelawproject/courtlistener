@@ -1,4 +1,5 @@
-import os
+"""Write opinions to disk as HTML files."""
+
 from pathlib import Path
 
 from asgiref.sync import async_to_sync
@@ -11,9 +12,12 @@ from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
+    """Render opinions with HTML content to files grouped by filing date."""
+
     help = "A simple script to serialize all opinions to disk as HTML"
 
     def add_arguments(self, parser):
+        """Add the output directory option."""
         parser.add_argument(
             "--output-directory",
             type=readable_dir,
@@ -22,6 +26,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Render each opinion with HTML content to ``<output>/<year>/<month>/<day>/<pk>.html``."""
         super().handle(*args, **options)
 
         ops = Opinion.objects.exclude(
@@ -35,13 +40,13 @@ class Command(VerboseCommand):
                 "simple_opinion.html",
                 {"caption": async_to_sync(op.cluster.acaption)(), "o": op},
             )
-            output_dir = os.path.join(
-                options["output_directory"],
-                str(op.cluster.date_filed.year),
-                str(op.cluster.date_filed.month),
-                str(op.cluster.date_filed.day),
+            output_dir = (
+                Path(options["output_directory"])
+                / str(op.cluster.date_filed.year)
+                / str(op.cluster.date_filed.month)
+                / str(op.cluster.date_filed.day)
             )
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-            output_path = os.path.join(output_dir, f"{op.pk}.html")
-            with open(output_path, "w") as f:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{op.pk}.html"
+            with output_path.open("w") as f:
                 f.write(content.encode())

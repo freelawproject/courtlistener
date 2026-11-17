@@ -1,3 +1,5 @@
+"""Celery tasks for crawling PACER RSS feeds and merging their contents."""
+
 import bz2
 import errno
 import json
@@ -5,9 +7,9 @@ import logging
 import re
 from calendar import SATURDAY, SUNDAY
 from datetime import datetime, timedelta
+from typing import Any, cast
 
-import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from dateparser import parse
 from django.conf import settings
@@ -15,10 +17,10 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
+from httpx import HTTPError
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 from redis import Redis
-from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
@@ -42,12 +44,13 @@ logger = logging.getLogger(__name__)
 
 
 def update_entry_types(court_pk: str, description: str) -> None:
-    """Check the entry types of a feed. If changed update our record and
-    send an email.
+    """Check the entry types of a feed.
 
-    :param court_pk: The CL identifier for the court
-    :param description: The <description> nodes in the feed
-    :return: None
+    If changed update our record and send an email.
+
+    Args:
+        court_pk: The CL identifier for the court
+        description: The <description> nodes in the feed
     """
     description = description.lower()
     if description == "public filings in the last 24 hours":
@@ -81,16 +84,17 @@ def update_entry_types(court_pk: str, description: str) -> None:
 
 
 def get_last_build_date(b: bytes) -> datetime | None:
-    """Get the last build date for an RSS feed
+    """Get the last build date for an RSS feed.
 
     In this case we considered using lxml & xpath, which was 1000× faster than
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
 
-    :param b: The content of the RSS feed as a string
-    :type b: bytes! This is a performance enhancement, but perhaps a premature
-    one. Depending on how this function returns we might not need to decode
-    the byte-string to text, so we just regex it as is.
+    Args:
+        b: The content of the RSS feed as a string. Taking bytes
+            is a performance enhancement, but perhaps a premature one.
+            Depending on how this function returns we might not need to
+            decode the byte-string to text, so we just regex it as is.
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = rb"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
@@ -106,12 +110,12 @@ def alert_on_staleness(
     court_id: str,
     url: str,
 ) -> None:
-    """Send an alert email if a feed goes stale on a weekday, according to its
-    timezone. Slow down after the first day.
+    """Send an alert email if a feed goes stale on a weekday, according to its timezone. Slow down after the first day.
 
-    :param current_build_date: When the feed was updated
-    :param court_id: The CL ID of the court
-    :param url: The URL for the feed
+    Args:
+        current_build_date: When the feed was updated
+        court_id: The CL ID of the court
+        url: The URL for the feed
     """
     _now = now()
     staleness = _now - current_build_date
@@ -147,21 +151,9 @@ def alert_on_staleness(
 
 
 def mark_status(status_obj, status_value):
-    """Update the status_obj object with a status_value"""
+    """Update the status_obj object with a status_value."""
     status_obj.status = status_value
     status_obj.save()
-
-
-def abort_task(task: Task, feed_status: RssFeedStatus):
-    """Abort RSS tasks without retry.
-
-    We don't want to retry RSS tasks because they'll get retried by the
-    daemon anyway, and because they have log timeouts. Better just to let
-    them die.
-    """
-    mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-    task.request.chain = None
-    return
 
 
 @app.task(
@@ -171,8 +163,23 @@ def abort_task(task: Task, feed_status: RssFeedStatus):
 )
 def check_if_feed_changed(
     self: Task, court_pk: str, feed_status_pk: int, date_last_built: datetime
-):
-    """Check if the feed changed
+) -> list[dict[str, Any]] | None:
+    """Check a feed and stop the chain when no merge is needed.
+
+    Failed feeds are retried by the daemon rather than by this task.
+    """
+    result = async_to_sync(check_if_feed_changed_base)(
+        court_pk, feed_status_pk, date_last_built
+    )
+    if result is None:
+        self.request.chain = None
+    return result
+
+
+async def check_if_feed_changed_base(
+    court_pk: str, feed_status_pk: int, date_last_built: datetime
+) -> list[dict[str, Any]] | None:
+    """Check if the feed changed.
 
     For now, we do this in a very simple way, by using the lastBuildDate field
     and checking if it differs from the last time we checked. One thing that
@@ -198,20 +205,24 @@ def check_if_feed_changed(
     lastBuildDate value. This is because parsing the feed properly can take
     several seconds for a big feed.
 
-    :param court_pk: The CL ID for the court object.
-    :param feed_status_pk: The CL ID for the status object.
-    :param date_last_built: The last time the court was scraped.
+    Args:
+        court_pk: The CL ID for the court object.
+        feed_status_pk: The CL ID for the status object.
+        date_last_built: The last time the court was scraped.
     """
-    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
+    feed_status = await RssFeedStatus.objects.aget(pk=feed_status_pk)
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
+
     try:
-        rss_feed.query()
-    except requests.RequestException:
+        async with rss_feed:
+            await rss_feed.query()
+    except HTTPError:
         logger.warning(
             "Network error trying to get RSS feed at %s", rss_feed.url
         )
-        abort_task(self, feed_status)
-        return
+        feed_status.status = RssFeedStatus.PROCESSING_FAILED
+        await feed_status.asave()
+        return None
 
     content = rss_feed.response.content
     if not content:
@@ -221,8 +232,9 @@ def check_if_feed_changed(
             )
         except Exception as exc:
             logger.warning(str(exc))
-            abort_task(self, feed_status)
-            return
+            feed_status.status = RssFeedStatus.PROCESSING_FAILED
+            await feed_status.asave()
+            return None
 
     try:
         rss_feed.response.raise_for_status()
@@ -233,16 +245,17 @@ def check_if_feed_changed(
             rss_feed.response.status_code,
             exc,
         )
-        abort_task(self, feed_status)
-        return
+        feed_status.status = RssFeedStatus.PROCESSING_FAILED
+        await feed_status.asave()
+        return None
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
-        alert_on_staleness(
+        await sync_to_async(alert_on_staleness)(
             current_build_date, feed_status.court_id, rss_feed.url
         )
         feed_status.date_last_build = current_build_date
-        feed_status.save()
+        await feed_status.asave()
     else:
         try:
             raise Exception(
@@ -251,8 +264,9 @@ def check_if_feed_changed(
             )
         except Exception as exc:
             logger.warning(str(exc))
-            abort_task(self, feed_status)
-            return
+            feed_status.status = RssFeedStatus.PROCESSING_FAILED
+            await feed_status.asave()
+            return None
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
@@ -262,15 +276,15 @@ def check_if_feed_changed(
             date_last_built,
         )
         # Abort. Nothing has changed here.
-        self.request.chain = None
-        mark_status(feed_status, RssFeedStatus.UNCHANGED)
-        return
+        feed_status.status = RssFeedStatus.UNCHANGED
+        await feed_status.asave()
+        return None
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge.",
         feed_status.court_id,
     )
-    rss_feed.parse()
+    await sync_to_async(rss_feed.parse)()
     logger.info(
         "%s: Got %s results to merge.",
         feed_status.court_id,
@@ -278,44 +292,50 @@ def check_if_feed_changed(
     )
 
     # Update RSS entry types in Court table
-    update_entry_types(court_pk, rss_feed.feed.feed.description)
+    feed_metadata = cast(dict[str, Any], rss_feed.feed["feed"])
+    await sync_to_async(update_entry_types)(
+        court_pk, feed_metadata["description"]
+    )
 
     # Save the feed to the DB
     feed_data = RssFeedData(court_id=court_pk)
     try:
-        feed_data.filepath.save(
+        await sync_to_async(feed_data.filepath.save)(
             "rss.xml.bz2", ContentFile(bz2.compress(content))
         )
     except OSError as exc:
         if exc.errno == errno.EIO:
-            abort_task(self, feed_status)
-        else:
-            raise exc
+            feed_status.status = RssFeedStatus.PROCESSING_FAILED
+            await feed_status.asave()
+            return None
+        raise exc
 
     return rss_feed.data
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed
 def hash_item(item):
-    """Hash an RSS item. Item should be a dict at this stage"""
+    """Hash an RSS item. Item should be a dict at this stage."""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
-    item_hash = sha256(item_j)
-    return item_hash
+    return sha256(item_j)
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed
 async def is_cached(item_hash: str) -> bool:
-    """Check if a hash is in the RSS Item Cache"""
+    """Check if a hash is in the RSS Item Cache."""
     return await RssItemCache.objects.filter(hash=item_hash).aexists()
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed
 async def cache_hash(item_hash: str) -> bool:
-    """Add a new hash to the RSS Item Cache
+    """Add a new hash to the RSS Item Cache.
 
-    :param item_hash: A SHA1 hash you wish to cache.
-    :returns True if successful, False if not.
+    Args:
+        item_hash: A SHA1 hash you wish to cache.
+
+    Returns:
+        True if successful, False if not.
     """
     try:
         await RssItemCache.objects.acreate(hash=item_hash)
@@ -328,19 +348,24 @@ async def cache_hash(item_hash: str) -> bool:
 
 
 def rss_cache_prefix() -> str:
+    """Get the prefix of the Redis keys for claimed RSS items."""
     return "rss_hash"
 
 
 def get_rss_cache_key(item_hash: str) -> str:
+    """Make the Redis key for a claimed RSS item's hash."""
     return f"{rss_cache_prefix()}:{item_hash}"
 
 
 def claim_item_hash(r: Redis, item_hash: str) -> bool:
     """Attempt to claim an RSS item by its hash atomically.
 
-    :param r: Redis client instance.
-    :param item_hash: A SHA1 hash you wish to cache.
-    :return: True if this call claimed it, False if it was already claimed.
+    Args:
+        r: Redis client instance.
+        item_hash: A SHA1 hash you wish to cache.
+
+    Returns:
+        True if this call claimed it, False if it was already claimed.
     """
     # Set expiration time to 2 days.
     return bool(
@@ -356,14 +381,17 @@ def claim_item_hash(r: Redis, item_hash: str) -> bool:
 def merge_rss_feed_contents(
     self, feed_data, court_pk, metadata_only=False
 ) -> list[tuple[int, datetime]]:
-    """Merge the rss feed contents into CourtListener
+    """Merge the rss feed contents into CourtListener.
 
-    :param self: The Celery task
-    :param feed_data: The data parameter of a PacerRssFeed object that has
-    already queried the feed and been parsed.
-    :param court_pk: The CourtListener court ID.
-    :param metadata_only: Whether to only do metadata and skip docket entries.
-    :returns A list of (docket ids, alert_time) tuples for sending alerts
+    Args:
+        self: The Celery task
+        feed_data: The data parameter of a PacerRssFeed object that has
+            already queried the feed and been parsed.
+        court_pk: The CourtListener court ID.
+        metadata_only: Whether to only do metadata and skip docket entries.
+
+    Returns:
+        A list of (docket ids, alert_time) tuples for sending alerts
     """
     start_time = now()
 
@@ -431,6 +459,7 @@ def merge_rss_feed_contents(
     queue=settings.CELERY_FEEDS_QUEUE,
 )
 def mark_status_successful(self: Task, feed_status_pk: int) -> None:
+    """Mark a feed status as successfully processed."""
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
@@ -444,12 +473,14 @@ def mark_status_successful(self: Task, feed_status_pk: int) -> None:
 def trim_rss_data(
     self: Task, cache_days: int = 2, status_days: int = 14
 ) -> None:
-    """Trim the various tracking objects used during RSS parsing
+    """Trim the various tracking objects used during RSS parsing.
 
-    :param cache_days: RssItemCache objects older than this number of days will
-    be deleted
-    :param status_days: RssFeedStatus objects older than this number of days
-    will be deleted.
+    Args:
+        self: The bound Celery task.
+        cache_days: RssItemCache objects older than this number of days will
+            be deleted
+        status_days: RssFeedStatus objects older than this number of days
+            will be deleted.
     """
     logger.info("Trimming RSS tracking items.")
     RssItemCache.objects.filter(
@@ -465,10 +496,12 @@ def trim_rss_data(
     queue=settings.CELERY_FEEDS_QUEUE,
 )
 def trim_rss_feed_status(self: Task, status_days: int = 14) -> None:
-    """Trim the RSSFeedStatus tracking objects used during RSS parsing
+    """Trim the RSSFeedStatus tracking objects used during RSS parsing.
 
-    :param status_days: RssFeedStatus objects older than this number of days
-    will be deleted.
+    Args:
+        self: The bound Celery task.
+        status_days: RssFeedStatus objects older than this number of days
+            will be deleted.
     """
     logger.info("Trimming RSS tracking items.")
     RssFeedStatus.objects.filter(

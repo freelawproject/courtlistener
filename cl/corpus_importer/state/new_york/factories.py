@@ -47,10 +47,11 @@ class _Filing(NamedTuple):
     `FILING_TYPE_MAP` is not part of its published API, hence the handful
     repeated here.
 
-    :ivar filing_type: The filing type, whose value is the Court's own wording.
-    :ivar role: The party role the filing type implies.
-    :ivar doctype: The document type the filing type implies.
-    :ivar entry_type: The standard docket entry type for the filing.
+    Attributes:
+        filing_type: The filing type, whose value is the Court's own wording.
+        role: The party role the filing type implies.
+        doctype: The document type the filing type implies.
+        entry_type: The standard docket entry type for the filing.
     """
 
     filing_type: FilingType
@@ -102,8 +103,9 @@ _FILINGS: tuple[_Filing, ...] = (
 class _PartyRole(NamedTuple):
     """A party role Court-PASS states, with the standard type it maps to.
 
-    :ivar raw: The role exactly as the ATTORNEY DETAILS section states it.
-    :ivar party_type: The standard party type the role maps to.
+    Attributes:
+        raw: The role exactly as the ATTORNEY DETAILS section states it.
+        party_type: The standard party type the role maps to.
     """
 
     raw: str
@@ -134,6 +136,8 @@ _ISSUES: tuple[str, ...] = (
 
 
 class NYCoAFileFactory(Factory):
+    """A downloaded appellant brief attached to a filing."""
+
     class Meta:
         model = NYCoAFile
 
@@ -144,13 +148,17 @@ class NYCoAFileFactory(Factory):
     doc_party = "Smith"
     doc_type = FilingDocType.BRIEF
     local_path = Sequence(
-        lambda n: f"{PRIVATE_PREFIX}nycourts_gov/"
-        f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+        lambda n: (
+            f"{PRIVATE_PREFIX}nycourts_gov/"
+            f"APL-2024-00177_smithvjones-app-smith{n}-brf_1.pdf"
+        )
     )
     content_hash = LazyAttribute(
-        lambda f: hashlib.sha256(f.local_path.encode()).hexdigest()
-        if f.local_path
-        else ""
+        lambda f: (
+            hashlib.sha256(f.local_path.encode()).hexdigest()
+            if f.local_path
+            else ""
+        )
     )
     file_size = LazyAttribute(lambda f: len(f.local_path) * 1000 or None)
 
@@ -214,6 +222,8 @@ class NYCoAFilingFactory(Factory):
 
 
 class NYCoAAttorneyFactory(Factory):
+    """An attorney representing a party on a Court-PASS docket."""
+
     class Meta:
         model = NYCoAAttorney
 
@@ -245,6 +255,8 @@ class NYCoAPartyFactory(Factory):
 
 
 class NYCoACaseFactory(Factory):
+    """An undecided Court of Appeals case with one issue and one filing, and no transfers."""
+
     class Meta:
         model = NYCoACase
 

@@ -10,6 +10,8 @@ from django.core.management.base import CommandError
 from google.genai.types import JobState
 
 from cl.ai.llm_providers.google import (
+    BatchRequest,
+    BatchTask,
     GoogleGenAIBatchWrapper,
     _ResponseValidator,
 )
@@ -208,7 +210,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_class.return_value = mock_client_instance
 
         wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
+        tasks_data: list[BatchTask] = [
             {
                 "llm_key": "task-1",
                 "input_file_path": "/fake/path/test.pdf",
@@ -245,7 +247,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_class.return_value = mock_client_instance
 
         wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
+        tasks_data: list[BatchTask] = [
             {
                 "llm_key": "task-2",
                 "input_text": "This is a sample document text.",
@@ -270,26 +272,6 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.files.upload.assert_not_called()
 
     @patch("cl.ai.llm_providers.google.genai.Client")
-    def test_prepare_batch_requests_skips_missing_key(self, mock_client_class):
-        """Test that requests without llm_key are skipped."""
-        mock_client_instance = MagicMock()
-        mock_client_class.return_value = mock_client_instance
-
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        tasks_data = [
-            {"input_text": "No key provided"},
-            {"llm_key": "task-3", "input_text": "Has key"},
-        ]
-
-        result = wrapper.prepare_batch_requests(
-            tasks_data=tasks_data, user_prompt="Process this"
-        )
-
-        # Only one request should be created
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["key"], "task-3")
-
-    @patch("cl.ai.llm_providers.google.genai.Client")
     def test_execute_batch_without_cache(self, mock_client_class):
         """Test executing a batch without system prompt caching."""
         # Setup mock batch job response
@@ -309,7 +291,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         wrapper = GoogleGenAIBatchWrapper(
             api_key="test-key", model_name="gemini-3.1-pro-preview"
         )
-        requests = [
+        requests: list[BatchRequest] = [
             {
                 "key": "req-1",
                 "request": {
@@ -359,7 +341,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         wrapper = GoogleGenAIBatchWrapper(
             api_key="test-key", model_name="gemini-3.1-pro-preview"
         )
-        requests = [
+        requests: list[BatchRequest] = [
             {
                 "key": "req-2",
                 "request": {
@@ -764,7 +746,7 @@ class SendGeminiBatchesTest(TestCase):
 
         return mock_s3_client
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -847,7 +829,7 @@ class SendGeminiBatchesTest(TestCase):
         # Verify temp file cleanup
         self.assertEqual(mock_remove.call_count, 3)
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -922,7 +904,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_file_batches_invalid_model(self):
         """Test validation fails for unsupported Gemini model."""
-
         with self.assertRaises(CommandError) as context:
             call_command(
                 "send_gemini_file_batches",
@@ -950,7 +931,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_file_batches_invalid_prompts(self):
         """Test validation fails for invalid prompts (wrong type or non-existent)."""
-
         # Test case 1: Prompt exists but has wrong type
         with self.subTest(case="wrong_prompt_type"):
             # Create a USER prompt but pass it as system_prompt argument
@@ -986,7 +966,7 @@ class SendGeminiBatchesTest(TestCase):
                 "Invalid system or user prompt", str(context.exception)
             )
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1011,7 +991,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test handling when S3 path has no files."""
-
         # Setup S3 mock to return empty list
         mock_s3_client = MagicMock()
         mock_boto3_client.return_value = mock_s3_client
@@ -1030,7 +1009,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("No .pdf files found", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1055,7 +1034,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test error handling when Gemini API fails."""
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=2)
 
@@ -1100,7 +1078,6 @@ class SendGeminiBatchesTest(TestCase):
         self, mock_boto3_client
     ):
         """Test error handling for S3 permission errors."""
-
         # Setup S3 mock to raise AccessDenied error
         mock_s3_client = MagicMock()
         mock_boto3_client.return_value = mock_s3_client
@@ -1122,7 +1099,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("Access denied", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1147,7 +1124,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test --bucket parameter works."""
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=1)
 
@@ -1163,7 +1139,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("not in allowed list", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1187,8 +1163,7 @@ class SendGeminiBatchesTest(TestCase):
         mock_tempfile,
         mock_remove,
     ):
-        """Test that files are split into multiple LLMRequests when
-        exceeding batch_size."""
+        """Test that files are split into multiple LLMRequests when exceeding batch_size."""
         # Setup S3 mocks with 5 files
         self._mock_s3_with_files(mock_boto3_client, num_files=5)
 
@@ -1816,12 +1791,15 @@ class DeduplicationTest(TestCase):
     ) -> LLMTask:
         """Create an LLMRequest + LLMTask with the given config.
 
-        :param s3_key: The S3 key to store in input_file.name.
-        :param status: The LLMTaskStatusChoices value.
-        :param model: Override model name (defaults to self.MODEL).
-        :param system_prompt: Override system prompt.
-        :param user_prompt: Override user prompt.
-        :returns: The created LLMTask.
+        Args:
+            s3_key: The S3 key to store in input_file.name.
+            status: The LLMTaskStatusChoices value.
+            model: Override model name (defaults to self.MODEL).
+            system_prompt: Override system prompt.
+            user_prompt: Override user prompt.
+
+        Returns:
+            The created LLMTask.
         """
         llm_request = LLMRequest.objects.create(
             name="Test Request",

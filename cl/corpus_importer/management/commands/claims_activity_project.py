@@ -1,11 +1,13 @@
 # !/usr/bin/python
+"""Query bankruptcy claims activity reports and export them to CSV."""
 
-import glob
 import json
 import os
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from juriscraper.pacer import ClaimsActivity
 
@@ -13,29 +15,32 @@ from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.utils import glob_files
 from cl.search.models import Court
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
-def query_and_parse_claims_activity(
+@async_to_sync
+async def query_and_parse_claims_activity(
     courts: list[str], date_start: date, date_end: date
 ) -> None:
-    """Queries and parses claims activity for a list of courts and a specified
-     date range.
+    """Queries and parses claims activity for a list of courts and a specified date range.
 
-    :param courts: List of courts to query the reports.
-    :param date_start: Start date for the date range to query.
-    :param date_end: End date for the date range to query.
-    :return: None, output files are stored in disk.
+    Args:
+        courts: List of courts to query the reports.
+        date_start: Start date for the date range to query.
+        date_end: End date for the date range to query.
+
+    Returns:
+        None, output files are stored in disk.
     """
-
     if not courts:
         bankr_courts = (
             Court.federal_courts.bankruptcy_pacer_courts().all().only("pk")
         )
-        courts = [court.pk for court in bankr_courts]
+        courts = [court.pk async for court in bankr_courts]
 
     creditor_names = {
         "international_flavors": "International Flavors",
@@ -44,90 +49,82 @@ def query_and_parse_claims_activity(
         "firmenich": "Firmenich",
     }
 
-    s = ProxyPacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
-    s.login()
-    for court_id in courts:
-        court = map_cl_to_pacer_id(court_id)
-        for alias, creditor_name in creditor_names.items():
-            logger.info(f"Doing {court} and creditor {alias}")
+    reports_path = Path(settings.MEDIA_ROOT) / "claims_activity" / "reports"
+    async with ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    ) as session:
+        await session.login()
+        for court_id in courts:
+            court = map_cl_to_pacer_id(court_id)
+            for alias, creditor_name in creditor_names.items():
+                logger.info(f"Doing {court} and creditor {alias}")
 
-            # Check if the reports directory already exists
-            html_path = os.path.join(
-                settings.MEDIA_ROOT, "claims_activity", "reports"
-            )
-            if not os.path.exists(html_path):
-                # Create the directory if it doesn't exist
-                os.makedirs(html_path)
+                reports_path.mkdir(parents=True, exist_ok=True)
+                html_file = reports_path / f"{court}-{alias}.html"
+                try:
+                    report = ClaimsActivity(court, session)
+                except AssertionError:
+                    # This is not a bankruptcy court.
+                    logger.warning(f"Court {court} is not a bankruptcy court.")
+                    continue
 
-            html_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "claims_activity",
-                "reports",
-                f"{court}-{alias}.html",
-            )
-            try:
-                report = ClaimsActivity(court, s)
-            except AssertionError:
-                # This is not a bankruptcy court.
-                logger.warning(f"Court {court} is not a bankruptcy court.")
-                continue
-
-            if not os.path.exists(html_file):
-                # If the HTML report for this creditor and court doesn't exist
-                # query it from PACER.
-                logger.info(f"File {html_file} doesn't exist.")
-                logger.info(
-                    f"Querying report, court_id: {court}, creditor_name: "
-                    f"{creditor_name}, date_start: {date_start}, date_end: "
-                    f"{date_end}."
-                )
-
-                report.query(
-                    pacer_case_id="",
-                    docket_number="",
-                    creditor_name=creditor_name,
-                    date_start=date_start,
-                    date_end=date_end,
-                )
-
-                # Save report HTML in disk.
-                with open(html_file, "w", encoding="utf-8") as file:
-                    file.write(report.response.text)
-
-            else:
-                logger.info(
-                    f"File {html_file} already exists court: {court}, "
-                    f"creditor_name: {alias}, skipping report query."
-                )
-
-            json_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "claims_activity",
-                "reports",
-                f"{court}-{alias}.json",
-            )
-            if not os.path.exists(json_file):
-                # If not json_file for court and creditor, parse it from HTML.
-                with open(html_file, "rb") as file:
-                    text = file.read().decode("utf-8")
-                report._parse_text(text)
-                with open(json_file, "w", encoding="utf-8") as file:
-                    json.dump(
-                        report.data,
-                        file,
-                        default=serialize_json,
-                        indent=2,
-                        sort_keys=True,
+                if not html_file.exists():
+                    # If the HTML report for this creditor and court doesn't exist
+                    # query it from PACER.
+                    logger.info(f"File {html_file} doesn't exist.")
+                    logger.info(
+                        f"Querying report, court_id: {court}, creditor_name: "
+                        f"{creditor_name}, date_start: {date_start}, date_end: "
+                        f"{date_end}."
                     )
+
+                    await report.query(
+                        pacer_case_id="",
+                        docket_number="",
+                        creditor_name=creditor_name,
+                        date_start=date_start,
+                        date_end=date_end,
+                    )
+                    if report.response is None:
+                        raise RuntimeError(
+                            "Claims activity query returned no response."
+                        )
+
+                    # Save report HTML in disk.
+                    with html_file.open("w", encoding="utf-8") as file:
+                        file.write(report.response.text)
+
+                else:
+                    logger.info(
+                        f"File {html_file} already exists court: {court}, "
+                        f"creditor_name: {alias}, skipping report query."
+                    )
+
+                json_file = reports_path / f"{court}-{alias}.json"
+                if not json_file.exists():
+                    # If not json_file for court and creditor, parse it from HTML.
+                    with html_file.open("rb") as file:
+                        text = file.read().decode("utf-8")
+                    report._parse_text(text)
+                    with json_file.open("w", encoding="utf-8") as file:
+                        json.dump(
+                            report.data,
+                            file,
+                            default=serialize_json,
+                            indent=2,
+                            sort_keys=True,
+                        )
 
 
 def serialize_json(obj: date) -> str:
     """Serialize a date object to ISO format string.
 
-    :param obj: A JSON object.
-    :return: A string date in ISO format.
-    """
+    Args:
+        obj: A JSON object.
 
+    Returns:
+        A string date in ISO format.
+    """
     if isinstance(obj, date):
         return obj.isoformat()
     return ""
@@ -136,29 +133,19 @@ def serialize_json(obj: date) -> str:
 def make_csv_file() -> None:
     """Generate a CSV based on the data of all the JSON files.
 
-    :return: None, The function saves a CSV file in disk.
+    Returns:
+        None, The function saves a CSV file in disk.
     """
+    claims_activity_path = Path(settings.MEDIA_ROOT) / "claims_activity"
+    csv_path = claims_activity_path / "csv"
+    csv_path.mkdir(parents=True, exist_ok=True)
 
-    # Check if the csv directory already exists
-    csv_path = os.path.join(settings.MEDIA_ROOT, "claims_activity", "csv")
-    if not os.path.exists(csv_path):
-        # Create the directory if it doesn't exist
-        os.makedirs(csv_path)
-
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "claims_activity",
-        "csv",
-        "global_report.csv",
-    )
-    files_path = os.path.join(
-        settings.MEDIA_ROOT, "claims_activity", "reports"
-    )
+    csv_file = csv_path / "global_report.csv"
     logger.info(f"Generating CSV {csv_file}")
-    json_files = glob.glob(f"{files_path}/*json")
+    json_files = glob_files(claims_activity_path / "reports", "*json")
     data_frames = []
     for file_path in json_files:
-        with open(file_path, encoding="utf-8") as f:
+        with file_path.open(encoding="utf-8") as f:
             data = json.load(f)
 
         if not data == {} and not data == []:
@@ -244,9 +231,12 @@ def make_csv_file() -> None:
 
 
 class Command(VerboseCommand):
+    """Query claims activity for bankruptcy courts and write the results to a CSV."""
+
     help = "Query claims activity and parse them."
 
     def add_arguments(self, parser):
+        """Add the courts and date range options."""
         parser.add_argument(
             "--courts",
             help="A list of bankruptcy courts.",
@@ -268,6 +258,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Query and parse claims activity for the courts and dates, then make the CSV."""
         date_start = options["date_start"]
         date_end = options["date_end"]
         query_and_parse_claims_activity(

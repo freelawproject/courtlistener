@@ -1,3 +1,5 @@
+"""Shared base class and types for corpus importer commands."""
+
 import csv
 import random
 import time
@@ -6,11 +8,10 @@ from collections.abc import Iterable
 from datetime import date
 from itertools import islice
 
-from celery import chain
+from celery import Task, chain
 from django.conf import settings
 from pydantic import BaseModel, field_validator
 
-from cl.celery_init import app
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.indexing_utils import (
@@ -20,6 +21,8 @@ from cl.lib.indexing_utils import (
 
 
 class TexasDocketMeta(BaseModel):
+    """Metadata about a Texas docket."""
+
     case_number: str
     case_url: str
     date_filed: date
@@ -35,12 +38,12 @@ class TexasDocketMeta(BaseModel):
 
     @field_validator("date_filed", mode="before")
     def date_filed_validator(cls, v):
+        """Parse the filing date from MM/DD/YYYY format."""
         return date(*(time.strptime(v, "%m/%d/%Y")[0:3]))
 
 
 class CorpusImporterCommand(VerboseCommand, ABC):
-    """Base class for `cl.corpus_importer` commands encapsulating inventory\
-        file reading, celery queue interactions, and redis logging.
+    """Base class for `cl.corpus_importer` commands encapsulating inventory file reading, celery queue interactions, and redis logging.
 
     Uses an inventory CSV from S3 to find files to parse and ingest into the\
         database. Includes ratelimiting and autoresume logic.
@@ -60,11 +63,13 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     Optional methods are:
     - `download_task`: Should return the task used to download files from S3.\
-        A default implementation is provided for convenience."""
+        A default implementation is provided for convenience.
+    """
 
     compose_redis_key: str
 
     def add_arguments(self, parser):
+        """Add the inventory, queue, throttling, resume, and attachment options."""
         parser.add_argument(
             "--inventory-file",
             required=True,
@@ -125,33 +130,39 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         )
 
     @staticmethod
-    def download_task() -> app.Task:
+    def download_task() -> Task:
+        """Get the default task for downloading inventory files from S3."""
         from cl.corpus_importer.tasks import default_corpus_download_task
 
         return default_corpus_download_task
 
     @staticmethod
     @abstractmethod
-    def merge_task() -> app.Task: ...
+    def merge_task() -> Task:
+        """Get the task that parses downloaded files and merges them into the database."""
 
     @staticmethod
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable:
-        """
-        Optionally performs transformations on the inventory CSV file\
-            before passing it to the download Celery task. Can be used for\
-            instance to merge consecutive rows which represent the same docket\
-            into one object.
+        """Optionally performs transformations on the inventory CSV file before passing it to the download Celery task. Can be used for instance to merge consecutive rows which represent the same docket into one object.
 
-        :param csv_reader: The `csv.Reader` object to use to read the CSV.
+        Args:
+            csv_reader: The `csv.Reader` object to use to read the CSV.
 
-        :return: The transformed inventory CSV iterator. The item of the\
+        Returns:
+            The transformed inventory CSV iterator. The item of the\
             iterable should be a list of arguments to be passed to the\
-            download task."""
+            download task.
+        """
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
     def handle(self, *args, **options):
+        """Schedule a download and merge chain for each inventory row.
+
+        Starts at ``--start-row``, or the last logged row with
+        ``--auto-resume``, and logs progress to Redis every 100 rows.
+        """
         super().handle(*args, **options)
 
         retrieval_queue = options["retrieval_queue"]
@@ -175,7 +186,7 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             queue_name=ingesting_queue,
         )
 
-        with open(inventory_path, encoding="utf-8") as f:
+        with inventory_path.open(encoding="utf-8") as f:
             download_inputs = self.transform_inventory_iterator(csv.reader(f))
             if options["test_random"]:
                 logger.warning(
