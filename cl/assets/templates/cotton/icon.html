@@ -1,11 +1,11 @@
 {% load svg_tags %}{% spaceless %}
 
-{# Icon from cl/assets/static-global/svg/: sizes it, picks the filled or outline variant and hides it from assistive technology unless it has a label. #}
+{# Icon from cl/assets/static-global/svg/: sizes it, picks the filled or outline variant and hides it from assistive technology unless it has an aria_label. #}
 <c-vars
   name=""
   size=""
   outline=""
-  label=""
+  aria_label=""
   class=""
 />
 
@@ -17,8 +17,8 @@
 
 {% with suffix=outline|yesno:"_outline,," %}
 {% with icon_name=name|add:suffix classes="shrink-0 "|add:size_class|add:" "|add:class %}
-  {% if label %}
-    {% svg icon_name class=classes|escape aria_label=label|escape %}
+  {% if aria_label %}
+    {% svg icon_name class=classes|escape aria_label=aria_label|escape %}
   {% else %}
     {% svg icon_name class=classes|escape aria_hidden="true" %}
   {% endif %}

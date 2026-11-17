@@ -1341,7 +1341,7 @@ Sample code here.
   {# ICON #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="icon">
     <h2 class="mt-6 mb-3">Icon</h2>
-    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text color. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has a label.</p>
+    <p>An icon from <code>cl/assets/static-global/svg/</code>, drawn in the surrounding text color. The component sets the size, picks the filled or outline variant, and hides the icon from assistive technology unless it has an <code>aria_label</code>.</p>
     <p>Without the component, the <code>{% templatetag openblock %} svg {% templatetag closeblock %}</code> tag from <code>svg_tags</code> inlines the same file and adds the attributes you pass, written in snake case, for example <code>{% templatetag openblock %} svg "magnifier" class="size-4" aria_hidden="true" {% templatetag closeblock %}</code>. Use it for a one-off icon that needs no sizing or variant logic, or when the <code>&lt;svg&gt;</code> needs an attribute the component doesn't take, such as an <code>id</code> or an Alpine binding (<code>x_bind__class</code>): the component only takes the props below and drops anything else.</p>
 
     <h4 class="mt-3">Demo</h4>
@@ -1360,9 +1360,9 @@ Sample code here.
       <span class="flex items-center gap-2"><c-icon name="bell" outline />Outline</span>
     </div>
 
-    <h5 class="mt-3">With a label</h5>
+    <h5 class="mt-3">With an aria_label</h5>
     <div class="my-4 flex flex-row flex-wrap items-center gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-2"><c-icon name="circle_question_mark" size="md" label="Help" />Screen readers announce this icon as "Help".</span>
+      <span class="flex items-center gap-2"><c-icon name="circle_question_mark" size="md" aria_label="Help" />Screen readers announce this icon as "Help".</span>
     </div>
 
     <c-library.list title="Props" only>
@@ -1379,7 +1379,7 @@ Sample code here.
         <c-slot name="description">Renders the <code>&lt;name&gt;_outline</code> file instead of the filled one. Pass it bare (<code>outline</code>) or bound to a boolean from the context (<code>:outline="show_outline"</code>). Any non-empty string counts as set, including <code>"false"</code>. Only for icons that have an <code>_outline</code> file.</c-slot>
       </c-library.item>
       <c-library.item optional only>
-        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="label"><code>aria_label</code></c-slot>
         <c-slot name="description">Accessible name, for an icon that carries meaning on its own. Without it the icon is decorative and gets <code>aria-hidden="true"</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
@@ -1400,7 +1400,7 @@ Sample code here.
 &lt;c-icon name="magnifier" size="custom" class="size-3" /&gt;
 &lt;c-icon name="bell" /&gt;
 &lt;c-icon name="bell" outline /&gt;
-&lt;c-icon name="circle_question_mark" size="md" label="Help" /&gt;
+&lt;c-icon name="circle_question_mark" size="md" aria_label="Help" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

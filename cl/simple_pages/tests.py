@@ -866,23 +866,23 @@ class IconComponentTest(SimpleTestCase):
         return fromstring(html).xpath("//path/@d")
 
     def test_icon_is_hidden_from_assistive_technology_by_default(self) -> None:
-        """An icon without a label is decorative."""
+        """An icon without an aria_label is decorative."""
         icon = fromstring(self.render('<c-icon name="chevron" />'))
         self.assertEqual(icon.get("aria-hidden"), "true")
         self.assertIsNone(icon.get("aria-label"))
 
-    def test_label_gives_the_icon_an_accessible_name(self) -> None:
-        """A labelled icon is named and not hidden."""
+    def test_aria_label_gives_the_icon_an_accessible_name(self) -> None:
+        """An icon with an aria_label is named and not hidden."""
         icon = fromstring(
-            self.render('<c-icon name="chevron" label="Next page" />')
+            self.render('<c-icon name="chevron" aria_label="Next page" />')
         )
         self.assertEqual(icon.get("aria-label"), "Next page")
         self.assertIsNone(icon.get("aria-hidden"))
 
-    def test_bound_label_is_escaped(self) -> None:
-        """A label bound from the context can't break out of its attribute."""
+    def test_bound_aria_label_is_escaped(self) -> None:
+        """An aria_label bound from the context can't break out of its attribute."""
         html = self.render(
-            '<c-icon name="chevron" :label="name" />',
+            '<c-icon name="chevron" :aria_label="name" />',
             {"name": 'A "b" <c> & d'},
         )
         self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
