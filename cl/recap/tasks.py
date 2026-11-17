@@ -2786,6 +2786,28 @@ async def fetch_appellate_docket_base(
                 fq=fq,
                 **get_fq_appellate_docket_kwargs(fq),
             )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        logger.error(
+            "fq %s: %s %s answered HTTP %s while purchasing docket",
+            fq_pk,
+            exc.request.method,
+            exc.request.url,
+            status,
+            exc_info=True,
+        )
+        if status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+            # The court rejected the request outright, either an auth problem
+            # or a disabled court app. Retrying cannot change that answer.
+            msg = (
+                f"{exc.request.url.host} rejected the request with HTTP "
+                f"{status} while purchasing docket for fq: {fq_pk}."
+            )
+            await mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        raise CourtQueryError(
+            f"HTTP {status} while purchasing docket for fq: {fq_pk}."
+        ) from exc
     except httpx.HTTPError as exc:
         raise CourtQueryError(
             f"Network error while purchasing docket for fq: {fq_pk}."
