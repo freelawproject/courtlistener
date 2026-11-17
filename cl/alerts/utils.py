@@ -1,3 +1,5 @@
+"""Helpers for percolating documents against search alerts and enforcing alert limits."""
+
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -86,12 +88,16 @@ COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
 @dataclass
 class DocketAlertReportObject:
+    """A docket alert and the docket it is on."""
+
     da_alert: DocketAlert
     docket: Docket
 
 
 @dataclass
 class TaskCompletionStatus:
+    """Progress of an Elasticsearch task."""
+
     completed: bool = False
     created: int = 0
     total: int = 0
@@ -99,24 +105,31 @@ class TaskCompletionStatus:
 
 
 class OldAlertReport:
+    """A user's docket alerts on terminated dockets, split into old, very old, and disabled alerts."""
+
     def __init__(self):
+        """Start with no alerts in any group."""
         self.old_alerts = []
         self.very_old_alerts = []
         self.disabled_alerts = []
 
     @property
     def old_dockets(self):
+        """The dockets of the old alerts."""
         return [obj.docket for obj in self.old_alerts]
 
     @property
     def very_old_dockets(self):
+        """The dockets of the very old alerts."""
         return [obj.docket for obj in self.very_old_alerts]
 
     @property
     def disabled_dockets(self):
+        """The dockets of the disabled alerts."""
         return [obj.docket for obj in self.disabled_alerts]
 
     def total_count(self):
+        """Count the alerts across all groups."""
         return (
             len(self.old_alerts)
             + len(self.very_old_alerts)
@@ -125,7 +138,7 @@ class OldAlertReport:
 
 
 class InvalidDateError(Exception):
-    pass
+    """Raised when a date is invalid."""
 
 
 def create_percolator_search_query(
@@ -246,7 +259,7 @@ def percolate_es_document(
         percolator_index, final_query, search_after=main_search_after
     )
     match app_label:
-        case "search.RECAPDocument":
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
             child_highlight_options, _ = build_highlights_dict(
                 SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
             )
@@ -389,10 +402,9 @@ def fetch_all_search_alerts_results(
         # Otherwise, increase search_after.
         if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
             break
-        else:
-            main_search_after = get_search_after(responses.main_response)
-            rd_search_after = get_search_after(responses.rd_response)
-            d_search_after = get_search_after(responses.d_response)
+        main_search_after = get_search_after(responses.main_response)
+        rd_search_after = get_search_after(responses.rd_response)
+        d_search_after = get_search_after(responses.d_response)
 
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
@@ -531,7 +543,7 @@ def make_alert_set_key(alert_id: int, document_type: str) -> str:
 
 
 def add_document_hit_to_alert_set(
-    r: Redis, alert_id: int, document_type: str, document_id: int
+    r: Redis, alert_id: int, document_type: str, document_id: int | str
 ) -> None:
     """Add a document ID to the Redis SET associated with an alert ID.
 
@@ -539,7 +551,8 @@ def add_document_hit_to_alert_set(
         r: Redis client instance.
         alert_id: The alert identifier.
         document_type: The type of document associated with the alert.
-        document_id: The docket identifier to add.
+        document_id: The document identifier to add: a pk, or a uid like
+            "scotus_123" for documents whose pk could collide with RECAP pks.
     """
     alert_key = make_alert_set_key(alert_id, document_type)
     r.sadd(alert_key, document_id)
@@ -563,7 +576,7 @@ def remove_alert_hits_set(r: Redis, alert_id: int) -> None:
 
 
 def has_document_alert_hit_been_triggered(
-    r: Redis, alert_id: int, document_type: str, document_id: int
+    r: Redis, alert_id: int, document_type: str, document_id: int | str
 ) -> bool:
     """Check if a document ID is a member of the Redis SET associated with an alert ID.
 
@@ -571,7 +584,8 @@ def has_document_alert_hit_been_triggered(
         r: Redis client instance.
         alert_id: The alert identifier.
         document_type: The type of document associated with the alert.
-        document_id: The docket identifier to check.
+        document_id: The document identifier to check: a pk, or a uid like
+            "scotus_123" for documents whose pk could collide with RECAP pks.
 
     Returns:
         True if the docket ID is a member of the set, False otherwise.
@@ -700,6 +714,11 @@ def include_recap_document_hit(
 
 
 def get_field_names(mapping_dict):
+    """List the field names in an Elasticsearch mapping.
+
+    Includes subfields as ``field.subfield``, except those whose names end
+    in ``exact`` or ``raw``.
+    """
     field_names = []
     for key, value in mapping_dict["properties"].items():
         field_names.append(key)
@@ -779,7 +798,8 @@ def prepare_percolator_content(
                 None,
                 None,
             )
-        case "search.RECAPDocument":
+        # SCOTUS documents share the RECAP percolator index and mapping.
+        case "search.RECAPDocument" | "search.SCOTUSDocument":
             percolator_index = RECAPPercolator._index._name
             es_document_index = None
             model = apps.get_model(app_label)

@@ -1,3 +1,5 @@
+"""Helpers for tracking Elasticsearch indexing progress."""
+
 from collections.abc import Mapping
 from datetime import datetime
 
@@ -39,9 +41,7 @@ def get_last_parent_document_id_processed(log_key: str) -> int:
     """
     r = get_redis_interface("CACHE")
     stored_values = r.hgetall(log_key)
-    last_document_id = int(stored_values.get("last_document_id", 0))
-
-    return last_document_id
+    return int(stored_values.get("last_document_id", 0))
 
 
 def compose_app_label(instance: ESModelType) -> str:

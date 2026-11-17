@@ -1,3 +1,5 @@
+"""Merge Harvard Caselaw Access Project opinions into existing clusters."""
+
 import itertools
 import json
 import logging
@@ -31,6 +33,8 @@ from cl.search.models import Docket, Opinion, OpinionCluster
 
 
 class HarvardConversionUtil:
+    """Mapping of Harvard opinion types to CourtListener opinion types."""
+
     types_mapping = {
         "unanimous": "015unamimous",
         "majority": "020lead",
@@ -198,8 +202,7 @@ def fetch_non_harvard_data(harvard_data: dict[str, Any]) -> dict[str, Any]:
     long_data = parse_extra_fields(soup, long_fields, True)
     all_data.update(short_data)
     all_data.update(long_data)
-    all_data = {k: v for k, v in all_data.items() if v}
-    return all_data
+    return {k: v for k, v in all_data.items() if v}
 
 
 def combine_non_overlapping_data(
@@ -610,7 +613,7 @@ def update_matching_opinions(
                     != find_just_name(author_str).lower()
                 ):
                     raise AuthorException("Authors don't match")
-                elif any(s.isupper() for s in op.author_str.split(",")):
+                if any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
 
@@ -689,9 +692,12 @@ def map_and_merge_opinions(
 
 
 class Command(VerboseCommand):
+    """Merge Harvard opinions into one cluster or a batch of clusters."""
+
     help = "Merge harvard opinions into CL opinions"
 
     def add_arguments(self, parser) -> None:
+        """Add the cluster ID, debug, fastcase, judge merger, offset, and limit options."""
         parser.add_argument(
             "--cluster-id",
             type=str,
@@ -727,6 +733,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Merge the given cluster, or the clusters with unmerged Harvard data.
+
+        A given cluster that is already merged or doesn't exist is logged
+        and skipped.
+        """
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
 

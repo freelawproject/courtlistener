@@ -24,6 +24,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
@@ -397,7 +398,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -417,6 +418,53 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_unknown_or_used_key_explains_what_happened(self) -> None:
+        """Does an unknown or already-used key get a helpful message?
+
+        Once a key is spent it is blanked, so a used key looks the same as one
+        that never existed. The page should say so rather than just "invalid".
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        url = reverse("email_confirm", args=[up.activation_key])
+        await self.async_client.post(url)  # Spends the key.
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = await getattr(self.async_client, method)(url)
+                self.assertEqual(r.status_code, 200)
+                content = r.content.decode()
+                self.assertIn("Confirmation Link Not Found", content)
+                self.assertIn("may have already been used", content)
+
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -428,7 +476,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -1459,7 +1507,7 @@ class SNSWebhookTest(TestCase):
 
         mock_logger.exception.assert_called_once()
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged when a unexpected bounceSubType event is received."""
         # Trigger a content_rejected event
@@ -1707,7 +1755,7 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned when an unexpected hard bounceSubType event is received. Also checks that if an email address is previously banned avoid creating a new ban object for that email address."""
         # Trigger a suppressed_asset event
@@ -3042,7 +3090,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
         """This test checks if a warning is logged when trying to enqueue a message but the stored message doesn't exist anymore because it was deleted."""
         # Create a backoff event message ID:
@@ -4186,7 +4234,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4223,7 +4271,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4249,7 +4297,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4395,6 +4443,36 @@ class RegisterViewTest(TestCase):
         form = response.context.get("form")
         self.assertIsNotNone(form, "Expected 'form' in template context")
         # The username field should display an error.
+        self.assertIn("username", form.errors)
+
+    async def test_failed_profile_save_does_not_leave_user(self) -> None:
+        """A failed profile save must not leave a user behind.
+
+        A user without a profile can't log in.
+        """
+        data = {
+            "username": "admin3",
+            "email": "admin3@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        with patch.object(
+            UserProfile, "save", side_effect=IntegrityError("profile")
+        ):
+            response = await self.async_client.post(
+                reverse("register"), data, follow=True
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertFalse(
+            await User.objects.filter(username="admin3").aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
         self.assertIn("username", form.errors)
 
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:

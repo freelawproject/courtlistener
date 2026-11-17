@@ -1,3 +1,5 @@
+"""General-purpose helpers shared across apps."""
+
 import datetime
 import re
 from collections.abc import Generator, Iterable
@@ -63,13 +65,11 @@ def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
         if "." in name:
             attr, subname = name.split(".", 1)
             return deepgetattr(getattr(obj, attr), subname, default)
-        else:
-            return getattr(obj, name)
+        return getattr(obj, name)
     except AttributeError:
         if default is _UNSPECIFIED:
             raise
-        else:
-            return default
+        return default
 
 
 def chunks[T](
@@ -113,6 +113,7 @@ def previous_and_next[T](
 
 
 def is_iter(item: Any) -> TypeIs[Iterable]:
+    """Check if an item is iterable."""
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
@@ -247,8 +248,7 @@ def modify_court_id_queries(query_str: str) -> str:
         the original query string if no valid 'court_id:' queries are found.
     """
     pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
-    modified_query = re.sub(pattern, extend_child_courts, query_str)
-    return modified_query
+    return re.sub(pattern, extend_child_courts, query_str)
 
 
 def check_query_for_disallowed_wildcards(query_string: str) -> bool:
@@ -316,11 +316,9 @@ def perform_special_character_replacements(query_string: str) -> str:
     # Replace * (universal character) that is not at the end of a word with ?.
     universal_char_pattern = r"\*(?=\w)"
     universal_char_replacement = "?"
-    query_string = re.sub(
+    return re.sub(
         universal_char_pattern, universal_char_replacement, query_string
     )
-
-    return query_string
 
 
 def cleanup_main_query(query_string: str) -> str:
@@ -425,8 +423,7 @@ def cleanup_main_query(query_string: str) -> str:
     cleaned_query = re.sub(r'(")\s*(?=~\d+)', r"\1", cleaned_query)
     # If it's a court_id query, parse it, append the child courts, and then
     # reintegrate them into the original query.
-    final_query = modify_court_id_queries(cleaned_query)
-    return final_query
+    return modify_court_id_queries(cleaned_query)
 
 
 def check_for_proximity_tokens(query: str) -> bool:
@@ -541,10 +538,9 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
     if sort_string == "dateFiled asc":
         return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
+    if sort_string == "dateFiled desc":
         return "entry_date_filed desc"
-    else:
-        return sort_string
+    return sort_string
 
 
 def append_value_in_cache(key: str, value: object) -> None:
@@ -637,6 +633,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
 
 
 def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
+    """Create a Chrome driver, remote if ``DOCKER_SELENIUM_HOST`` is set and headless if configured."""
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")

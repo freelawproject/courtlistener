@@ -1,3 +1,5 @@
+"""View decorators that set up view tracking in the template context."""
+
 from collections.abc import Coroutine
 from functools import wraps
 from inspect import iscoroutinefunction
@@ -68,8 +70,7 @@ def track_view_counter[
                     f"Response context_data is None (attempting to track {track_attribute})"
                 )
             model = response.context_data[track_attribute]
-            label = template % (model.id)
-            return label
+            return template % (model.id)
 
         if iscoroutinefunction(func):
 

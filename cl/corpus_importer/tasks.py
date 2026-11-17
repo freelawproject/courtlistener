@@ -1,3 +1,5 @@
+"""Celery tasks for importing PACER, state, and archival data and uploading to the Internet Archive."""
+
 from __future__ import annotations
 
 import asyncio
@@ -106,6 +108,7 @@ from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.alerts.utils import set_skip_percolation_if_parties_data
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
@@ -203,6 +206,7 @@ from cl.scrapers.tasks import (
     extract_pdf_document_base,
 )
 from cl.search.cluster_sources import ClusterSources
+from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     CaseTransfer,
@@ -226,7 +230,7 @@ from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
 )
-from cl.search.tasks import index_docket_parties_in_es
+from cl.search.tasks import index_docket_parties_in_es, percolate_document
 from cl.settings import COURT_REQUEST_USER_AGENT
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -237,6 +241,7 @@ env = environ.FileAwareEnv()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
+    """Increment and save the object's Internet Archive upload failure count."""
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -387,6 +392,11 @@ async def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
+    """Download a RECAP item to ``MEDIA_ROOT/recap/<filename>``.
+
+    Existing files are kept unless ``clobber`` is set. Timeouts, HTTP errors,
+    and an existing file are logged rather than raised.
+    """
     logger.info("  Getting item at: %s", url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
@@ -402,11 +412,11 @@ async def download_recap_item(
             )
         r.raise_for_status()
     except TimeoutException:
-        logger.warning(f"    Timed out attempting to get: {url}\n")
+        logger.warning("    Timed out attempting to get: %s\n", url)
     except HTTPError as e:
-        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
+        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
     except OSError as e:
-        logger.warning(f"    {e}")
+        logger.warning("    %s", e)
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             tmp.write(r.content)
@@ -804,14 +814,13 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
-        else:
-            msg = (
-                "Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None
+        msg = (
+            "Ran into unknown HTTPError while getting PDF: "
+            f"{exc.response.status_code}. Aborting."
+        )
+        logger.error(msg)
+        self.request.chain = None
+        return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -868,11 +877,16 @@ def get_and_process_free_pdf(
 
 
 class OverloadedException(Exception):
-    pass
+    """Raised when the Internet Archive's S3 API is overloaded."""
 
 
 @app.task(bind=True)
 def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
+    """Upload a RECAP document's PDF to the Internet Archive.
+
+    On success, the archive URL is saved on the document and its failure
+    count is cleared. On failure, its failure count is incremented.
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
     file_name = get_document_filename(
@@ -1041,6 +1055,11 @@ def upload_to_ia(
 
 @app.task
 def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+    """Set a free document log's status and completion date.
+
+    Returns:
+        The status, or None if the log doesn't exist.
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
@@ -1055,6 +1074,11 @@ def mark_court_done_on_date(log_id: int, status: int) -> int | None:
 
 @app.task(ignore_result=True)
 def delete_pacer_row(data: TaskData, pk: int) -> list[int]:
+    """Delete a free document row, if it still exists.
+
+    Returns:
+        A list holding the RECAP document PK from ``data``.
+    """
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -1712,7 +1736,7 @@ def probe_or_scrape_iquery_pages(
                 exc,
             )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         except HTTPStatusError:
             # Set expiration accordingly and value to 2 to difference from
@@ -1756,7 +1780,7 @@ def probe_or_scrape_iquery_pages(
                     next_blocked_court_wait / 3600,
                 )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-            return None
+            return
 
         if report is not None:
             # Find and update/store the Docket.
@@ -1792,7 +1816,7 @@ def probe_or_scrape_iquery_pages(
             highest_known_pacer_case_id + settings.IQUERY_FIXED_SWEEP,
         )
         delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
-        return None
+        return
 
     if not reports_data:
         today = localtime().weekday()
@@ -2202,11 +2226,10 @@ def get_attachment_page_by_rd(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting."
-            logger.error(msg, exc.response.status_code)
-            self.request.chain = None
-            return None
+        msg = "Ran into unknown HTTPError. %s. Aborting."
+        logger.error(msg, exc.response.status_code)
+        self.request.chain = None
+        return None
     except RequestError as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
@@ -2327,7 +2350,7 @@ def create_attachment_pq(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
+    return ProcessingQueue(
         court_id=rd.docket_entry.docket.court_id,
         pacer_doc_id=rd.pacer_doc_id,
         uploader=user,
@@ -2335,7 +2358,6 @@ def create_attachment_pq(
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
         source=source,
     )
-    return pq
 
 
 @app.task(bind=True, ignore_result=True)
@@ -2473,10 +2495,9 @@ async def download_pacer_pdf_by_rd(
             )
         else:
             report = FreeOpinionReport(pacer_court_id, s)
-            # Juriscraper annotates this argument as int, but PACER IDs are strings.
             r, r_msg = await report.download_pdf(
                 pacer_case_id,
-                cast(Any, pacer_doc_id),
+                pacer_doc_id,
                 magic_number,
                 # Without a magic number, Juriscraper sends this as multipart
                 # form data, and httpx only accepts str/bytes values there.
@@ -2518,10 +2539,9 @@ async def download_pdf_by_magic_number(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     ) as s:
         report = FreeOpinionReport(court_id, s)
-        # Juriscraper annotates this argument as int, but PACER IDs are strings.
         return await report.download_pdf(
             pacer_case_id,
-            cast(Any, pacer_doc_id),
+            pacer_doc_id,
             magic_number,
             appellate,
             de_seq_num,
@@ -2922,7 +2942,7 @@ def get_pacer_doc_by_rd_and_description(
         msg = f"Aborting. Did not find civil cover sheet for {rd}."
         logger.error(msg)
         self.request.chain = None
-        return None
+        return
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -3003,7 +3023,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
     except CourtQueryError as exc:
         if self.request.retries == self.max_retries:
             logger.error("%s Aborting.", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3078,6 +3098,7 @@ def make_csv_file(
 
 
 def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
+    """Make the key for a docket's enqueued list of creditors query."""
     return f"list.creditors.enqueued:{court_id}-{d_number_file_name}"
 
 
@@ -3116,7 +3137,7 @@ def query_and_save_list_of_creditors(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -3154,7 +3175,7 @@ async def query_and_save_list_of_creditors_base(
                 "CACHE",
                 make_list_of_creditors_key(court_id, d_number_file_name),
             )
-            return None
+            return
 
         # Check if HTML report for this docket_number already exists, if so
         # omit it. Otherwise, query the pacer_case_id and the list of creditors
@@ -3177,7 +3198,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             if not result:
                 logger.info(
@@ -3190,7 +3211,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             pacer_case_id = result.get("pacer_case_id")
             if not pacer_case_id:
@@ -3204,7 +3225,7 @@ async def query_and_save_list_of_creditors_base(
                     "CACHE",
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
-                return None
+                return
 
             logger.info("File %s doesn't exist.", html_file)
             logger.info(
@@ -3228,7 +3249,7 @@ async def query_and_save_list_of_creditors_base(
                     make_list_of_creditors_key(court_id, d_number_file_name),
                 )
                 logger.info("Invalid POST param for %s, aborting...", court_id)
-                return None
+                return
 
             await report.query(
                 pacer_case_id=pacer_case_id,
@@ -3654,7 +3675,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Docket %s does not exist; skipping.",
             docket_id,
         )
-        return None
+        return
 
     scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
 
@@ -3664,7 +3685,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: No questions_presented_url for docket %s.",
             docket_id,
         )
-        return None
+        return
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
@@ -3673,7 +3694,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "for docket %s; skipping.",
             docket_id,
         )
-        return None
+        return
 
     logger.info(
         "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
@@ -3690,7 +3711,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 docket_id,
                 qp_url,
             )
-            return None
+            return
 
         tmp, _ = result
         filename = f"{docket_id}-qp.pdf"
@@ -3734,9 +3755,10 @@ def merge_scotus_document(
     """Merge a single SCOTUSDocument attachment into CL.
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
-    not. Then, if the document is new, was a placeholder, or the filename has
-    changed, fetch the attachment PDF, store it, and compute metadata. The
-    download is queued when the current transaction commits.
+    not. Then, if the document is new, was a placeholder, has no stored file
+    (e.g. its earlier download failed), or the filename has changed, fetch the
+    attachment PDF, store it, and compute metadata. The download is queued
+    when the current transaction commits.
 
     Args:
         docket_entry: The docket entry this attachment belongs to.
@@ -3756,47 +3778,93 @@ def merge_scotus_document(
     attachment_number = doc_data["attachment_number"]
 
     # Retrieve existing object or create new one
-    scotus_document, created = SCOTUSDocument.objects.get_or_create(
-        docket_entry=docket_entry,
-        document_number=document_number,
-        attachment_number=attachment_number,
-        defaults={
-            "description": description,
-            "url": url,
-        },
-    )
+    lookup = {
+        "docket_entry": docket_entry,
+        "document_number": document_number,
+        "attachment_number": attachment_number,
+    }
+    try:
+        scotus_document = SCOTUSDocument.objects.get(**lookup)
+        created = False
+    except SCOTUSDocument.DoesNotExist:
+        scotus_document = SCOTUSDocument(
+            **lookup, description=description, url=url
+        )
+        # Its PDF is downloaded next, so don't percolate it yet: it's
+        # percolated once, with its text, by percolate_scotus_document.
+        scotus_document.skip_percolator_request = download_file
+        scotus_document.save()
+        created = True
 
-    # Check if the filename has changed for existing documents. A filled-in
-    # placeholder never had a file, so it needs one whatever its URL.
-    file_name_changed = False
+    # Existing documents need a download if their filename has changed or
+    # they have no stored file, whatever their URL: a filled-in placeholder
+    # never had one, and a failed download didn't store one.
+    needs_download = False
     if not created:
         old_file_name = extract_file_name_from_url(scotus_document.url)
         new_file_name = extract_file_name_from_url(url)
-        file_name_changed = (
-            scotus_document.is_placeholder or old_file_name != new_file_name
+        needs_download = (
+            not scotus_document.filepath_local
+            or old_file_name != new_file_name
         )
 
         # Update the fields
         scotus_document.description = description
         scotus_document.url = url
+        # A new PDF is downloaded next, and the document is percolated once
+        # its text is ready (see percolate_scotus_document), so don't
+        # percolate this save too.
+        scotus_document.skip_percolator_request = (
+            download_file and needs_download
+        )
         scotus_document.save(
             update_fields=["description", "url", "date_modified"]
         )
 
-    if download_file and (created or file_name_changed):
+    if download_file and (created or needs_download):
+        percolate = percolate_scotus_document.si(scotus_document.pk)
+        pdf_chain = chain(
+            download_scotus_document_pdf.si(scotus_document.pk),
+            extract_pdf_document.s(
+                check_if_needed=False, model_name="search.SCOTUSDocument"
+            ),
+            # Also runs when the extraction service can't extract the text,
+            # so the document is still percolated with its metadata.
+            percolate,
+        )
+        # The chain stops at a task that fails for good (e.g. an HTTP error
+        # or exhausted retries), so percolate the document then too. Celery
+        # applies the chain's error callback to every task in it.
+        pdf_chain.link_error(percolate)
         # Queue the download once the merge commits; otherwise the worker can
         # read the document before it exists or, for a filled-in placeholder,
         # while its url is still empty.
-        transaction.on_commit(
-            chain(
-                download_scotus_document_pdf.si(scotus_document.pk),
-                extract_pdf_document.s(
-                    check_if_needed=False, model_name="search.SCOTUSDocument"
-                ),
-            ).apply_async
-        )
+        transaction.on_commit(pdf_chain.apply_async)
 
     return created, scotus_document.pk
+
+
+@app.task(ignore_result=True)
+def percolate_scotus_document(doc_pk: int) -> None:
+    """Percolate a new SCOTUSDocument once its PDF processing is done, so search alerts match its text too.
+
+    Runs as the last step of the document's PDF chain, and as its error
+    callback when a task in the chain fails. New documents with a PDF to
+    download skip percolation when they're created (see
+    merge_scotus_document), so this is their first percolation. Percolation
+    is still gated by PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED.
+
+    Args:
+        doc_pk: The SCOTUSDocument pk.
+    """
+    scotus_document = (
+        SCOTUSDocument.objects.select_related("docket_entry__docket")
+        .filter(pk=doc_pk)
+        .first()
+    )
+    if not scotus_document:
+        return
+    percolate_document(ESRECAPDocument, scotus_document.pk, scotus_document)
 
 
 def add_scotus_placeholder_document(docket_entry: SCOTUSDocketEntry) -> None:
@@ -3811,7 +3879,9 @@ def add_scotus_placeholder_document(docket_entry: SCOTUSDocketEntry) -> None:
 
 
 def fill_scotus_placeholder_document(
-    docket_entry: SCOTUSDocketEntry, attachment: dict[str, Any]
+    docket_entry: SCOTUSDocketEntry,
+    attachment: dict[str, Any],
+    download_file: bool = False,
 ) -> int | None:
     """Turn the entry's placeholder, if it has one, into the given attachment by giving it the attachment's numbers. merge_scotus_document then finds it and fills in the rest, instead of creating a new document and leaving the empty placeholder next to it.
 
@@ -3822,6 +3892,9 @@ def fill_scotus_placeholder_document(
 
     :param docket_entry: The entry whose placeholder to fill in.
     :param attachment: The attachment data the placeholder becomes.
+    :param download_file: Whether merge_scotus_document downloads the
+    placeholder's PDF next. If so, this save isn't percolated: the document
+    is percolated once its text is ready.
     :return: The placeholder's pk, or None if there was none to fill in.
     """
     # unique_together treats NULLs as distinct, so it doesn't stop an entry
@@ -3852,6 +3925,7 @@ def fill_scotus_placeholder_document(
         return None
     placeholder.document_number = attachment["document_number"]
     placeholder.attachment_number = attachment["attachment_number"]
+    placeholder.skip_percolator_request = download_file
     placeholder.save(
         update_fields=["document_number", "attachment_number", "date_modified"]
     )
@@ -3971,7 +4045,7 @@ def merge_scotus_docket_entry(
         # Merge attachments; only track newly created document PKs
         doc_pks = []
         filled_placeholder_pk = fill_scotus_placeholder_document(
-            de, attachments[0]
+            de, attachments[0], download_file=download_file
         )
         for document in attachments:
             created, doc_pk = merge_scotus_document(
@@ -4138,11 +4212,36 @@ def merge_scotus_docket(
         # source=SCRAPER is indistinguishable from an opinion-scraper
         # Docket, so it can't tell them apart on its own.
         d._index_in_es = True
+        normalized_parties = (
+            normalize_scotus_parties(report_data["parties"])
+            if report_data["parties"]
+            else []
+        )
+        # Like RECAP: if the parties fit the attorney limit, skip
+        # percolating this save; the docket is percolated after its parties
+        # are indexed, so alerts on party fields can match it.
+        percolate_parties = set_skip_percolation_if_parties_data(
+            normalized_parties, d
+        )
+        scotus_metadata = (
+            ScotusDocketMetadata.objects.filter(docket=d).first()
+            if d.pk
+            else None
+        )
+        capital_case = bool(report_data.get("capital_case"))
+        if (
+            scotus_metadata is not None
+            and not percolate_parties
+            and scotus_metadata.capital_case != capital_case
+        ):
+            # The metadata update below percolates the docket after this
+            # save, so don't percolate it twice.
+            d.skip_percolator_request = True
         d.save()
 
         # Merge ScotusDocketMetadata
         defaults = {
-            "capital_case": bool(report_data.get("capital_case")),
+            "capital_case": capital_case,
             "date_discretionary_court_decision": report_data.get(
                 "discretionary_court_decision"
             ),
@@ -4158,21 +4257,37 @@ def merge_scotus_docket(
                 qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
             defaults["questions_presented_url"] = qp_url
 
-        scotus_metadata, _ = ScotusDocketMetadata.objects.update_or_create(
-            docket=d,
-            defaults=defaults,
+        # True for a new Docket, and for an existing one (e.g. created to
+        # hold a scraped opinion) that becomes SCOTUS docket content now.
+        metadata_created = scotus_metadata is None
+        if scotus_metadata is None:
+            scotus_metadata = ScotusDocketMetadata(docket=d)
+        for field, value in defaults.items():
+            setattr(scotus_metadata, field, value)
+        # The parties are merged after this block. If the docket is
+        # percolated after its parties are indexed (below), don't percolate
+        # this metadata change now, with the old parties.
+        scotus_metadata.skip_percolator_request = (
+            percolate_parties or metadata_created
         )
+        scotus_metadata.save()
         download_qp = bool(
             qp_url and not scotus_metadata.questions_presented_file
         )
 
     # Merge Parties
-    if report_data["parties"]:
-        normalized_parties = normalize_scotus_parties(report_data["parties"])
+    if normalized_parties:
         add_parties_and_attorneys(d, normalized_parties)
-        # Party rows don't trigger ES signals, and the Docket was indexed
-        # when its metadata was saved, before these parties existed.
-        index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
+    if normalized_parties or metadata_created:
+        # Party rows don't trigger ES signals, and the Docket was indexed when
+        # its metadata was saved, before these parties existed. A docket that
+        # just became SCOTUS content (new, or an existing opinion-only docket)
+        # is always percolated here: its first ES write comes from the
+        # metadata save, which isn't percolated, so it's never percolated on
+        # save.
+        index_docket_parties_in_es.delay(
+            d.pk, percolate_parties=percolate_parties or metadata_created
+        )
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
@@ -4257,6 +4372,9 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
                 doc_pk,
                 url,
             )
+            # The chain stops here, so percolate the document now, with
+            # its metadata only.
+            percolate_scotus_document.delay(doc_pk)
             self.request.chain = None
             return None
 
@@ -4828,6 +4946,7 @@ def is_texas_appellate_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasCourtOfAppealsDocket]:
+    """Check if a Texas docket is from an appellate court."""
     return d["court_type"] == CourtType.APPELLATE.value
 
 
@@ -4836,6 +4955,7 @@ def is_texas_supreme_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
+    """Check if a Texas docket's court type is ``CourtType.SUPREME``."""
     return d["court_type"] == CourtType.SUPREME.value
 
 
@@ -5523,7 +5643,7 @@ def fl_ingest_docket_task(
     task: Task,
     download_result: tuple[bytes | FloridaCase, str, str],
     download_attachments: bool = True,
-) -> MergeResult[Any]:
+) -> MergeResult:
     """Task to parse and merge a Florida docket.
 
     Args:
@@ -5568,7 +5688,8 @@ def fl_ingest_docket_task(
         )
 
     merger = FloridaDocketMerger(scrape=case, params=case.entries)
-    result = merger.merge()
+    with transaction.atomic():
+        result = merger.merge()
     if result.failures:
         logger.error(
             "An error occurred while merging Florida case %s: %s",
@@ -5688,7 +5809,7 @@ def merge_state_scrape_row(
         return
 
     try:
-        label, result = loader_class.merge_payload(payload)
+        label, result, files = loader_class.merge_payload(payload)
     except ValidationError as error:
         logger.error(
             "Row %s of the %s run no longer validates for %s: %s",
@@ -5737,7 +5858,7 @@ def merge_state_scrape_row(
 
     if result.success:
         logger.info("Merged row %s of the %s run (%s)", row, loader, label)
-        ledger.merged(row, result)
+        ledger.merged(row, result, files)
     else:
         logger.error(
             "Merge of row %s of the %s run (%s) reported failures: %s",
@@ -5747,7 +5868,7 @@ def merge_state_scrape_row(
             result.failures,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        ledger.rejected(row, result)
+        ledger.rejected(row, result, files)
 
     if not extract:
         return

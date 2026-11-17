@@ -1,3 +1,5 @@
+"""Daemon that sweeps through models and re-indexes their Elasticsearch documents."""
+
 import time
 from collections.abc import Iterable, Mapping
 from datetime import datetime
@@ -162,18 +164,20 @@ def build_parent_model_queryset(
         # If the model is Docket, incorporate a source filter to only match
         # Dockets that belong to the RECAP collection.
         query_args["source__in"] = Docket.RECAP_SOURCES()
-    queryset = (
+    return (
         model.objects.filter(**query_args)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    return queryset
 
 
 class Command(VerboseCommand):
+    """Run sweep indexing cycles over the supported models."""
+
     help = "Sweep indexer for Elasticsearch documents."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with the sweep indexer's settings."""
         super().__init__(*args, **kwargs)
         self.options = {}
         self.sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
@@ -184,6 +188,7 @@ class Command(VerboseCommand):
         )
 
     def add_arguments(self, parser):
+        """Add the testing-mode flag."""
         parser.add_argument(
             "--testing-mode",
             action="store_true",
@@ -191,6 +196,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run sweep indexing cycles forever, or once in testing mode."""
         super().handle(*args, **options)
         self.options = options
 

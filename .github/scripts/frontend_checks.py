@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Automated frontend checks for CourtListener PR reviews.
+r"""Automated frontend checks for CourtListener PR reviews.
 
 Runs checks on changed template and CSS files to enforce frontend
 conventions, and checks that changes to vendored JS are recorded in that
 directory's README. Called by the frontend-lint GitHub Actions workflow.
 
-Input file must be in git --name-status format (STATUS\\tPATH per line).
+Input file must be in git --name-status format (STATUS\tPATH per line).
 """
 
 from __future__ import annotations
@@ -138,10 +138,12 @@ REDESIGN_PREFIXES = (V2_PREFIX, WIP_PREFIX)
 
 
 def is_v2_template(path: str) -> bool:
+    """A v2_ template."""
     return f"templates/{V2_PREFIX}" in path and path.endswith(".html")
 
 
 def is_wip_template(path: str) -> bool:
+    """A wip_ template."""
     return f"templates/{WIP_PREFIX}" in path and path.endswith(".html")
 
 
@@ -161,10 +163,12 @@ def is_v2_partial(path: str) -> bool:
 
 
 def is_cotton_component(path: str) -> bool:
+    """A Django Cotton component template."""
     return "templates/cotton/" in path and path.endswith(".html")
 
 
 def is_legacy_template(path: str) -> bool:
+    """A legacy-stack template: not v2_, wip_, Cotton, or new_base.html."""
     if not path.endswith(".html"):
         return False
     if "templates/" not in path:
@@ -177,6 +181,7 @@ def is_legacy_template(path: str) -> bool:
 
 
 def is_input_css(path: str) -> bool:
+    """The Tailwind input stylesheet."""
     return path == "cl/assets/tailwind/input.css"
 
 
@@ -838,6 +843,8 @@ def check_raw_css(lines: list[str]) -> list[tuple[int, str]]:
 
 @dataclass
 class Finding:
+    """A single check result at a line of a file."""
+
     file: str
     line: int
     check: str
@@ -1105,8 +1112,7 @@ def run_checks(
 
 
 def check_vendored_js_readme(diff_paths: list[str]) -> list[Finding]:
-    """Fail when upstream files in a vendored JS directory change but that
-    directory's README doesn't.
+    """Fail when upstream files in a vendored JS directory change but that directory's README doesn't.
 
     ``diff_paths`` is every path in the diff, including the old side of a
     rename, so moving a file into or out of a directory counts for both.
@@ -1268,6 +1274,11 @@ def format_summary_markdown(findings: list[Finding]) -> str:
 
 
 def main() -> int:
+    """Run the checks on the changed files and report findings.
+
+    Returns:
+        1 if any check failed with an error, otherwise 0.
+    """
     parser = argparse.ArgumentParser(
         description="Frontend checks for CourtListener templates"
     )

@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Find and clean up duplicated appellate docket entries."""
 
 from datetime import datetime
 
@@ -97,12 +98,15 @@ def clean_up_duplicate_appellate_entries(
 
 
 class Command(VerboseCommand):
+    """Find, and optionally clean up, duplicated appellate entries in some courts."""
+
     help = (
         "Find and clean duplicated appellate entries after courts enable "
         "document numbers."
     )
 
     def add_arguments(self, parser):
+        """Add the clean flag and the court and date options."""
         parser.add_argument(
             "--clean",
             action="store_true",
@@ -125,6 +129,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Find duplicated entries in the courts, cleaning them up with ``--clean``."""
         after_date = options["after_date"]
         clean_up_duplicate_appellate_entries(
             options["courts"], after_date, clean=options["clean"]
