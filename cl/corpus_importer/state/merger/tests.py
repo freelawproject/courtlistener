@@ -29,7 +29,7 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     Update,
 )
-from cl.corpus_importer.state.merger.specifications import Database
+from cl.corpus_importer.state.merger.specifications import Coalesce, Database
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -1610,6 +1610,18 @@ class SpecAccessTrackingTest(SimpleTestCase):
                 True,
                 {"case_name"},
             ),
+            (
+                "coalesce",
+                Coalesce(Database(CASE_NAME), Scrape(dict)["a"], default=""),
+                True,
+                {"case_name"},
+            ),
+            (
+                "coalesce without scrape",
+                Coalesce(Database(CASE_NAME), Constant("a"), default=""),
+                False,
+                {"case_name"},
+            ),
         ]
         for name, spec, uses_scrape, db_fields in cases:
             with self.subTest(name):
@@ -1621,3 +1633,69 @@ class SpecAccessTrackingTest(SimpleTestCase):
         spec: Any = Scrape(dict)[Params(str)]
 
         self.assertEqual(spec.transform({"a": 1}, "a", None), 1)
+
+
+def _raise(*_: Any) -> Any:
+    """Fail if called, to show an expression was never evaluated."""
+    raise AssertionError("Expression should not have been evaluated")
+
+
+class CoalesceSpecTest(SimpleTestCase):
+    """Expressions picking the first usable value among several."""
+
+    def test_outputs_first_truthy_or_integer_value(self) -> None:
+        """Is the first argument that evaluates to a truthy value or an integer output?"""
+        cases: list[tuple[str, dict[str, Any], Any]] = [
+            ("first truthy", {"a": "x", "b": "y"}, "x"),
+            ("skips None", {"a": None, "b": "y"}, "y"),
+            ("skips empty string", {"a": "", "b": "y"}, "y"),
+            ("skips empty list", {"a": [], "b": "y"}, "y"),
+            ("keeps zero", {"a": 0, "b": 5}, 0),
+        ]
+        spec: Any = Coalesce(Scrape(dict)["a"], Scrape(dict)["b"], default="d")
+        for name, scrape, expected in cases:
+            with self.subTest(name):
+                self.assertEqual(spec.transform(scrape, None, None), expected)
+
+    def test_outputs_default_when_no_value_is_usable(self) -> None:
+        """Is the default output when every argument evaluates to a falsy non-integer?"""
+        spec: Any = Coalesce(Scrape(dict)["a"], Scrape(dict)["b"], default="d")
+
+        self.assertEqual(spec.transform({"a": None, "b": ""}, None, None), "d")
+
+    def test_default_defaults_to_none(self) -> None:
+        """Is None output when every argument is unusable and no default is given?"""
+        spec: Any = Coalesce(Scrape(dict)["a"])
+
+        self.assertIsNone(spec.transform({"a": ""}, None, None))
+
+    def test_default_is_not_evaluated(self) -> None:
+        """Is an expression passed as the default output as-is rather than evaluated?"""
+        default = Scrape(dict)["b"]
+        spec: Any = Coalesce(Scrape(dict)["a"], default=default)
+
+        self.assertIs(
+            spec.transform({"a": None, "b": "y"}, None, None), default
+        )
+
+    def test_arguments_after_a_usable_value_are_not_evaluated(self) -> None:
+        """Are arguments after the first usable one left unevaluated?"""
+        spec: Any = Coalesce(Scrape(dict)["a"], Fn(_raise)(), default="d")
+
+        self.assertEqual(spec.transform({"a": "x"}, None, None), "x")
+
+    def test_reads_database(self) -> None:
+        """Can a stored value be coalesced with a scraped one?"""
+        spec: Any = Coalesce(
+            Database(CASE_NAME), Scrape(dict)["a"], default=""
+        )
+        cases: list[tuple[str, Docket | None, str]] = [
+            ("stored", Docket(case_name="Stored"), "Stored"),
+            ("blank stored", Docket(case_name=""), "Scraped"),
+            ("no object", None, "Scraped"),
+        ]
+        for name, docket, expected in cases:
+            with self.subTest(name):
+                self.assertEqual(
+                    spec.transform({"a": "Scraped"}, None, docket), expected
+                )
