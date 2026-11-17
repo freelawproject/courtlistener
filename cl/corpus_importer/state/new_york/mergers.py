@@ -35,7 +35,9 @@ from cl.corpus_importer.state.common.party import (
 )
 from cl.corpus_importer.state.merger import (
     Ancestor,
+    Coalesce,
     Constant,
+    Database,
     Fn,
     ManyStrategy,
     Merger,
@@ -45,8 +47,6 @@ from cl.corpus_importer.state.merger import (
     OneToOneRelation,
     RelatedParams,
     Scrape,
-    WithStrategy,
-    overwrite_if_present,
 )
 from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAAttorney,
@@ -125,7 +125,7 @@ def _storable_number(
     return None
 
 
-def _keep_stored_file(scrape: str, db: FieldFile) -> str:
+def _keep_stored_file(scrape: str, db: FieldFile | None) -> str:
     """Merge strategy that keeps the path already stored for a document when this scrape has no published one to put there.
 
     Args:
@@ -135,20 +135,9 @@ def _keep_stored_file(scrape: str, db: FieldFile) -> str:
     Returns:
         The path to store.
     """
+    if db is None:
+        return scrape or ""
     return scrape or (db.name or "")
-
-
-def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
-    """Merge strategy for scraped files.
-
-    Args:
-        scrape: What this scrape's download established, if it made one.
-        db: What is already stored for the document.
-
-    Returns:
-        The value to store.
-    """
-    return db if scrape is None or scrape == "" else scrape
 
 
 def _stated(reading: CourtVocabulary | Unclassified) -> str:
@@ -213,14 +202,17 @@ class NYCoADocumentMerger[ParamType](
     part: int | None = Fn(_storable_number)(
         Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
     )
-    filepath_local: str = WithStrategy(
-        Scrape(NYCoAFile).local_path, _keep_stored_file
+    filepath_local: str = Fn(_keep_stored_file)(
+        Scrape(NYCoAFile).local_path,
+        Database(NYCoADocument.filepath_local),
     )
-    sha256: str = WithStrategy(
-        Scrape(NYCoAFile).content_hash, _keep_downloaded
+    sha256: str = Coalesce(
+        Scrape(NYCoAFile).content_hash,
+        Database(NYCoADocument.sha256),
+        default="",
     )
-    file_size: int | None = WithStrategy(
-        Scrape(NYCoAFile).file_size, _keep_downloaded
+    file_size: int | None = Coalesce(
+        Scrape(NYCoAFile).file_size, Database(NYCoADocument.file_size)
     )
 
     @override
@@ -368,11 +360,6 @@ def _entry_party_id(entry: NYCoDocketEntry, docket: Docket) -> int | None:
     return matched[0] if by_role is None else by_role
 
 
-def _keep_party_name(scrape: str | None, db: str | None) -> str:
-    """Merge strategy that keeps the party name an earlier scrape recorded when this one read none, rather than blanking it."""
-    return scrape or db or ""
-
-
 class NYCoADocketEntryMerger[ParamType](
     Merger[NYCoDocketEntry, RelatedParams[ParamType], NYCoADocketEntry]
 ):
@@ -404,15 +391,18 @@ class NYCoADocketEntryMerger[ParamType](
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    party_id: int | None = WithStrategy(
+    party_id: int | None = Coalesce(
         Fn(_entry_party_id)(Scrape(NYCoDocketEntry), Ancestor(Docket)),
-        overwrite_if_present,
+        # pyrefly:ignore[bad-argument-type]
+        Database(cast(int | None, NYCoADocketEntry.party_id)),
     )
     # The name Court-PASS printed, kept whether or not `party_id` resolved --
     # on a filing by a party with no attorney of record it is the only record
     # of who filed.
-    party_name: str = WithStrategy(
-        Scrape(NYCoDocketEntry).party, _keep_party_name
+    party_name: str = Coalesce(
+        Scrape(NYCoDocketEntry).party,
+        Database(NYCoADocketEntry.party_name),
+        default="",
     )
     # Court-PASS lists every file it has for a case, so a file that is gone
     # from the list -- or that it has stopped serving -- is gone from the
@@ -836,11 +826,11 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     docket_number_core: str = Fn(make_docket_number_core)(
         Scrape(NYCoACase).docket_number
     )
-    date_filed: date | None = WithStrategy(
-        Scrape(NYCoACase).date_filed, overwrite_if_present
+    date_filed: date | None = Coalesce(
+        Scrape(NYCoACase).date_filed, Database(Docket.date_filed)
     )
-    date_argued: date | None = WithStrategy(
-        Scrape(NYCoACase).argument_date, overwrite_if_present
+    date_argued: date | None = Coalesce(
+        Scrape(NYCoACase).argument_date, Database(Docket.date_argued)
     )
     date_last_filing: date | None = Fn(_date_last_filing)(Scrape(NYCoACase))
 

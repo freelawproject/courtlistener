@@ -51,7 +51,9 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Ancestor,
+    Coalesce,
     Constant,
+    Database,
     Fn,
     ManyStrategy,
     Merger,
@@ -61,9 +63,7 @@ from cl.corpus_importer.state.merger import (
     Params,
     RelatedParams,
     Scrape,
-    WithStrategy,
 )
-from cl.corpus_importer.state.merger.strategy import overwrite_if_present
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
@@ -171,11 +171,13 @@ class FloridaDocumentMerger(
         Scrape(ScrapeFloridaDocument).document_type
     )
     content_type: str = Fn(_content_type)(Scrape(ScrapeFloridaDocument))
-    page_count: int | None = WithStrategy(
-        Scrape(ScrapeFloridaDocument).page_count, overwrite_if_present
+    page_count: int | None = Coalesce(
+        Scrape(ScrapeFloridaDocument).page_count,
+        Database(FloridaDocument.page_count),
     )
-    file_size: int | None = WithStrategy(
-        Scrape(ScrapeFloridaDocument).file_size, overwrite_if_present
+    file_size: int | None = Coalesce(
+        Scrape(ScrapeFloridaDocument).file_size,
+        Database(FloridaDocument.file_size),
     )
     link_uuid: UUID = Scrape(ScrapeFloridaDocument).document_link_uuid
 
@@ -351,11 +353,12 @@ class FloridaDocketEntryMerger(
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    submitted_by_id: int | None = WithStrategy(
+    submitted_by_id: int | None = Coalesce(
         Fn(_submitted_by_id)(
             Scrape(ScrapeFloridaDocketEntry), Ancestor(Docket)
         ),
-        overwrite_if_present,
+        # pyrefly:ignore[bad-argument-type]
+        Database(cast(int | None, FloridaDocketEntry.submitted_by_id)),
     )
     docket_entry_uuid: UUID = Scrape(
         ScrapeFloridaDocketEntry
