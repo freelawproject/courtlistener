@@ -1,3 +1,5 @@
+"""Generate a crosswalk between CAP cases and CourtListener clusters."""
+
 import json
 import logging
 import os
@@ -38,9 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 class Command(CommandUtils, BaseCommand):
+    """Match CAP case metadata to CourtListener clusters and save the crosswalk files."""
+
     help = "Generate a comprehensive crosswalk between CAP and CourtListener cases using only CasesMetadata.json"
 
     def add_arguments(self, parser):
+        """Add the reporter, volume, dry-run, verbosity, output, start, and updated-after options."""
         parser.add_argument(
             "--reporter", type=str, help="Process only this reporter"
         )
@@ -73,6 +78,11 @@ class Command(CommandUtils, BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Generate the crosswalk and print statistics, creating the output directory if needed.
+
+        Raises:
+            ValueError: If ``--updated-after`` isn't a valid date.
+        """
         if options["verbose"]:
             logger.setLevel(logging.DEBUG)
 
@@ -318,14 +328,13 @@ class Command(CommandUtils, BaseCommand):
             if matching_cluster:
                 # Match found, return object
                 return matching_cluster
-            else:
-                logger.info(
-                    "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
-                    cap_case_id,
-                    reporter_slug,
-                    volume,
-                    page,
-                )
+            logger.info(
+                "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
+                cap_case_id,
+                reporter_slug,
+                volume,
+                page,
+            )
 
         except Exception as e:
             logger.exception(

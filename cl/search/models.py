@@ -1,3 +1,5 @@
+"""Models for dockets, docket entries, opinions, courts, and related search data."""
+
 import logging
 import re
 from collections.abc import Callable
@@ -109,6 +111,8 @@ logger = logging.getLogger(__name__)
 
 
 class PRECEDENTIAL_STATUS:
+    """Precedential status choices for opinion clusters."""
+
     PUBLISHED = "Published"
     UNPUBLISHED = "Unpublished"
     ERRATA = "Errata"
@@ -129,16 +133,20 @@ class PRECEDENTIAL_STATUS:
 
     @classmethod
     def get_status_value(cls, name):
+        """Get the status value for a display name, or None if there is none."""
         reverse_names = {value: key for key, value in cls.NAMES}
         return reverse_names.get(name)
 
     @classmethod
     def get_status_value_reverse(cls, name):
+        """Get the display name for a status value, or None if there is none."""
         reverse_names = {key: value for key, value in cls.NAMES}
         return reverse_names.get(name)
 
 
 class DocketNumberSources:
+    """Where a docket number came from: the original source or a cleaning step."""
+
     ORIGINAL = 0
     AUTOMATED = 1
     MANUAL = 2
@@ -261,11 +269,13 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
 
     @property
     def administrative_link(self):
+        """Link to the lower court docket number, based on the court appealed from."""
         return linkify_orig_docket_number(
             self.docket.appeal_from_str, self.docket_number
         )
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the docket's page."""
         return self.docket.get_absolute_url()
 
     class Meta:
@@ -740,10 +750,19 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def __str__(self) -> str:
         if self.case_name:
             return force_str(f"{self.pk}: {self.case_name}")
-        else:
-            return f"{self.pk}"
+        return f"{self.pk}"
 
     def save(self, update_fields=None, *args, **kwargs):
+        """Save the docket, updating its slug and filling in its docket number core.
+
+        If saving raises an IntegrityError, it is retried once with a new
+        modification date.
+
+        Raises:
+            ValidationError: If a RECAP docket is missing its docket number,
+                or is missing its PACER case ID outside federal appellate
+                courts.
+        """
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number_raw and not self.docket_number_core:
             if self.court_id == "scotus":
@@ -794,13 +813,19 @@ class Docket(AbstractDateTimeModel, DocketSources):
             super().save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the docket's page."""
         return reverse("view_docket", args=[self.pk, self.slug])
 
     def add_scraper_source(self) -> None:
+        """Add the scraper to the docket's source, if its source is one of the non-scraper sources."""
         if self.source in self.NON_SCRAPER_SOURCES():
             self.source = self.source + self.SCRAPER
 
     def add_recap_source(self):
+        """Add RECAP to the docket's sources, if it isn't there already.
+
+        Dockets with the default source become RECAP and scraper dockets.
+        """
         if self.source == self.DEFAULT:
             self.source = self.RECAP_AND_SCRAPER
         elif self.source in self.NON_RECAP_SOURCES():
@@ -808,6 +833,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
             self.source = self.source + self.RECAP
 
     def add_opinions_source(self, scraper_source: int):
+        """Add an opinion source to the docket's sources, if it isn't there already.
+
+        Only the Columbia, scraper, Harvard, and scanning project sources are
+        added; other values are ignored.
+        """
         match scraper_source:
             case self.COLUMBIA:
                 non_source_list = self.NON_COLUMBIA_SOURCES()
@@ -832,10 +862,12 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     async def ahas_authorities(self):
+        """Check whether the docket's documents cite any opinions."""
         return await self.authorities.aexists()
 
     @property
     def authority_count(self):
+        """The number of citations to opinions from the docket's documents."""
         return self.authorities.count()
 
     @property
@@ -863,15 +895,18 @@ class Docket(AbstractDateTimeModel, DocketSources):
         return build_authority_opinions_query(opinions)
 
     def add_idb_source(self):
+        """Add the IDB to the docket's sources, if it isn't there already."""
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
 
     def add_anon_2020_source(self) -> None:
+        """Add the 2020 anonymous dataset to the docket's source, if its source is one of the non-anonymous-2020 sources."""
         if self.source in self.NON_ANON_2020_SOURCES():
             self.source = self.source + self.ANON_2020
 
     @property
     def pacer_court_id(self):
+        """The PACER ID of the docket's court, cached on the docket."""
         if hasattr(self, "_pacer_court_id"):
             return self._pacer_court_id
 
@@ -882,6 +917,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
         return pacer_court_id
 
     def pacer_district_url(self, path):
+        """Build a district PACER URL for a report at ``path``.
+
+        Returns None for dockets without a PACER case ID and for federal
+        appellate dockets.
+        """
         if not self.pacer_case_id or (
             self.court.jurisdiction == Court.FEDERAL_APPELLATE
         ):
@@ -889,6 +929,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         return f"https://ecf.{self.pacer_court_id}.uscourts.gov/cgi-bin/{path}?{self.pacer_case_id}"
 
     def pacer_appellate_url_with_caseId(self, path):
+        """Build an appellate PACER case summary URL using the PACER case ID."""
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
@@ -899,6 +940,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     def pacer_appellate_url_with_caseNum(self, path):
+        """Build an appellate PACER case summary URL using the raw docket number."""
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
@@ -909,6 +951,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
 
     def pacer_acms_url(self):
+        """Build the ACMS URL for the docket's raw docket number."""
         return (
             f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
             f"{self.docket_number_raw}"
@@ -930,15 +973,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
             if not self.pacer_case_id:
                 return self.pacer_appellate_url_with_caseNum(path)
-            elif self.pacer_case_id.count("-") > 1:
+            if self.pacer_case_id.count("-") > 1:
                 return self.pacer_acms_url()
-            else:
-                return self.pacer_appellate_url_with_caseId(path)
-        else:
-            return self.pacer_district_url("DktRpt.pl")
+            return self.pacer_appellate_url_with_caseId(path)
+        return self.pacer_district_url("DktRpt.pl")
 
     @property
     def scotus_docket_url(self) -> str:
+        """The Supreme Court's docket page URL, or an empty string without a docket number."""
         if not self.docket_number:
             return ""
         return (
@@ -965,50 +1007,62 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     @property
     def pacer_alias_url(self):
+        """The district PACER alias report URL, if any."""
         return self.pacer_district_url("qryAlias.pl")
 
     @property
     def pacer_associated_cases_url(self):
+        """The district PACER associated cases report URL, if any."""
         return self.pacer_district_url("qryAscCases.pl")
 
     @property
     def pacer_attorney_url(self):
+        """The district PACER attorney report URL, if any."""
         return self.pacer_district_url("qryAttorneys.pl")
 
     @property
     def pacer_case_file_location_url(self):
+        """The district PACER case file location report URL, if any."""
         return self.pacer_district_url("QryRMSLocation.pl")
 
     @property
     def pacer_summary_url(self):
+        """The district PACER case summary report URL, if any."""
         return self.pacer_district_url("qrySummary.pl")
 
     @property
     def pacer_deadlines_and_hearings_url(self):
+        """The district PACER deadlines and hearings report URL, if any."""
         return self.pacer_district_url("SchedQry.pl")
 
     @property
     def pacer_filers_url(self):
+        """The district PACER filers report URL, if any."""
         return self.pacer_district_url("FilerQry.pl")
 
     @property
     def pacer_history_and_documents_url(self):
+        """The district PACER history and documents report URL, if any."""
         return self.pacer_district_url("HistDocQry.pl")
 
     @property
     def pacer_party_url(self):
+        """The district PACER party report URL, if any."""
         return self.pacer_district_url("qryParties.pl")
 
     @property
     def pacer_related_transactions_url(self):
+        """The district PACER related transactions report URL, if any."""
         return self.pacer_district_url("RelTransactQry.pl")
 
     @property
     def pacer_status_url(self):
+        """The district PACER status report URL, if any."""
         return self.pacer_district_url("StatusQry.pl")
 
     @property
     def pacer_view_doc_url(self):
+        """The district PACER document query URL, if any."""
         return self.pacer_district_url("qryDocument.pl")
 
     def reprocess_recap_content(self, do_original_xml: bool = False) -> None:
@@ -1061,6 +1115,8 @@ class DocketPanel(Docket.panel.through):
 
 @pghistory.track()
 class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """An entry on a docket, which may have documents."""
+
     docket = models.ForeignKey(
         Docket,
         help_text=(
@@ -1173,6 +1229,10 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
     @property
     def datetime_filed(self) -> datetime | None:
+        """The filing date and time in the court's timezone, or None without a filing time.
+
+        Courts without a known timezone default to US/Eastern.
+        """
         if self.time_filed:
             from cl.recap.constants import COURT_TIMEZONES
 
@@ -1185,6 +1245,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return None
 
     def get_csv_columns(self, get_column_name=False):
+        """List the entry fields exported to CSV, prefixed with the class name if ``get_column_name``."""
         columns = [
             "id",
             "entry_number",
@@ -1217,6 +1278,8 @@ class DocketEntryTags(DocketEntry.tags.through):
 
 
 class AbstractPacerDocument(models.Model):
+    """Abstract model for the fields shared by documents from PACER."""
+
     date_upload = models.DateTimeField(
         help_text=(
             "upload_date in RECAP. The date the file was uploaded to "
@@ -1368,6 +1431,10 @@ class RECAPDocument(
         return str(Path(root) / bucket / filename)
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the document's or attachment's page.
+
+        Documents without a document number get an empty string.
+        """
         if not self.document_number:
             # Numberless entries don't get URLs
             return ""
@@ -1380,7 +1447,7 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
-        elif self.document_type == self.ATTACHMENT:
+        if self.document_type == self.ATTACHMENT:
             return reverse(
                 "view_recap_attachment",
                 kwargs={
@@ -1390,8 +1457,10 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
+        return None
 
     def get_authorities_url(self) -> str:
+        """Get the URL of the page listing the opinions this document or attachment cites."""
         if self.document_type == self.ATTACHMENT:
             return reverse(
                 "view_attachment_authorities",
@@ -1402,15 +1471,14 @@ class RECAPDocument(
                     "slug": self.docket_entry.docket.slug,
                 },
             )
-        else:
-            return reverse(
-                "view_document_authorities",
-                kwargs={
-                    "docket_id": self.docket_entry.docket.pk,
-                    "doc_num": self.document_number,
-                    "slug": self.docket_entry.docket.slug,
-                },
-            )
+        return reverse(
+            "view_document_authorities",
+            kwargs={
+                "docket_id": self.docket_entry.docket.pk,
+                "doc_num": self.document_number,
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
 
     def is_acms_document(self) -> bool:
         """Checks if the document is from ACMS based on the presence of hyphens in the pacer_doc_id.
@@ -1438,7 +1506,7 @@ class RECAPDocument(
                     f"{self.docket_entry.docket.pacer_case_id}/"
                     f"{self.pacer_doc_id}"
                 )
-            elif court.jurisdiction == Court.FEDERAL_APPELLATE:
+            if court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
                 template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
@@ -1447,28 +1515,27 @@ class RECAPDocument(
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
-        else:
-            if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                return ""
-            else:
-                attachment_number = self.attachment_number or ""
-                return (
-                    "https://ecf.{court_id}.uscourts.gov/cgi-bin/"
-                    "show_case_doc?"
-                    "{document_number},"
-                    "{pacer_case_id},"
-                    "{attachment_number},"
-                    "{magic_number},".format(
-                        court_id=court_id,
-                        document_number=self.document_number,
-                        pacer_case_id=self.docket_entry.docket.pacer_case_id,
-                        attachment_number=attachment_number,
-                        magic_number="",  # For future use.
-                    )
-                )
+        if court.jurisdiction == Court.FEDERAL_APPELLATE:
+            return ""
+        attachment_number = self.attachment_number or ""
+        return (
+            "https://ecf.{court_id}.uscourts.gov/cgi-bin/"
+            "show_case_doc?"
+            "{document_number},"
+            "{pacer_case_id},"
+            "{attachment_number},"
+            "{magic_number},".format(
+                court_id=court_id,
+                document_number=self.document_number,
+                pacer_case_id=self.docket_entry.docket.pacer_case_id,
+                attachment_number=attachment_number,
+                magic_number="",  # For future use.
+            )
+        )
 
     @property
     def has_valid_pdf(self) -> bool:
+        """Whether the document is available and has a local file."""
         return self.is_available and self.filepath_local
 
     @property
@@ -1486,6 +1553,7 @@ class RECAPDocument(
 
     @property
     def authority_count(self):
+        """The number of opinions the document cites."""
         return self.cited_opinions.count()
 
     @property
@@ -1504,6 +1572,16 @@ class RECAPDocument(
         *args,
         **kwargs,
     ):
+        """Validate and save the document, optionally queueing text extraction.
+
+        A missing PACER document ID is saved as blank. When a main document
+        would duplicate another, the other is deleted if they share a PACER
+        document ID. ``index`` is unused.
+
+        Raises:
+            ValidationError: If the document is invalid, or duplicates other
+                documents that can't be resolved automatically.
+        """
         self.clean()
 
         if self.pacer_doc_id is None:
@@ -1569,6 +1647,7 @@ class RECAPDocument(
         *args,
         **kwargs,
     ):
+        """Async version of ``save``."""
         return await sync_to_async(self.save)(
             update_fields=update_fields,
             do_extraction=do_extraction,
@@ -1598,6 +1677,7 @@ class RECAPDocument(
             raise ValidationError({"attachment_number": msg})
 
     def get_csv_columns(self, get_column_name=False):
+        """List the document fields exported to CSV, prefixed with the class name if ``get_column_name``."""
         columns = [
             "id",
             "document_type",
@@ -1656,6 +1736,8 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
 
 @pghistory.track()
 class BankruptcyInformation(AbstractDateTimeModel):
+    """Bankruptcy details for a docket."""
+
     docket = models.OneToOneField(
         Docket,
         help_text="The docket that the bankruptcy info is associated with.",
@@ -1705,6 +1787,8 @@ class BankruptcyInformation(AbstractDateTimeModel):
 
 @pghistory.track()
 class Claim(AbstractDateTimeModel):
+    """A claim from a bankruptcy docket's claims register."""
+
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the claim is associated with.",
@@ -1825,6 +1909,8 @@ class ClaimTags(Claim.tags.through):
 
 @pghistory.track()
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
+    """A row in a claim's history, which may be a document."""
+
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
     CLAIM_TYPES = (
@@ -1892,10 +1978,14 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
 
 class FederalCourtsQuerySet(models.QuerySet["Court"]):
+    """Queries for federal courts."""
+
     def all(self) -> Self:
+        """Filter to courts with a federal jurisdiction."""
         return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
     def all_pacer_courts(self) -> Self:
+        """Filter to the current, in-use federal courts on PACER, excluding SCOTUS."""
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1910,6 +2000,7 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
         ).exclude(pk="scotus")
 
     def district_or_bankruptcy_pacer_courts(self) -> Self:
+        """Filter to current federal district and bankruptcy courts, plus the CIT, JPML, and Court of Federal Claims."""
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1922,31 +2013,41 @@ class FederalCourtsQuerySet(models.QuerySet["Court"]):
         )
 
     def bankruptcy_pacer_courts(self) -> Self:
+        """Filter to current federal bankruptcy courts."""
         return self.filter(
             jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
     def district_courts(self) -> Self:
+        """Filter to federal district courts."""
         return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
 
     def bankruptcy_courts(self) -> Self:
+        """Filter on ``jurisdictions`` against the bankruptcy jurisdictions."""
         return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
 
     def appellate_courts(self) -> Self:
+        """Filter to federal appellate courts."""
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
     def tribal_courts(self) -> Self:
+        """Filter on ``jurisdictions`` against the tribal jurisdictions."""
         return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
 
     def territorial_courts(self) -> Self:
+        """Filter on ``jurisdictions`` against the territory jurisdictions."""
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
     def military_courts(self) -> Self:
+        """Filter on ``jurisdictions`` against the military jurisdictions."""
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
 class StateCourtsQuerySet(models.QuerySet["Court"]):
+    """Queries for state courts."""
+
     def all(self) -> Self:
+        """Filter to courts with a state jurisdiction."""
         return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
 
 
@@ -2182,6 +2283,7 @@ class Court(models.Model):
 
     @property
     def is_terminated(self):
+        """Whether the court has an end date."""
         if self.end_date:
             return True
         return False
@@ -2278,6 +2380,11 @@ class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
     """
 
     def filter(self, *args, **kwargs):
+        """Filter citations, accepting a ``citation`` string parsed into volume, reporter, and page.
+
+        Raises:
+            ValueError: If the ``citation`` string can't be parsed.
+        """
         clone = self._clone()
         citation_str = kwargs.pop("citation", None)
         if citation_str:
@@ -2648,7 +2755,7 @@ class OpinionCluster(AbstractDateTimeModel):
                 caption += f", {citations[0]}"
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
-            elif (
+            if (
                 len(citations) >= 2
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
@@ -2694,7 +2801,7 @@ class OpinionCluster(AbstractDateTimeModel):
                 caption += f", {citations[0]}"
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
-            elif (
+            if (
                 len(citations) >= 2
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
@@ -2774,6 +2881,7 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def parentheticals(self):
+        """The parentheticals describing the cluster's opinions, highest score first."""
         return Parenthetical.objects.filter(
             described_opinion_id__in=self.sub_opinions.values_list(
                 "pk", flat=True
@@ -2782,20 +2890,24 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def parenthetical_groups(self):
+        """The parenthetical groups for the cluster's opinions, highest score first."""
         return ParentheticalGroup.objects.filter(
             opinion__in=self.sub_opinions.values_list("pk", flat=True)
         ).order_by("-score")
 
     @property
     def authority_count(self):
+        """The number of clusters this cluster cites."""
         return self.authorities.count()
 
     async def aauthority_count(self):
+        """Async version of ``authority_count``."""
         authorities = await self.aauthorities()
         return await authorities.acount()
 
     @property
     def has_private_authority(self):
+        """Whether any cited cluster is blocked, cached on the cluster."""
         if not hasattr(self, "_has_private_authority"):
             # Calculate it, then cache it.
             private = False
@@ -2807,6 +2919,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return self._has_private_authority
 
     async def ahas_private_authority(self):
+        """Async version of ``has_private_authority``."""
         if not hasattr(self, "_has_private_authority"):
             # Calculate it, then cache it.
             private = False
@@ -2848,6 +2961,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return [authority async for authority in self.authorities_with_data]
 
     def top_visualizations(self):
+        """Get the cluster's published, undeleted visualizations, most viewed first."""
         return self.visualizations.filter(
             published=True, deleted=False
         ).order_by("-view_count")
@@ -2855,14 +2969,18 @@ class OpinionCluster(AbstractDateTimeModel):
     def __str__(self) -> str:
         if self.case_name:
             return f"{self.pk}: {self.case_name}"
-        else:
-            return f"{self.pk}"
+        return f"{self.pk}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the cluster's page."""
         return reverse("view_case", args=[self.pk, self.slug])
 
     @cached_property
     def ordered_opinions(self):
+        """The cluster's main-version opinions by ordering key.
+
+        If there are several, only those with an ordering key are included.
+        """
         # Fetch all sub-opinions ordered by ordering_key
         sub_opinions = self.sub_opinions.all().order_by("ordering_key")
         if self.sub_opinions.filter(main_version__isnull=False).exists():
@@ -2891,6 +3009,7 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @cached_property
     def opinions_versions(self):
+        """Up to the 10 newest opinions in the cluster that are versions of another opinion."""
         # Fetch all sub-opinions versions from cluster, limit to 10 versions
         return self.sub_opinions.filter(main_version__isnull=False).order_by(
             "-date_created"
@@ -2902,6 +3021,7 @@ class OpinionCluster(AbstractDateTimeModel):
         *args,
         **kwargs,
     ):
+        """Save the cluster, updating its slug from its case name."""
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
@@ -2913,6 +3033,7 @@ class OpinionCluster(AbstractDateTimeModel):
         *args,
         **kwargs,
     ):
+        """Async version of ``save``."""
         return await sync_to_async(self.save)(
             update_fields=update_fields,
             *args,
@@ -3022,6 +3143,7 @@ class Citation(BaseCitation, AbstractDateTimeModel):
     )
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the cited cluster's page."""
         return self.cluster.get_absolute_url()
 
     class Meta:
@@ -3065,26 +3187,24 @@ def sort_cites(c):
     if c.type == Citation.FEDERAL:
         if c.reporter == "U.S.":
             return 1.1
-        elif c.reporter == "S. Ct.":
+        if c.reporter == "S. Ct.":
             return 1.2
-        elif "L. Ed." in c.reporter:
+        if "L. Ed." in c.reporter:
             return 1.3
-        else:
-            return 1.4
-    elif c.type == Citation.SCOTUS_EARLY:
+        return 1.4
+    if c.type == Citation.SCOTUS_EARLY:
         return 2
-    elif c.type == Citation.SPECIALTY:
+    if c.type == Citation.SPECIALTY:
         return 3
-    elif c.type == Citation.STATE_REGIONAL:
+    if c.type == Citation.STATE_REGIONAL:
         return 4
-    elif c.type == Citation.STATE:
+    if c.type == Citation.STATE:
         return 5
-    elif c.type == Citation.WEST:
+    if c.type == Citation.WEST:
         return 6
-    elif c.type == Citation.LEXIS:
+    if c.type == Citation.LEXIS:
         return 7
-    else:
-        return 8
+    return 8
 
 
 OPINION_TEXT_SOURCE_FIELDS = [
@@ -3099,6 +3219,8 @@ OPINION_TEXT_SOURCE_FIELDS = [
 
 
 class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
+    """Queries for opinions."""
+
     def with_best_text(self) -> Self:
         """Annotates an Opinion QuerySet with best_text and best_text_source.
 
@@ -3151,6 +3273,8 @@ class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
 
 @pghistory.track(exclude=["html_with_citations"])
 class Opinion(AbstractDateTimeModel):
+    """An opinion in a cluster, such as a lead opinion, concurrence, or dissent."""
+
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
     LEAD = "020lead"
@@ -3349,6 +3473,7 @@ class Opinion(AbstractDateTimeModel):
 
     @property
     def siblings(self) -> QuerySet:
+        """All opinions in the opinion's cluster, including this one."""
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
@@ -3385,9 +3510,16 @@ class Opinion(AbstractDateTimeModel):
             return f"Orphan opinion with ID: {self.pk}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the opinion's cluster page."""
         return reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
 
     def clean(self) -> None:
+        """Validate the opinion.
+
+        Raises:
+            ValidationError: If the type is empty or the ordering key is an
+                integer less than one.
+        """
         if self.type == "":
             raise ValidationError("'type' is a required field.")
         if isinstance(self.ordering_key, int) and self.ordering_key < 1:
@@ -3396,6 +3528,11 @@ class Opinion(AbstractDateTimeModel):
             )
 
     def save(self, *args, **kwargs) -> None:
+        """Validate and save the opinion.
+
+        Raises:
+            ValidationError: If the opinion is invalid.
+        """
         self.clean()
         super().save(*args, **kwargs)
 
@@ -3517,6 +3654,8 @@ class OpinionContent(AbstractDateTimeModel):
 
 
 class OpinionsCited(models.Model):
+    """A citation from one opinion to another, with how many times the citing opinion cites it."""
+
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
     )
@@ -3547,6 +3686,8 @@ class OpinionsCited(models.Model):
 
 
 class OpinionsCitedByRECAPDocument(models.Model):
+    """A citation from a RECAP document to an opinion, with how many times the document cites it."""
+
     citing_document = models.ForeignKey(
         RECAPDocument, related_name="cited_opinions", on_delete=models.CASCADE
     )
@@ -3646,6 +3787,8 @@ def build_authorities_query(
 
 
 class Parenthetical(models.Model):
+    """A parenthetical in one opinion describing another, scored for how descriptive it is."""
+
     describing_opinion = models.ForeignKey(
         Opinion,
         related_name="authored_parentheticals",
@@ -3680,6 +3823,7 @@ class Parenthetical(models.Model):
         )
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the summaries page for the described opinion's cluster."""
         cluster = self.described_opinion.cluster
         return reverse("view_summaries", args=[cluster.pk, cluster.slug])
 
@@ -3688,6 +3832,8 @@ class Parenthetical(models.Model):
 
 
 class ParentheticalGroup(models.Model):
+    """A group of similar parentheticals describing an opinion, with a representative."""
+
     opinion = models.ForeignKey(
         Opinion,
         related_name="parenthetical_groups",
@@ -3721,6 +3867,7 @@ class ParentheticalGroup(models.Model):
         )
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the representative parenthetical."""
         return self.representative.get_absolute_url()
 
     class Meta:
@@ -3733,6 +3880,8 @@ type TaggableType = Docket | DocketEntry | RECAPDocument | Claim
 
 @pghistory.track()
 class Tag(AbstractDateTimeModel):
+    """A uniquely named tag for dockets, entries, documents, and claims."""
+
     name = models.CharField(
         help_text="The name of the tag.",
         max_length=50,
@@ -3828,6 +3977,8 @@ class Tag(AbstractDateTimeModel):
 #     class Meta:
 #         unique_together = ("upper_court", "lower_court")
 class SEARCH_TYPES:
+    """Search type codes, their names, and lists of types for alerts."""
+
     OPINION = "o"
     RECAP = "r"
     DOCKETS = "d"
@@ -3858,6 +4009,8 @@ class SEARCH_TYPES:
 
 
 class SearchQuery(models.Model):
+    """A logged search, with its source, engine, timing, and outcome."""
+
     WEBSITE = 1
     API = 2
     SOURCES = (
@@ -4227,6 +4380,7 @@ class CaseTransfer(AbstractDateTimeModel):
 
     @classmethod
     def fill_null_dockets(cls) -> None:
+        """Fill in missing origin and destination dockets on case transfers, logging the counts."""
         logger.info(
             "Attempting to populate missing fields in CaseTransfer table..."
         )
@@ -4430,6 +4584,10 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
         )
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the document's or attachment's page.
+
+        Documents without a document number get an empty string.
+        """
         if not self.document_number:
             return ""
         if self.attachment_number is None:
@@ -4453,6 +4611,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
 
     @property
     def is_available(self) -> bool:
+        """Whether the document has a local file."""
         return bool(self.filepath_local)
 
     @property
@@ -4462,6 +4621,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF, CSVExportMixin):
 
     @property
     def has_valid_pdf(self) -> bool:
+        """Whether the document has a local file."""
         return self.is_available
 
     @property

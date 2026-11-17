@@ -1,3 +1,5 @@
+"""Celery tasks for indexing search documents, percolating alerts, and generating embeddings."""
+
 import asyncio
 import concurrent.futures
 import csv
@@ -330,9 +332,8 @@ def es_save_document(
             document_content=doc,
             app_label=app_label,
         )
-    else:
-        self.request.chain = None
-        return None
+    self.request.chain = None
+    return None
 
 
 def document_fields_to_update(
@@ -461,7 +462,7 @@ def email_search_results(self: Task, user_id: int, query: str):
     # Retry task if an error occurred and retry limit not reached.
     if error:
         if self.request.retries == self.max_retries:
-            return None
+            return
         raise self.retry()
 
     if not search_results:
@@ -569,11 +570,11 @@ def update_es_document(
     main_model = apps.get_model(main_app_label)
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
-        return
+        return None
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:
-        return
+        return None
 
     related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
@@ -585,7 +586,7 @@ def update_es_document(
             related_instance_id, related_instance_model
         )
         if not related_instance:
-            return
+            return None
 
     # Get the fields to update and their values from DB.
     fields_values_to_update = document_fields_to_update(
@@ -597,14 +598,14 @@ def update_es_document(
     )
     if not fields_values_to_update:
         # Abort, avoid updating not indexed fields, like "source" in Docket.
-        return
+        return None
 
     embeddings = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":
         storage = AWSMediaStorage()
         embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
-            logging.error(
+            logger.error(
                 "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
@@ -1914,10 +1915,12 @@ def inception_cpu_batch_request(batch: dict) -> list[dict]:
 
 
 def embeddings_cache_key():
+    """Get the prefix of embeddings cache keys."""
     return "embeddings:"
 
 
 def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    """Get the cache key for an embeddings batch's range."""
     return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
 
 
@@ -1952,10 +1955,10 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     """
     opinion = Opinion.objects.filter(id=pk).with_best_text().first()
     if not opinion:
-        return None
+        return
 
     if opinion.token_count < settings.MIN_OPINION_SIZE:
-        return None
+        return
 
     embeddings = asyncio.run(
         microservice(
@@ -1967,7 +1970,7 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     if not embeddings.is_success:
         if not isinstance(embeddings, list):
             log_invalid_embedding_errors(embeddings)
-        return None
+        return
 
     # Save embeddings to S3.
     storage = S3IntelligentTieringStorage()
@@ -2102,11 +2105,11 @@ def save_embeddings(
             "Embeddings for the opinion range %s are missing from Redis",
             batch_range,
         )
-        return None
+        return
 
     if not isinstance(embeddings, list):
         log_invalid_embedding_errors(embeddings)
-        return None
+        return
 
     storage = S3IntelligentTieringStorage()
     for embedding_record in embeddings:
@@ -2151,8 +2154,7 @@ def download_embedding(
     try:
         with storage.open(file_path, "rb") as f:
             file_contents = f.read().decode("utf-8")
-        embedding_data = json.loads(file_contents)
-        return embedding_data
+        return json.loads(file_contents)
     except FileNotFoundError:
         logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
         return None
@@ -2249,7 +2251,7 @@ def index_embeddings(
         documents_to_update.append(doc_to_update)
 
     if not documents_to_update:
-        return None
+        return
 
     index_documents_in_bulk(documents_to_update)
 

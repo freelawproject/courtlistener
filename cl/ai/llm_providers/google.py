@@ -1,3 +1,5 @@
+"""Google Gemini batch API wrapper and its request and result types."""
+
 import json
 import logging
 import mimetypes
@@ -241,10 +243,10 @@ class GoogleGenAIBatchWrapper:
 
         for cache in self.client.caches.list():
             if cache.display_name == cache_display_name:
-                logger.info(f"Found existing cache: {cache_display_name}")
+                logger.info("Found existing cache: %s", cache_display_name)
                 return cache.name
 
-        logger.info(f"Creating new cache: {cache_display_name}")
+        logger.info("Creating new cache: %s", cache_display_name)
         cached_content = self.client.caches.create(
             model=self.model_name,
             config=types.CreateCachedContentConfig(
@@ -255,7 +257,7 @@ class GoogleGenAIBatchWrapper:
                 ttl=cache_ttl,
             ),
         )
-        logger.info(f"Cache created successfully: {cache_display_name}")
+        logger.info("Cache created successfully: %s", cache_display_name)
         return cached_content.name
 
     def prepare_batch_requests(

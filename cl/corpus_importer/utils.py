@@ -1,3 +1,5 @@
+"""Shared helpers for importing and merging dockets, opinions, and PACER data."""
+
 from __future__ import annotations
 
 import itertools
@@ -113,6 +115,7 @@ class OpinionMatchingException(Exception):
     """An exception for wrong matching opinions."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -120,6 +123,7 @@ class AuthorException(Exception):
     """Error found in author merger."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -127,6 +131,7 @@ class JudgeException(Exception):
     """An exception for wrong judges."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -134,6 +139,7 @@ class OpinionTypeException(Exception):
     """An exception for incorrect opinion types."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -141,6 +147,7 @@ class DocketSourceException(Exception):
     """An exception for wrong docket source."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -148,6 +155,7 @@ class DateException(Exception):
     """Error found in date merger."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -155,6 +163,7 @@ class EmptyOpinionException(Exception):
     """An exception for opinions that raise a ZeroDivisionError Exception due empty opinion tag or empty opinion content in cl."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -339,10 +348,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
     for overlap in filtered_subset:
         count += len(overlap)
 
-    percent_match = int(
-        100 * (count / min([len(file_characters), len(cl_characters)]))
-    )
-    return percent_match
+    return int(100 * (count / min([len(file_characters), len(cl_characters)])))
 
 
 def similarity_scores(
@@ -377,10 +383,9 @@ def similarity_scores(
     )
 
     # Calculate cosine similarity between weight of words for each text in list
-    scores = cosine_similarity(
+    return cosine_similarity(
         X[: len(texts_to_compare_1)], X[len(texts_to_compare_1) :]
     )
-    return scores
 
 
 def match_opinion_lists(
@@ -460,8 +465,7 @@ def clean_docket_number(docket_number: str) -> str:
         A stripped down docket number.
     """
     docket_number = re.sub("Department.*", "", docket_number)
-    docket_number = re.sub("Nos?. ", "", docket_number)
-    return docket_number
+    return re.sub("Nos?. ", "", docket_number)
 
 
 def merge_docket_numbers(
@@ -485,15 +489,14 @@ def merge_docket_numbers(
             and cl_docket.docket_number_raw != file_cleaned_docket
         ):
             return file_cleaned_docket
-        else:
-            # Check if their relatively similar and if so save the one from file
-            # if its longer
-            similarity = get_cosine_similarity(
-                cl_clean_docket, file_cleaned_docket
-            )
-            if similarity > 0.8:
-                if len(file_cleaned_docket) > len(cl_clean_docket):
-                    return file_cleaned_docket
+        # Check if their relatively similar and if so save the one from file
+        # if its longer
+        similarity = get_cosine_similarity(
+            cl_clean_docket, file_cleaned_docket
+        )
+        if similarity > 0.8:
+            if len(file_cleaned_docket) > len(cl_clean_docket):
+                return file_cleaned_docket
     else:
         # CL docket doesn't have a docket number, add the one from  file
         return file_cleaned_docket
@@ -658,7 +661,7 @@ def merge_judges(
         temp_file_data_clean.issuperset(temp_cl_clean) or cl_data_upper
     ) and file_data_cleaned != cl_clean:
         return {"judges": judges}
-    elif not temp_file_data_clean.intersection(temp_cl_clean):
+    if not temp_file_data_clean.intersection(temp_cl_clean):
         # Last resort, use distance between words to solve typos
         cl_data_clean_list = list(cl_clean)
         file_data_clean_list = list(file_data_cleaned)
@@ -693,16 +696,14 @@ def merge_judges(
                 set(cl_data_clean_list + file_data_clean_list)
             )
             return {"judges": titlecase(", ".join(new_judges_list))}
-        else:
-            if skip_judge_merger:
-                # Fail silently but continue to merge
-                logger.info(
-                    f"Can't merge judges, something failed, cluster id: {cluster_id}"
-                )
-                return {}
-            else:
-                # Stop merge raising an exception
-                raise JudgeException("Judges are completely different.")
+        if skip_judge_merger:
+            # Fail silently but continue to merge
+            logger.info(
+                f"Can't merge judges, something failed, cluster id: {cluster_id}"
+            )
+            return {}
+        # Stop merge raising an exception
+        raise JudgeException("Judges are completely different.")
 
     return {}
 
@@ -1058,8 +1059,7 @@ def content_too_different(
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)
         if cosine_sim > 0.97:
             return False
-        else:
-            return True
+        return True
 
     percent_match = compare_documents(file_characters, cl_characters)
     if percent_match < 60:
@@ -1393,6 +1393,7 @@ class CycleChecker:
     """
 
     def __init__(self) -> None:
+        """Start on the first iteration with no courts seen."""
         self.court_counts: defaultdict = defaultdict(int)
         self.current_iteration: int = 1
         self.count_prev_iteration_courts: int = 0
@@ -1413,17 +1414,16 @@ class CycleChecker:
             # Keep track of processed courts in last cycle
             self.prev_iteration_courts.add(court_id)
             return False
-        else:
-            # Finished cycle and court has been seen more times than the
-            # iteration count. Bump the iteration count and return True.
-            self.current_iteration += 1
-            self.count_prev_iteration_courts = len(self.prev_iteration_courts)
-            # Clear set of previous courts processed
-            self.prev_iteration_courts.clear()
-            # Add the first item for the new iteration,
-            # when self.court_counts[court_id] != self.current_iteration
-            self.prev_iteration_courts.add(court_id)
-            return True
+        # Finished cycle and court has been seen more times than the
+        # iteration count. Bump the iteration count and return True.
+        self.current_iteration += 1
+        self.count_prev_iteration_courts = len(self.prev_iteration_courts)
+        # Clear set of previous courts processed
+        self.prev_iteration_courts.clear()
+        # Add the first item for the new iteration,
+        # when self.court_counts[court_id] != self.current_iteration
+        self.prev_iteration_courts.add(court_id)
+        return True
 
 
 def is_long_appellate_document_number(

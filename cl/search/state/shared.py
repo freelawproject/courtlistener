@@ -1,3 +1,5 @@
+"""Choices, exceptions, and the base document model shared by state court data."""
+
 import logging
 from datetime import date, datetime
 from http import HTTPStatus
@@ -57,6 +59,8 @@ class DocketEntryType:
 
 
 class ProcessingError:
+    """Why a state document couldn't be processed."""
+
     BAD_URL = 1
     EXTRACTION_FAILURE = 2
     SEALED = 3

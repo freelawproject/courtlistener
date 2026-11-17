@@ -1,3 +1,5 @@
+"""Models for SCOTUS network visualizations and their JSON versions."""
+
 import json
 from typing import Any
 
@@ -20,6 +22,8 @@ from cl.visualizations.network_utils import (
 
 
 class SCOTUSMap(AbstractDateTimeModel):
+    """A user's network visualization of citations between two Supreme Court cases."""
+
     user = models.ForeignKey(
         User,
         help_text="The user that owns the visualization",
@@ -90,6 +94,7 @@ class SCOTUSMap(AbstractDateTimeModel):
     __original_deleted = None
 
     def __init__(self, *args, **kwargs):
+        """Build the visualization, remembering whether it was deleted."""
         super().__init__(*args, **kwargs)
         self.__original_deleted = self.deleted
 
@@ -313,6 +318,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{getattr(self, 'pk', None)}: {self.title}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the visualization's embedded page."""
         return reverse("view_embedded_visualization", kwargs={"pk": self.pk})
 
     def make_title(self):
@@ -333,6 +339,13 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{get_best_case_name(self.cluster_start)} ({self.cluster_start.date_filed.year}) to {get_best_case_name(self.cluster_end)} ({self.cluster_end.date_filed.year})"
 
     def save(self, update_fields=None, *args, **kwargs):
+        """Save the visualization, filling in derived fields.
+
+        Makes a title if there is none, sets the publish and delete dates
+        when those flags are first set, and makes a slug on the first save.
+        When ``update_fields`` is given, the title, publish date, and creation
+        date are always updated too.
+        """
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
         if not self.title:

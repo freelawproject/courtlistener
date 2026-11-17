@@ -1,3 +1,5 @@
+"""REST API serializers for people and their positions, education, and ratings, plus parties and attorneys."""
+
 from rest_framework import serializers
 
 from cl.api.utils import (
@@ -30,6 +32,8 @@ class SchoolSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for schools."""
+
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="school-detail",
@@ -47,6 +51,8 @@ class EducationSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for education records, nesting their school."""
+
     school = SchoolSerializer(many=False, read_only=True)
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -65,6 +71,8 @@ class PoliticalAffiliationSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for political affiliations."""
+
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -82,6 +90,8 @@ class SourceSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for a person's sources."""
+
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -99,6 +109,8 @@ class ABARatingSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for ABA ratings."""
+
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -116,6 +128,8 @@ class PersonSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for people, nesting their sources, ratings, education, and affiliations."""
+
     race = serializers.StringRelatedField(many=True)
     sources = SourceSerializer(many=True, read_only=True)
     aba_ratings = ABARatingSerializer(many=True, read_only=True)
@@ -146,6 +160,8 @@ class RetentionEventSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for retention events."""
+
     position = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="position-detail",
@@ -163,6 +179,8 @@ class PositionSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for positions, nesting their retention events, people, school, and court."""
+
     retention_events = RetentionEventSerializer(many=True, read_only=True)
     person = PersonSerializer(many=False, read_only=True)
     supervisor = PersonSerializer(many=False, read_only=True)
@@ -184,18 +202,24 @@ class PositionSerializer(
 
 
 class CriminalCountSerializer(serializers.ModelSerializer):
+    """Serializer for criminal counts."""
+
     class Meta:
         model = CriminalCount
         fields = "__all__"
 
 
 class CriminalComplaintSerializer(serializers.ModelSerializer):
+    """Serializer for criminal complaints."""
+
     class Meta:
         model = CriminalComplaint
         fields = "__all__"
 
 
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for a party's type on a docket, with its criminal counts and complaints."""
+
     criminal_counts = CriminalCountSerializer(many=True)
     criminal_complaints = CriminalComplaintSerializer(many=True)
     docket_id = serializers.ReadOnlyField()
@@ -216,6 +240,8 @@ class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for an attorney's role on a docket."""
+
     role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
     attorney_id = serializers.ReadOnlyField()
     docket_id = serializers.ReadOnlyField()
@@ -233,6 +259,8 @@ class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for the role an attorney has for a party on a docket."""
+
     role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
 
     class Meta:
@@ -246,6 +274,7 @@ class DynamicAttorneyRoleSerializer(
     """Serializes attorney role data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in AttorneyRoleSerializer."""
 
     def __init__(self, **kwargs):
+        """Build the field, marking it as writable."""
         super().__init__(**kwargs)
         self.read_only = False
 
@@ -256,15 +285,19 @@ class DynamicPartyTypeSerializer(
     """Serializes party type data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in PartyTypeSerializer."""
 
     def __init__(self, **kwargs):
+        """Build the field, marking it as writable."""
         super().__init__(**kwargs)
         self.read_only = False
 
 
 class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    """Serializer for parties, with their attorneys and party types."""
+
     attorneys = DynamicAttorneyRoleSerializer()
     party_types = DynamicPartyTypeSerializer()
 
     def get_attorneys(self, obj: Party):
+        """Serialize the party's attorney roles, using ``filtered_roles`` if present."""
         if hasattr(obj, "filtered_roles"):
             data = obj.filtered_roles
         else:
@@ -275,6 +308,7 @@ class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         ).data
 
     def get_party_types(self, obj: Party):
+        """Serialize the party's types, using ``filtered_party_types`` if present."""
         if hasattr(obj, "filtered_party_types"):
             data = obj.filtered_party_types
         else:
@@ -295,14 +329,18 @@ class DynamicPartySerializer(
     """Serializes party data by dynamically computing the field's value using a serializer method. This combines the flexibility of the SerializerMethodField class and allow us to use the schema defined in PartyRoleSerializer."""
 
     def __init__(self, **kwargs):
+        """Build the field, marking it as writable."""
         super().__init__(**kwargs)
         self.read_only = False
 
 
 class AttorneySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    """Serializer for attorneys, with the parties they represent."""
+
     parties_represented = DynamicPartySerializer()
 
     def get_parties_represented(self, obj: Attorney):
+        """Serialize the attorney's party roles, using ``filtered_roles`` if present."""
         if hasattr(obj, "filtered_roles"):
             data = obj.filtered_roles
         else:

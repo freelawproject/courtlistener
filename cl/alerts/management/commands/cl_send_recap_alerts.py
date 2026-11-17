@@ -1,3 +1,5 @@
+"""Send and schedule RECAP search alerts using the RECAP sweep index."""
+
 import copy
 import datetime
 import time
@@ -128,7 +130,7 @@ def compute_estimated_remaining_time(
         task_status.start_time_millis / 1000.0
     )
     time_now = datetime.datetime.now()
-    estimated_time_remaining = max(
+    return max(
         datetime.timedelta(
             seconds=(
                 (time_now - start_time).total_seconds() / task_status.created
@@ -137,8 +139,6 @@ def compute_estimated_remaining_time(
         ).total_seconds(),
         initial_wait,
     )
-
-    return estimated_time_remaining
 
 
 def retrieve_task_info(
@@ -508,6 +508,12 @@ def filter_rd_alert_hits(
 def query_alerts(
     search_params: QueryDict,
 ) -> tuple[Response | None, Response | None, Response | None]:
+    """Run an alert's query against the RECAP sweep indices.
+
+    Returns:
+        The three responses from ``do_es_sweep_alert_query``, or three
+        ``None`` values if the query is invalid or Elasticsearch fails.
+    """
     try:
         search_query = RECAPSweepDocument.search()
         child_search_query = ESRECAPSweepDocument.search()
@@ -868,6 +874,7 @@ class Command(VerboseCommand):
     help = "Send RECAP Search Alerts."
 
     def add_arguments(self, parser):
+        """Add the testing-mode flag and query date option."""
         parser.add_argument(
             "--testing-mode",
             action="store_true",
@@ -881,6 +888,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Re-index the period's RECAP content, then send and schedule alerts.
+
+        The period defaults to the day before today, or starts at midnight of
+        ``--query-date`` if it is given.
+        """
         super().handle(*args, **options)
         testing_mode = options["testing_mode"]
         r = get_redis_interface("CACHE")

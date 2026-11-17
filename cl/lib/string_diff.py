@@ -1,3 +1,5 @@
+"""Helpers for comparing strings, mainly case names."""
+
 import difflib
 import math
 import re
@@ -8,6 +10,7 @@ from typing import TypedDict
 
 
 def remove_words(phrase: str) -> str:
+    """Strip punctuation and stop words from a phrase, joining the remaining words without spaces."""
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = (
         r"a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
@@ -44,9 +47,7 @@ def gen_diff_ratio(left: str, right: str) -> float:
     right = remove_words(right)
 
     # compute the difference value
-    diff = difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
-
-    return diff
+    return difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
 
 
 class _BestMatchOutput(TypedDict):
@@ -142,5 +143,4 @@ def get_cosine_similarity(left_str: str, right_str: str) -> float:
 
     if not denominator:
         return 0.0
-    else:
-        return float(numerator) / denominator
+    return float(numerator) / denominator

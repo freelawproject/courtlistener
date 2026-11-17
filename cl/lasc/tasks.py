@@ -1,3 +1,5 @@
+"""Celery tasks and helpers for scraping and storing LASC cases and PDFs."""
+
 import json
 import logging
 import os
@@ -40,6 +42,8 @@ LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
 class SESSION_IS:
+    """Statuses of the shared LASC session."""
+
     LOGGING_IN = "logging_in"
     OK = "ok"
 
@@ -117,7 +121,7 @@ def download_pdf(self: Task, pdf_pk: int) -> None:
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
 
 
@@ -232,7 +236,7 @@ def add_or_update_case_db(self: Task, case_id: str) -> None:
         retries_remaining = self.max_retries - self.request.retries
         if retries_remaining == 0:
             logger.error("%s", exc)
-            return
+            return None
         logger.info("%s %s retries remaining.", exc, retries_remaining)
         r = get_redis_interface("CACHE")
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
@@ -395,7 +399,7 @@ def fetch_date_range(self: Task, start: date, end: date) -> None:
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
 
 
@@ -425,11 +429,9 @@ async def fetch_date_range_base(start: date, end: date) -> None:
         )
         if not await case_object.aexists():
             await QueuedCase.objects.acreate(
-                **{
-                    "internal_case_id": internal_case_id,
-                    "judge_code": case["judge_code"],
-                    "case_type_code": case["case_type_code"],
-                }
+                internal_case_id=internal_case_id,
+                judge_code=case["judge_code"],
+                case_type_code=case["case_type_code"],
             )
             cases_added_cnt += 1
             logger.info(

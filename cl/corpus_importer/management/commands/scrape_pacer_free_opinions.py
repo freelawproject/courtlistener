@@ -1,3 +1,5 @@
+"""Scrape PACER's free opinion reports and the documents they list."""
+
 import argparse
 import datetime
 import inspect
@@ -99,11 +101,10 @@ def get_last_complete_date(
 
     # Ensure that we go back a few days from the last time we had success if
     # that success was in the last few days.
-    last_complete_date = min(
+    return min(
         now().date() - datetime.timedelta(days=RECENT_REQUERY_DAYS),
         last_completion_log.date_queried,
     )
-    return last_complete_date
 
 
 def get_outstanding_failed_dates(
@@ -665,9 +666,16 @@ def do_everything(courts, date_start, date_end, queue, day_span=1):
 
 
 class Command(VerboseCommand):
+    """Run one of the free PACER content actions."""
+
     help = "Get all the free content from PACER."
 
     def valid_actions(self, s: str) -> Callable:
+        """Parse an action name into its function.
+
+        Raises:
+            argparse.ArgumentTypeError: If the action is unknown.
+        """
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: {}".format(
@@ -688,12 +696,12 @@ class Command(VerboseCommand):
         """
         if not opts.get("date_start") and not opts.get("date_end"):
             return True
-        elif not opts.get("date_start") or not opts.get("date_end"):
+        if not opts.get("date_start") or not opts.get("date_end"):
             logger.error(
                 "Both --date-start and --date-end must be specified together."
             )
             return False
-        elif opts.get("date_start") > opts.get("date_end"):
+        if opts.get("date_start") > opts.get("date_end"):
             logger.error(
                 "--date-end must be greater than or equal to --date-start."
             )
@@ -716,6 +724,7 @@ class Command(VerboseCommand):
         }
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the action, queue, court, date range, day span, and stale-days options."""
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -776,6 +785,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Call the chosen action with the options it accepts.
+
+        No action is called if the date range is invalid.
+        """
         super().handle(*args, **options)
 
         if not self.validate_date_args(options):

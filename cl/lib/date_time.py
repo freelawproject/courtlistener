@@ -1,3 +1,5 @@
+"""Helpers for converting between dates and timezone-aware datetimes."""
+
 from datetime import date, datetime, time
 
 import pytz
@@ -10,8 +12,7 @@ def midnight_pt(d: date) -> datetime:
     """Cast a naive date object to midnight Pacific Time, PST or PDT according to the date."""
     pst = pytz.timezone("US/Pacific")
     d = datetime.combine(d, time())
-    d = pst.localize(d)
-    return d
+    return pst.localize(d)
 
 
 def fixed_midnight_pt(d: date) -> datetime:

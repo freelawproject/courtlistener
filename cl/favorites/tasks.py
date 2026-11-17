@@ -1,3 +1,5 @@
+"""Celery tasks for checking prayed-for documents on PACER."""
+
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from django.conf import settings
@@ -65,11 +67,10 @@ async def check_prayer_pacer_base(rd_pk: int, user_pk: int) -> None:
         )
         await sync_to_async(prayer_unavailable)(rd, user_pk)
         return
-    else:
-        # making sure that previously sealed documents that are now available are marked as such
-        rd.is_sealed = False
-        await rd.asave()
-        await PrayerAvailability.objects.filter(recap_document=rd).adelete()
+    # making sure that previously sealed documents that are now available are marked as such
+    rd.is_sealed = False
+    await rd.asave()
+    await PrayerAvailability.objects.filter(recap_document=rd).adelete()
 
     billable_pages = int(data.get("billable_pages", 0))
     if billable_pages and billable_pages != 30:
