@@ -174,7 +174,7 @@ class NeonClient:
             "email1": user.email,
         }
 
-        profile = user.profile  # type: ignore
+        profile = user.profile  # pyrefly: ignore[missing-attribute]
         address_dict: NeonAddress = {
             "addressLine1": profile.address1,
             "addressLine2": profile.address2,

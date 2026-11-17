@@ -117,4 +117,4 @@ if settings.DEVELOPMENT:
             path("__debug__/", include("debug_toolbar.urls")),
         )
 
-urlpatterns += static("/", document_root=settings.MEDIA_ROOT)  # type: ignore
+urlpatterns += static("/", document_root=settings.MEDIA_ROOT)

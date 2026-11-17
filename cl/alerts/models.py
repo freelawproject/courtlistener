@@ -239,7 +239,7 @@ class ScheduledAlertHit(AbstractDateTimeModel):
         related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
     )
-    document_content = models.JSONField(  # type: ignore
+    document_content = models.JSONField(
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
     )
