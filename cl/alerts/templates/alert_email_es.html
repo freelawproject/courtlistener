@@ -59,7 +59,7 @@
                       {% for doc in result.child_docs %}
                         {% with doc=doc|get_es_doc_content:scheduled_alert %}
                           <li>
-                            <a href="https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" style="font-weight: bold; font-size: 1.2em;" class="visitable">{% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+                            <a href="https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}{% if doc.docket_entry_id %}#minute-entry-{{ doc.docket_entry_id }}{% endif %}{% endif %}" style="font-weight: bold; font-size: 1.2em;" class="visitable">{% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
                             </a>
                             <span style="display: block; margin-top: 5px; font-size: 1.1em;">Date Updated: {{ doc.timestamp|parse_utc_date|localtime|date:"F jS, Y h:i a T" }}</span>
                             {% if doc.description %}
@@ -168,13 +168,7 @@
             {% endfor %}
             <br>
         {% endfor %}
-        <p style="font-size: 110%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-          📣 <strong>The power of CourtListener</strong> can now be integrated into
-          <a href="https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">Claude</a>
-          and is part of
-          <a href="https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">Gemini Enterprise for Legal</a>.
-          Combine CourtListener with AI to make the hardest research just a prompt away.
-        </p>
+        {% include "includes/alert_promo_banner.html" %}
         <p style="font-size: 1em; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
             <strong>This alert brought to you by the non-profit Free Law Project.
                 <a href="https://donate.free.law/forms/supportflp" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">

@@ -1,3 +1,5 @@
+"""Views for oral argument audio pages."""
+
 from typing import cast
 
 from django.contrib.auth.models import AnonymousUser, User

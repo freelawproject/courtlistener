@@ -1,3 +1,5 @@
+"""Template tag for inlining SVG files."""
+
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
@@ -8,8 +10,7 @@ register = template.Library()
 
 @register.simple_tag()
 def svg(name, **kwargs):
-    """
-    Include an SVG file directly in the template.
+    """Include an SVG file directly in the template.
 
     Usage:
     ```

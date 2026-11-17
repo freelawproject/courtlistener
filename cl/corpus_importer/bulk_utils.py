@@ -1,22 +1,25 @@
+"""Helpers for bulk-downloading bankruptcy petitions from PACER."""
+
 from asgiref.sync import async_to_sync
 from celery import chain
 
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import RECAPDocument
 
 
 def make_bankr_docket_number(docket_number: str, office_code: str) -> str:
-    """Combine the office number and core docket number to make a nice one
+    """Combine the office number and core docket number to make a nice one.
 
     E.g., docket number of 1421168 + office number of 2 becomes '2:14-bk-21168'
 
-    :param docket_number: The docket number from the FJC IDB, as a string of
-    numbers.
-    :param office_code: The office code
+    Args:
+        docket_number: The docket number from the FJC IDB, as a string of
+            numbers.
+        office_code: The office code
     """
     return f"{office_code}:{docket_number[:2]}-bk-{docket_number[-5:]}"
 
@@ -63,7 +66,7 @@ def get_petitions(
         chain(
             get_pacer_doc_by_rd.s(
                 rd_pk,
-                SessionData(session.cookies, session.proxy_address),
+                session,
                 tag=tag_petitions,
             ).set(queue=q),
             extract_pdf_document.si(rd_pk).set(queue=q),

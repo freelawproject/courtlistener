@@ -1,3 +1,5 @@
+"""REST API serializers for search models and Elasticsearch search results."""
+
 from datetime import UTC
 from typing import Any
 
@@ -68,9 +70,12 @@ inverted_o_type_index_map = {
 def get_value_from_es_obj(obj: dict | ESDictDocument | Hit, field: str) -> Any:
     """Retrieve a value field from an ES object or dict.
 
-    :param obj: The object or dict to access.
-    :param field: The field name to retrieve.
-    :return: The value of the field, or None if not present.
+    Args:
+        obj: The object or dict to access.
+        field: The field name to retrieve.
+
+    Returns:
+        The value of the field, or None if not present.
     """
     if isinstance(obj, dict):
         return obj.get(field, None)
@@ -80,6 +85,8 @@ def get_value_from_es_obj(obj: dict | ESDictDocument | Hit, field: str) -> Any:
 class PartyTypeSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for a party's type, as its party and type name."""
+
     party_type = serializers.CharField(source="name")
 
     class Meta:
@@ -95,6 +102,8 @@ class OriginalCourtInformationSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for originating court information."""
+
     class Meta:
         model = OriginatingCourtInformation
         fields = "__all__"
@@ -105,6 +114,8 @@ class BankruptcyInformationSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for bankruptcy information."""
+
     class Meta:
         model = BankruptcyInformation
         fields = "__all__"
@@ -115,6 +126,8 @@ class DocketSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for dockets, linking their court, clusters, audio, and judges."""
+
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="court-detail",
@@ -172,6 +185,8 @@ class RECAPDocumentSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for RECAP documents, without their docket entry."""
+
     tags = serializers.HyperlinkedRelatedField(
         many=True,
         view_name="tag-detail",
@@ -192,6 +207,8 @@ class DocketEntrySerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for docket entries, with their RECAP documents nested."""
+
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="docket-detail",
@@ -206,6 +223,8 @@ class DocketEntrySerializer(
 
 
 class FullDocketSerializer(DocketSerializer):
+    """Serializer for dockets, with their docket entries nested."""
+
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
@@ -322,6 +341,8 @@ class CourtSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for courts, without their notes."""
+
     class Meta:
         model = Court
         exclude = ("notes",)
@@ -332,6 +353,8 @@ class OpinionSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for opinions, linking their cluster and judges."""
+
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
@@ -366,6 +389,8 @@ class OpinionsCitedSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for citations between opinions."""
+
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
     # pulls back ALL Opinions.
@@ -388,6 +413,8 @@ class OpinionsCitedSerializer(
 
 
 class CitationSerializer(ModelSerializer):
+    """Serializer for citations, without their ID or cluster."""
+
     class Meta:
         model = Citation
         exclude = (
@@ -397,6 +424,8 @@ class CitationSerializer(ModelSerializer):
 
 
 class ClusterRedirectionSerializer(ModelSerializer):
+    """Serializer for cluster redirections, without their ID or cluster."""
+
     class Meta:
         model = ClusterRedirection
         exclude = (
@@ -410,6 +439,8 @@ class OpinionClusterSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for opinion clusters, with their citations and redirections nested."""
+
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
@@ -453,6 +484,8 @@ class TagSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for tags."""
+
     class Meta:
         model = Tag
         fields = "__all__"
@@ -466,6 +499,7 @@ class V3OAESResultSerializer(DocumentSerializer):
     timestamp = TimeStampField(read_only=True)
 
     def get_snippet(self, obj):
+        """Get the result's highlighted text."""
         # If the snippet has not yet been set upstream, set it here.
         return get_highlight(obj, "text")
 
@@ -492,7 +526,7 @@ class V3PersonESResultSerializer(DocumentSerializer):
 
 
 class ExtendedPersonESSerializer(V3PersonESResultSerializer):
-    """Extends the Person serializer with all the field we get from the db"""
+    """Extends the Person serializer with all the field we get from the db."""
 
     snippet = serializers.SerializerMethodField(read_only=True)
     appointer = serializers.ListField(read_only=True)
@@ -520,6 +554,7 @@ class ExtendedPersonESSerializer(V3PersonESResultSerializer):
     termination_reason = serializers.ListField(read_only=True)
 
     def get_snippet(self, obj):
+        """Get the result's highlighted text."""
         # If the snippet has not yet been set upstream, set it here.
         return get_highlight(obj, "text")
 
@@ -558,16 +593,19 @@ class V3OpinionESResultSerializer(DocumentSerializer):
     suitNature = SuppressHighlightsField(read_only=True)
 
     def get_type(self, obj):
+        """Map the result's opinion type to its V3 value."""
         return inverted_o_type_index_map.get(
             get_value_from_es_obj(obj, "type")
         )
 
     def get_status(self, obj):
+        """Map the result's precedential status to its V3 value."""
         return PRECEDENTIAL_STATUS.get_status_value_reverse(
             get_value_from_es_obj(obj, "status")
         )
 
     def get_snippet(self, obj):
+        """Get the result's highlighted text."""
         # If the snippet has not yet been set upstream, set it here.
         return get_highlight(render_string_or_list(obj), "text")
 
@@ -590,10 +628,14 @@ class V3OpinionESResultSerializer(DocumentSerializer):
 
 
 class ScoreDataSerializer(serializers.Serializer):
+    """Serializer for a result's BM25 score."""
+
     bm25 = serializers.FloatField(read_only=True, source="bm25_score")
 
 
 class SemanticSearchScoreSerializer(serializers.Serializer):
+    """Serializer for a result's BM25 and semantic scores."""
+
     bm25 = serializers.FloatField(read_only=True, source="bm25_score")
     semantic = serializers.FloatField(read_only=True, source="semantic_score")
 
@@ -607,14 +649,14 @@ class BaseMetaDataSerializer(serializers.Serializer):
 
 class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
     """The metadata serializer V4 Search API for main documents.
+
     Includes the score field.
     """
 
     score = serializers.SerializerMethodField(source="*", read_only=True)
 
     def get_score(self, obj):
-        """
-        Returns the appropriate score serialization for a given result object.
+        """Returns the appropriate score serialization for a given result object.
 
         If the `semantic` keyword is included in the query string with a truthy value,
         this method uses `SemanticSearchScoreSerializer`, which includes both semantic
@@ -633,9 +675,7 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
 
 
 class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
-    """The metadata serializer for the RECAP search type includes the
-    additional more_docs field.
-    """
+    """The metadata serializer for the RECAP search type includes the additional more_docs field."""
 
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining", default=False
@@ -643,9 +683,7 @@ class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
 
 
 class RECAPWebhookMetaDataSerializer(BaseMetaDataSerializer):
-    """The metadata serializer for the RECAP search Webhook that includes the
-    additional more_docs field without the score field.
-    """
+    """The metadata serializer for the RECAP search Webhook that includes the additional more_docs field without the score field."""
 
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining", default=False
@@ -700,6 +738,10 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_case_id",
             "plain_text",
             "docket_id",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 
@@ -742,6 +784,8 @@ class BaseDocketESResultSerializer(DocumentSerializer):
             "court_exact",
             "timestamp",
             "date_created",
+            # SCOTUS fields aren't exposed until the SCOTUS search API (#8153).
+            "capital_case",
         )
 
 
@@ -946,6 +990,7 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
     timestamp = TimeStampField(read_only=True)
 
     def get_snippet(self, obj):
+        """Get the result's highlighted plain text."""
         # If the snippet has not yet been set upstream, set it here.
         return get_highlight(obj, "plain_text")
 
@@ -961,10 +1006,15 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "cites",
             "pacer_doc_id",
             "trustee_str",
+            "capital_case",
+            "uid",
+            "docket_entry_uid",
         )
 
 
 class VectorSerializer(serializers.Serializer):
+    """Serializer for an optional embedding of exactly ``EMBEDDING_DIMENSIONS`` floats."""
+
     embedding = serializers.ListField(
         child=serializers.FloatField(),
         min_length=settings.EMBEDDING_DIMENSIONS,

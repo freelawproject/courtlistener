@@ -1,3 +1,5 @@
+"""File storage backends for S3 buckets and static files."""
+
 import itertools
 import os
 import uuid
@@ -25,7 +27,7 @@ def clobbering_get_name(
     name: str,
     max_length: int | None = None,
 ) -> str:
-    """A no-op get name function that clobbers if the item already exists"""
+    """A no-op get name function that clobbers if the item already exists."""
     return name
 
 
@@ -52,10 +54,13 @@ def get_name_by_incrementing(
 
     https://docs.djangoproject.com/en/1.8/releases/1.5.9/#file-upload-denial-of-service
 
-    :param instance: The instance of the storage class being used
-    :param max_length: The name will not exceed max_length, if provided
-    :param name: File name of the object being saved
-    :return: The filepath
+    Args:
+        instance: The instance of the storage class being used
+        max_length: The name will not exceed max_length, if provided
+        name: File name of the object being saved
+
+    Returns:
+        The filepath
     """
     dir_name, file_name = os.path.split(name)
     file_root, file_ext = os.path.splitext(file_name)
@@ -67,7 +72,7 @@ def get_name_by_incrementing(
 
 
 class AWSMediaStorage(S3Storage):
-    """Implements AWS file system storage with a few overrides"""
+    """Implements AWS file system storage with a few overrides."""
 
     location = ""
     file_overwrite = True
@@ -75,6 +80,7 @@ class AWSMediaStorage(S3Storage):
     object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
+        """Get the object parameters with very long cache headers added."""
         # Set extremely long caches b/c we hash our content anyway
         # Expires is the old header, replaced by Cache-Control, but we can
         # include them both for good measure.
@@ -86,6 +92,8 @@ class AWSMediaStorage(S3Storage):
 
 
 class IncrementingAWSMediaStorage(AWSMediaStorage):
+    """Media storage that numbers new files instead of overwriting existing ones."""
+
     file_overwrite = False
 
     def get_available_name(
@@ -93,10 +101,13 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
         name: str,
         max_length: int | None = None,
     ) -> str:
+        """Get a free name by adding an incrementing number to the file name."""
         return get_name_by_incrementing(self, name, max_length)
 
 
 class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
+    """Static file storage under ``static`` that tolerates files missing from the manifest."""
+
     location = "static"
     # Don't throw a ValueError if an item isn't in the manifest.json file. This
     # is important because otherwise the site can go down if our static files
@@ -107,14 +118,20 @@ class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
 
 
 class RecapEmailSESStorage(S3Storage):
+    """Storage for the ``recap.email`` bucket."""
+
     bucket_name = "recap.email"
 
 
 class SCOTUSSESStorage(S3Storage):
+    """Storage for the ``scotus-email`` bucket."""
+
     bucket_name = "scotus-email"
 
 
 class TexasEmailSESStorage(S3Storage):
+    """Storage for the ``texas-email`` bucket."""
+
     bucket_name = "texas-email"
 
 
@@ -137,7 +154,8 @@ class ScanningFinalXmlStorage(S3Storage):
     def __init__(self, **kwargs: Any) -> None:
         """Use the scanning portal's read-only keys when they are set.
 
-        :param kwargs: The S3Storage settings; explicit keys take precedence.
+        Args:
+            kwargs: The S3Storage settings; explicit keys take precedence.
         """
         if settings.SCANNING_AWS_ACCESS_KEY_ID:
             kwargs.setdefault(
@@ -153,10 +171,7 @@ class ScanningFinalXmlStorage(S3Storage):
 
 
 class S3PrivateLLMStorage(S3Storage):
-    """Private S3 storage for LLM-related files (inputs, responses, batch
-    results). Uses private ACL to keep internal processing files
-    inaccessible to the public
-    """
+    """Private S3 storage for LLM-related files (inputs, responses, batch results). Uses private ACL to keep internal processing files inaccessible to the public."""
 
     default_acl = "private"
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
@@ -180,13 +195,14 @@ class S3PrivateUUIDStorage(S3Storage):
         name: str,
         max_length: int | None = None,
     ) -> str:
+        """Replace the file name with a random UUID, keeping its directory and extension."""
         dir_name, file_name = os.path.split(name)
         _, file_ext = os.path.splitext(file_name)
         return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
 
 
 class S3GlacierInstantRetrievalStorage(S3Storage):
-    """Uses S3 GlacierInstantRetrieval storage class with private ACL"""
+    """Uses S3 GlacierInstantRetrieval storage class with private ACL."""
 
     default_acl = "private"
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
@@ -201,12 +217,14 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
         ] = get_name_by_incrementing,
         **settings: Any,
     ) -> None:
+        """Build the storage with the function used to pick free file names."""
         self.naming_strategy: Callable[[Storage, str, int | None], str] = (
             naming_strategy
         )
         super().__init__(**settings)
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
+        """Get the object parameters with the Glacier Instant Retrieval storage class."""
         params = self.object_parameters.copy()
         params["StorageClass"] = "GLACIER_IR"
         return params
@@ -216,6 +234,7 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
         name: str,
         max_length: int | None = None,
     ) -> str:
+        """Get a free name using the storage's naming strategy."""
         return self.naming_strategy(self, name, max_length)
 
 
@@ -230,7 +249,7 @@ class HarvardPDFStorage(S3Boto3Storage):
 
 
 class S3IntelligentTieringStorage(S3Storage):
-    """Uses S3 Intelligent Tiering storage class"""
+    """Uses S3 Intelligent Tiering storage class."""
 
     location = ""
     file_overwrite = True
@@ -238,6 +257,7 @@ class S3IntelligentTieringStorage(S3Storage):
     object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
+        """Get the object parameters with the Intelligent Tiering storage class."""
         params = self.object_parameters.copy()
         params["StorageClass"] = "INTELLIGENT_TIERING"
         return params

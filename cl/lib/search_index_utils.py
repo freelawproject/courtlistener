@@ -1,3 +1,5 @@
+"""Helpers for preparing values for the search index."""
+
 import re
 from collections.abc import Iterable
 from datetime import date
@@ -24,7 +26,7 @@ def extract_field_values[M: Model](
 
     Args:
         m2m_list: A list of objects.
-        field_name: The name of the field to extract values from.
+        field: The name of the field to extract values from.
 
     Returns:
         A list of extracted field values
@@ -41,27 +43,30 @@ def extract_field_values[M: Model](
 
 
 class InvalidDocumentError(Exception):
-    """The document could not be formed"""
+    """The document could not be formed."""
 
     def __init__(self, message: str) -> None:
+        """Build the error with a message."""
         Exception.__init__(self, message)
 
 
 # Used to nuke null and control characters.
 null_map: dict[int, None] = dict.fromkeys(
-    list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
+    list(range(10)) + list(range(11, 13)) + list(range(14, 32))
 )
 
 VALID_CASE_NAME_SEPARATORS = [" v ", " v. ", " vs. ", " vs "]
 
 
 def get_parties_from_case_name(case_name: str) -> list[str]:
-    """Extracts the parties from case_name by splitting on common case_name
-    separators.
+    """Extracts the parties from case_name by splitting on common case_name separators.
 
-    :param case_name: The case_name to be split.
-    :return: A list of parties. If no valid separator is found, returns an
-    empty list.
+    Args:
+        case_name: The case_name to be split.
+
+    Returns:
+        A list of parties. If no valid separator is found, returns an
+        empty list.
     """
     for separator in VALID_CASE_NAME_SEPARATORS:
         if separator in case_name:
@@ -81,10 +86,13 @@ def get_parties_from_case_name_bankr(case_name: str) -> list[str]:
     is returned, as these typically don't contain party information in the
     standard format.
 
-    :param case_name: The bankruptcy case name string.
-    :return: A list of strings, where each string represents a party involved
-    in the case. If no recognized separator is found, the function returns
-    a list containing the cleaned case name as a single element.
+    Args:
+        case_name: The bankruptcy case name string.
+
+    Returns:
+        A list of strings, where each string represents a party involved
+        in the case. If no recognized separator is found, the function returns
+        a list containing the cleaned case name as a single element.
     """
     # Handle cases beginning with "in re" or "in the matter of".
     # These usually don't contain party information in the expected format.
@@ -121,12 +129,16 @@ def check_bulk_indexing_exceptions(
     errors: list[dict[str, Any]], error_types: list[str]
 ) -> tuple[bool, bool]:
     """Check for specific exception types in bulk indexing errors.
-    :param errors: A list of dictionaries representing errors from a bulk
-    indexing operation.
-    :param error_types: A list of exception type strings to check for in the
-    error details.
-    :return: A two-tuple: a boolean indicating whether a ConflictError was found,
-     and a boolean indicating whether an unknown error was found.
+
+    Args:
+        errors: A list of dictionaries representing errors from a bulk
+            indexing operation.
+        error_types: A list of exception type strings to check for in the
+            error details.
+
+    Returns:
+        A two-tuple: a boolean indicating whether a ConflictError was found,
+        and a boolean indicating whether an unknown error was found.
     """
     conflict_found = False
     raise_error = False
@@ -152,11 +164,10 @@ def check_bulk_indexing_exceptions(
 def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
     """Index documents in Elasticsearch using the bulk API.
 
-    :param documents_to_index: A list of dictionaries representing the documents
-    to be indexed in bulk.
-    :return: None.
+    Args:
+        documents_to_index: A list of dictionaries representing the documents
+            to be indexed in bulk.
     """
-
     client = connections.get_connection(alias="no_retry_connection")
     # Execute the bulk update
     ids = [doc["_id"] for doc in documents_to_index]
@@ -180,7 +191,7 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
                 ),  # TODO: Exception requires an ApiResponseMeta object, but we don't have one here
                 {"ids": ids},
             )
-        elif raise_error:
+        if raise_error:
             # If the error is of any other type, raises the original
             # BulkIndexError for debugging.
             raise exc

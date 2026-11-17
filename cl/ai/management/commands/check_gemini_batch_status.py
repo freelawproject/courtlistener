@@ -1,5 +1,4 @@
-"""
-Check the status of in-progress Google Gemini batch jobs and download results when complete.
+"""Check the status of in-progress Google Gemini batch jobs and download results when complete.
 
 This command queries all LLMRequest objects for Google Gemini provider with status
 IN_PROGRESS and checks their batch job status with the Google GenAI API. When a
@@ -97,9 +96,10 @@ def process_succeeded_request(
 
     Wrapped in an atomic transaction so a partial failure rolls back cleanly.
 
-    :param wrapper: Google GenAI batch wrapper used to download results.
-    :param request: The LLMRequest whose batch job succeeded.
-    :param job: The batch job object returned by the provider API.
+    Args:
+        wrapper: Google GenAI batch wrapper used to download results.
+        request: The LLMRequest whose batch job succeeded.
+        job: The batch job object returned by the provider API.
     """
     jsonl_content = wrapper.download_results(job)
     processed_results = wrapper.process_results(jsonl_content)
@@ -139,7 +139,9 @@ def process_succeeded_request(
                     )
                 except (TypeError, ValueError) as e:
                     logger.error(
-                        f"Could not serialize JSON for task {task.llm_key}: {e}"
+                        "Could not serialize JSON for task %s: %r",
+                        task.llm_key,
+                        e,
                     )
                     task.response_file.save(
                         f"{task.llm_key}_result.txt",
@@ -174,9 +176,10 @@ def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
 
     Wrapped in an atomic transaction so all updates succeed or fail together.
 
-    :param request: The LLMRequest to mark as failed.
-    :param job_state_name: The terminal job state name (e.g.
-        ``JOB_STATE_FAILED``) included in task error messages.
+    Args:
+        request: The LLMRequest to mark as failed.
+        job_state_name: The terminal job state name (e.g.
+            ``JOB_STATE_FAILED``) included in task error messages.
     """
     with transaction.atomic():
         request.tasks.all().update(
@@ -199,15 +202,17 @@ def handle_request(
     (reported to Sentry) to ensure one failing request doesn't stop
     processing of subsequent requests.
 
-    :param wrapper: Google GenAI batch wrapper used to query job status.
-    :param request: The in-progress LLMRequest to check.
+    Args:
+        wrapper: Google GenAI batch wrapper used to query job status.
+        request: The in-progress LLMRequest to check.
     """
     try:
         job = wrapper.get_job(request.batch_id)
 
         if job.state not in COMPLETED_STATES:
             logger.info(
-                f"  - Job state is '{job.state.name}'. Skipping for now."
+                "  - Job state is %r. Skipping for now.",
+                job.state.name,  # pyrefly:ignore[missing-attribute] I think the `ValueError` below is catching this, but this should be fixed later - Morgan
             )
             return
 
@@ -218,13 +223,13 @@ def handle_request(
             process_succeeded_request(wrapper, request, job)
         else:
             logger.info(
-                f"  - Job ended with non-success state: {job.state.name}"
+                "  - Job ended with non-success state: %r", job.state.name
             )
             process_failed_request(request, job.state.name)
 
     except ValueError as e:
         logger.warning(
-            f"ValueError downloading results for request {request.pk}: {e}"
+            "ValueError downloading results for request %r: %r", request.pk, e
         )
     except (
         ServerError,
@@ -254,16 +259,24 @@ def handle_request(
             sentry_sdk.capture_exception(e)
     except Exception as e:
         logger.exception(
-            f"Unexpected error in check_gemini_batch_status for request {request.pk}"
+            "Unexpected error in check_gemini_batch_status for request %r",
+            request.pk,
         )
         sentry_sdk.capture_exception(e)
         process_failed_request(request, "UNEXPECTED_ERROR")
 
 
 class Command(VerboseCommand):
+    """Check in-progress Gemini batch jobs and process completed ones."""
+
     help = "Check the status of in-progress Google Gemini batch jobs and download results when complete."
 
     def handle(self, *args, **options):
+        """Check every in-progress Gemini batch request.
+
+        Raises:
+            CommandError: If ``GEMINI_BATCH_API_KEY`` is not set.
+        """
         super().handle(*args, **options)
         env = environ.FileAwareEnv()
         batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
@@ -280,7 +293,7 @@ class Command(VerboseCommand):
             provider=LLMProvider.GEMINI,
         )
         pending_count = pending_requests.count()
-        logger.info(f"Found {pending_count} pending batch requests to check.")
+        logger.info("Found %d pending batch requests to check.", pending_count)
 
         if pending_count == 0:
             return
@@ -288,7 +301,9 @@ class Command(VerboseCommand):
         wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
         for request in pending_requests:
             logger.info(
-                f"Checking status for request: {request.pk} ({request.batch_id})"
+                "Checking status for request: %d (%r)",
+                request.pk,
+                request.batch_id,
             )
             handle_request(wrapper, request)
 

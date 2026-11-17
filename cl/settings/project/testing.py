@@ -1,3 +1,5 @@
+"""Settings for running tests, including Selenium."""
+
 import sys
 
 import environ

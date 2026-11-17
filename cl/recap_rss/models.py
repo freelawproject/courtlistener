@@ -1,3 +1,5 @@
+"""Models for PACER RSS feed statuses, stored feed data, and seen items."""
+
 import bz2
 
 from django.db import models
@@ -60,9 +62,7 @@ class RssFeedStatus(AbstractDateTimeModel):
 
 
 class RssItemCache(models.Model):
-    """A cache for hashes of the RSS models to make it faster to look them up
-    and merge them in.
-    """
+    """A cache for hashes of the RSS models to make it faster to look them up and merge them in."""
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -73,6 +73,7 @@ class RssItemCache(models.Model):
 
 
 def make_rss_feed_path(instance, filename: str) -> str:
+    """Make a dated upload path under ``pacer-rss-feeds``."""
     return make_path("pacer-rss-feeds", filename)
 
 
@@ -94,19 +95,23 @@ class RssFeedData(AbstractDateTimeModel):
 
     @property
     def file_contents(self) -> str:
+        """The decompressed contents of the stored feed."""
         return bz2.decompress(self.filepath.read()).decode()
 
     def print_file_contents(self) -> None:
+        """Print the decompressed contents of the stored feed."""
         print(self.file_contents)
 
     def reprocess_item(
         self,
         metadata_only: bool = False,
     ) -> None:
-        """Reprocess the RSS feed
+        """Reprocess the RSS feed.
 
-        :param metadata_only: If True, only do the metadata, not the docket
-        entries.
+        Args:
+            metadata_only: If True, only do the metadata, not the docket
+                entries.
+
         when doing medata only since no entries are modified).
         """
         from cl.recap_rss.tasks import merge_rss_feed_contents

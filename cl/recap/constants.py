@@ -1,3 +1,9 @@
+"""FJC Integrated Database constants and court timezones.
+
+Covers the IDB dataset sources, field metadata, and nature of suit and
+nature of offense codes, plus a partial mapping of courts to timezones.
+"""
+
 from datetime import date
 from typing import TypedDict
 

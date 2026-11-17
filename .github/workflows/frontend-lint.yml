@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       - name: Get changed files
         id: changed

@@ -1,3 +1,5 @@
+"""Views for court, docket, RECAP document, opinion, and citation pages."""
+
 import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
@@ -47,6 +49,7 @@ from reporters_db import (
     VARIATIONS_ONLY,
 )
 from seal_rookery.search import ImageSizes, seal
+from waffle import flag_is_active
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -77,7 +80,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
-from cl.opinion_page import docket_entry_sources
+from cl.opinion_page import docket_entry_sources, forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
     SourceDocketEntry,
@@ -102,6 +105,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     es_related_case_count,
     generate_docket_entries_csv_data,
+    separate_syllabus,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -131,8 +135,7 @@ HYPERSCAN_TOKENIZER: HyperscanTokenizer = HyperscanTokenizer(
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
-    """Individual Court Home Pages"""
-
+    """Individual Court Home Pages."""
     available_courts = [
         "tennworkcompcl",
         "tennworkcompapp",
@@ -209,12 +212,12 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_missctapp",
 )
 async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
-    """Display upload form and intake Opinions for partner courts
+    """Display upload form and intake Opinions for partner courts.
 
-    :param request: A GET or POST request for the page
-    :param pk: The CL Court ID for each court
+    Args:
+        request: A GET or POST request for the page
+        pk: The CL Court ID for each court
     """
-
     available_courts = [
         "tennworkcompcl",
         "tennworkcompapp",
@@ -283,10 +286,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("court_publish_page", kwargs={"pk": pk})
             )
-        else:
-            messages.info(
-                request, "Error submitting form, please review below."
-            )
+        messages.info(request, "Error submitting form, please review below.")
     return TemplateResponse(
         request,
         "publish.html",
@@ -300,8 +300,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
 
 
 async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
-    """Redirect an open graph bot to the page for a RECAP document so that
-    it can get good thumbnails and metadata even though it's a PDF.
+    """Redirect an open graph bot to the page for a RECAP document so that it can get good thumbnails and metadata even though it's a PDF.
 
     If it hits an error, send the bot back to AWS to get the PDF, but set
     "no-og" parameter to be sure the file gets served.
@@ -341,6 +340,11 @@ async def redirect_docket_recap(
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
+    """Redirect to the page of the court's docket with the PACER case ID.
+
+    Raises:
+        Http404: If there is no such docket.
+    """
     docket: Docket = await aget_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
@@ -369,8 +373,15 @@ async def fetch_docket_entries(
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
+    """Render a docket's page of entries, filtered and sorted by the request's parameters.
+
+    Shows 100 entries per page.
+    """
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    if await sync_to_async(flag_is_active)(request, "use_new_design"):
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     source = docket.get_entry_source()
@@ -412,7 +423,11 @@ async def view_docket(
     def _attach_documents(entries: list) -> list:
         page_documents = []
         for entry in entries:
-            entry.documents = list(source.documents_for_entry(entry))
+            entry.documents = [
+                document
+                for document in source.documents_for_entry(entry)
+                if source.document_is_listed(document)
+            ]
             for document in entry.documents:
                 attach_display_fields(source, document)
             page_documents.extend(entry.documents)
@@ -459,6 +474,7 @@ async def view_docket(
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
+    """Render a docket's Atom feed."""
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
@@ -469,7 +485,6 @@ async def view_parties(
     slug: str,
 ) -> HttpResponse:
     """Show the parties and attorneys tab on the docket with pagination."""
-
     page = request.GET.get("page", 1)
     docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
@@ -544,6 +559,11 @@ async def docket_idb_data(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's FJC Integrated Database tab.
+
+    Raises:
+        Http404: If the docket has no IDB data.
+    """
     docket, context = await core_docket_data(request, docket_id)
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
@@ -587,6 +607,11 @@ async def docket_authorities(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
+    """Render a docket's authorities tab.
+
+    Raises:
+        Http404: If the docket has no authorities.
+    """
     docket, context = await core_docket_data(request, docket_id)
     if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
@@ -603,9 +628,7 @@ async def docket_authorities(
 
 
 def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
-    """
-    This will result in three database loads if rd hasn't already cached the objects.
-    """
+    """This will result in three database loads if rd hasn't already cached the objects."""
     de = rd.docket_entry
     d = de.docket
     court = d.court
@@ -630,10 +653,13 @@ def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
 def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
-    """Download csv file containing list of DocketEntry for specific Docket"""
-
+    """Download csv file containing list of DocketEntry for specific Docket."""
     docket, _ = async_to_sync(core_docket_data)(request, docket_id)
-    de_list = async_to_sync(fetch_docket_entries)(docket)
+    # Order explicitly from the source config: SCOTUSDocketEntry's
+    # Meta.ordering is descending, while DocketEntry's is ascending.
+    de_list = async_to_sync(fetch_docket_entries)(docket).order_by(
+        *docket.get_entry_source().order_by_asc
+    )
     court_id = docket.court_id
     case_name = docket.slug
 
@@ -641,21 +667,7 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    try:
-        csv_content = (
-            generate_docket_entries_csv_data(de_list) if de_list else b""
-        )
-    except (NotImplementedError, AttributeError):
-        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
-        # Only return a handled 501 for those. A RECAP docket hitting
-        # this branch means a real bug in the CSV path, and that should
-        # still raise a error 500.
-        if docket.get_entry_source() is docket_entry_sources.RECAP:
-            raise
-        # A handled 501 shows an error message instead of crashing: the
-        # generic one in legacy's export-csv.js, the status-keyed one in the
-        # v2 download composable.
-        return HttpResponse(status=501)
+    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -670,9 +682,7 @@ async def view_recap_document(
     slug: str = "",
     is_og_bot: bool = False,
 ) -> HttpResponse:
-    """This view can either load an attachment or a regular document,
-    depending on the URL pattern that is matched.
-    """
+    """This view can either load an attachment or a regular document, depending on the URL pattern that is matched."""
     return await recap_document_context(
         request,
         docket_id,
@@ -692,9 +702,7 @@ async def view_recap_authorities(
     slug: str = "",
     is_og_bot: bool = False,
 ) -> HttpResponse:
-    """This view can display authorities of an attachment or a regular
-    document, depending on the URL pattern that is matched.
-    """
+    """This view can display authorities of an attachment or a regular document, depending on the URL pattern that is matched."""
     response = await recap_document_context(
         request,
         docket_id,
@@ -721,11 +729,7 @@ async def recap_document_context(
     is_og_bot: bool = False,
     template: str = "",
 ) -> HttpResponse:
-    """
-    Returns an HttpResponse for a RECAPDocument or SCOTUSDocument,
-    depending on the docket's court. This can be either an
-    HttpResponseRedirect or a TemplateResponse.
-    """
+    """Returns an HttpResponse for a RECAPDocument or SCOTUSDocument, depending on the docket's court. This can be either an HttpResponseRedirect or a TemplateResponse."""
     docket = await aget_object_or_404(Docket, pk=docket_id)
     source = docket.get_entry_source()
     is_scotus = source is docket_entry_sources.SCOTUS
@@ -790,17 +794,17 @@ async def recap_document_context(
     redirect_or_modal = request.GET.get("redirect_or_modal", False)
     if rd_download_redirect or redirect_or_modal:
         # Check if the document is available from CourtListener and
-        # if it is, redirect to the local document
-        # if it isn't, if pacer_url is available and
-        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-        # is True set redirect_to_pacer_modal to True to open the modal.
+        # if it is, redirect to the local document. If it isn't, fall back
+        # to the source's own external URL (PACER for RECAP, the source
+        # court's website for SCOTUS) when rd_download_redirect is True.
+        # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        elif source.has_pay_and_pray:
-            if rd.pacer_url and rd_download_redirect:
-                return HttpResponseRedirect(rd.pacer_url)
-            if rd.pacer_url and redirect_or_modal:
-                redirect_to_pacer_modal = True
+        external_url = source.document_external_url(rd)
+        if external_url and rd_download_redirect:
+            return HttpResponseRedirect(external_url)
+        if source.has_pay_and_pray and external_url and redirect_or_modal:
+            redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
@@ -874,11 +878,7 @@ def get_attachment_values(
     slug: str,
     doc_num: str,
 ) -> list[dict[str, str | int | None]]:
-    """
-    Moved this out of recap_document_context because it is easily severable and
-    just clutters it up.
-    """
-
+    """Moved this out of recap_document_context because it is easily severable and just clutters it up."""
     # How many documents to return
     max_displayed = 20
     # How many of those should be previous docs
@@ -943,8 +943,11 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
     Builds a list of embeddable PDFs for accordion display when multiple
     PDFs exist (e.g. Lead Opinion, Concurrence, Dissent).
 
-    :param cluster: The opinion cluster.
-    :return: A dict with ``has_downloads``, ``download_file_path`` (first PDF URL),
+    Args:
+        cluster: The opinion cluster.
+
+    Returns:
+        A dict with ``has_downloads``, ``download_file_path`` (first PDF URL),
         and ``embeddable_pdfs`` (list of dicts with label/url/id).
     """
     has_downloads = False
@@ -989,12 +992,15 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
 async def setup_opinion_context(
     cluster: OpinionCluster, request: HttpRequest, tab: str
 ) -> dict[str, Any]:
-    """Generate the basic page information we need to load the page
+    """Generate the basic page information we need to load the page.
 
-    :param cluster: The opinion cluster
-    :param request: The HTTP request from the user
-    :param tab: The tab to load
-    :return: The opinion page context used to generate the page
+    Args:
+        cluster: The opinion cluster
+        request: The HTTP request from the user
+        tab: The tab to load
+
+    Returns:
+        The opinion page context used to generate the page
     """
     tab_intros = {
         "authorities": "Authorities for ",
@@ -1036,6 +1042,7 @@ async def setup_opinion_context(
         "private": cluster.blocked,
         "sponsored": sponsored,
         "citations": sorted(cluster.citations.all(), key=sort_cites),
+        "separate_syllabus": separate_syllabus(cluster),
     }
 
     download_context = await get_downloads_context(cluster)
@@ -1047,13 +1054,15 @@ async def setup_opinion_context(
 async def get_opinions_queryset(
     sub_opinions_prefetch: str,
 ) -> QuerySet[OpinionCluster]:
-    """Prepare a cluster queryset with common prefetches to prevent extra
-    queries
+    """Prepare a cluster queryset with common prefetches to prevent extra queries.
 
-    :param sub_opinions_prefetch: a plain string which identifies a prefetch
-        path. If it's value is "no_text_fields", it will get the sub_opinions
-        without their big text fields, for performance improvements
-    :return: the queryset
+    Args:
+        sub_opinions_prefetch: a plain string which identifies a prefetch
+            path. If it's value is "no_text_fields", it will get the sub_opinions
+            without their big text fields, for performance improvements
+
+    Returns:
+        the queryset
     """
     if sub_opinions_prefetch == "no_text_fields":
         prefetch = Prefetch(
@@ -1085,11 +1094,14 @@ async def render_opinion_view(
 ) -> HttpResponse:
     """Helper function to render opinion views with common context.
 
-    :param request: The HttpRequest object
-    :param pk: The primary key for the OpinionCluster
-    :param tab: The selected tab
-    :param additional_context: Any additional context to be passed to the view
-    :return: HttpResponse
+    Args:
+        request: The HttpRequest object
+        cluster: The OpinionCluster to render
+        tab: The selected tab
+        additional_context: Any additional context to be passed to the view
+
+    Returns:
+        HttpResponse
     """
     context = await setup_opinion_context(cluster, request, tab=tab)
 
@@ -1104,13 +1116,15 @@ async def render_opinion_view(
 
 
 async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
-    """Generate opinions tab dynamically
+    """Generate opinions tab dynamically.
 
-    :param request: The HTTP request from the user
-    :param pk: OpinionCluster pk
-    :return: partial rendered or blank if not htmx request
+    Args:
+        request: The HTTP request from the user
+        pk: OpinionCluster pk
+
+    Returns:
+        partial rendered or blank if not htmx request
     """
-
     if "HX-Request" not in request.headers:
         return HttpResponse("")
 
@@ -1177,12 +1191,15 @@ async def update_opinion_tabs(request: HttpRequest, pk: int) -> HttpResponse:
 @track_view_counter(tracks="cluster", label_format="o.%s:view")
 @ratelimit_deny_list
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
-    """View Opinions
+    """View Opinions.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: The old or new opinion HTML
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        The old or new opinion HTML
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("sub_opinions"), pk=pk
@@ -1195,12 +1212,15 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View Opinion PDF Tab
+    """View Opinion PDF Tab.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: Opinion PDF tab
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        Opinion PDF tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("no_text_fields"), pk=pk
@@ -1213,12 +1233,15 @@ async def view_opinion_pdf(
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View Opinion Table of Authorities
+    """View Opinion Table of Authorities.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: Table of Authorities tab
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("no_text_fields"),
@@ -1238,12 +1261,15 @@ async def view_opinion_authorities(
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View Cited By Tab
+    """View Cited By Tab.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: Cited By tab
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        Cited By tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("sub_opinions__opinions_cited"), pk=pk
@@ -1263,12 +1289,15 @@ async def view_opinion_cited_by(
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View Opinion Summaries tab
+    """View Opinion Summaries tab.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: Summaries tab
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        Summaries tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("no_text_fields"), pk=pk
@@ -1303,12 +1332,15 @@ async def view_opinion_summaries(
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View Related Cases Tab
+    """View Related Cases Tab.
 
-    :param request: HTTP request
-    :param pk: The cluster PK
-    :param _: url slug
-    :return: Related Cases tab
+    Args:
+        request: HTTP request
+        pk: The cluster PK
+        _: url slug
+
+    Returns:
+        Related Cases tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
         await get_opinions_queryset("no_text_fields"), pk=pk
@@ -1329,6 +1361,7 @@ async def view_opinion_related_cases(
 
 
 async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
+    """Render the reporter volumes page with a 404 status."""
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
@@ -1342,10 +1375,13 @@ async def get_prev_next_volumes(
 ) -> tuple[str | None, str | None]:
     """Get the volume before and after the current one.
 
-    :param reporter: The reporter where the volume is found
-    :param volume: The volume we're inspecting
-    :return Tuple of the volume number we have prior to the selected one, and
-    of the volume number after it.
+    Args:
+        reporter: The reporter where the volume is found
+        volume: The volume we're inspecting
+
+    Returns:
+        Tuple of the volume number we have prior to the selected one, and
+        of the volume number after it.
     """
     raw_volumes = [
         vol
@@ -1367,8 +1403,7 @@ async def get_prev_next_volumes(
 async def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
-    """Show all the volumes for a given reporter abbreviation or all the cases
-    for a reporter-volume dyad.
+    """Show all the volumes for a given reporter abbreviation or all the cases for a reporter-volume dyad.
 
     Two things going on here:
     1. We don't know which reporter the user actually wants when they provide
@@ -1502,7 +1537,7 @@ async def reporter_or_volume_handler(
 
 
 async def make_reporter_dict() -> dict:
-    """Make a dict of reporter names and abbreviations
+    """Make a dict of reporter names and abbreviations.
 
     The format here is something like:
 
@@ -1522,8 +1557,7 @@ async def make_reporter_dict() -> dict:
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
                 reporters[name].append(abbrev)
-    reporters = OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
-    return reporters
+    return OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
 
 
 async def citation_handler(
@@ -1532,8 +1566,7 @@ async def citation_handler(
     volume: str,
     page: str,
 ) -> HttpResponse:
-    """Load the page when somebody looks up a complete citation"""
-
+    """Load the page when somebody looks up a complete citation."""
     citation_str = " ".join([volume, reporter, page])
     clusters, cluster_count = await get_clusters_from_citation_str(
         reporter, volume, page
@@ -1606,10 +1639,11 @@ async def attempt_reporter_variation(
     variation. When that happens, we give up. When there's exactly one, we
     redirect to the canonical variation. When there's zero, we give up.
 
-    :param request: The HTTP request
-    :param reporter: The reporter string we're trying to look up, e.g., "f-3d"
-    :param volume: The volume requested, if provided
-    :param page: The page requested, if provided
+    Args:
+        request: The HTTP request
+        reporter: The reporter string we're trying to look up, e.g., "f-3d"
+        volume: The volume requested, if provided
+        page: The page requested, if provided
     """
     possible_canonicals = get_canonicals_from_reporter(reporter)
     if len(possible_canonicals) == 0:
@@ -1619,7 +1653,7 @@ async def attempt_reporter_variation(
             {"no_reporters": True, "reporter": reporter, "private": True},
         )
 
-    elif len(possible_canonicals) == 1:
+    if len(possible_canonicals) == 1:
         # Unambiguous reporter variation. Great. Redirect to the canonical
         # reporter
         return HttpResponseRedirect(
@@ -1631,7 +1665,7 @@ async def attempt_reporter_variation(
             ),
         )
 
-    elif len(possible_canonicals) > 1:
+    if len(possible_canonicals) > 1:
         # The reporter variation is ambiguous b/c it can refer to more than
         # one reporter. Abort with a 300 status.
         return TemplateResponse(
@@ -1645,8 +1679,7 @@ async def attempt_reporter_variation(
             },
             status=HTTPStatus.MULTIPLE_CHOICES,
         )
-    else:
-        return HttpResponse(status=500)
+    return HttpResponse(status=500)
 
 
 async def citation_redirector(
@@ -1655,8 +1688,7 @@ async def citation_redirector(
     volume: str | None = None,
     page: str | None = None,
 ) -> HttpResponse:
-    """Take a citation URL and use it to redirect the user to the canonical
-    page for that citation.
+    """Take a citation URL and use it to redirect the user to the canonical page for that citation.
 
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
@@ -1688,18 +1720,18 @@ async def citation_redirector(
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:
         return await citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
+    if proper_reporter and volume and page is None:
         return await reporter_or_volume_handler(
             request, proper_reporter, volume
         )
-    elif proper_reporter and volume is None and page is None:
+    if proper_reporter and volume is None and page is None:
         return await reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
 
 @csrf_exempt
 async def citation_homepage(request: HttpRequest) -> HttpResponse:
-    """Show the citation homepage"""
+    """Show the citation homepage."""
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if await sync_to_async(form.is_valid)():
@@ -1726,13 +1758,12 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
-        else:
-            # Error in form, somehow.
-            return TemplateResponse(
-                request,
-                "citation_redirect_info_page.html",
-                {"show_homepage": True, "form": form, "private": False},
-            )
+        # Error in form, somehow.
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {"show_homepage": True, "form": form, "private": False},
+        )
 
     form = CitationRedirectorForm()
     reporter_dict = await make_reporter_dict()

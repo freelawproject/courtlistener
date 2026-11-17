@@ -1,3 +1,5 @@
+"""Score how descriptive a parenthetical is."""
+
 import re
 from math import log
 
@@ -28,9 +30,7 @@ MINIMUM_WORDS_DESCRIPTIVE = 10
 def parenthetical_score(
     description: str, citing_opinion_cluster: OpinionCluster
 ) -> float:
-    """
-    Takes a cleaned, non-spam description; returns a usefulness score between 0 and 1.
-    """
+    """Takes a cleaned, non-spam description; returns a usefulness score between 0 and 1."""
     num_words = len(description.split(" "))
     # Baseline 500 so we don't end up with negative score when we penalize
     score = 500.0
@@ -67,5 +67,4 @@ def parenthetical_score(
     # approximately between 0 and 1
     normalized_score = score / 1000
     # Now cap the score between 0 and 1
-    normalized_score = min(max(normalized_score, 0.0), 1.0)
-    return normalized_score
+    return min(max(normalized_score, 0.0), 1.0)
