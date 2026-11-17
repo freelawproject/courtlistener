@@ -6339,8 +6339,9 @@ class CentraliaIngestTest(TestCase):
         """Does each writing after the first become a sibling opinion?
 
         The seed keeps the first writing, so citations to it still point at
-        the decision. Siblings share its PDF but not its sha1 or download
-        URL, which duplicate and version detection group opinions by.
+        the decision and its PDF. Siblings get no PDF, sha1 or download
+        URL, so the PDF is offered once and duplicate and version detection
+        don't group them with the seed.
         """
         opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
             self.seed, self.multi_payload
@@ -6366,7 +6367,10 @@ class CentraliaIngestTest(TestCase):
             msg=dissent.html[:80],
         )
         self.assertEqual(dissent.plain_text, "I respectfully dissent.")
-        self.assertEqual(dissent.local_path.name, self.seed.local_path.name)
+        self.assertEqual(dissent.local_path.name, "")
+        self.assertEqual(
+            self.seed.local_path.name, "pdf/2024/01/01/opinion.pdf"
+        )
         self.assertEqual(dissent.sha1, "")
         self.assertIsNone(dissent.download_url)
         self.assertEqual(self.cluster.sub_opinions.count(), 2)

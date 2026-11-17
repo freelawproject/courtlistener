@@ -364,8 +364,9 @@ def merge_structured_opinion_into_cl_opinion(
 
     When the read found several writings, such as a majority and a dissent,
     each writing after the first becomes a new opinion in the cluster, with
-    its text in `plain_text`. New opinions share the original opinion's
-    `local_path`, but not its `sha1` or `download_url`, so duplicate and
+    its text in `plain_text`. The source document stays on the original
+    opinion only: new opinions get no `local_path`, `download_url` or
+    `sha1`, so the PDF is offered once on the case page, and duplicate and
     version detection don't mistake them for copies of it.
 
     Extractions that fail check_structured_extraction are logged and
@@ -415,7 +416,6 @@ def merge_structured_opinion_into_cl_opinion(
         sibling = Opinion(
             cluster=opinion.cluster,
             plain_text=writing.get("text") or "",
-            local_path=opinion.local_path.name,
         )
         _apply_writing(sibling, writing, ordering_key)
         siblings.append(sibling)
