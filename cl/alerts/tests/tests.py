@@ -1421,9 +1421,30 @@ class DocketAlertTexasTest(TestCase):
 
     def test_nothing_happens_for_entries_before_since(self) -> None:
         """Is no email sent when every entry predates `since`?"""
-        TexasDocketEntryFactory(docket=self.docket)
-        send_alert_and_webhook(self.docket.pk, now())
+        created_at = now()
+        with time_machine.travel(created_at, tick=False):
+            TexasDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(
+            self.docket.pk, created_at + timedelta(seconds=1)
+        )
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_case_name_is_escaped_in_the_html_part(self) -> None:
+        """Is the scraped case name escaped in the HTML heading, while the plain text part keeps it as is?"""
+        self.docket.case_name = (
+            '<a href="https://example.com">Smith</a> v. Jones'
+        )
+        self.docket.save()
+        TexasDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        message = mail.outbox[0]
+        html = message.alternatives[0][0]
+        self.assertIn(
+            "&lt;a href=&quot;https://example.com&quot;&gt;Smith&lt;/a&gt; v. Jones",
+            html,
+        )
+        self.assertNotIn('<a href="https://example.com">', html)
+        self.assertIn(self.docket.case_name, message.body)
 
 
 class DocketAlertWebhookSourceGateTest(TestCase):
@@ -1431,6 +1452,7 @@ class DocketAlertWebhookSourceGateTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Create a subscriber and a stand-in court for the new source."""
         cls.user = UserFactory()
         cls.court = CourtFactory(id="newsource", jurisdiction="S")
 
