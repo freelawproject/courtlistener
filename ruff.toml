@@ -27,6 +27,8 @@ lint.select = [
   "RET",
   # flake8-slots
   "SLOT",
+  # flake8-use-pathlib
+  "PTH",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

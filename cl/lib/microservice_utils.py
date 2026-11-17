@@ -4,6 +4,7 @@ import json
 import logging
 from contextlib import nullcontext
 from io import BufferedReader
+from pathlib import Path
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -140,7 +141,7 @@ async def microservice(
         upload_context = nullcontext(upload_file)
         if upload_file is None and filepath:
             filename = filepath
-            upload_context = open(filepath, "rb")
+            upload_context = Path(filepath).open("rb")
 
         with upload_context as upload_file:
             files = (

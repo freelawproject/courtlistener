@@ -1,9 +1,11 @@
 import datetime
 import pickle
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
+from pathlib import Path
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -99,6 +101,7 @@ from cl.lib.utils import (
     check_for_proximity_tokens,
     check_unbalanced_parenthesis,
     check_unbalanced_quotes,
+    glob_files,
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
 )
@@ -3323,3 +3326,51 @@ class DocumentModelTest(SimpleTestCase):
             with self.subTest(field=field_name):
                 self.assertEqual(fields[field_name].help_text, doc)
                 self.assertEqual(fields[field_name].db_comment, doc)
+
+
+class TestGlobFiles(SimpleTestCase):
+    """`glob_files` must match what `glob.glob` returned."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        for name in (
+            "a.json",
+            ".hidden.json",
+            "sub/b.json",
+            "sub/deep/c.json",
+            ".dot/d.json",
+            "sub/.dot/e.json",
+        ):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+
+    def matches(self, pattern: str, recursive: bool = False) -> set[str]:
+        return {
+            str(p.relative_to(self.root))
+            for p in glob_files(self.root, pattern, recursive=recursive)
+        }
+
+    def test_wildcards_skip_hidden_files_and_directories(self) -> None:
+        """Wildcards do not match names beginning with a dot."""
+        with self.subTest("file"):
+            self.assertEqual(self.matches("*.json"), {"a.json"})
+        with self.subTest("directory"):
+            self.assertEqual(self.matches("*/*.json"), {"sub/b.json"})
+
+    def test_explicit_dot_is_matched(self) -> None:
+        """A pattern that names a hidden entry literally still matches it."""
+        self.assertEqual(self.matches(".dot/*.json"), {".dot/d.json"})
+        self.assertEqual(self.matches(".*.json"), {".hidden.json"})
+
+    def test_double_star_only_recurses_when_recursive(self) -> None:
+        """`**` acts like `*` unless `recursive` is set, as in `glob.glob`."""
+        with self.subTest(recursive=False):
+            self.assertEqual(self.matches("**/*.json"), {"sub/b.json"})
+        with self.subTest(recursive=True):
+            self.assertEqual(
+                self.matches("**/*.json", recursive=True),
+                {"a.json", "sub/b.json", "sub/deep/c.json"},
+            )

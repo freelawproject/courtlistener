@@ -2,6 +2,7 @@
 
 import csv
 import os
+from pathlib import Path
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
@@ -25,7 +26,7 @@ PROJECT_TAG_NAME = "cmSyHgaaCIFnUOop"
 
 def download_dockets(options):
     """Download dockets listed in the spreadsheet."""
-    f = open(options["input_file"])
+    f = Path(options["input_file"]).open()
     dialect = csv.Sniffer().sniff(f.read(2048))
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)

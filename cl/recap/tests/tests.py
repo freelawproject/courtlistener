@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 from datetime import UTC, date, datetime, time, timedelta
 from http import HTTPStatus
@@ -180,6 +179,8 @@ from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
 )
+
+TEST_ASSETS_DIR = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
 
 
 class ProcessingQueueSourceChoicesTest(SimpleTestCase):
@@ -4354,11 +4355,10 @@ class ProcessingQueueApiFilterTest(TestCase):
 
 def mock_bucket_open(message_id, r, read_file=False):
     """This function mocks bucket.open() method in order to call a recap.email notification fixture."""
-    test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+    path = TEST_ASSETS_DIR / message_id
     if read_file:
-        with open(test_dir / message_id, "rb") as file:
-            return file.read()
-    return open(test_dir / message_id, "rb")
+        return path.read_bytes()
+    return path.open("rb")
 
 
 class DebugRecapUploadtest(TestCase):
@@ -4370,18 +4370,16 @@ class DebugRecapUploadtest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.pdf = SimpleUploadedFile("file.pdf", b"file content more content")
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets"
-        )
         self.d_filename = "cand.html"
-        d_path = os.path.join(test_dir, self.d_filename)
-        with open(d_path, "rb") as f:
-            self.docket = SimpleUploadedFile(self.d_filename, f.read())
+        self.docket = SimpleUploadedFile(
+            self.d_filename, (TEST_ASSETS_DIR / self.d_filename).read_bytes()
+        )
 
         self.att_filename = "dcd_04505578698.html"
-        att_path = os.path.join(test_dir, self.att_filename)
-        with open(att_path, "rb") as f:
-            self.att = SimpleUploadedFile(self.att_filename, f.read())
+        self.att = SimpleUploadedFile(
+            self.att_filename,
+            (TEST_ASSETS_DIR / self.att_filename).read_bytes(),
+        )
 
     def tearDown(self) -> None:
         ProcessingQueue.objects.all().delete()
@@ -4498,7 +4496,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.delete()
         try:
             self.docket.delete()  # This cascades to self.de and self.rd
-        except (Docket.DoesNotExist, AssertionError, ValueError):
+        except Docket.DoesNotExist, AssertionError, ValueError:
             pass
 
     def test_pq_has_default_status(self) -> None:
@@ -4604,10 +4602,6 @@ class RecapPdfTaskTest(TestCase):
 class RecapZipTaskTest(TestCase):
     """Do we do good things when people send us zips?"""
 
-    test_dir = os.path.join(
-        settings.INSTALL_ROOT, "cl", "recap", "test_assets"
-    )
-
     def setUp(self) -> None:
         self.docket = Docket.objects.create(
             source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
@@ -4643,7 +4637,7 @@ class RecapZipTaskTest(TestCase):
             court_id="scotus",
             uploader=user,
             pacer_case_id="asdf",
-            filepath_local__from_path=os.path.join(cls.test_dir, filename),
+            filepath_local__from_path=str(TEST_ASSETS_DIR / filename),
             filepath_local__filename="some.zip",
             upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
         )
@@ -5133,16 +5127,15 @@ class RecapMinuteEntriesTest(TestCase):
     """Can we ingest minute and numberless entries properly?"""
 
     @staticmethod
-    def make_path(filename):
-        return os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", filename
-        )
+    def read_asset(filename: str) -> str:
+        """Read a test asset file as UTF-8 text."""
+        return (TEST_ASSETS_DIR / filename).read_bytes().decode()
 
     def make_pq(self, filename="azd.html", upload_type=UPLOAD_TYPE.DOCKET):
         """Make a simple pq object for processing."""
-        path = self.make_path(filename)
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(filename, f.read())
+        f = SimpleUploadedFile(
+            filename, (TEST_ASSETS_DIR / filename).read_bytes()
+        )
         return ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -5215,8 +5208,7 @@ class RecapMinuteEntriesTest(TestCase):
         court_id = "scotus"
         rss_feed = PacerRssFeed(court_id)
         rss_feed.is_bankruptcy = True  # Needed because we say SCOTUS above.
-        with open(self.make_path("rss_sample_unnumbered_mdb.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_sample_unnumbered_mdb.xml")
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
         d = async_to_sync(find_docket_object)(
@@ -5293,8 +5285,7 @@ class RecapMinuteEntriesTest(TestCase):
         """Can we ingest Appellate RSS feeds?"""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court_ca10.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(text)
         merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
 
@@ -5319,8 +5310,7 @@ class RecapMinuteEntriesTest(TestCase):
 
         self.assertEqual(docket.docket_entries.count(), 0)
         rss_feed = PacerRssFeed(court_ca10.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(text)
         merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
         docket.refresh_from_db()
@@ -5344,8 +5334,7 @@ class RecapMinuteEntriesTest(TestCase):
 
         self.assertEqual(docket.docket_entries.count(), 0)
         rss_feed = PacerRssFeed(court_ca10.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(text)
         merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
         docket.refresh_from_db()
@@ -5371,8 +5360,7 @@ class RecapMinuteEntriesTest(TestCase):
 
         self.assertEqual(docket.docket_entries.count(), 0)
         rss_feed = PacerRssFeed(court_ca10.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(text)
         merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
         docket.refresh_from_db()
@@ -5386,8 +5374,7 @@ class RecapMinuteEntriesTest(TestCase):
         """Test that merging identical docket entries without a short_description does not delete or overwrite the existing short_description."""
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court_ca10.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            text = f.read().decode()
+        text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
         d = async_to_sync(find_docket_object)(
@@ -5423,8 +5410,7 @@ class RecapMinuteEntriesTest(TestCase):
         """Test that cached (already seen) RSS items are skipped during the RSS ingestion process."""
         court = CourtFactory(id="ca10", jurisdiction="F")
         rss_feed = PacerRssFeed(court.pk)
-        with open(self.make_path("rss_ca10.xml"), "rb") as f:
-            rss_text = f.read().decode()
+        rss_text = self.read_asset("rss_ca10.xml")
         rss_feed._parse_text(rss_text)
         rss_data = rss_feed.data
         rss_data_2 = deepcopy(rss_data)
@@ -5530,11 +5516,9 @@ class RecapDocketTaskTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        f = SimpleUploadedFile(
+            self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -5676,17 +5660,15 @@ class RecapDocketTaskTest(TestCase):
         )
 
         # Re-upload the case again.
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        pq_2 = ProcessingQueue.objects.create(
+            court_id="scotus",
+            uploader=self.user,
+            pacer_case_id="asdf",
+            filepath_local=SimpleUploadedFile(
+                self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
+            ),
+            upload_type=UPLOAD_TYPE.DOCKET,
         )
-        with open(path, "rb") as f:
-            pq_2 = ProcessingQueue.objects.create(
-                court_id="scotus",
-                uploader=self.user,
-                pacer_case_id="asdf",
-                filepath_local=SimpleUploadedFile(self.filename, f.read()),
-                upload_type=UPLOAD_TYPE.DOCKET,
-            )
         with CaptureQueriesContext(connection) as ctx:
             async_to_sync(process_recap_docket)(pq_2.pk)
 
@@ -6263,11 +6245,9 @@ class RecapDocketAttachmentTaskTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand_7.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        f = SimpleUploadedFile(
+            self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="cand",
             uploader=self.user,
@@ -6527,11 +6507,9 @@ class ClaimsRegistryTaskTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "claims_registry_njb.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        f = SimpleUploadedFile(
+            self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="canb",
             uploader=self.user,
@@ -6559,11 +6537,9 @@ class ClaimsRegistryTaskTest(TestCase):
     def test_parsing_bad_data(self) -> None:
         """Can we handle it when there's no data to parse?"""
         filename = "claims_registry_empty.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", filename
+        f = SimpleUploadedFile(
+            filename, (TEST_ASSETS_DIR / filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(filename, f.read())
         self.pq.filepath_local = f
         self.pq.save()
 
@@ -6589,11 +6565,9 @@ class RecapDocketAppellateTaskTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "ca9.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        f = SimpleUploadedFile(
+            self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -6633,11 +6607,9 @@ class RecapCriminalDataUploadTaskTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand_criminal.html"
-        path = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        f = SimpleUploadedFile(
+            self.filename, (TEST_ASSETS_DIR / self.filename).read_bytes()
         )
-        with open(path, "rb") as f:
-            f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -6673,13 +6645,11 @@ class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets"
-        )
         self.att_filename = "dcd_04505578698.html"
-        att_path = os.path.join(test_dir, self.att_filename)
-        with open(att_path, "rb") as f:
-            self.att = SimpleUploadedFile(self.att_filename, f.read())
+        self.att = SimpleUploadedFile(
+            self.att_filename,
+            (TEST_ASSETS_DIR / self.att_filename).read_bytes(),
+        )
         self.d = Docket.objects.create(
             source=0, court=self.court, pacer_case_id="asdf"
         )
@@ -7039,14 +7009,11 @@ class WebhooksRetries(TestCase):
             url="https://example.com/",
             enabled=False,
         )
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt_4.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_4.json").open(
                 encoding="utf-8",
             ) as file_4,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda.json").open(
                 encoding="utf-8",
             ) as file_5,
         ):

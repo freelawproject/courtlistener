@@ -1,6 +1,7 @@
 """Abstract base models and shared models used across apps."""
 
 from abc import abstractmethod
+from pathlib import Path
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -152,8 +153,7 @@ class AbstractFile(models.Model):
     @property
     def file_contents(self) -> str:
         """The contents of the file, read from its local path."""
-        with open(self.filepath.path) as f:
-            return f.read()
+        return Path(self.filepath.path).read_text()
 
     def print_file_contents(self) -> None:
         """Print the contents of the file."""
