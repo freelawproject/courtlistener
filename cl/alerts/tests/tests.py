@@ -1031,6 +1031,40 @@ class DocketAlertTest(TestCase):
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_v3_docket_webhook_payload_has_its_source(self, mock_post) -> None:
+        """v3 docket webhooks also get the API path of their entries.
+
+        Earlier versions keep their payload as it was.
+        """
+        WebhookFactory(
+            user=self.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/v3",
+            enabled=True,
+            version=WebhookVersions.v3,
+        )
+
+        send_alert_and_webhook(self.docket.pk, self.before)
+
+        payloads = dict(
+            WebhookEvent.objects.values_list("webhook__version", "content")
+        )
+        v1_payload = payloads[WebhookVersions.v1]["payload"]
+        self.assertEqual(list(v1_payload), ["results"])
+        self.assertEqual(
+            payloads[WebhookVersions.v3]["payload"],
+            {
+                "source": reverse(
+                    "docketentry-list", kwargs={"version": "v4"}
+                ),
+                **v1_payload,
+            },
+        )
+
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
     def test_recap_webhook_task_gets_two_arguments(
         self, mock_webhooks
