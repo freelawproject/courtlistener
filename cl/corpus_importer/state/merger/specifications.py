@@ -47,7 +47,6 @@ from .parameters import (
     ThroughParameters,
     Update,
 )
-from .strategy import Strategy, overwrite
 
 if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
@@ -129,27 +128,22 @@ class AttributeMerger[Scrape, Params, Transform](
 
     Because attribute access is proxied, a name that isn't defined on the class
     becomes a deferred lookup that fails when the merge runs.
-
-    Attributes:
-        strategy: How the computed value is reconciled with the value already
-            in the DB.
     """
 
-    __slots__ = ("strategy", "_transform")
+    __slots__ = ("_transform",)
 
     _transform: Transformer[Any, Any, Any, Any]
 
     def __init__(self):
         """Create an expression."""
         super().__init__()
-        self.strategy: Strategy = overwrite
 
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.
 
         Names defined on the class resolve to the expression's own attribute
-        instead, so a scraped attribute called e.g. `strategy` or `transform`
-        cannot be reached this way.
+        instead, so a scraped attribute called e.g. `transform` cannot be
+        reached this way.
 
         Args:
             name: The attribute to read at merge time.
@@ -550,7 +544,8 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
-def Database[ST, GT](field: Field[ST, GT]) -> GT | None:
+# TODO: Correctly type this once Pyrefly updates to handle Django field descriptors
+def Database[GT](field: GT) -> GT | None:
     """Start an expression from a model field passed to the merger.
 
     For example, `Database(Docket.docket_number)`.
@@ -563,7 +558,7 @@ def Database[ST, GT](field: Field[ST, GT]) -> GT | None:
         is not that type: it has no value until the merge runs, so it is only meaningful
         as (part of) a merger attribute.
     """
-    # pyrefly: ignore[bad-return]
+    # pyrefly: ignore[bad-return,bad-argument-type]
     return _DatabaseProxy(field)
 
 
@@ -603,9 +598,9 @@ def Constant[T](value: T) -> T:
 
 
 @overload
-def Coalesce[T](*args: T | None, default: T) -> T | None: ...
+def Coalesce[T](*args: T | None, default: T) -> T: ...
 @overload
-def Coalesce[T](*args: T | None, default: None = ...) -> T | None: ...
+def Coalesce[T](*args: T, default: None = ...) -> T: ...
 def Coalesce[T](*args: T | None, default: T | None = None) -> T | None:
     """Output the first truthy, boolean, or integer argument, with a default.
 
@@ -621,30 +616,6 @@ def Coalesce[T](*args: T | None, default: T | None = None) -> T | None:
     """
     # pyrefly:ignore[bad-return,bad-argument-type]
     return _CoalesceProxy(*args, default=default)
-
-
-def WithStrategy[T](specification: T, strategy: Strategy) -> T:
-    """Set how an attribute expression's value is reconciled with the DB.
-
-    This mutates `specification` rather than copying it, so an expression
-    shared between attributes takes on the strategy everywhere it is used.
-
-    Args:
-        specification: The attribute expression to change.
-        strategy: The strategy to use.
-
-    Returns:
-        The same `specification` object that was passed in.
-
-    Raises:
-        TypeError: If `specification` is not an attribute expression.
-    """
-    if not isinstance(specification, AttributeMerger):
-        raise TypeError(
-            f"Specification must be an AttributeMerger. Found {type(specification)!r}"
-        )
-    specification.strategy = strategy
-    return specification
 
 
 class RelatedMerger[

@@ -52,10 +52,6 @@ from .specifications import (
     Params,
 )
 from .specifications import Scrape as ScrapeProxy
-from .strategy import (
-    overwrite,
-    overwrite_if_present,
-)
 
 # Sizes for the benches that scale with the amount of scraped data.
 ATTRIBUTE_COUNT = 20
@@ -260,12 +256,6 @@ class SpecificationBench:
         spec._name = "court_id"
 
         benchmark(spec.transform, None, DocketParams(court_id=STUB_COURT.pk))
-
-    def bench_strategy_overwrite(self, benchmark: BenchmarkFixture):
-        benchmark(overwrite, "scrape", "db")
-
-    def bench_strategy_overwrite_if_present(self, benchmark: BenchmarkFixture):
-        benchmark(overwrite_if_present, None, "db")
 
     def bench_attr_validation(self, benchmark: BenchmarkFixture):
         spec = cast(AttributeMerger, Constant("abcdefg"))

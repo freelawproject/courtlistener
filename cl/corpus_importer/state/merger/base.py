@@ -573,12 +573,11 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         for name, spec in self.config.registry.attr.items():
             obj_v = getattr(self, name)
             db_v = getattr(state.instance, name)
-            merged = spec.strategy(obj_v, db_v)
-            if merged != db_v:
+            if obj_v != db_v:
                 setattr(
                     state.instance,
                     name,
-                    merged,
+                    obj_v,
                 )
                 updated.append(name)
         result = MergeResult.unnecessary()

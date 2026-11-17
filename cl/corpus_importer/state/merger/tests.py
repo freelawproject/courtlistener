@@ -2,7 +2,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, ClassVar, cast, override
 
 from django.db import connection
-from django.db.models import Field, Model, QuerySet
+from django.db.models import Model, QuerySet
 from django.db.models.signals import post_delete
 from django.test.utils import CaptureQueriesContext
 from juriscraper.state.docket import Document as ScrapeDocument
@@ -1393,8 +1393,8 @@ class MergerConfigInheritanceTest(SimpleTestCase):
         )
 
 
-CASE_NAME = cast(Field, Docket.case_name)
-CASE_NAME_FULL = cast(Field, Docket.case_name_full)
+CASE_NAME = Docket.case_name
+CASE_NAME_FULL = Docket.case_name_full
 
 
 def _prefer_stored(stored: str | None, scraped: str) -> str:
@@ -1509,9 +1509,7 @@ class DatabaseSpecTest(TestCase):
                     model=Docket
                 )
 
-                case_name: str | None = Database(
-                    cast(Field, DocketEntry._meta.get_field("description"))
-                )
+                case_name: str | None = Database(DocketEntry.description)
 
 
 class SaveStateTest(TestCase):
