@@ -1,3 +1,5 @@
+"""Rate-limiting decorators and helpers for identifying clients."""
+
 import contextlib
 import functools
 import hashlib
@@ -33,7 +35,9 @@ class RatelimitDecorator(Protocol):
         Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
     ](
         self, view: DjangoViewType[P, Request, Response]
-    ) -> DjangoViewType[P, Request, Response]: ...
+    ) -> DjangoViewType[P, Request, Response]:
+        """Protocol signature for decorating a view, returning a view of the same type."""
+        ...
 
 
 def get_viewer_ip(request: HttpRequest) -> str:

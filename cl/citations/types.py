@@ -1,3 +1,5 @@
+"""Types for matching citations and the citation lookup API."""
+
 from typing import NotRequired, TypedDict
 
 from django.db.models import QuerySet
@@ -20,6 +22,8 @@ ResolvedFullCites = list[ResolvedFullCite]
 
 
 class CitationAPIResponse(TypedDict):
+    """The lookup result for one citation in the citation lookup API."""
+
     status: int
     normalized_citations: NotRequired[list[str]]
     error_message: NotRequired[str]

@@ -4495,7 +4495,7 @@ class EsOpinionsIndexingTest(
         # check the cache entry is removed after updating the ES document
         self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
 
-    @mock.patch("cl.search.tasks.logging.error")
+    @mock.patch("cl.search.tasks.logger.error")
     @mock.patch("cl.search.tasks.download_embedding")
     @mock.patch("cl.search.tasks.microservice")
     def test_missing_embeddings_log_error(

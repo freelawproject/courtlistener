@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+"""Elasticsearch queries for matching citations to opinions."""
+
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 from elasticsearch.dsl.query import Query

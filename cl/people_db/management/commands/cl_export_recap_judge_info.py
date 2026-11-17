@@ -1,3 +1,5 @@
+"""Export counts of judge names on RECAP dockets by court, title, and year."""
+
 from collections import Counter, OrderedDict
 
 import pandas
@@ -11,9 +13,12 @@ from cl.search.models import Court, Docket
 
 
 class Command(VerboseCommand):
+    """Export the judges named on federal RECAP dockets."""
+
     help = "Export a CSV of RECAP judges."
 
     def add_arguments(self, parser):
+        """Add the debug flag."""
         parser.add_argument(
             "--debug",
             action="store_true",
@@ -22,6 +27,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Generate and export the judge data."""
         super().handle(*args, **options)
         self.debug = options["debug"]
         self.options = options
@@ -90,6 +96,7 @@ class Command(VerboseCommand):
 
     @staticmethod
     def export_files(out):
+        """Write the judge data to ``recap_export.pkl`` and ``recap_export.csv``."""
         to_pickle(out, "recap_export.pkl")
         out_csv = []
         for court, v in out.items():

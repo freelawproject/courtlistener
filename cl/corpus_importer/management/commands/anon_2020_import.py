@@ -1,3 +1,5 @@
+"""Import opinions from the anonymous 2020 database."""
+
 import json
 import re
 from datetime import date, datetime
@@ -298,7 +300,7 @@ def attempt_cluster_lookup(
         cite_count = cites.count()
         if cite_count == 1:
             return cites[0].cluster_id
-        elif cite_count > 1:
+        if cite_count > 1:
             new_docket_number = clean_docket_number(new_docket_number)
             for cite in cites:
                 found_dn = clean_docket_number(
@@ -345,8 +347,7 @@ def do_docket_number(data: dict[str, Any]) -> str:
             length=5000,
             ellipsis="...",
         )
-    else:
-        return ""
+    return ""
 
 
 def find_court_id(court_str: str) -> str:
@@ -461,9 +462,12 @@ def import_anon_2020_db(
 
 
 class Command(VerboseCommand):
+    """Import the anonymous 2020 database from a directory of files."""
+
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
+        """Add the import directory and skip-until options."""
         parser.add_argument(
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
@@ -479,6 +483,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the files in the import directory."""
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
         import_anon_2020_db(import_dir, skip_until)

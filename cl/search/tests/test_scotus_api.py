@@ -462,8 +462,10 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
     def get_documents(
         self, path: str, params: dict[str, str]
     ) -> tuple[list[dict], list[str]]:
-        """Return the documents a request serializes, top-level or nested,
-        and the SQL it ran against the SCOTUS documents table.
+        """Return the documents a request serializes and the SQL it ran.
+
+        Documents may be top-level or nested in entries; the SQL is limited
+        to the queries against the SCOTUS documents table.
         """
         with CaptureQueriesContext(connection) as ctx:
             r = self.client.get(path, params)
@@ -483,8 +485,10 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
         return documents, sql
 
     def test_lists_and_nested_documents_leave_out_plain_text(self) -> None:
-        """Do lists and nested documents leave out plain_text, even when the
-        fields param asks for it, without reading it from the database?
+        """Do lists and nested documents leave out plain_text?
+
+        It must stay out even when the fields param asks for it, and it must
+        not be read from the database.
         """
         entry_path = self.detail_path("scotusdocketentry", self.entry.pk)
         cases = [

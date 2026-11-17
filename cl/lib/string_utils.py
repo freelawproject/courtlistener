@@ -1,3 +1,5 @@
+"""String cleanup and conversion helpers."""
+
 import re
 
 import tiktoken
@@ -32,18 +34,17 @@ def trunc(s: str, length: int, ellipsis: str | None = None) -> str:
     if len(s) <= length:
         # Do not ellipsize if the item is not truncated.
         return s
-    else:
-        # find the rightmost space using a zero-indexed (+1) length minus the
-        # length of the ellipsis.
-        rightmost_space_index = length - ellipsis_length + 1
-        end = s.rfind(" ", 0, rightmost_space_index)
-        if end == -1:
-            # no spaces found, just use max position
-            end = length - ellipsis_length
-        s = s[0:end]
-        if ellipsis:
-            s = f"{s}{ellipsis}"
-        return s
+    # find the rightmost space using a zero-indexed (+1) length minus the
+    # length of the ellipsis.
+    rightmost_space_index = length - ellipsis_length + 1
+    end = s.rfind(" ", 0, rightmost_space_index)
+    if end == -1:
+        # no spaces found, just use max position
+        end = length - ellipsis_length
+    s = s[0:end]
+    if ellipsis:
+        s = f"{s}{ellipsis}"
+    return s
 
 
 def filter_invalid_XML_chars(input: str) -> str:
@@ -65,8 +66,7 @@ def filter_invalid_XML_chars(input: str) -> str:
             "",
             input,
         )
-    else:
-        return input
+    return input
 
 
 def removeLeftMargin(s: str) -> str:
@@ -146,5 +146,4 @@ def normalize_dashes(text: str) -> str:
 def get_token_count_from_string(string: str) -> int:
     """Returns the number of tokens in a text string."""
     encoding = tiktoken.get_encoding("cl100k_base")
-    num_tokens = len(encoding.encode(string))
-    return num_tokens
+    return len(encoding.encode(string))

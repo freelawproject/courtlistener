@@ -1,3 +1,5 @@
+"""Helpers for PACER court IDs, docket data, and connectivity."""
+
 import logging
 import pickle
 import re
@@ -53,10 +55,12 @@ cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
 def map_pacer_to_cl_id(pacer_id: str) -> str:
+    """Map a PACER court ID to its CourtListener ID, if they differ."""
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
 def map_cl_to_pacer_id(cl_id: str) -> str:
+    """Map a CourtListener court ID to its PACER ID, if they differ."""
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
@@ -486,11 +490,10 @@ def normalize_attorney_contact(
             if m:
                 atty_info["fax"] = normalize_us_phone_number(clean_line)
             continue
-        else:
-            m = phone_digits_re.search(clean_line)
-            if m:
-                atty_info["phone"] = normalize_us_phone_number(clean_line)
-                continue
+        m = phone_digits_re.search(clean_line)
+        if m:
+            atty_info["phone"] = normalize_us_phone_number(clean_line)
+            continue
 
         # First line containing an ampersand? These are usually law firm names.
         if "&" in line and i == 0:
@@ -575,6 +578,8 @@ def normalize_attorney_contact(
 
 
 class ConnectionType(TypedDict):
+    """The result of checking a PACER court's connectivity."""
+
     connection_ok: bool
     status_code: int | None
     date_time: datetime
@@ -623,8 +628,7 @@ def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
-        court_status = pickle.loads(pickle_status)
-        return court_status
+        return pickle.loads(pickle_status)
 
     # Unable to find court_status in cache, getting it from request.
     connection_info = check_pacer_court_connectivity(court_id)
@@ -693,5 +697,4 @@ def is_pacer_court_accessible(court_id: str) -> bool:
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
 
-    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
-    return court_status
+    return get_or_cache_pacer_court_status(pacer_court_id, ip_addr)

@@ -1,3 +1,5 @@
+"""Pre-generate large sitemaps in chunks and cache them."""
+
 import hashlib
 import logging
 from datetime import UTC, datetime
@@ -318,6 +320,4 @@ def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
     else:
         tz = UTC if settings.USE_TZ else None
         exp = datetime.fromtimestamp(local_timeout, tz=tz)
-    exp = exp.replace(microsecond=0)
-
-    return exp
+    return exp.replace(microsecond=0)

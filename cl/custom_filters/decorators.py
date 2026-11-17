@@ -1,3 +1,5 @@
+"""Decorators for checking a view's honeypot field."""
+
 from collections.abc import Callable
 from functools import wraps
 from typing import overload
@@ -37,6 +39,7 @@ def verify_honeypot_value(request, field_name):
                 {"fieldname": field},
                 status=400,
             )
+    return None
 
 
 @overload
@@ -89,8 +92,7 @@ def check_honeypot[
             response = verify_honeypot_value(request, field_name)
             if response:
                 return response
-            else:
-                return func(request, *args, **kwargs)
+            return func(request, *args, **kwargs)
 
         return inner
 

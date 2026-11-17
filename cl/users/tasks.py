@@ -1,3 +1,5 @@
+"""Celery tasks for account emails, Neon and Zoho syncing, and webhook notifications."""
+
 import logging
 from collections.abc import Sequence
 from http import HTTPStatus
@@ -28,8 +30,7 @@ def abort_or_retry(task, exc):
     """Abort a task if we've run out of retries. Else, retry it."""
     if task.request.retries == task.max_retries:
         return
-    else:
-        raise task.retry(exc=exc)
+    raise task.retry(exc=exc)
 
 
 @app.task(
@@ -68,7 +69,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
             settings.DEFAULT_FROM_EMAIL,
             ["donate@free.law"],
         )
-        return None
+        return
 
     profile = user.profile  # type: ignore
     if len(neon_accounts) == 1:
@@ -77,7 +78,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
         # merges.
         profile.neon_account_id = neon_accounts[0]["Account ID"]
         profile.save(update_fields=["neon_account_id"])
-        return None
+        return
 
     if len(neon_accounts) == 0:
         # No account found, create one

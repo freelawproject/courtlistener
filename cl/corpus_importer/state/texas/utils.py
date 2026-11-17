@@ -1,3 +1,5 @@
+"""Helpers for parsing Texas TAMES pages."""
+
 from typing import cast
 
 from lxml import html

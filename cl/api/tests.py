@@ -817,7 +817,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-        await sync_to_async(view)(request, **{"version": f"{api_version}"})
+        await sync_to_async(view)(request, version=f"{api_version}")
 
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
@@ -2396,6 +2396,7 @@ class V4DRFPaginationTest(TestCase):
             return await api_client.get(url, params)
         if method == "post":
             return await api_client.post(url, params)
+        return None
 
     @classmethod
     def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:
@@ -2856,8 +2857,8 @@ class V4DRFPaginationTest(TestCase):
 
     async def test_scotus_docket_metadata_endpoint(self) -> None:
         """Test the V4 SCOTUS docket metadata endpoint confirming that its
-        cursor pagination works properly."""
-
+        cursor pagination works properly.
+        """
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocketmetadata-list",
             default_ordering="-id",
@@ -2867,9 +2868,10 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_scotus_docket_entries_endpoint(self) -> None:
-        """Test the V4 SCOTUS docket entries endpoint confirming that its
-        cursor and page number pagination works properly."""
+        """Test the V4 SCOTUS docket entries endpoint pagination.
 
+        Confirms that its cursor and page number pagination works properly.
+        """
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocketentry-list",
             default_ordering="-id",
@@ -2879,9 +2881,10 @@ class V4DRFPaginationTest(TestCase):
         )
 
     async def test_scotus_documents_endpoint(self) -> None:
-        """Test the V4 SCOTUS documents endpoint confirming that its cursor
-        and page number pagination works properly."""
+        """Test the V4 SCOTUS documents endpoint pagination.
 
+        Confirms that its cursor and page number pagination works properly.
+        """
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocument-list",
             default_ordering="-id",

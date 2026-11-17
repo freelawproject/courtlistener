@@ -1,3 +1,5 @@
+"""Settings for the OAuth2 and OpenID Connect provider."""
+
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
