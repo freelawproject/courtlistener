@@ -1,7 +1,8 @@
 """Signal handlers that keep Elasticsearch documents in sync with their models."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from functools import partial
+from typing import Literal
 
 from celery.canvas import chain
 from django.conf import settings
@@ -68,7 +69,10 @@ from cl.search.types import (
     ESModelType,
 )
 
-type DocumentModelMapping = dict[str, dict[type[Model], dict]]
+type DocumentModelMapping = Mapping[
+    Literal["save", "delete", "m2m", "reverse", "reverse-delete"],
+    Mapping[type[Model], dict],
+]
 
 
 def check_fields_that_changed(
