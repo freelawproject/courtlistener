@@ -20,7 +20,7 @@ TaskData = dict[str, Any]
 class AuthenticatedHttpRequest(HttpRequest):
     # Narrowing `user` is the purpose of this class; views that take it are
     # only reachable once authentication has run.
-    user: "User"  # pyrefly:ignore[bad-override-mutable-attribute]
+    user: User  # pyrefly:ignore[bad-override-mutable-attribute]
 
 
 class EmailType(TypedDict, total=False):
