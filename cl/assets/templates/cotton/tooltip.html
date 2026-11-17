@@ -12,12 +12,6 @@
   position="bottom"
 />
 
-{% if variant == "light" %}
-{% firstof "absolute text-white" as arrow_class %}
-{% else %}
-{% firstof "absolute text-greyscale-900" as arrow_class %}
-{% endif %}
-
 <div
   x-data="tooltip"
   x-on:mouseenter="show"
@@ -44,18 +38,20 @@
     tabindex="-1"
     x-anchor.{{ position }}.offset.6="$refs.trigger"
     x-effect="placeArrow($anchor)"
-    class="z-30 outline-none [filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.08))_drop-shadow(0_4px_3px_rgba(0,0,0,0.03))]"
+    class="z-30 outline-none"
   ></div>
   {# Copied into the live region on open; Alpine never initialises this copy, so the arrow is positioned from JS #}
   <template x-ref="message">
-    <div class="flex flex-col w-max max-w-xs rounded-lg text-xs {% if description %} gap-1 p-3{% else %} px-3 py-2{% endif %} {% if variant == 'light' %}bg-white text-greyscale-700{% else %}bg-greyscale-900 text-white{% endif %}">
+    <div class="flex flex-col w-max max-w-xs rounded-lg text-xs shadow-[0_12px_8px_rgba(0,0,0,0.08),0_4px_3px_rgba(0,0,0,0.03)] {% if description %} gap-1 p-3{% else %} px-3 py-2{% endif %} {% if variant == 'light' %}bg-white text-greyscale-700{% else %}bg-greyscale-900 text-white{% endif %}">
       <p class="font-medium">{{ slot }}</p>
       {% if description %}
-        <div class="{% if variant == 'light' %}text-greyscale-500{% else %}text-greyscale-200{% endif %}">{{ description }}</div>
+        <p class="{% if variant == 'light' %}text-greyscale-500{% else %}text-greyscale-200{% endif %}">{{ description }}</p>
       {% endif %}
     </div>
     {% if has_arrow %}
-      {% svg "tooltip_arrow" aria_hidden="true" data_arrow="" class=arrow_class %}
+      <span aria-hidden="true" data-arrow class="absolute {% if variant == 'light' %}text-white{% else %}text-greyscale-900{% endif %}">
+        {% svg "tooltip_arrow" class="block" %}
+      </span>
     {% endif %}
   </template>
 </div>
