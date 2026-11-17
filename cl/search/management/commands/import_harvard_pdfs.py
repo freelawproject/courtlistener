@@ -1,3 +1,5 @@
+"""Import Harvard Case Law Access Project PDFs using CAP crosswalk files."""
+
 import json
 import logging
 import os
@@ -18,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+    """Import CAP PDFs for the clusters listed in the crosswalk files."""
+
     def __init__(self, *args, **kwargs):
+        """Build the command with no PDFs processed yet."""
         super().__init__(*args, **kwargs)
         self.processed_pdfs = set()
 
@@ -28,6 +33,7 @@ class Command(BaseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the reporter, resume, dry-run, verbosity, crosswalk directory, and worker options."""
         parser.add_argument(
             "--reporter",
             type=str,
@@ -160,13 +166,12 @@ class Command(BaseCommand):
                     reporters,
                 )
                 return
-            else:
-                reporter_item_index = reporters.index(self.start_from_reporter)
-                if reporter_item_index:
-                    # Update reporters and reporters files list
-                    reporters = reporters[reporter_item_index:]
-                    reporters_files = reporters_files[reporter_item_index:]
-                    self.start_from_reporter = None
+            reporter_item_index = reporters.index(self.start_from_reporter)
+            if reporter_item_index:
+                # Update reporters and reporters files list
+                reporters = reporters[reporter_item_index:]
+                reporters_files = reporters_files[reporter_item_index:]
+                self.start_from_reporter = None
 
         for filename in reporters_files:
             if filename.endswith(".json"):

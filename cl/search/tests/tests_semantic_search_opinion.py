@@ -102,7 +102,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
             opinion_1_embeddings = json.load(embeddings_file)
             Document.update(
                 es_opinion_1,
-                **{"embeddings": opinion_1_embeddings["embeddings"]},
+                embeddings=opinion_1_embeddings["embeddings"],
                 refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
             )
 
@@ -383,7 +383,7 @@ class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
                 embeddings = json.load(f)
                 Document.update(
                     opinion,
-                    **{"embeddings": embeddings["embeddings"]},
+                    embeddings=embeddings["embeddings"],
                     refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                 )
 

@@ -1,3 +1,5 @@
+"""Celery tasks for creating Zoho Desk tickets."""
+
 from celery import Task
 from requests.exceptions import ConnectionError, Timeout
 

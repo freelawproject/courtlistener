@@ -1,3 +1,5 @@
+"""Helpers for running, caching, and summarizing searches."""
+
 import logging
 import pickle
 import re
@@ -382,6 +384,8 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
+    """Elasticsearch search results and counts as stored in the cache."""
+
     es_results_items: Response | list
     main_query_hits: int | None
     cardinality_count_response: Response | int | None
@@ -686,6 +690,8 @@ def remove_missing_citations(
 
 
 class ESSearchResult(TypedDict):
+    """The results of a search and the context for rendering them."""
+
     results: Page | list
     results_details: list[int | None]
     search_form: Any

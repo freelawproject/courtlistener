@@ -1,3 +1,5 @@
+"""Helpers for preparing values for the search index."""
+
 import re
 from collections.abc import Iterable
 from datetime import date
@@ -44,12 +46,13 @@ class InvalidDocumentError(Exception):
     """The document could not be formed."""
 
     def __init__(self, message: str) -> None:
+        """Build the error with a message."""
         Exception.__init__(self, message)
 
 
 # Used to nuke null and control characters.
 null_map: dict[int, None] = dict.fromkeys(
-    list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
+    list(range(10)) + list(range(11, 13)) + list(range(14, 32))
 )
 
 VALID_CASE_NAME_SEPARATORS = [" v ", " v. ", " vs. ", " vs "]
@@ -188,7 +191,7 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
                 ),  # TODO: Exception requires an ApiResponseMeta object, but we don't have one here
                 {"ids": ids},
             )
-        elif raise_error:
+        if raise_error:
             # If the error is of any other type, raises the original
             # BulkIndexError for debugging.
             raise exc

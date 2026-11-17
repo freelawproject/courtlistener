@@ -1,3 +1,5 @@
+"""Send a welcome email to the users who signed up in the last day."""
+
 import sys
 from datetime import datetime, timedelta
 
@@ -23,10 +25,9 @@ def get_welcome_recipients(time_now: datetime) -> QuerySet[User]:
     # Not passing a timezone in make_aware will use the default timezone
     # defined on settings.TIME_ZONE
     yesterday = make_aware(time_now) - timedelta(days=1)
-    recipients = User.objects.filter(
+    return User.objects.filter(
         date_joined__gt=yesterday, profile__stub_account=False
     ).only("pk", "first_name", "email")
-    return recipients
 
 
 class Command(VerboseCommand):
@@ -38,6 +39,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the simulate flag."""
         parser.add_argument(
             "--simulate",
             action="store_true",
@@ -46,6 +48,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Email the users who joined in the last day, if there are any."""
         super().handle(*args, **options)
         self.options = options
         time_now = datetime.now()

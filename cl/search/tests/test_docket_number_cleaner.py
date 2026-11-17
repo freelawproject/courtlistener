@@ -473,11 +473,11 @@ class TestProcessLLMBatches(TestCase):
                 return (
                     self.extract_response_2
                 )  # Simulate results for first batch
-            elif batch == self.llm_batches[2:4]:
+            if batch == self.llm_batches[2:4]:
                 return (
                     self.extract_response_3
                 )  # Simulate partial results for second batch
-            elif batch == [self.llm_batches[3]]:
+            if batch == [self.llm_batches[3]]:
                 return (
                     self.extract_response_4
                 )  # Simulate results for retry on failed record
@@ -509,11 +509,11 @@ class TestProcessLLMBatches(TestCase):
                 return (
                     self.extract_response_2
                 )  # Simulate results for first batch
-            elif batch == self.llm_batches[2:4]:
+            if batch == self.llm_batches[2:4]:
                 return (
                     self.extract_response_3
                 )  # Simulate partial results for second batch
-            elif batch == [self.llm_batches[3]]:
+            if batch == [self.llm_batches[3]]:
                 return dict()  # Simulate no results for retry on failed record
             return dict()
 

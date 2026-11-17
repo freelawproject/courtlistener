@@ -1,3 +1,5 @@
+"""Models for notes, tags, prayers, and event counts."""
+
 import pghistory
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -131,6 +133,8 @@ class UserTag(AbstractDateTimeModel):
 
 @pghistory.track()
 class Prayer(models.Model):
+    """A user's request for a RECAP document to be bought from PACER."""
+
     WAITING = 1
     GRANTED = 2
     STATUSES = (
@@ -193,6 +197,8 @@ class Prayer(models.Model):
 
 # model to keep track of when we last checked whether a given PACER document was still unavailable for purchase
 class PrayerAvailability(models.Model):
+    """When a prayed-for document's availability on PACER was last checked."""
+
     recap_document = models.ForeignKey(
         RECAPDocument,
         help_text="The document people prayed for.",
@@ -216,6 +222,8 @@ class PrayerAvailability(models.Model):
 
 
 class GenericCount(models.Model):
+    """A counter for an action on an object, keyed by a namespaced label."""
+
     label = models.CharField(
         max_length=255,
         primary_key=True,

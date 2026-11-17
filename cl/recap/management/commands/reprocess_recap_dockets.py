@@ -1,3 +1,5 @@
+"""Reprocess RECAP dockets from their stored files, or extract unextracted RECAP documents."""
+
 import sys
 from itertools import batched
 
@@ -49,9 +51,12 @@ def extract_unextracted_rds(
 
 
 class Command(VerboseCommand):
+    """Reprocess RECAP dockets, or queue extraction of unextracted documents."""
+
     help = "Reprocess all dockets in the RECAP Archive."
 
     def add_arguments(self, parser):
+        """Add the start pk, queue, extraction, chunk size, and replica options."""
         parser.add_argument(
             "--start-pk",
             type=int,
@@ -85,6 +90,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Reprocess RECAP dockets that have HTML or IA XML files.
+
+        With ``--extract-unextracted-rds``, only queues extraction of RECAP
+        documents that need it instead.
+        """
         super().handle(*args, **options)
         db_connection = (
             "replica"

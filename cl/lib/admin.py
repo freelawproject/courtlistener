@@ -1,3 +1,5 @@
+"""Shared Django admin mixins, inlines, and link helpers."""
+
 from typing import Any, TypedDict
 from urllib.parse import urlencode
 
@@ -12,6 +14,8 @@ from cl.lib.models import Note
 
 
 class AdminTweaksMixin:
+    """Admin mixin that adds the ``css/admin.css`` stylesheet."""
+
     class Media:
         css = {
             "all": ("css/admin.css",),
@@ -19,6 +23,8 @@ class AdminTweaksMixin:
 
 
 class NotesInline(GenericTabularInline):
+    """Inline for editing the notes attached to an object."""
+
     model = Note
     extra = 1
 
@@ -53,12 +59,16 @@ def build_admin_url(
 
 
 class AdminLinkConfig(TypedDict):
+    """Configuration for a link to a model's admin changelist."""
+
     label: str
     model_class: type[Model]
     query_params: dict[str, Any] | None
 
 
 class AdminLink(TypedDict):
+    """A link with its URL and label."""
+
     href: str
     label: str
 
@@ -175,6 +185,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         raise NotImplementedError
 
     def get_urls(self) -> list[URLPattern]:
+        """Add the seal confirmation URL to the admin's URLs."""
         urls = super().get_urls()
         custom_urls = [
             path(
@@ -192,6 +203,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         form_url: str = "",
         extra_context: dict[Any, Any] | None = None,
     ) -> HttpResponse:
+        """Render the change view with a link to the seal confirmation page."""
         extra_context = extra_context or {}
         seal_url = reverse(
             f"admin:{self.seal_url_name}",

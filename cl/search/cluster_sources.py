@@ -1,7 +1,11 @@
+"""Choices for where an opinion cluster's data came from."""
+
 from django.core.exceptions import ValidationError
 
 
 class ClusterSources:
+    """Source codes for an opinion cluster's data, alone or combined, with helpers for them."""
+
     # Canonical ordering for deterministic source combination.
     # When merging sources, characters are sorted in this order.
     # This matches the explicit combination sources

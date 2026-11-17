@@ -1,3 +1,5 @@
+"""Helpers for converting dates and times to a court's timezone."""
+
 from datetime import date, datetime, time
 
 import pytz
@@ -69,5 +71,4 @@ def localize_naive_datetime_to_court_timezone(
         A datetime object in the court timezone.
     """
     court_timezone = pytz.timezone(COURT_TIMEZONES.get(court_id, "US/Eastern"))
-    d = court_timezone.localize(naive_datetime)
-    return d
+    return court_timezone.localize(naive_datetime)

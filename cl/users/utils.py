@@ -1,3 +1,5 @@
+"""Helpers for stub accounts, deleting users' data, and account emails."""
+
 from typing import NotRequired, TypedDict
 
 from django.conf import settings

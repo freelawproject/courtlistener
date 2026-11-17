@@ -1,3 +1,5 @@
+"""Import Florida dockets from S3 using an inventory CSV."""
+
 from collections.abc import Iterable
 
 from celery import Task
@@ -13,11 +15,14 @@ from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
+    """Download and merge the Florida dockets listed in an S3 inventory."""
+
     help = "Import Florida dockets from S3 using an inventory CSV."
 
     compose_redis_key = "florida_docket_import:log"
 
     def add_arguments(self, parser):
+        """Add the case transfer filling and case merge skipping flags."""
         super().add_arguments(parser)
         parser.add_argument(
             "--fill-case-transfer",
@@ -36,19 +41,23 @@ class Command(CorpusImporterCommand):
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable[tuple[str, str]]:
+        """Turn each inventory row into a stripped (bucket, key) pair."""
         return map(lambda r: (r[0].strip(), r[1].strip()), csv_reader)
 
     @staticmethod
     def download_task() -> Task:
+        """The task that downloads a Florida docket."""
         return fl_corpus_download_task
 
     @staticmethod
     def merge_task() -> Task:
+        """The task that ingests a Florida docket."""
         return fl_ingest_docket_task
 
     def handle(
         self, *args, fill_case_transfer: bool, skip_case_merge: bool, **options
     ):
+        """Import the dockets unless skipped, then fill case transfer dockets if requested."""
         if not skip_case_merge:
             super().handle(*args, **options)
         if fill_case_transfer:
