@@ -213,6 +213,10 @@ ratelimiter_all_2_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="2/m" if "test" not in sys.argv else None,
 )
+ratelimiter_all_5_per_m: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="5/m" if "test" not in sys.argv else None,
+)
 ratelimiter_unsafe_3_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="3/m" if "test" not in sys.argv else None,
