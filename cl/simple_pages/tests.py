@@ -940,7 +940,7 @@ class ToastComponentTest(SimpleTestCase):
 class ComponentsToastDemoTest(TestCase):
     """The components view answers the server-rendered toast demo's htmx request."""
 
-    def get(self, toast: str, **headers: str) -> "_MonkeyPatchedWSGIResponse":
+    def get(self, toast: str, **headers: str) -> _MonkeyPatchedWSGIResponse:
         """Requests the components page the way a demo button does."""
         return self.client.get(
             reverse("components"),
