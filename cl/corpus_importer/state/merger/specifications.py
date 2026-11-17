@@ -33,6 +33,8 @@ from django.db.models import (
     QuerySet,
     prefetch_related_objects,
 )
+from django.db.models.query_utils import DeferredAttribute
+from model_utils.tracker import DescriptorWrapper
 
 from cl.corpus_importer.state.utils import MergeResult
 
@@ -290,9 +292,15 @@ class _DatabaseProxy(AttributeMerger):
 
     __slots__ = ("_field",)
 
-    def __init__(self, field: Field):
+    def __init__(
+        self, attribute: DeferredAttribute | DescriptorWrapper | Field
+    ):
         """Create an expression evaluating to the matched DB row."""
         super().__init__()
+        if not isinstance(attribute, Field):
+            field = attribute.field
+        else:
+            field = attribute
         getter = operator.attrgetter(field.name)
         self._field: Field = field
         self._transform = lambda s, p, m: getter(m) if m is not None else None
@@ -358,6 +366,8 @@ class _AttrProxy(AttributeMerger):
 class _ItemProxy(AttributeMerger):
     """Expression indexing another expression's value."""
 
+    __slots__ = ()
+
     def __init__(self, previous: AttributeMerger, key: AttributeMerger | Any):
         """Create an expression indexing a value.
 
@@ -373,7 +383,7 @@ class _ItemProxy(AttributeMerger):
             f = key._transform
             match previous:
                 case _ScrapeProxy():
-                    self._transform = lambda s, p, m: s[f(s, p)]
+                    self._transform = lambda s, p, m: s[f(s, p, m)]
                 case _ParamsProxy():
                     self._transform = lambda s, p, m: p[f(s, p, m)]
                 case _ConstantProxy():
@@ -399,6 +409,8 @@ class _ItemProxy(AttributeMerger):
 
 class _CallProxy(AttributeMerger):
     """Expression calling another expression's value."""
+
+    __slots__ = ()
 
     def __init__(
         self,
@@ -437,7 +449,7 @@ class _CallProxy(AttributeMerger):
         arg_fns = tuple(_make_transform(arg) for arg in args)
         kwarg_fns = {k: _make_transform(kwarg) for k, kwarg in kwargs.items()}
 
-        self._uses_srcape = previous._uses_scrape or any(
+        self._uses_scrape = previous._uses_scrape or any(
             a._uses_scrape
             for a in itertools.chain(args, kwargs.values())
             if isinstance(a, AttributeMerger)
@@ -522,7 +534,7 @@ def Params[T](_: type[T]) -> T:
 def Database[ST, GT](field: Field[ST, GT]) -> GT | None:
     """Start an expression from a model field passed to the merger.
 
-    For example, `Database(Docket).docket_number`.
+    For example, `Database(Docket.docket_number)`.
 
     Args:
         field: The model field accessed from the model class.
