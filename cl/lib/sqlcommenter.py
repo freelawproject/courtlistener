@@ -1,3 +1,5 @@
+"""Middleware that tags SQL queries with comments describing the request."""
+
 from collections.abc import Callable
 from contextlib import ExitStack
 from typing import Any
@@ -29,9 +31,7 @@ def escape_sql_comment_value(value: Any) -> str | None:
 
 
 def add_sql_comment(sql: str, **meta: Any) -> str:
-    """
-    Append a SQL comment containing key=value pairs from meta.
-    """
+    """Append a SQL comment containing key=value pairs from meta."""
     if not meta:
         return sql
 
@@ -54,19 +54,18 @@ def add_sql_comment(sql: str, **meta: Any) -> str:
 
 
 class SqlCommenter:
-    """
-    Middleware to append a comment to each database query with details about
-    the framework and the execution context.
-    """
+    """Middleware to append a comment to each database query with details about the framework and the execution context."""
 
     def __init__(
         self, get_response: Callable[[HttpRequest], HttpResponseBase]
     ):
+        """Wrap ``get_response``."""
         self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
             get_response
         )
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        """Handle the request with every database connection's queries commented."""
         with ExitStack() as stack:
             for db_alias in connections:
                 stack.enter_context(
@@ -78,13 +77,14 @@ class SqlCommenter:
 
 
 class QueryWrapper:
+    """Database execute wrapper that comments queries with a request's user and URL."""
+
     def __init__(self, request: HttpRequest):
+        """Build the wrapper for a request."""
         self.request: HttpRequest = request
 
     def get_context(self) -> dict[str, Any]:
-        """
-        Extract relevant context information from the request for SQL comments.
-        """
+        """Extract relevant context information from the request for SQL comments."""
         user = None
         if hasattr(self.request, "user"):
             user_obj = self.request.user
@@ -124,5 +124,6 @@ class QueryWrapper:
         many: bool,
         context: dict[str, Any],
     ) -> Any:
+        """Execute the query with the request's context appended as a comment."""
         sql_with_comment = add_sql_comment(sql, **self.get_context())
         return execute(sql_with_comment, params, many, context)

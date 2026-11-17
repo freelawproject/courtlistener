@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Download the Harvard corpus from the Internet Archive."""
 
 import json
 import os
@@ -19,6 +20,8 @@ from cl.lib.utils import human_sort
 
 
 class OptionsType(TypedDict):
+    """The command's options: a reporter and an optional range of volumes."""
+
     reporter: str
     volumes: range | None
 
@@ -29,11 +32,13 @@ def fetch_ia_volumes(
 ) -> list[str]:
     """Find and order volumes for a reporter (if found).
 
-    :param ia_session: The IA archive session object
-    :param options: The reporter and volume dictionary from argparse
-    :return: List of volumes to download from IA
-    """
+    Args:
+        ia_session: The IA archive session object
+        options: The reporter and volume dictionary from argparse
 
+    Returns:
+        List of volumes to download from IA
+    """
     reporter = options["reporter"]
     volumes = options["volumes"]
 
@@ -57,20 +62,19 @@ def fetch_ia_volumes(
     vol_pattern = "|".join(
         rf"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
     )
-    results = [
+    return [
         res
         for res in results
         if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
-    return results
 
 
 def download_file(ia_key: str, file_name) -> None:
-    """Check if we have file, and download new files
+    """Check if we have file, and download new files.
 
-    :param ia_key: The IA key
-    :param file_name: The file name
-    :return: None
+    Args:
+        ia_key: The IA key
+        file_name: The file name
     """
     url = f"https://archive.org/download/{ia_key}/{file_name}"
     if "_" in ia_key:
@@ -102,9 +106,10 @@ def download_file(ia_key: str, file_name) -> None:
 
 
 def create_ia_session() -> ArchiveSession:
-    """Generate IA Session object
+    """Generate IA Session object.
 
-    :return: IA session object
+    Returns:
+        IA session object
     """
     logger.info("Creating IA session...")
     access_key = settings.IA_ACCESS_KEY
@@ -113,13 +118,13 @@ def create_ia_session() -> ArchiveSession:
 
 
 def get_from_ia(options: OptionsType) -> None:
-    """Find and download files from IA
+    """Find and download files from IA.
 
     Download cases from internet archive via case law and write them to
     disk.
 
-    :param options: Pass the reporter and volume parameters from command line
-    :return: None
+    Args:
+        options: Pass the reporter and volume parameters from command line
     """
     ia_session = create_ia_session()
     volumes_ids_for_reporter = fetch_ia_volumes(ia_session, options)
@@ -143,9 +148,12 @@ def get_from_ia(options: OptionsType) -> None:
 
 
 class Command(VerboseCommand):
+    """Download a reporter's Harvard corpus volumes from the Internet Archive to disk."""
+
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        """Add the reporter and volume range options."""
         parser.add_argument(
             "--reporter",
             help="Reporter abbreviation as saved on IA.",
@@ -160,4 +168,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Download the requested volumes."""
         get_from_ia(options)

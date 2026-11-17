@@ -1,3 +1,5 @@
+"""Core Django settings: databases, caches, static files, templates, middleware, and apps."""
+
 from pathlib import Path
 
 import environ
@@ -57,7 +59,7 @@ if env("DB_READ_REPLICA_HOST", default=""):
         },
     }
 
-MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
+MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=10**8)  # 100MB
 SLACK_REPLICATION_WEBHOOK_URL = env(
     "SLACK_REPLICATION_WEBHOOK_URL", default=""
 )

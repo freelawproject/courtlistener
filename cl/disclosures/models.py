@@ -1,3 +1,5 @@
+"""Models for judges' financial disclosures and their parts."""
+
 from typing import TypedDict
 
 import pghistory
@@ -36,6 +38,8 @@ class _WealthEstimate(_ValueRange):
 
 
 class CODES:
+    """Value codes used in financial disclosure forms."""
+
     # FORM CODES - these are used in multiple fields in different sections
     # of the disclosures.  For example liabilities/debts uses Gross Value
     # As well as investments.
@@ -140,14 +144,17 @@ S3_TEMPLATE = (
 
 
 def thumbnail_path(
-    instance: "FinancialDisclosure",
+    instance: FinancialDisclosure,
     filename: str | None = None,
 ) -> str:
-    """Generate thumbnail location for disclosures
+    """Generate thumbnail location for disclosures.
 
-    :param instance: The disclosure
-    :param filename: An empty value - not sure why its needed
-    :return: Location to save thumbnail
+    Args:
+        instance: The disclosure
+        filename: An empty value - not sure why its needed
+
+    Returns:
+        Location to save thumbnail
     """
     return (
         S3_TEMPLATE.format(
@@ -160,14 +167,17 @@ def thumbnail_path(
 
 
 def pdf_path(
-    instance: "FinancialDisclosure",
+    instance: FinancialDisclosure,
     filename: str | None = None,
 ) -> str:
-    """Generate a path for the FD PDF
+    """Generate a path for the FD PDF.
 
-    :param instance: The disclosure object
-    :param filename: The name of the file
-    :return: Location to save the PDF
+    Args:
+        instance: The disclosure object
+        filename: The name of the file
+
+    Returns:
+        Location to save the PDF
     """
     return (
         S3_TEMPLATE.format(
@@ -186,7 +196,7 @@ disclosure_permissions = (
 
 @pghistory.track()
 class FinancialDisclosure(AbstractDateTimeModel):
-    """A simple table to hold references to financial disclosure forms"""
+    """A simple table to hold references to financial disclosure forms."""
 
     person = models.ForeignKey(
         Person,
@@ -259,13 +269,14 @@ class FinancialDisclosure(AbstractDateTimeModel):
         return f"{self.pk}, person: {self.person_id}, year: {self.year}"
 
     def get_absolute_url(self) -> str:
+        """Get the URL of the disclosure's viewer page."""
         return reverse(
             "financial_disclosures_viewer",
             args=(self.person.pk, self.pk, self.person.slug),
         )
 
     def calculate_wealth(self, field_name: str) -> _WealthEstimate:
-        """Calculate gross value of all investments in disclosure
+        """Calculate gross value of all investments in disclosure.
 
         We can calculate the total investment for four fields
 
@@ -274,8 +285,11 @@ class FinancialDisclosure(AbstractDateTimeModel):
         ** transaction_gain_code  - Total Income gain
         ** transaction_value_code - Total Transaction values
 
-        :param field_name: The field to process for the disclosure
-        :return: Total value of investments for supplied field.
+        Args:
+            field_name: The field to process for the disclosure
+
+        Returns:
+            Total value of investments for supplied field.
         """
         investments = self.investments.exclude(
             **{field_name: CODES.X}
@@ -301,6 +315,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         }
 
     def save(self, *args, **kwargs):
+        """Save the disclosure, queueing a thumbnail if one is needed."""
         super().save(*args, **kwargs)
         if self.thumbnail_status == THUMBNAIL_STATUSES.NEEDED:
             from cl.disclosures.tasks import (
@@ -315,7 +330,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
 
 @pghistory.track()
 class Investment(AbstractDateTimeModel):
-    """Financial Disclosure Investments Table"""
+    """Financial Disclosure Investments Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -402,7 +417,7 @@ class Investment(AbstractDateTimeModel):
 
 @pghistory.track()
 class Position(AbstractDateTimeModel):
-    """Financial Disclosure Position Table"""
+    """Financial Disclosure Position Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -430,7 +445,7 @@ class Position(AbstractDateTimeModel):
 
 @pghistory.track()
 class Agreement(AbstractDateTimeModel):
-    """Financial Disclosure Agreements Table"""
+    """Financial Disclosure Agreements Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -458,7 +473,7 @@ class Agreement(AbstractDateTimeModel):
 
 @pghistory.track()
 class NonInvestmentIncome(AbstractDateTimeModel):
-    """Financial Disclosure Non Investment Income Table"""
+    """Financial Disclosure Non Investment Income Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -492,7 +507,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
 
 @pghistory.track()
 class SpouseIncome(AbstractDateTimeModel):
-    """Financial Disclosure Judge Spouse Income Table"""
+    """Financial Disclosure Judge Spouse Income Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -521,7 +536,7 @@ class SpouseIncome(AbstractDateTimeModel):
 
 @pghistory.track()
 class Reimbursement(AbstractDateTimeModel):
-    """Reimbursements listed in judicial disclosure"""
+    """Reimbursements listed in judicial disclosure."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -563,7 +578,7 @@ class Reimbursement(AbstractDateTimeModel):
 
 @pghistory.track()
 class Gift(AbstractDateTimeModel):
-    """Financial Disclosure Gifts Table"""
+    """Financial Disclosure Gifts Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -594,7 +609,7 @@ class Gift(AbstractDateTimeModel):
 
 @pghistory.track()
 class Debt(AbstractDateTimeModel):
-    """Financial Disclosure Judicial Debts/Liabilities Table"""
+    """Financial Disclosure Judicial Debts/Liabilities Table."""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,

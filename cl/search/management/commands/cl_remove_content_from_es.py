@@ -1,3 +1,5 @@
+"""Remove non-RECAP dockets, or opinions in a date range, from Elasticsearch."""
+
 from collections.abc import Iterable
 from datetime import date, datetime
 
@@ -17,19 +19,25 @@ from cl.search.tasks import remove_documents_by_query
 
 def compose_redis_key_remove_content() -> str:
     """Compose a Redis key for storing the removal action status.
-    :return: A Redis key as a string.
+
+    Returns:
+        A Redis key as a string.
     """
     return "es_remove_content_from_es:log"
 
 
 class Command(VerboseCommand):
+    """Run a removal action against the Elasticsearch indices."""
+
     help = "Remove content from an ES index."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the queue, chunk, resume, action, date range, testing, and rate options."""
         parser.add_argument(
             "--queue",
             type=str,
@@ -92,6 +100,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen removal action.
+
+        ``non-recap-dockets`` queues removal of dockets without a RECAP
+        source. ``opinions-removal`` schedules removal of opinions in the
+        date range, and does nothing without both dates. Without an action,
+        nothing is removed.
+        """
         super().handle(*args, **options)
         self.options = options
         start_date: date | None = options.get("start_date", None)
@@ -154,10 +169,10 @@ class Command(VerboseCommand):
     ) -> None:
         """Process the queryset that removes non-recap dockets from ES.
 
-        :param items: Iterable of items IDS to process.
-        :param count: Total number of items expected to process.
-        :param chunk_size: The number of items to process in a single chunk.
-        :return: None
+        Args:
+            items: Iterable of items IDS to process.
+            count: Total number of items expected to process.
+            chunk_size: The number of items to process in a single chunk.
         """
         queue = self.options["queue"]
         queue_size = self.options["queue_size"]

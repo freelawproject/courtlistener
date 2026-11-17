@@ -1,3 +1,5 @@
+"""Views for account registration, confirmation, and the user's profile pages."""
+
 import logging
 from collections import OrderedDict
 from datetime import timedelta
@@ -62,7 +64,8 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.es_docket_sources import es_uid
+from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
@@ -95,6 +98,7 @@ logger = logging.getLogger(__name__)
 @login_required
 @never_cache
 def view_alerts(request: HttpRequest) -> HttpResponse:
+    """Redirect to the docket alerts page if the user only has docket alerts, otherwise to search alerts."""
     if (
         not request.user.alerts.exists()
         and request.user.docket_alerts.filter(
@@ -108,6 +112,7 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_search_alerts(request: HttpRequest) -> HttpResponse:
+    """Render the user's search alerts, each with its search type."""
     search_alerts = request.user.alerts.all()
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
@@ -128,6 +133,10 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's docket subscriptions, sorted by the ``order_by`` parameter.
+
+    Defaults to the most recently triggered alerts first.
+    """
     order_by_param = request.GET.get("order_by", "")
     if order_by_param.startswith("-"):
         direction = "-"
@@ -188,10 +197,7 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Show the logged-in user's notes, grouped by the kind of object
-    each is attached to (docket, opinion, oral argument, or RECAP
-    document).
-    """
+    """Show the logged-in user's notes, grouped by the kind of object each is attached to (docket, opinion, oral argument, or RECAP document)."""
     notes = request.user.notes.prefetch_related("content_object").order_by(
         "pk"
     )
@@ -208,29 +214,41 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
         # Carried alongside the form so the template can build a link/
         # icon for the noted object.
         note_forms[bucket].append((NoteForm(instance=note), target))
+    search_url = reverse("show_results")
     docket_search_url = (
-        "/?type=r&q=xxx AND docket_id:("
+        f"{search_url}?type=r&q=xxx AND docket_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Dockets"])
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=xxx AND id:("
+        f"{search_url}?type=oa&q=xxx AND id:("
         + " OR ".join(
             str(target.pk) for _, target in note_forms["Oral Arguments"]
         )
         + ")"
     )
-    recap_search_url = (
-        "/?type=r&q=xxx AND id:("
-        + " OR ".join(
-            str(target.pk)
-            for _, target in note_forms["Documents"]
-            if isinstance(target, RECAPDocument)
-        )
-        + ")"
-    )
+    # The ES id field holds RECAP pks only; other sources' documents are
+    # matched by their uid (e.g. "scotus_123").
+    ids: list[str] = []
+    uids: list[str] = []
+    for _, d in note_forms["Documents"]:
+        if uid := es_uid(type(d), d.pk):
+            uids.append(uid)
+        else:
+            ids.append(str(d.pk))
+    id_query = f"id:({' OR '.join(ids)})"
+    uid_query = f"uid:({' OR '.join(uids)})"
+    # ES rejects an empty "id:()" or "uid:()", so each is only added when
+    # it has values.
+    if ids and uids:
+        document_query = f"({id_query} OR {uid_query})"
+    elif uids:
+        document_query = uid_query
+    else:
+        document_query = id_query
+    recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
     opinion_search_url = (
-        "/?q=xxx AND cluster_id:("
+        f"{search_url}?q=xxx AND cluster_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
@@ -252,6 +270,7 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's support page."""
     return TemplateResponse(
         request,
         "profile/donations.html",
@@ -262,6 +281,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API documentation tab of the user's API page."""
     return TemplateResponse(
         request,
         "profile/api.html",
@@ -276,6 +296,7 @@ def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API token tab of the user's API page."""
     return TemplateResponse(
         request,
         "profile/api.html",
@@ -289,6 +310,11 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Replace the user's API token after they confirm their password.
+
+    Shows the confirmation form with the user's API request count from the
+    last five minutes, and redirects to the token page after a reset.
+    """
     if request.method == "POST":
         reset_form = PasswordConfirmForm(request, request.POST)
         if reset_form.is_valid():
@@ -321,6 +347,10 @@ def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the API usage tab with the user's effective API rate limits.
+
+    Blocking rates (``0/...``) are left out.
+    """
     overrides = get_all_throttle_overrides(ThrottleType.API)
     user_rates = overrides.get(request.user.username) or []
     if not user_rates:
@@ -363,6 +393,12 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show and save the user's account and profile settings.
+
+    Changing the email address unconfirms the account, emails both the new
+    and old addresses, and logs the user out. Outside development, saving
+    also queues a Neon account update or creation.
+    """
     old_email = request.user.email  # this line has to be at the top to work.
     user = request.user
     up = user.profile
@@ -370,7 +406,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     profile_form = ProfileForm(request.POST or None, instance=up)
     if profile_form.is_valid() and user_form.is_valid():
         user_cd = user_form.cleaned_data
-        profile_cd = profile_form.cleaned_data
         new_email = user_cd["email"]
         changed_email = old_email != new_email
         if changed_email:
@@ -429,6 +464,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's CourtListener ID."""
     user = request.user
     return TemplateResponse(
         request,
@@ -442,6 +478,11 @@ def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Delete the user's account after they confirm their password.
+
+    Emails a deletion notice, deletes the user's assets, converts the
+    account to a stub, and logs the user out.
+    """
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
     ).count()
@@ -477,11 +518,17 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 async def delete_profile_done(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming the account was deleted."""
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
 @login_required
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Request an export of the user's data.
+
+    On POST, queues a Zoho Desk ticket for the export and redirects to the
+    done page.
+    """
     if request.method == "POST":
         user = request.user
         confirmed = "Yes" if user.profile.email_confirmed else "No"
@@ -512,6 +559,7 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 async def take_out_done(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming the data export was requested."""
     return TemplateResponse(
         request,
         "profile/take_out_done.html",
@@ -531,7 +579,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 @check_honeypot(field_name="skip_me_if_alive")
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
-    """allow only an anonymous user to register"""
+    """Allow only an anonymous user to register."""
     redirect_to = get_redirect_or_abort(request, "next")
     # Every successful-looking outcome below, including a refused duplicate,
     # must produce this exact redirect. Anything that differs between the
@@ -583,32 +631,36 @@ def register(request: HttpRequest) -> HttpResponse:
                     return HttpResponseRedirect(success_url)
 
                 try:
-                    if not stub_account:
-                        # make a new user that is active, but has not confirmed
-                        # their email address
-                        user = User.objects.create_user(
-                            cd["username"], cd["email"], cd["password1"]
-                        )
-                        up = UserProfile(user=user)
-                    else:
-                        # Upgrade the stub account to make it a regular account.
-                        user = stub_account
-                        user.set_password(cd["password1"])
-                        user.username = cd["username"]
-                        user.is_active = True
-                        up = stub_account.profile
-                        up.stub_account = False
+                    # Create the user and profile together, so a failure
+                    # can't leave a user without a profile, who can't log in.
+                    with transaction.atomic():
+                        if not stub_account:
+                            # make a new user that is active, but has not
+                            # confirmed their email address
+                            user = User.objects.create_user(
+                                cd["username"], cd["email"], cd["password1"]
+                            )
+                            up = UserProfile(user=user)
+                        else:
+                            # Upgrade the stub account to make it a regular
+                            # account.
+                            user = stub_account
+                            user.set_password(cd["password1"])
+                            user.username = cd["username"]
+                            user.is_active = True
+                            up = stub_account.profile
+                            up.stub_account = False
 
-                    if cd["first_name"]:
-                        user.first_name = cd["first_name"]
-                    if cd["last_name"]:
-                        user.last_name = cd["last_name"]
-                    user.save()
+                        if cd["first_name"]:
+                            user.first_name = cd["first_name"]
+                        if cd["last_name"]:
+                            user.last_name = cd["last_name"]
+                        user.save()
 
-                    # Build and assign the activation key
-                    up.activation_key = generate_activation_key()
-                    up.key_expires = now() + timedelta(days=5)
-                    up.save()
+                        # Build and assign the activation key
+                        up.activation_key = generate_activation_key()
+                        up.key_expires = now() + timedelta(days=5)
+                        up.save()
 
                 except IntegrityError as e:
                     # Redirect to success if user already exists
@@ -618,10 +670,9 @@ def register(request: HttpRequest) -> HttpResponse:
 
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
-                        logger.error(
+                        logger.exception(
                             "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
                             str(e),
-                            exc_info=True,
                         )
 
                         form.add_error(
@@ -649,16 +700,14 @@ def register(request: HttpRequest) -> HttpResponse:
             "register/register.html",
             {"form": form, "consent_form": consent_form, "private": False},
         )
-    else:
-        # The user is already logged in. Direct them to their settings page as
-        # a logical fallback
-        return HttpResponseRedirect(reverse("view_settings"))
+    # The user is already logged in. Direct them to their settings page as
+    # a logical fallback
+    return HttpResponseRedirect(reverse("view_settings"))
 
 
 @never_cache
 def register_success(request: HttpRequest) -> HttpResponse:
-    """Tell the user they have been registered and allow them to continue where
-    they left off."""
+    """Tell the user they have been registered and allow them to continue where they left off."""
     redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
     if email:
@@ -753,7 +802,7 @@ def confirm_email(request, activation_key):
 )
 @check_honeypot(field_name="skip_me_if_alive")
 def request_email_confirmation(request: HttpRequest) -> HttpResponse:
-    """Send an email confirmation email"""
+    """Send an email confirmation email."""
     if request.method == "POST":
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
@@ -811,6 +860,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def email_confirm_success(request: HttpRequest) -> HttpResponse:
+    """Render the page confirming an email confirmation link was requested."""
     return TemplateResponse(
         request,
         "register/request_email_confirmation_success.html",
@@ -824,6 +874,7 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Change the user's password, keeping them logged in."""
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
@@ -844,7 +895,7 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Render the webhooks page"""
+    """Render the webhooks page."""
     return TemplateResponse(
         request,
         "profile/webhooks.html",
@@ -862,8 +913,7 @@ def view_webhook_logs(
     request: AuthenticatedHttpRequest,
     route_prefix: str,
 ) -> HttpResponse:
-    """Render the webhooks logs page"""
-
+    """Render the webhooks logs page."""
     page_title = "Webhook Logs"
     sub_page = "logs"
     debug = False
@@ -892,8 +942,7 @@ def view_webhook_logs(
 def view_webhook_logs_detail(
     request: AuthenticatedHttpRequest, pk: int
 ) -> HttpResponse:
-    """Render the webhook event detail page"""
-
+    """Render the webhook event detail page."""
     webhook_event = get_object_or_404(
         WebhookEvent, webhook__user=request.user, pk=pk
     )
@@ -924,8 +973,7 @@ def view_webhook_logs_detail(
 def toggle_recap_email_auto_subscription(
     request: AuthenticatedHttpRequest,
 ) -> HttpResponse:
-    """Toggle the user's setting to auto-subscribe to recap.email cases"""
-
+    """Toggle the user's setting to auto-subscribe to recap.email cases."""
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
 
@@ -942,6 +990,7 @@ def toggle_recap_email_auto_subscription(
 @login_required
 @never_cache
 def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Render the user's RECAP email page with their auto-subscribe setting."""
     auto_subscribe = request.user.profile.auto_subscribe
     return TemplateResponse(
         request,
@@ -957,9 +1006,7 @@ def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
 @method_decorator(ratelimiter_unsafe_10_per_m, name="post")
 @method_decorator(ratelimiter_unsafe_2000_per_h, name="post")
 class RateLimitedPasswordResetView(PasswordResetView):
-    """
-    Custom Password reset view with rate limiting
-    """
+    """Custom Password reset view with rate limiting."""
 
     template_name = "register/password_reset_form.html"
     email_template_name = "register/password_reset_email.html"
@@ -967,9 +1014,7 @@ class RateLimitedPasswordResetView(PasswordResetView):
 
 
 class SafeRedirectLoginView(auth_views.LoginView):
-    """
-    Custom LoginView that validates and sanitizes the redirect URL after a
-    successful login.
+    """Custom LoginView that validates and sanitizes the redirect URL after a successful login.
 
     This view inherits from Django's built-in LoginView but adds an extra layer
     of security by ensuring the redirect URL submitted by the login form is safe
@@ -977,9 +1022,7 @@ class SafeRedirectLoginView(auth_views.LoginView):
     """
 
     def get_redirect_url(self):
-        """
-        Return the user-originating redirect URL if it's safe. otherwise falls
-        back to the default.
+        """Return the user-originating redirect URL if it's safe. otherwise falls back to the default.
 
         This method ensures users cannot be redirected to malicious URLs after
         logging in, even if they attempt to provide one.

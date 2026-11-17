@@ -1,3 +1,5 @@
+"""Factories for Neon memberships and webhook events."""
+
 import factory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
@@ -12,6 +14,8 @@ from cl.users.factories import UserFactory
 
 
 class NeonWebhookEventFactory(DjangoModelFactory):
+    """Make a Neon webhook event with a random trigger."""
+
     class Meta:
         model = NeonWebhookEvent
 
@@ -26,6 +30,8 @@ class NeonWebhookEventFactory(DjangoModelFactory):
 
 
 class NeonMembershipFactory(DjangoModelFactory):
+    """Make a paid tier 1 Neon membership for a new user."""
+
     class Meta:
         model = NeonMembership
 

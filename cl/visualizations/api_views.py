@@ -1,3 +1,5 @@
+"""REST API viewsets for SCOTUS network visualizations and their JSON versions."""
+
 from http import HTTPStatus
 
 from asgiref.sync import async_to_sync
@@ -18,8 +20,7 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ReadOnlyModelViewSet):
-    """Read-only: JSONVersions are only ever created server-side, by
-    build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
+    """Read-only: JSONVersions are only ever created server-side, by build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
 
     permission_classes = [
         IsAuthenticated,
@@ -37,12 +38,15 @@ class JSONViewSet(LoggingMixin, ReadOnlyModelViewSet):
     ]
 
     def get_queryset(self):
+        """Get the JSON versions of the user's and published visualizations."""
         return JSONVersion.objects.filter(
             Q(map__user=self.request.user) | Q(map__published=True)
         ).order_by("-id")
 
 
 class VisualizationViewSet(LoggingMixin, ModelViewSet):
+    """API endpoint for SCOTUS network visualizations."""
+
     permission_classes = [IsAuthenticated, IsOwner, V3APIPermission]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
@@ -56,6 +60,7 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     ]
 
     def get_queryset(self):
+        """Get the user's and published visualizations."""
         return (
             SCOTUSMap.objects.filter(
                 Q(user=self.request.user) | Q(published=True)
@@ -65,6 +70,11 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
         )
 
     def create(self, request, *args, **kwargs):
+        """Create and build a visualization.
+
+        Responds with 400 and the build status if the build doesn't
+        succeed, otherwise with 201 and the visualization.
+        """
         # Override create by copying from source so we can throw 403's
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -76,12 +86,16 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
                 status=HTTPStatus.BAD_REQUEST,
                 headers=headers,
             )
-        else:
-            return Response(
-                serializer.data, status=HTTPStatus.CREATED, headers=headers
-            )
+        return Response(
+            serializer.data, status=HTTPStatus.CREATED, headers=headers
+        )
 
     def perform_create(self, serializer):
+        """Save the visualization with its endpoints in date order, then build it.
+
+        Returns:
+            The status of building the visualization.
+        """
         cd = serializer.validated_data
         start, end = reverse_endpoints_if_needed(
             cd["cluster_start"], cd["cluster_end"]

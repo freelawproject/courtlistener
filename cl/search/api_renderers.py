@@ -1,3 +1,5 @@
+"""REST API renderers that handle invalid XML characters."""
+
 import re
 from typing import Any
 
@@ -11,10 +13,10 @@ INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def clean_xml_data(data: Any) -> Any:
-    """
-    Recursively clean strings of invalid XML characters
+    """Recursively clean strings of invalid XML characters.
 
-    :param data: the serialized object, or one of its elements
+    Args:
+        data: the serialized object, or one of its elements
     """
     if isinstance(data, dict):
         return {k: clean_xml_data(v) for k, v in data.items()}
@@ -27,15 +29,16 @@ def clean_xml_data(data: Any) -> Any:
 
 
 class SafeXMLRenderer(XMLRenderer):
-    """
-    A XML renderer that tries to render the data as-is, and if it fails with an
-    UnserializableContentError, it cleans the data of invalid XML characters
-    and tries again.
-    """
+    """A XML renderer that tries to render the data as-is, and if it fails with an UnserializableContentError, it cleans the data of invalid XML characters and tries again."""
 
     redis_set_name = "api:invalid_xml_chars:opinion_ids"
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
+        """Render the data as XML, cleaning invalid characters if needed.
+
+        If the data can't be serialized, the IDs found in list or dict data
+        are saved to a Redis set before the cleaned data is rendered.
+        """
         if data is None:
             return b""
 

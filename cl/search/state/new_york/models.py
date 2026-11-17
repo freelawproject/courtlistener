@@ -32,8 +32,7 @@ COURT_PASS_DOCUMENT_URL = "https://courtpass.nycourts.gov/Docket"
 @pghistory.track()
 @document_model
 class NYCoADocketMetadata(AbstractDateTimeModel):
-    """
-    Represents the New York Court of Appeals-specific metadata for a docket.
+    """Represents the New York Court of Appeals-specific metadata for a docket.
 
     These fields only apply to NYCoA cases, so they live here instead of
     widening the shared `Docket` model.
@@ -41,12 +40,13 @@ class NYCoADocketMetadata(AbstractDateTimeModel):
     The issues the Court assigned to the case hang off this model, one row
     each, as `NYCoADocketIssue`.
 
-    :ivar docket: The Docket this NYCoA metadata applies to.
-    :ivar decision_date: The date this case was decided, if it has been
-    decided.
-    :ivar official_citation: The official citation, for decided cases.
-    :ivar lower_court_citation: The "Reported Below" citation for the decision
-    under review, when Court-PASS reports one.
+    Attributes:
+        docket: The Docket this NYCoA metadata applies to.
+        decision_date: The date this case was decided, if it has been
+            decided.
+        official_citation: The official citation, for decided cases.
+        lower_court_citation: The "Reported Below" citation for the decision
+            under review, when Court-PASS reports one.
     """
 
     docket = models.OneToOneField(
@@ -70,24 +70,24 @@ class NYCoADocketMetadata(AbstractDateTimeModel):
 @pghistory.track()
 @document_model
 class NYCoADocketIssue(AbstractDateTimeModel):
-    """
-    Represents one issue the New York Court of Appeals assigned to a case.
+    """Represents one issue the New York Court of Appeals assigned to a case.
 
     The Court states an issue as a category and a subcategory joined by a
     double dash, and describes most of them in a paragraph of detail. A case
     usually has one issue but may have several.
 
-    :ivar metadata: The NYCoA docket metadata this issue belongs to.
-    :ivar category: The issue's category.
-    :ivar subcategory: The issue's subcategory. Unknown on the issues the Court
-    states as a bare category.
-    :ivar category_raw: The issue exactly as Court-PASS stated it, category and
-    subcategory together.
-    :ivar detail: The Court's description of the issue. Blank when Court-PASS
-    stated none. Deliberately outside the key, because the Court does assign a
-    case two issues under one category pair, told apart only by this, and it
-    also rewords a description it has already published, so which of the two a
-    scrape is looking at is the merger's call rather than the database's.
+    Attributes:
+        metadata: The NYCoA docket metadata this issue belongs to.
+        category: The issue's category.
+        subcategory: The issue's subcategory. Unknown on the issues the Court
+            states as a bare category.
+        category_raw: The issue exactly as Court-PASS stated it, category and
+            subcategory together.
+        detail: The Court's description of the issue. Blank when Court-PASS
+            stated none. Deliberately outside the key, because the Court does assign a
+            case two issues under one category pair, told apart only by this, and it
+            also rewords a description it has already published, so which of the two a
+            scrape is looking at is the merger's call rather than the database's.
     """
 
     metadata = models.ForeignKey(
@@ -132,8 +132,7 @@ class NYCoADocketIssue(AbstractDateTimeModel):
 @pghistory.track()
 @document_model
 class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
-    """
-    Represents a docket entry in a New York Court of Appeals docket.
+    """Represents a docket entry in a New York Court of Appeals docket.
 
     An entry is either a row from the FILINGS table on the Court-PASS docket
     page or a filing the scraper reconstructed from a document the FILINGS
@@ -142,29 +141,30 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
     webcasts. A reconstructed filing has no `filing_type_raw`, because no table
     row named it.
 
-    :ivar docket: The Docket this entry is associated with.
-    :ivar docket_entry_id: The identifier for this entry, unique within the
-    docket and stable across scrapes. Composed from the filing type and party
-    for a FILINGS table row, and from the role, party, and document type for
-    an entry reconstructed from a document.
-    :ivar entry_index: The position of this entry in the source listing.
-    Reproduces the order Court-PASS displayed, but shifts between scrapes
-    because new rows are inserted above existing ones, so it is not an
-    identifier.
-    :ivar filing_type: The type of filing the FILINGS table listed. Unknown on
-    a reconstructed filing, whose role and document type are still recorded.
-    :ivar filing_type_raw: The filing type exactly as the FILINGS table
-    rendered it. Blank when no table row listed this filing.
-    :ivar filing_role: The role of the party that made this filing.
-    :ivar filing_doctype: The kind of document this filing consists of.
-    :ivar party: FK to the case party associated with this filing. May be null
-    if the party cannot be found.
-    :ivar party_name: The party as the FILINGS table named it. Court-PASS only
-    identifies a party's attorneys elsewhere on the page, so `party` stays null
-    for a party with no attorney of record; this preserves the name either way.
-    :ivar date_filed: The date Court-PASS recorded this filing as received.
-    Null on entries reconstructed from a document, which carry no date.
-    :ivar date_due: The date Court-PASS recorded this filing as due.
+    Attributes:
+        docket: The Docket this entry is associated with.
+        docket_entry_id: The identifier for this entry, unique within the
+            docket and stable across scrapes. Composed from the filing type and party
+            for a FILINGS table row, and from the role, party, and document type for
+            an entry reconstructed from a document.
+        entry_index: The position of this entry in the source listing.
+            Reproduces the order Court-PASS displayed, but shifts between scrapes
+            because new rows are inserted above existing ones, so it is not an
+            identifier.
+        filing_type: The type of filing the FILINGS table listed. Unknown on
+            a reconstructed filing, whose role and document type are still recorded.
+        filing_type_raw: The filing type exactly as the FILINGS table
+            rendered it. Blank when no table row listed this filing.
+        filing_role: The role of the party that made this filing.
+        filing_doctype: The kind of document this filing consists of.
+        party: FK to the case party associated with this filing. May be null
+            if the party cannot be found.
+        party_name: The party as the FILINGS table named it. Court-PASS only
+            identifies a party's attorneys elsewhere on the page, so `party` stays null
+            for a party with no attorney of record; this preserves the name either way.
+        date_filed: The date Court-PASS recorded this filing as received.
+            Null on entries reconstructed from a document, which carry no date.
+        date_due: The date Court-PASS recorded this filing as due.
     """
 
     docket = models.ForeignKey(
@@ -225,30 +225,30 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
 @pghistory.track()
 @document_model
 class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
-    """
-    Represents a document attached to a New York Court of Appeals docket entry.
+    """Represents a document attached to a New York Court of Appeals docket entry.
 
     The `url` every other state document carries is a property here rather
     than a column; see below.
 
-    :ivar docket_entry: The Docket entry this document is associated with.
-    :ivar file_name: The name of the file as Court-PASS published it. Filers
-    are expected to follow the Court's naming convention, which encodes the
-    party role, party name, and document type.
-    :ivar content_type: The MIME type of the file. Court-PASS publishes PDFs
-    along with playlist files for oral argument recordings.
-    :ivar doc_role: The party role encoded in the file name, e.g. "appellant".
-    Blank when the file name does not follow the naming convention.
-    :ivar doc_party: The party name encoded in the file name. Blank when the
-    file name does not follow the naming convention.
-    :ivar doc_type: The document type encoded in the file name, e.g. "brf".
-    Values beginning with an underscore are the court's own output rather than
-    a party filing. Blank when the file name does not follow the naming
-    convention.
-    :ivar volume: The volume number, for a record or appendix published in
-    several volumes.
-    :ivar part: The part number, for a volume that is itself split into parts.
-    :ivar sha256: Hex digest of the file.
+    Attributes:
+        docket_entry: The Docket entry this document is associated with.
+        file_name: The name of the file as Court-PASS published it. Filers
+            are expected to follow the Court's naming convention, which encodes the
+            party role, party name, and document type.
+        content_type: The MIME type of the file. Court-PASS publishes PDFs
+            along with playlist files for oral argument recordings.
+        doc_role: The party role encoded in the file name, e.g. "appellant".
+            Blank when the file name does not follow the naming convention.
+        doc_party: The party name encoded in the file name. Blank when the
+            file name does not follow the naming convention.
+        doc_type: The document type encoded in the file name, e.g. "brf".
+            Values beginning with an underscore are the court's own output rather than
+            a party filing. Blank when the file name does not follow the naming
+            convention.
+        volume: The volume number, for a record or appendix published in
+            several volumes.
+        part: The part number, for a volume that is itself split into parts.
+        sha256: Hex digest of the file.
     """
 
     docket_entry = models.ForeignKey(
@@ -286,8 +286,11 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         caller believes documents have distinct URLs, which is a bug worth
         surfacing rather than a value worth silently dropping.
 
-        :param value: The URL being assigned.
-        :raises ValueError: If `value` is not `COURT_PASS_DOCUMENT_URL`.
+        Args:
+            value: The URL being assigned.
+
+        Raises:
+            ValueError: If `value` is not `COURT_PASS_DOCUMENT_URL`.
         """
         if value != COURT_PASS_DOCUMENT_URL:
             raise ValueError(
@@ -315,9 +318,10 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         Takes the base signature so a caller reaching it through
         `AbstractStateDocument` gets the error rather than a `TypeError`.
 
-        :param pk: Unused; the primary key the base implementation would load.
-        :param extract: Unused; see the base implementation.
-        :param queue: Unused; see the base implementation.
+        Args:
+            pk: Unused; the primary key the base implementation would load.
+            extract: Unused; see the base implementation.
+            queue: Unused; see the base implementation.
         """
         raise NotImplementedError(
             "NYCoADocument cannot be downloaded by URL; Court-PASS serves "

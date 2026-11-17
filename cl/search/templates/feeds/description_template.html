@@ -13,6 +13,6 @@
         <p>{{ doc0.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
       {% endif %}
     {% endif %}
-    <a href="{{doc0.absolute_url}}">Original document</a>
+    <a href="{{ item_link|default:doc0.absolute_url }}">Original document</a>
   {% endwith %}
 {% endwith %}

@@ -1,3 +1,5 @@
+"""Settings for search and docket alerts."""
+
 import environ
 
 env = environ.FileAwareEnv()
@@ -15,8 +17,12 @@ SCHEDULED_ALERT_HIT_BATCH_SIZE = env.int(
 )
 
 ##########################
-# SCOTUS docket alerts   #
+# SCOTUS alerts          #
 ##########################
-# Temporary kill switch: keeps SCOTUS docket alerts from firing until their
-# email templates and webhook payloads are ready.
-SCOTUS_ALERTS_ENABLED = env.bool("SCOTUS_ALERTS_ENABLED", default=False)
+# Keeps SCOTUS docket alert webhooks off until send_docket_alert_webhook_events
+# can serialize SCOTUSDocketEntry rows, and SCOTUS search alert webhooks off
+# until SCOTUS ids are exposed in the search API (#8153). Alert emails are not
+# affected.
+SCOTUS_ALERT_WEBHOOKS_ENABLED = env.bool(
+    "SCOTUS_ALERT_WEBHOOKS_ENABLED", default=False
+)
