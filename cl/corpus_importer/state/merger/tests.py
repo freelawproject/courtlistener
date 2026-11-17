@@ -1,10 +1,11 @@
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, cast, override
 
 from django.db import connection
-from django.db.models import Model, QuerySet
+from django.db.models import Field, Model, QuerySet
 from django.db.models.signals import post_delete
 from django.test.utils import CaptureQueriesContext
+from juriscraper.state.docket import Document as ScrapeDocument
 
 from cl.corpus_importer.state.common.docket import (
     DocketEntryRelation,
@@ -13,6 +14,7 @@ from cl.corpus_importer.state.common.docket import (
 from cl.corpus_importer.state.common.party import PartyMerger
 from cl.corpus_importer.state.merger import (
     Constant,
+    Create,
     Fn,
     ManyStrategy,
     ManyToManyRelation,
@@ -27,6 +29,7 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     Update,
 )
+from cl.corpus_importer.state.merger.specifications import Database
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -1388,3 +1391,233 @@ class MergerConfigInheritanceTest(SimpleTestCase):
         self.assertEqual(
             set(BaseTestMerger.config.registry.attr), {"docket_number"}
         )
+
+
+CASE_NAME = cast(Field, Docket.case_name)
+CASE_NAME_FULL = cast(Field, Docket.case_name_full)
+
+
+def _prefer_stored(stored: str | None, scraped: str) -> str:
+    """Keep a stored value over a scraped one."""
+    return stored or scraped
+
+
+class DatabaseSpecTest(TestCase):
+    """Specs that read the object being merged into."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            source=DocketSources.SCRAPER,
+            docket_number="DB-1",
+            case_name="Stored Name",
+        )
+        cls.blank_docket = DocketFactory.create(
+            court=cls.court,
+            source=DocketSources.SCRAPER,
+            docket_number="DB-2",
+            case_name="",
+        )
+
+    def merger(self) -> type[Merger[dict[str, str], None, Docket]]:
+        """A docket merger keeping any case name already stored."""
+        court = self.court
+
+        class TestMerger(Merger[dict[str, str], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, reads=DOCKET_SAVE_READS
+            )
+
+            court_id: str = Constant(court.pk)
+            source: int = Constant(DocketSources.SCRAPER)
+            docket_number: str = Scrape(dict)["docket_number"]
+            case_name: str = Fn(_prefer_stored)(
+                Database(CASE_NAME), Scrape(dict)["case_name"]
+            )
+
+        return TestMerger
+
+    def loaded(
+        self, merger: type[Merger[Any, Any, Docket]], docket: Docket
+    ) -> Docket:
+        """Read a docket the way the merger's lookup would."""
+        return merger.config.loading(Docket.objects.filter(pk=docket.pk)).get()
+
+    def test_create_reads_no_stored_value(self) -> None:
+        """Does a spec reading the database get nothing when there is no object to read, so the scraped value is used?"""
+        result = self.merger()(
+            {"docket_number": "DB-NEW", "case_name": "Scraped Name"},
+            params=None,
+            existing=Create,
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
+        self.assertEqual(docket.case_name, "Scraped Name")
+
+    def test_update_reads_stored_value(self) -> None:
+        """Does a spec reading the database see the object being merged into, so a stored value is kept and nothing is updated?"""
+        merger = self.merger()
+        result = merger(
+            {"docket_number": "DB-1", "case_name": "Scraped Name"},
+            params=None,
+            existing=Update(self.loaded(merger, self.docket)),
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.update)
+        self.docket.refresh_from_db()
+        self.assertEqual(self.docket.case_name, "Stored Name")
+
+    def test_update_falls_back_when_stored_value_is_blank(self) -> None:
+        """Does a spec reading a blank stored value fall back to the scrape and update the object?"""
+        merger = self.merger()
+        result = merger(
+            {"docket_number": "DB-2", "case_name": "Scraped Name"},
+            params=None,
+            existing=Update(self.loaded(merger, self.blank_docket)),
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertIn(self.blank_docket.pk, result.updates["Docket"])
+        self.blank_docket.refresh_from_db()
+        self.assertEqual(self.blank_docket.case_name, "Scraped Name")
+
+    def test_fields_read_from_database_are_loaded(self) -> None:
+        """Is a field a spec reads from the database loaded, though no spec merges into it?"""
+
+        class TestMerger(Merger[dict[str, str], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            case_name: str = Fn(_prefer_stored)(
+                Database(CASE_NAME_FULL), Scrape(dict)["case_name"]
+            )
+
+        docket = self.loaded(TestMerger, self.docket)
+
+        self.assertNotIn("case_name_full", docket.get_deferred_fields())
+        self.assertIn("case_name_short", docket.get_deferred_fields())
+
+    def test_database_field_of_another_model_is_rejected(self) -> None:
+        """Is a spec reading a field of a model other than the merger's refused when the merger is defined?"""
+        with self.assertRaisesRegex(TypeError, "is from DocketEntry"):
+
+            class TestMerger(Merger[dict[str, str], None, Docket]):
+                config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                    model=Docket
+                )
+
+                case_name: str | None = Database(
+                    cast(Field, DocketEntry._meta.get_field("description"))
+                )
+
+
+class SaveStateTest(TestCase):
+    """How a merger writes the object it merged into."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+        cls.docket = DocketFactory.create(
+            court=cls.court,
+            source=DocketSources.SCRAPER,
+            docket_number="SAVE-1",
+        )
+
+    @merger_test(expected_query_count=0)
+    def test_unchanged_update_is_neither_written_nor_recorded(self) -> None:
+        """Does an update that changes nothing skip the write and report no update?"""
+        result = KeyedDocketMerger(
+            {"docket_number": "SAVE-1", "entries": []},
+            params=None,
+            existing=Update(self.docket),
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.update)
+
+    def test_forced_update_is_recorded_without_writing(self) -> None:
+        """Does a forced save of an unchanged object report it as updated without writing it?"""
+
+        class TestMerger(Merger[dict[str, str], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            docket_number: str = Scrape(dict)["docket_number"]
+
+            @override
+            def update(
+                self, state: MergerState.Update[Any, Any, Docket]
+            ) -> MergerState.UpdateOutput[Any, Any, Docket]:
+                save_state = super().update(state)
+                if not isinstance(save_state, MergerState.Save):
+                    return save_state
+                return state.save(
+                    save_state.operation.instance,
+                    save_state.operation.fields,
+                    save_state.result,
+                    force=True,
+                )
+
+        with CaptureQueriesContext(connection) as queries:
+            result = TestMerger(
+                {"docket_number": "SAVE-1"},
+                params=None,
+                existing=Update(self.docket),
+            ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertEqual(result.updates["Docket"], {self.docket.pk})
+        self.assertEqual(len(queries), 0, queries.captured_queries)
+
+
+class SpecAccessTrackingTest(SimpleTestCase):
+    """What specs record about the inputs they read."""
+
+    def test_specs_track_what_they_read(self) -> None:
+        """Does every kind of expression report whether it reads the scrape and which stored fields it reads?"""
+        cases: list[tuple[str, Any, bool, set[str]]] = [
+            ("constant", Constant(1), False, set()),
+            ("params", Params(dict)["a"], False, set()),
+            ("scrape item", Scrape(dict)["a"], True, set()),
+            ("scrape attribute", Scrape(ScrapeDocument).url, True, set()),
+            ("database", Database(CASE_NAME), False, {"case_name"}),
+            (
+                "database attribute",
+                cast(str, Database(CASE_NAME)).upper,
+                False,
+                {"case_name"},
+            ),
+            ("call on scrape", Fn(str)(Scrape(dict)["a"]), True, set()),
+            (
+                "call on database",
+                Fn(_prefer_stored)(Database(CASE_NAME_FULL), Constant("")),
+                False,
+                {"case_name_full"},
+            ),
+            (
+                "related",
+                OneToManyRelation(
+                    EntryMerger,
+                    cast(
+                        Any,
+                        Fn(_prefer_stored)(
+                            Database(CASE_NAME), Scrape(dict)["a"]
+                        ),
+                    ),
+                ),
+                True,
+                {"case_name"},
+            ),
+        ]
+        for name, spec, uses_scrape, db_fields in cases:
+            with self.subTest(name):
+                self.assertEqual(spec._uses_scrape, uses_scrape)
+                self.assertEqual(set(spec._db_fields), db_fields)
+
+    def test_item_keyed_by_expression_on_scrape(self) -> None:
+        """Can the scrape be indexed by the value of another expression?"""
+        spec: Any = Scrape(dict)[Params(str)]
+
+        self.assertEqual(spec.transform({"a": 1}, "a", None), 1)
