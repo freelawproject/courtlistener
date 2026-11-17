@@ -1,3 +1,5 @@
+"""REST API permission classes."""
+
 import random
 
 from django.conf import settings
@@ -11,15 +13,22 @@ from cl.lib.redis_utils import get_redis_interface
 
 
 class IsOwner(permissions.BasePermission):
-    """Only allow changes to visualizations by its owner"""
+    """Only allow changes to visualizations by its owner."""
 
     def has_object_permission(self, request, view, obj):
+        """Allow safe methods for anyone and other methods for the object's user."""
         if request.method in permissions.SAFE_METHODS:
             return True
         return obj.user == request.user
 
 
 class V3APIPermission(permissions.BasePermission):
+    """Block anonymous and new users from the V3 API.
+
+    Only applies when ``BLOCK_NEW_V3_USERS`` is set. Users are checked
+    against Redis sets of known and blocked V3 users.
+    """
+
     r = get_redis_interface("STATS")
     v3_blocked_message = (
         "As a new user, you don't have permission to access V3 of the API. "
@@ -29,33 +38,35 @@ class V3APIPermission(permissions.BasePermission):
     v3_users_list_key = "v3-users-list"
 
     def is_new_v3_user(self, user: User) -> bool:
-        """Check if the user is new for V3 by determining their presence in the
-        v3-users-list.
+        """Check if the user is new for V3 by determining their presence in the v3-users-list.
 
-        :param user: The User to check.
-        :return: True if the user is new for V3, False otherwise.
+        Args:
+            user: The User to check.
+
+        Returns:
+            True if the user is new for V3, False otherwise.
         """
-        is_new_user = self.r.sismember(self.v3_users_list_key, user.id) != 1
-        return is_new_user
+        return self.r.sismember(self.v3_users_list_key, user.id) != 1
 
     def is_user_v3_blocked(self, user: User) -> bool:
-        """Check if the user is already blocked form V3 by determining their
-        presence in the v3-blocked-users-list.
+        """Check if the user is already blocked form V3 by determining their presence in the v3-blocked-users-list.
 
-        :param user: The User to check.
-        :return: True if the user is blocked for V3, False otherwise.
+        Args:
+            user: The User to check.
+
+        Returns:
+            True if the user is blocked for V3, False otherwise.
         """
-        is_blocked_user = (
-            self.r.sismember(self.v3_blocked_list_key, user.id) == 1
-        )
-        return is_blocked_user
+        return self.r.sismember(self.v3_blocked_list_key, user.id) == 1
 
     @staticmethod
     def is_v3_api_request(request: Request) -> bool:
+        """Check if the request is for the V3 API."""
         return getattr(request, "version", None) == "v3"
 
     @staticmethod
     def check_request() -> bool:
+        """Randomly select about one in 50 requests for checking."""
         # Check 1 in 50 requests.
         if random.randint(1, 50) == 1:
             return True
@@ -64,14 +75,16 @@ class V3APIPermission(permissions.BasePermission):
     def has_permission(self, request: Request, view: APIView) -> bool:
         """Check if the user has permission to access the V3 API.
 
-        :param request: The HTTPRequest object.
-        :param view: The APIview being accessed.
-        :return: True if the user has permission to access V3, False if not.
-        """
+        Args:
+            request: The HTTPRequest object.
+            view: The APIview being accessed.
 
+        Returns:
+            True if the user has permission to access V3, False if not.
+        """
         if (
             not self.is_v3_api_request(request)
-            or not settings.BLOCK_NEW_V3_USERS  # type: ignore
+            or not settings.BLOCK_NEW_V3_USERS
         ):
             # Allow the request if it is not a V3 request
             return True

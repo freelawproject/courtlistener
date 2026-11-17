@@ -183,7 +183,7 @@ class NoteDialogComponentTest(TestCase):
         """Render the dialog for the docket, for a user who may have a
         note."""
         if note:
-            instance = NoteFactory.for_object(self.docket, user=user)
+            instance = NoteFactory(content_object=self.docket, user=user)
             form = NoteForm(instance=instance)
         else:
             form = NoteForm(
@@ -269,8 +269,8 @@ class GetNoteFormForTest(TestCase):
     async def test_existing_note_still_gets_the_suggested_name(self) -> None:
         """Does a v2 form for an existing note carry the page's suggested
         name, whether it is given as text or as a lazy callable?"""
-        await sync_to_async(NoteFactory.for_object)(
-            self.docket, user=self.user, name="Old name"
+        await sync_to_async(NoteFactory)(
+            content_object=self.docket, user=self.user, name="Old name"
         )
 
         async def lazy_name() -> str:

@@ -1,3 +1,5 @@
+"""Detect requests from bots by their user agent."""
+
 from django.http import HttpRequest
 
 
@@ -5,7 +7,7 @@ def base_bot_matcher(
     request: HttpRequest,
     known_bots: list[str],
 ) -> bool:
-    """Detect if a request's user agent is in a list of user agents
+    """Detect if a request's user agent is in a list of user agents.
 
     Matching is done by seeing if any of the items in the list of known_bots
     is in the user agent for the request provided.

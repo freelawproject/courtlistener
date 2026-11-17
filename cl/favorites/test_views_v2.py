@@ -105,7 +105,9 @@ class SaveNoteHtmxTest(TestCase):
 
     def test_updates_the_existing_note(self) -> None:
         """Does a second save change the user's note instead of adding one?"""
-        note = NoteFactory.for_object(self.docket, user=self.user, name="Old")
+        note = NoteFactory(
+            content_object=self.docket, user=self.user, name="Old"
+        )
 
         r = self.post(name="New name", notes="New notes")
 
@@ -118,8 +120,8 @@ class SaveNoteHtmxTest(TestCase):
     def test_leaves_other_users_notes_alone(self) -> None:
         """Does saving a note keep another user's note on the same object
         as it was?"""
-        other = NoteFactory.for_object(
-            self.docket, user=self.other_user, name="Theirs"
+        other = NoteFactory(
+            content_object=self.docket, user=self.other_user, name="Theirs"
         )
 
         self.post()
@@ -180,8 +182,8 @@ class SaveNoteHtmxTest(TestCase):
     def test_a_save_that_loses_a_race_updates_the_winner(self) -> None:
         """When another request creates the note first, is this request's
         text applied to it, leaving one note?"""
-        winner = NoteFactory.for_object(
-            self.docket, user=self.user, name="Winner"
+        winner = NoteFactory(
+            content_object=self.docket, user=self.user, name="Winner"
         )
         real_save = Note.save
         failures = []
@@ -279,7 +281,7 @@ class DeleteNoteHtmxTest(TestCase):
 
     def test_deletes_the_note(self) -> None:
         """Is the note deleted, and the form returned in its empty state?"""
-        NoteFactory.for_object(self.docket, user=self.user)
+        NoteFactory(content_object=self.docket, user=self.user)
 
         r = self.post()
 
@@ -299,7 +301,7 @@ class DeleteNoteHtmxTest(TestCase):
         ):
             with self.subTest(case=label):
                 if has_note:
-                    NoteFactory.for_object(self.docket, user=self.user)
+                    NoteFactory(content_object=self.docket, user=self.user)
 
                 r = self.post()
 
@@ -323,8 +325,11 @@ class DeleteNoteHtmxTest(TestCase):
         """Does the form come back with Name prefilled with the page's
         suggested name and Notes empty, whatever the note held, and still
         identify the object so the next save works?"""
-        NoteFactory.for_object(
-            self.docket, user=self.user, name="Renamed", notes="Old text"
+        NoteFactory(
+            content_object=self.docket,
+            user=self.user,
+            name="Renamed",
+            notes="Old text",
         )
 
         r = self.post(
@@ -343,8 +348,8 @@ class DeleteNoteHtmxTest(TestCase):
 
     def test_leaves_other_users_notes_alone(self) -> None:
         """Does deleting keep another user's note on the same object?"""
-        NoteFactory.for_object(self.docket, user=self.user)
-        other = NoteFactory.for_object(self.docket, user=self.other_user)
+        NoteFactory(content_object=self.docket, user=self.user)
+        other = NoteFactory(content_object=self.docket, user=self.other_user)
 
         self.post()
 
@@ -362,7 +367,7 @@ class DeleteNoteHtmxTest(TestCase):
     def test_unusable_object_ids_ask_for_a_reload(self) -> None:
         """Does a request that doesn't name a noteable object get the reload
         notice, and keep the user's note?"""
-        note = NoteFactory.for_object(self.docket, user=self.user)
+        note = NoteFactory(content_object=self.docket, user=self.user)
         user_content_type = ContentType.objects.get_for_model(type(self.user))
         cases = (
             ("missing content_type", {"content_type": ""}),
@@ -405,7 +410,7 @@ class DeleteNoteLegacyTest(TestCase):
 
     def test_ajax_request_gets_plain_text(self) -> None:
         """Does an AJAX request delete the note and get the legacy text?"""
-        NoteFactory.for_object(self.docket, user=self.user)
+        NoteFactory(content_object=self.docket, user=self.user)
         self.client.force_login(self.user)
 
         r = self.client.post(self.url, self.data, headers=AJAX)
@@ -416,7 +421,7 @@ class DeleteNoteLegacyTest(TestCase):
     def test_plain_request_is_refused(self) -> None:
         """Is a request that is neither AJAX nor htmx still a 405, with the
         note kept?"""
-        note = NoteFactory.for_object(self.docket, user=self.user)
+        note = NoteFactory(content_object=self.docket, user=self.user)
         self.client.force_login(self.user)
 
         r = self.client.post(self.url, self.data)

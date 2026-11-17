@@ -1,9 +1,11 @@
+"""Import Harvard Case Law Access Project PDFs using CAP crosswalk files."""
+
 import json
 import logging
-import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -18,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+    """Import CAP PDFs for the clusters listed in the crosswalk files."""
+
     def __init__(self, *args, **kwargs):
+        """Build the command with no PDFs processed yet."""
         super().__init__(*args, **kwargs)
         self.processed_pdfs = set()
 
@@ -28,6 +33,7 @@ class Command(BaseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the reporter, resume, dry-run, verbosity, crosswalk directory, and worker options."""
         parser.add_argument(
             "--reporter",
             type=str,
@@ -67,9 +73,9 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Handle the command execution.
 
-        :param args: Additional arguments.
-        :param options: Command options.
-        :return: None
+        Args:
+            args: Additional arguments.
+            options: Command options.
         """
         logger.info("Starting import_harvard_pdfs command")
         if options["verbose"]:
@@ -78,11 +84,11 @@ class Command(BaseCommand):
         self.dry_run = options["dry_run"]
         self.resume = options["resume"]
         self.reporter = options["reporter"]
-        self.crosswalk_dir = options["crosswalk_dir"]
+        self.crosswalk_dir = Path(options["crosswalk_dir"])
         self.max_workers = options["max_workers"]
         self.start_from_reporter = options["start_from_reporter"]
 
-        if not os.path.exists(self.crosswalk_dir):
+        if not self.crosswalk_dir.exists():
             logger.warning(
                 "Crosswalk directory does not exist: %s", self.crosswalk_dir
             )
@@ -98,10 +104,7 @@ class Command(BaseCommand):
         self.process_crosswalks(self.reporter, self.resume)
 
     def setup_s3_clients(self) -> None:
-        """Initialize S3 client for accessing Harvard CAP R2.
-
-        :return: None
-        """
+        """Initialize S3 client for accessing Harvard CAP R2."""
         # Initialize S3 client for accessing Harvard CAP R2
         self.cap_client = boto3.client(
             "s3",
@@ -116,9 +119,9 @@ class Command(BaseCommand):
     ) -> None:
         """Process crosswalk files for importing PDFs.
 
-        :param specific_reporter: Specific reporter to process, if any.
-        :param resume: Whether to resume from the last completed reporter.
-        :return: None
+        Args:
+            specific_reporter: Specific reporter to process, if any.
+            resume: Whether to resume from the last completed reporter.
         """
         logger.info(
             "Processing crosswalks. Specific reporter: %s, Resume: %s, Workers: %s",
@@ -127,7 +130,7 @@ class Command(BaseCommand):
             self.max_workers,
         )
         # Find all json files
-        reporters_files = sorted(os.listdir(self.crosswalk_dir))
+        reporters_files = sorted(p.name for p in self.crosswalk_dir.iterdir())
         reporters_files = [r for r in reporters_files if ".json" in r]
 
         # Generate a list of reporters available
@@ -136,15 +139,14 @@ class Command(BaseCommand):
             for r in reporters_files
         ]
 
-        last_reporter_file = os.path.join(
-            self.crosswalk_dir, "last_completed_reporter.txt"
-        )
+        last_reporter_file = self.crosswalk_dir / "last_completed_reporter.txt"
 
         # Load the last completed reporter if resuming
         if resume:
             try:
-                with open(last_reporter_file) as f:
-                    last_completed_reporter = f.read().strip()
+                last_completed_reporter = (
+                    last_reporter_file.read_text().strip()
+                )
                 resume = True
             except FileNotFoundError:
                 logger.warning(
@@ -163,13 +165,12 @@ class Command(BaseCommand):
                     reporters,
                 )
                 return
-            else:
-                reporter_item_index = reporters.index(self.start_from_reporter)
-                if reporter_item_index:
-                    # Update reporters and reporters files list
-                    reporters = reporters[reporter_item_index:]
-                    reporters_files = reporters_files[reporter_item_index:]
-                    self.start_from_reporter = None
+            reporter_item_index = reporters.index(self.start_from_reporter)
+            if reporter_item_index:
+                # Update reporters and reporters files list
+                reporters = reporters[reporter_item_index:]
+                reporters_files = reporters_files[reporter_item_index:]
+                self.start_from_reporter = None
 
         for filename in reporters_files:
             if filename.endswith(".json"):
@@ -199,27 +200,27 @@ class Command(BaseCommand):
                     continue
 
                 logger.info("Starting to process reporter: %s", reporter)
-                self.process_crosswalk_file(
-                    os.path.join(self.crosswalk_dir, filename)
-                )
+                self.process_crosswalk_file(self.crosswalk_dir / filename)
 
                 # Log the completed reporter
                 logger.info("Completed processing reporter: %s", reporter)
-                with open(last_reporter_file, "w") as f:
-                    f.write(reporter)
+                last_reporter_file.write_text(reporter)
 
     def process_entry(self, entry: dict[str, Any]) -> int:
-        """Processes a single entry by attempting to download and store its associated
-        PDF file
-        :param entry: A dictionary containing details about the case entry.
-        :return: An integer indicating the result of the process:
+        """Processes a single entry by attempting to download and store its associated PDF file.
+
+        Args:
+            entry: A dictionary containing details about the case entry.
+
+        Returns:
+            An integer indicating the result of the process:
                  - 1 if the PDF was successfully downloaded and stored.
                  - 0 if the PDF was not downloaded (e.g., already processed, dry run
                  mode, or an error occurred).
         """
         logger.debug("Processing entry: %s", entry)
         try:
-            cap_case_id = entry["cap_case_id"]
+            entry["cap_case_id"]
             cl_cluster_id = entry["cl_cluster_id"]
             json_path = entry["cap_path"]
 
@@ -275,17 +276,17 @@ class Command(BaseCommand):
         # No files downloaded
         return 0
 
-    def process_crosswalk_file(self, crosswalk_file: str) -> None:
+    def process_crosswalk_file(self, crosswalk_file: Path) -> None:
         """Process a single crosswalk file.
 
-        :param crosswalk_file: Path to the crosswalk file.
-        :return: None
+        Args:
+            crosswalk_file: Path to the crosswalk file.
         """
         logger.info("Processing crosswalk file: %s", crosswalk_file)
 
         start_time = time.time()
 
-        with open(crosswalk_file) as f:
+        with crosswalk_file.open() as f:
             crosswalk_data = json.load(f)
             logger.info("Documents to download: %s", len(crosswalk_data))
 
@@ -319,8 +320,11 @@ class Command(BaseCommand):
     def parse_cap_path(self, cap_path: str) -> tuple[str, str, str]:
         """Extract data from CAP path.
 
-        :param cap_path: CAP path string.
-        :return: Tuple containing reporter_slug, volume_folder, and case_name.
+        Args:
+            cap_path: CAP path string.
+
+        Returns:
+            Tuple containing reporter_slug, volume_folder, and case_name.
         """
         # Extract data from CAP path
         parts = cap_path.strip("/").split("/")
@@ -332,8 +336,11 @@ class Command(BaseCommand):
     def fetch_pdf_from_cap(self, pdf_path: str) -> bytes | None:
         """Fetch PDF content from CAP.
 
-        :param pdf_path: Path to the PDF in CAP storage.
-        :return: PDF content as bytes, or None if fetching fails.
+        Args:
+            pdf_path: Path to the PDF in CAP storage.
+
+        Returns:
+            PDF content as bytes, or None if fetching fails.
         """
         logger.info("Fetching PDF from CAP: %s", pdf_path)
         logger.debug("Bucket name: %s", self.cap_bucket_name)
@@ -344,18 +351,16 @@ class Command(BaseCommand):
             logger.info("Dry run: Would fetch PDF from %s", pdf_path)
             return b"Mock PDF content"
 
-        temp_file = None
+        temp_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_path = Path(temp_file.name)
                 logger.debug("Attempting to download file: %s", pdf_path)
                 self.cap_client.download_file(
-                    self.cap_bucket_name, pdf_path, temp_file.name
+                    self.cap_bucket_name, pdf_path, str(temp_path)
                 )
-                with open(temp_file.name, "rb") as f:
-                    pdf_content = f.read()
-                logger.debug(
-                    "Downloaded PDF to temporary file: %s", temp_file.name
-                )
+                pdf_content = temp_path.read_bytes()
+                logger.debug("Downloaded PDF to temporary file: %s", temp_path)
                 logger.debug("Read PDF content, length: %s", len(pdf_content))
                 return pdf_content
         except Exception as e:
@@ -365,17 +370,17 @@ class Command(BaseCommand):
             )
             return None
         finally:
-            if temp_file and os.path.exists(temp_file.name):
-                os.unlink(temp_file.name)
+            if temp_path:
+                temp_path.unlink(missing_ok=True)
 
     def store_pdf_in_cl(
         self, cluster: OpinionCluster, pdf_content: bytes
     ) -> None:
         """Store the fetched PDF in CourtListener's storage.
 
-        :param cluster: OpinionCluster object to associate the PDF with.
-        :param pdf_content: PDF content as bytes.
-        :return: None
+        Args:
+            cluster: OpinionCluster object to associate the PDF with.
+            pdf_content: PDF content as bytes.
         """
         logger.info("Storing PDF for cluster: %s", cluster.id)
         storage = HarvardPDFStorage()

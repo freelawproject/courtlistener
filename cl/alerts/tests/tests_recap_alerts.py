@@ -55,6 +55,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
 )
 from cl.search.documents import (
+    ES_CHILD_ID,
     DocketDocument,
     RECAPPercolator,
     RECAPSweepDocument,
@@ -68,6 +69,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
     RECAPDocumentFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
@@ -96,9 +98,7 @@ class RECAPAlertsSweepIndexTest(
     TestCase,
     SearchAlertsAssertions,
 ):
-    """
-    RECAP Alerts Sweep Index Tests
-    """
+    """RECAP Alerts Sweep Index Tests."""
 
     @staticmethod
     def rebuild_percolator_index():
@@ -154,13 +154,13 @@ class RECAPAlertsSweepIndexTest(
             self.r.delete(*keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
-        """Test filter RECAP alerts that met the conditions to be sent:
+        """Test filtering RECAP alerts that meet the following conditions to be sent.
+
         - RECAP type alert.
         - RT or DLY rate
         - RT alerts require the user to have an active membership or the
         unlimited search alerts flag.
         """
-
         rt_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -247,9 +247,7 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(dly_recap_alert.name, html_content)
 
     def test_index_daily_recap_documents(self, mock_prefix) -> None:
-        """Test index_daily_recap_documents method over different documents
-        conditions.
-        """
+        """Test index_daily_recap_documents method over different documents conditions."""
         RECAPSweepDocument._index.delete(ignore=404)
         RECAPSweepDocument.init()
         recap_search = DocketDocument.search()
@@ -317,7 +315,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File",
                 document_number="1",
@@ -362,7 +360,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd_2 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de_2,
                 description="Motion to File Lorem",
                 document_number="2",
@@ -401,7 +399,7 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd_old = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de_old,
                 description="Motion to File",
                 document_number="1",
@@ -479,8 +477,7 @@ class RECAPAlertsSweepIndexTest(
     def test_filter_out_alerts_to_send_by_query_and_hits(
         self, mock_prefix
     ) -> None:
-        """Test RECAP alerts can be properly filtered out according to
-        their query and hits matched conditions.
+        """Test RECAP alerts can be properly filtered out according to their query and hits matched conditions.
 
         - Docket-only Alerts should be triggered only if the Docket was
           modified on the day. This prevents sending Alerts due to related
@@ -496,7 +493,6 @@ class RECAPAlertsSweepIndexTest(
 
         Assert the content structure accordingly.
         """
-
         # This docket-only alert matches a Docket ingested today.
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
@@ -803,13 +799,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
 
     def test_special_cross_object_alerts_or_clause(self, mock_prefix) -> None:
-        """This test confirms that hits are properly filtered out or included
-        in alerts for special cross-object alerts that can match either a
-        Docket-only hit and/or Docket + RDs simultaneously in the same hit.
-        These cases include queries that use an OR clause combining
-        Docket field + RD fields.
-        """
-
+        """This test confirms that hits are properly filtered out or included in alerts for special cross-object alerts that can match either a Docket-only hit and/or Docket + RDs simultaneously in the same hit. These cases include queries that use an OR clause combining Docket field + RD fields."""
         # The following test confirms that an alert with a query that can match
         # a Docket or RECAPDocuments from different cases simultaneously are
         # properly filtered.
@@ -903,13 +893,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
     def test_special_cross_object_alerts_text_query(self, mock_prefix) -> None:
-        """This test confirms that hits are properly filtered out or included
-        in alerts for special cross-object alerts that can match either a
-        Docket-only hit and/or Docket + RDs simultaneously in the same hit.
-        These cases include queries that use a text query that can match a
-        Docket and RD field simultaneously.
-        """
-
+        """This test confirms that hits are properly filtered out or included in alerts for special cross-object alerts that can match either a Docket-only hit and/or Docket + RDs simultaneously in the same hit. These cases include queries that use a text query that can match a Docket and RD field simultaneously."""
         # This test confirms a text query cross-object alert matches documents
         # according to trigger conditions like indexed date and previous triggers
         # by the same document.
@@ -1080,7 +1064,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_4 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
                 document_number="3",
@@ -1205,11 +1189,7 @@ class RECAPAlertsSweepIndexTest(
 
     @mock.patch("cl.alerts.management.commands.cl_send_recap_alerts.logger")
     def test_alert_fails_gracefully(self, mock_logger, mock_prefix) -> None:
-        """This test confirms that if an alert has bad syntax or another
-        Elasticsearch issue that prevents it from being sent, it fails
-        gracefully by logging the error and continuing with the remaining alerts.
-        """
-
+        """This test confirms that if an alert has bad syntax or another Elasticsearch issue that prevents it from being sent, it fails gracefully by logging the error and continuing with the remaining alerts."""
         AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -1248,10 +1228,7 @@ class RECAPAlertsSweepIndexTest(
         self.assertFalse(self.r.exists("alert_sweep:rd_re_index_completed"))
 
     def test_send_alerts_on_custom_date(self, mock_prefix) -> None:
-        """This test confirms that the cl_send_recap_alerts --query-date
-        argument works correctly to send alerts for the specified date.
-        """
-
+        """This test confirms that the cl_send_recap_alerts --query-date argument works correctly to send alerts for the specified date."""
         indexing_date = self.mock_date - datetime.timedelta(days=5)
         with (
             time_machine.travel(indexing_date, tick=False),
@@ -1307,10 +1284,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
     def test_limit_alert_case_child_hits(self, mock_prefix) -> None:
-        """Test limit case child hits up to 5 and display the "View additional
-        results for this Case" button.
-        """
-
+        """Test limit case child hits up to 5 and display the "View additional results for this Case" button."""
         with (
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -1393,10 +1367,7 @@ class RECAPAlertsSweepIndexTest(
         alert_de.delete()
 
     def test_cross_object_parties_alert_query(self, mock_prefix) -> None:
-        """Test a cross object alert including parties can be properly
-        triggered.
-        """
-
+        """Test a cross object alert including parties can be properly triggered."""
         cross_object_parties_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -1491,10 +1462,7 @@ class RECAPAlertsSweepIndexTest(
         alert_de.delete()
 
     def test_docket_only_parties_alert_query(self, mock_prefix) -> None:
-        """Test a docket only alert including parties can be properly
-        triggered.
-        """
-
+        """Test a docket only alert including parties can be properly triggered."""
         docket_parties_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -1550,10 +1518,7 @@ class RECAPAlertsSweepIndexTest(
     def test_multiple_alerts_email_hits_limit_per_alert(
         self, mock_prefix
     ) -> None:
-        """Test multiple alerts can be grouped in an email and hits within an
-        alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits.
-        """
-
+        """Test multiple alerts can be grouped in an email and hits within an alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits."""
         with (
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -1798,10 +1763,7 @@ class RECAPAlertsSweepIndexTest(
             d.delete()
 
     def test_schedule_wly_and_mly_recap_alerts(self, mock_prefix) -> None:
-        """Test Weekly and Monthly RECAP Search Alerts are scheduled daily
-        before being sent later.
-        """
-
+        """Test Weekly and Monthly RECAP Search Alerts are scheduled daily before being sent later."""
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.WEEKLY,
@@ -1957,7 +1919,6 @@ class RECAPAlertsSweepIndexTest(
 
     def test_alert_frequency_estimation(self, mock_prefix) -> None:
         """Test alert frequency ES API endpoint for RECAP Alerts."""
-
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Frequency Test RECAP",
@@ -2095,9 +2056,7 @@ class RECAPAlertsSweepIndexTest(
     def test_percolator_plus_sweep_alerts_integration(
         self, mock_prefix
     ) -> None:
-        """Integration test to confirm alerts missing by the percolator approach
-        are properly send by the sweep index without duplicating alerts.
-        """
+        """Integration test to confirm alerts missing by the percolator approach are properly send by the sweep index without duplicating alerts."""
         # Rename percolator index for this test to avoid collisions.
         self.rebuild_percolator_index()
 
@@ -2157,7 +2116,7 @@ class RECAPAlertsSweepIndexTest(
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
 
-            rd_1 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File 1",
                 document_number="1",
@@ -2338,13 +2297,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
-        """Confirm that case-only alerts are properly sent and that they are
-        triggered only once per case. This means that if a Docket or a
-        RECAPDocument belonging to the case triggers the alert, subsequent
-        changes to the Docket or the ingestion of another matching
-        RECAPDocument for the same case will not trigger the alert again.
-        """
-
+        """Confirm that case-only alerts are properly sent and that they are triggered only once per case. This means that if a Docket or a RECAPDocument belonging to the case triggers the alert, subsequent changes to the Docket or the ingestion of another matching RECAPDocument for the same case will not trigger the alert again."""
         # Test: Case-only alert Docket Only query
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
@@ -2679,6 +2632,45 @@ class RECAPAlertsSweepIndexTest(
         docket_only_alert.delete()
         docket_2.delete()
 
+    def test_sweep_index_skips_scotus(
+        self, mock_prefix: mock.MagicMock
+    ) -> None:
+        """SCOTUS search alerts only go through the percolator, so the daily sweep index gets RECAP content changed that day but not SCOTUS content."""
+        RECAPSweepDocument._index.delete(ignore=404)
+        RECAPSweepDocument.init()
+        with (
+            time_machine.travel(self.mock_date_indexing, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            scotus_document = SCOTUSDocumentFactory(
+                docket_entry__docket__court=CourtFactory(id="scotus")
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry__docket__court=self.court_2,
+                docket_entry__docket__source=Docket.RECAP,
+            )
+
+        with time_machine.travel(self.mock_date, tick=False):
+            index_daily_recap_documents(
+                self.r,
+                DocketDocument._index._name,
+                RECAPSweepDocument,
+                get_day_before_query_date(),
+                testing=True,
+            )
+
+        swept_ids = {hit.meta.id for hit in RECAPSweepDocument.search().scan()}
+        self.assertIn(str(rd.docket_entry.docket_id), swept_ids)
+        self.assertIn(ES_CHILD_ID(rd.pk).RECAP, swept_ids)
+        self.assertNotIn(
+            str(scotus_document.docket_entry.docket_id), swept_ids
+        )
+        self.assertNotIn(ES_CHILD_ID(scotus_document.pk).SCOTUS, swept_ids)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            scotus_document.docket_entry.docket.delete()
+            rd.docket_entry.docket.delete()
+
 
 @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
@@ -2689,9 +2681,7 @@ class RECAPAlertsSweepIndexTest(
 class RECAPAlertsPercolatorTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
-    """
-    RECAP Alerts Percolator Tests
-    """
+    """RECAP Alerts Percolator Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2808,8 +2798,7 @@ class RECAPAlertsPercolatorTest(
         self.percolator_call_count = 0
 
     def count_percolator_calls(self, method, *args, **kwargs) -> None:
-        """Wraps the helper percolator method to count its calls and assert
-        the expected count."""
+        """Wraps the helper percolator method to count its calls and assert the expected count."""
         # Increment the call count
         self.percolator_call_count += 1
 
@@ -2817,9 +2806,7 @@ class RECAPAlertsPercolatorTest(
         return method(*args, **kwargs)
 
     def reset_and_assert_percolator_count(self, expected) -> None:
-        """Resets the helper percolator method count and asserts the expected
-        number of calls."""
-
+        """Resets the helper percolator method count and asserts the expected number of calls."""
         assert self.percolator_call_count == expected, (
             f"Expected {expected} method calls, but got {self.percolator_call_count}"
         )
@@ -2834,9 +2821,7 @@ class RECAPAlertsPercolatorTest(
     def test_recap_document_cross_object_percolator_queries(
         self, mock_prefix
     ) -> None:
-        """Test if a variety of RECAPDocuments can trigger cross-object percolator
-        queries"""
-
+        """Test if a variety of RECAPDocuments can trigger cross-object percolator queries."""
         created_queries_ids = []
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -2935,9 +2920,7 @@ class RECAPAlertsPercolatorTest(
         )
 
     def test_recap_document_percolator(self, mock_prefix) -> None:
-        """Test if a variety of RECAPDocument triggers a RD-only percolator
-        query."""
-
+        """Test if a variety of RECAPDocument triggers a RD-only percolator query."""
         created_queries_ids = []
         # Test percolate text query + different filters.
         cd = {
@@ -3037,7 +3020,6 @@ class RECAPAlertsPercolatorTest(
 
     def test_docket_percolator(self, mock_prefix) -> None:
         """Test if a variety of Docket documents triggers a percolator query."""
-
         document_index_alias = DocketDocument._index._name
         created_queries_ids = []
 
@@ -3206,7 +3188,6 @@ class RECAPAlertsPercolatorTest(
         self, mock_prefix
     ) -> None:
         """Test a RECAP alert is removed from the RECAPPercolator index."""
-
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -3259,14 +3240,12 @@ class RECAPAlertsPercolatorTest(
     def test_alert_hit_not_stored_for_non_member_rt_without_webhook(
         self, mock_prefix
     ) -> None:
-        """Confirm the hit is not stored in the alert_hits Redis set when a
-        Real-Time alert belongs to a non-member user without a webhook enabled.
+        """Confirm the hit is not stored in the alert_hits Redis set when a Real-Time alert belongs to a non-member user without a webhook enabled.
 
         For such alerts the hit is neither delivered via webhook nor scheduled
         for an email digest (non-members aren't eligible for RT email alerts),
         so recording it would only grow the Redis set unbounded.
         """
-
         with self.captureOnCommitCallbacks(execute=True):
             non_member = UserProfileWithParentsFactory()
             # Real-Time alert owned by a non-member user without a webhook.
@@ -3339,13 +3318,11 @@ class RECAPAlertsPercolatorTest(
     def test_alert_hit_stored_for_non_member_rt_with_webhook(
         self, mock_prefix
     ) -> None:
-        """Confirm the hit is stored in the alert_hits Redis set when a
-        Real-Time alert belongs to a non-member user that has a webhook enabled.
+        """Confirm the hit is stored in the alert_hits Redis set when a Real-Time alert belongs to a non-member user that has a webhook enabled.
 
         Webhooks are delivered for all users in real time regardless of
         membership, so the hit must be recorded to avoid re-sending it.
         """
-
         with self.captureOnCommitCallbacks(execute=True):
             # self.user_profile_no_member is a non-member with a webhook enabled.
             non_member_alert = AlertFactory(
@@ -3400,7 +3377,6 @@ class RECAPAlertsPercolatorTest(
 
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm a Docket or RECAPDocument is percolated upon ingestion."""
-
         docket_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
@@ -3769,7 +3745,6 @@ class RECAPAlertsPercolatorTest(
 
     def test_recap_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm RECAP Search alerts are properly highlighted."""
-
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -3858,7 +3833,6 @@ class RECAPAlertsPercolatorTest(
     )
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
-
         with (
             time_machine.travel(self.mock_date, tick=False),
             mock.patch(
@@ -4169,8 +4143,7 @@ class RECAPAlertsPercolatorTest(
     def test_filter_out_alerts_to_send_by_query_and_hits(
         self, mock_prefix
     ) -> None:
-        """Test RECAP alerts can be properly filtered out according to
-        their query and hits matched conditions.
+        """Test RECAP alerts can be properly filtered out according to their query and hits matched conditions.
 
         - Docket-only Alerts should be triggered only upon a Docket ingestion.
           committing RECAPDocument ingestion that can match the alert.
@@ -4178,7 +4151,6 @@ class RECAPAlertsPercolatorTest(
         - RECAP-only Alerts should only include RDs that have not triggered the
           same alert previously.
         """
-
         scheduled_hits = ScheduledAlertHit.objects.all()
         self.assertEqual(len(scheduled_hits), 0)
 
@@ -4264,7 +4236,7 @@ class RECAPAlertsPercolatorTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Motion to File",
                 document_number="1",
@@ -4312,13 +4284,7 @@ class RECAPAlertsPercolatorTest(
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)
     def test_retrieve_all_the_matched_alerts_in_batches(self, mock_prefix):
-        """Confirm that we can retrieve all the matched alerts by the
-        percolator if the number of alerts matched exceeds the initial query
-        ELASTICSEARCH_PAGINATION_BATCH_SIZE.
-        Also assert that no RT alerts are scheduled to be sent according to its
-        rate.
-        """
-
+        """Confirm that we can retrieve all the matched alerts by the percolator if the number of alerts matched exceeds the initial query ELASTICSEARCH_PAGINATION_BATCH_SIZE. Also assert that no RT alerts are scheduled to be sent according to its rate."""
         alerts_created_user_1 = []
         alerts_created_user_2 = []
         for i in range(6):
@@ -4397,10 +4363,7 @@ class RECAPAlertsPercolatorTest(
     def test_count_percolator_requests_on_related_documents(
         self, mock_prefix
     ) -> None:
-        """Confirm a percolator request is performed only once when adding or
-        updating related documents like BankruptcyInformation or Parties.
-        """
-
+        """Confirm a percolator request is performed only once when adding or updating related documents like BankruptcyInformation or Parties."""
         with self.captureOnCommitCallbacks(execute=True):
             AlertFactory(
                 user=self.user_profile.user,
@@ -4615,12 +4578,7 @@ class RECAPAlertsPercolatorTest(
     def test_skip_parties_percolation_when_attorneys_exceed_limit(
         self, mock_prefix
     ) -> None:
-        """Confirm that when the number of attorneys exceeds
-        MAX_ATTORNEYS_TO_PERCOLATE, percolation is skipped on docket
-        save and index_docket_parties_in_es is not called, so no percolation
-        happens at all.
-        """
-
+        """Confirm that when the number of attorneys exceeds MAX_ATTORNEYS_TO_PERCOLATE, percolation is skipped on docket save and index_docket_parties_in_es is not called, so no percolation happens at all."""
         with self.captureOnCommitCallbacks(execute=True):
             AlertFactory(
                 user=self.user_profile.user,
@@ -4728,11 +4686,7 @@ class RECAPAlertsPercolatorTest(
     def test_recap_document_parties_percolation_based_on_attorney_limit(
         self, mock_prefix
     ) -> None:
-        """Confirm that parties data is included or excluded from
-        percolation based on the attorney count relative to
-        MAX_ATTORNEYS_TO_PERCOLATE for RECAPDocuments.
-        """
-
+        """Confirm that parties data is included or excluded from percolation based on the attorney count relative to MAX_ATTORNEYS_TO_PERCOLATE for RECAPDocuments."""
         docket = DocketFactory(
             court=self.court,
             case_name="Party Limit Docket Case",
@@ -4844,11 +4798,7 @@ class RECAPAlertsPercolatorTest(
     def test_docket_parties_percolation_based_on_attorney_limit(
         self, mock_prefix
     ) -> None:
-        """Confirm that parties data is included or excluded from
-        percolation based on the attorney count relative to
-        MAX_ATTORNEYS_TO_PERCOLATE for Dockets.
-        """
-
+        """Confirm that parties data is included or excluded from percolation based on the attorney count relative to MAX_ATTORNEYS_TO_PERCOLATE for Dockets."""
         with self.captureOnCommitCallbacks(execute=True):
             party_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -4961,13 +4911,7 @@ class RECAPAlertsPercolatorTest(
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
-        """Confirm that case-only alerts are properly sent and that they are
-        triggered only once per case. This means that if a Docket or a
-        RECAPDocument belonging to the case triggers the alert, subsequent
-        changes to the Docket or the ingestion of another matching
-        RECAPDocument for the same case will not trigger the alert again.
-        """
-
+        """Confirm that case-only alerts are properly sent and that they are triggered only once per case. This means that if a Docket or a RECAPDocument belonging to the case triggers the alert, subsequent changes to the Docket or the ingestion of another matching RECAPDocument for the same case will not trigger the alert again."""
         # Test: Case-only alert Docket Only query
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
@@ -5316,10 +5260,7 @@ class RECAPAlertsPercolatorTest(
         docket_2.delete()
 
     def test_percolate_rd_upon_cites_fields_update(self, mock_prefix) -> None:
-        """Test RECAPDocument percolation to match queries that involve the
-        cites field.
-        """
-
+        """Test RECAPDocument percolation to match queries that involve the cites field."""
         rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
         with self.captureOnCommitCallbacks(execute=True):
             opinion = OpinionFactory(
@@ -5397,12 +5338,7 @@ class RECAPAlertsPercolatorTest(
     def test_percolates_rd_upon_plain_text_extraction_if_no_citations(
         self, mock_prefix
     ) -> None:
-        """The RECAPDocument percolation upon the plain_text extraction is delayed
-        in order to avoid two percolation requests if the plain_text contains
-        citations. But in case no citations are found the document should still
-        be percolated to match other types of alerts with no citations.
-        """
-
+        """The RECAPDocument percolation upon the plain_text extraction is delayed in order to avoid two percolation requests if the plain_text contains citations. But in case no citations are found the document should still be percolated to match other types of alerts with no citations."""
         rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
         with self.captureOnCommitCallbacks(execute=True):
             rd_no_cites = AlertFactory(

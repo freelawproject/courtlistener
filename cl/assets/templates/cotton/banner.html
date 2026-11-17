@@ -22,7 +22,7 @@
 />
 {% with banner_id_str=banner_id|stringformat:"s" %}
 {% with cookie_name="banner_dismissed_"|add:banner_id_str %}
-{% with base="flex flex-nowrap gap-2 py-[10px] pr-[10px] pl-[16px] border rounded-[10px] md:items-center" info="bg-sky-100/75 border-sky-400 text-sky-800" warning="bg-red-100/75 border-red-400 text-red-800" %}
+{% with base="flex flex-nowrap gap-2 py-[10px] pr-[10px] pl-[16px] border rounded-lg-10 md:items-center" info="bg-sky-100/75 border-sky-400 text-sky-800" warning="bg-red-100/75 border-red-400 text-red-800" %}
 
 {% if cookie_name not in request.COOKIES %}
   <div

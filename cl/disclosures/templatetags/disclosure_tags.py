@@ -1,3 +1,5 @@
+"""Template filters for displaying financial disclosure codes."""
+
 from django import template
 
 from cl.disclosures.models import CODES

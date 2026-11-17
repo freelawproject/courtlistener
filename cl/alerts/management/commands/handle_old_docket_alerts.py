@@ -1,3 +1,5 @@
+"""Warn about and disable docket alerts on long-terminated dockets."""
+
 from argparse import RawTextHelpFormatter
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -16,15 +18,15 @@ from cl.lib.date_time import dt_as_local_date
 
 
 def build_user_report(user, delete=False):
-    """Figure out which alerts are old or too old; disable very old ones based
-    on date_modified since this field is updated when the alert_type field is
-    toggled
+    """Figure out which alerts are old or too old; disable very old ones based on date_modified since this field is updated when the alert_type field is toggled.
 
-    :param user: A user that has alerts
-    :param delete: Whether to disable really old alerts
-    :return A dict indicating the counts of old alerts.
+    Args:
+        user: A user that has alerts
+        delete: Whether to disable really old alerts
+
+    Returns:
+        A dict indicating the counts of old alerts.
     """
-
     report = OldAlertReport()
     alerts = (
         user.docket_alerts.filter(alert_type=DocketAlert.SUBSCRIPTION)
@@ -80,13 +82,15 @@ def build_user_report(user, delete=False):
 
 
 async def send_old_alert_warning_email_and_webhook(user, report) -> int:
-    """Send alerts emails and webhooks for old alerts
+    """Send alerts emails and webhooks for old alerts.
 
-    :param user: The user with terminated dockets
-    :param report: A dict containing information about old alerts
-    :return The number of webhook events sent
+    Args:
+        user: The user with terminated dockets
+        report: A dict containing information about old alerts
+
+    Returns:
+        The number of webhook events sent
     """
-
     user_webhooks = user.webhooks.filter(
         event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT, enabled=True
     )
@@ -118,6 +122,8 @@ async def send_old_alert_warning_email_and_webhook(user, report) -> int:
 
 
 class Command(VerboseCommand):
+    """Email users about old docket alerts and disable very old ones."""
+
     help = """Check for old docket alerts and email or disable them.
 
 Alerts are sent weekly, therefore we have to capture things in date ranges.
@@ -139,11 +145,13 @@ The schedule is thus:
 """
 
     def create_parser(self, *args, **kwargs):
+        """Create a parser that keeps the help text's formatting."""
         parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
     def add_arguments(self, parser):
+        """Add the ``--delete-old-alerts`` and ``--send-alerts`` flags."""
         parser.add_argument(
             "--delete-old-alerts",
             action="store_true",
@@ -158,6 +166,11 @@ The schedule is thus:
         )
 
     def handle(self, *args, **options):
+        """Build a report for each user with terminated docket alerts.
+
+        Very old alerts are only disabled with ``--delete-old-alerts``, and
+        emails and webhooks are only sent with ``--send-alerts``.
+        """
         super().handle(*args, **options)
 
         # Needs to be user-oriented so that we only send one email per person.

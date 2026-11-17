@@ -29,7 +29,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
    Date Updated: {{ doc.timestamp|parse_utc_date|localtime|date:"F jS, Y h:i a T" }}
    {% if doc.description %}Description: {{ doc.description|render_string_or_list|safe|striptags }}{% endif %}
    {% if doc.plain_text %}{% contains_highlights doc.plain_text.0 True as highlighted %}{% if highlighted %}...{% endif %}{{ doc.plain_text|render_string_or_list|safe|striptags|underscore_to_space }}...{% endif %}
-   View this document on our site: https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}
+   View this document on our site: https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}{% if doc.docket_entry_id %}#minute-entry-{{ doc.docket_entry_id }}{% endif %}{% endif %}
 {% endwith %}{% endfor %}
 {% if result.child_docs and result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
 {% endif %}~~~~~
@@ -38,9 +38,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endif %}{% endfor %}
 {% endfor %}
 ************************
-📣 The power of CourtListener can now be integrated into Claude and is part of Gemini Enterprise for Legal. Combine CourtListener with AI to make the hardest research just a prompt away.
-Learn more about Claude: https://free.law/2026/05/12/courtlistener-is-now-available-inside-claude/
-Learn more about Gemini Enterprise for Legal: https://free.law/2026/08/25/courtlistener-gemini-enterprise-for-legal/
+{% include "includes/alert_promo_banner.txt" %}
 
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
  - Blog: https://free.law
