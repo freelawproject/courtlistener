@@ -939,7 +939,7 @@ class AudioFileTaskTest(TestCase):
             process_audio_file(pk=self.audio1.id)
 
         af.refresh_from_db()
-        measured_duration: float = af.duration  # type: ignore
+        measured_duration: float = af.duration
         # Use almost equal because measuring MP3's is wonky.
         self.assertAlmostEqual(
             measured_duration,

@@ -199,7 +199,7 @@ class NeonWebhookEvent(AbstractDateTimeModel):
         help_text="Unique identifier assigned by Neon CRM to a membership record",
         blank=True,
     )
-    content = models.JSONField(  # type: ignore
+    content = models.JSONField(
         encoder=DjangoJSONEncoder,
         help_text="The content of the payload of the POST request.",
     )

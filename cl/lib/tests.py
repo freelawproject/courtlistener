@@ -1493,13 +1493,13 @@ class TestDateTimeHelpers(SimpleTestCase):
         # Date in PSD time -8 hours UTC offset
         pst_date = datetime.date(2023, 1, 3)
         pst_date_time = midnight_pt(pst_date)
-        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pst_utc_offset_hours, -8.0)
 
         # Date in PDT time -7 hours UTC offset
         pdt_date = datetime.date(2023, 5, 3)
         pdt_date_time = midnight_pt(pdt_date)
-        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pdt_utc_offset_hours, -7.0)
 
 

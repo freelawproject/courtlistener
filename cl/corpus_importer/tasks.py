@@ -322,7 +322,7 @@ def generate_ia_json(
         *[
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
-            attorney_prefetch,  # type: ignore
+            attorney_prefetch,
         ],
     )
 
