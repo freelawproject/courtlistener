@@ -970,7 +970,7 @@ class ESSignalProcessor:
         if action == "post_add" or action == "post_remove":
             mapping_fields = self.documents_model_mapping["m2m"][sender]
             for fields_map in mapping_fields.values():
-                affected_field = list(fields_map.keys())[0]
+                affected_field = next(iter(fields_map.keys()))
                 update_remove_m2m_documents(
                     self.main_model,
                     self.es_document,

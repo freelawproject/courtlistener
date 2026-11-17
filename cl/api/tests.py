@@ -939,7 +939,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # IP address
         keys = self.r.keys("api:v3-Test.d:*")
-        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        ip_key = next(k for k in keys if k.endswith("ip_map"))
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
@@ -976,7 +976,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # IP address
         keys = self.r.keys("api:v4-Test.d:*")
-        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        ip_key = next(k for k in keys if k.endswith("ip_map"))
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
