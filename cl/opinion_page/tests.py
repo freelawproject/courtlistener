@@ -4268,8 +4268,10 @@ class BuildDocketMetadataTest(TestCase):
             self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
 
     def test_recap_docket_explains_last_updated(self) -> None:
-        """A RECAP docket's Last Updated item carries a safe HTML message for
-        its tooltip, explaining why the date can lag the latest filing."""
+        """A RECAP docket's Last Updated item carries a tooltip message.
+
+        The message is safe HTML explaining why the date can lag the latest filing.
+        """
         docket = DocketFactory(
             court=self.court,
             source=Docket.RECAP,
@@ -4745,8 +4747,11 @@ class DocketPageV2TemplateTest(TestCase):
     def test_metadata_section_places_tooltips_from_their_messages(
         self,
     ) -> None:
-        """A tooltip_message puts a help button after the label, and a
-        suffix_tooltip_message puts one after the suffix link."""
+        """Each tooltip message places a help button next to what it explains.
+
+        tooltip_message puts one after the label, suffix_tooltip_message after
+        the suffix link.
+        """
         # Rendered through a wrapper string so the component's own c-vars
         # don't shadow the context, as in the one_click_select test above.
         template = engines["django"].from_string(
@@ -4875,8 +4880,11 @@ class DocketPageV2TemplateTest(TestCase):
 
 
 class LegacyMetadataSectionTooltipTest(SimpleTestCase):
-    """The legacy metadata section shows its Bootstrap tooltips from the
-    message fields alone, now that the has_tooltip flags are gone."""
+    """The legacy metadata section shows tooltips from the message fields.
+
+    The has_tooltip flags are gone, so a message alone turns its Bootstrap
+    tooltip on.
+    """
 
     def render(self, item: dict[str, str]) -> Any:
         """Renders one item through the legacy include and parses it."""
@@ -4886,8 +4894,10 @@ class LegacyMetadataSectionTooltipTest(SimpleTestCase):
         return fromstring(html)
 
     def test_tooltips_follow_their_messages(self) -> None:
-        """Each message adds a tooltip where legacy has always shown it, and
-        an item with neither has no tooltip at all."""
+        """Each message adds a tooltip where legacy has always shown it.
+
+        An item with neither message has no tooltip at all.
+        """
         base = {"label": "Last Updated", "value": "Jan 20"}
 
         with self.subTest("tooltip_message"):
