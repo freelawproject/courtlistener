@@ -415,8 +415,6 @@ def send_alert_and_webhook(
 
     # Send docket entries to webhook. RECAP calls keep two arguments, so
     # workers still on the old task signature accept them during a deploy.
-    # SCOTUS webhooks stay off until they get a webhook version with a source
-    # field.
     if source is not SCOTUS_ALERT_SOURCE:
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     elif settings.SCOTUS_ALERT_WEBHOOKS_ENABLED:

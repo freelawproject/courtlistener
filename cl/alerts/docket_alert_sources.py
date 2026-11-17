@@ -34,6 +34,9 @@ class DocketAlertSource:
 
     ``webhook_serializer`` serializes each entry from ``entries_by_pk`` for
     send_docket_alert_webhook_events.
+
+    ``api_view_name`` names the REST API list view of this source's
+    entries. v3+ webhooks send its path as the payload's ``source``.
     """
 
     entries_by_pk: Callable[[list[int]], QuerySet]
@@ -41,6 +44,7 @@ class DocketAlertSource:
     email_txt_template: str
     email_html_template: str
     webhook_serializer: type[ModelSerializer]
+    api_view_name: str
 
 
 def _with_email_relations(
@@ -95,6 +99,7 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
     email_txt_template="docket_alert_email.txt",
     email_html_template="docket_alert_email.html",
     webhook_serializer=DocketEntrySerializer,
+    api_view_name="docketentry-list",
 )
 
 
@@ -134,6 +139,7 @@ SCOTUS_ALERT_SOURCE = DocketAlertSource(
     email_txt_template="docket_alert_email_scotus.txt",
     email_html_template="docket_alert_email_scotus.html",
     webhook_serializer=SCOTUSDocketEntrySerializer,
+    api_view_name="scotusdocketentry-list",
 )
 
 

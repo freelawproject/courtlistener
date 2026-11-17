@@ -71,6 +71,7 @@ from cl.api.models import (
     Webhook,
     WebhookEvent,
     WebhookEventType,
+    WebhookVersions,
 )
 from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
@@ -1288,13 +1289,18 @@ class DocketAlertScotusTest(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_triggering_scotus_docket_webhook(self, mock_post) -> None:
-        """A SCOTUS docket alert sends the SCOTUS entries to the webhook."""
-        WebhookFactory(
-            user=self.user,
-            event_type=WebhookEventType.DOCKET_ALERT,
-            url="https://example.com/",
-            enabled=True,
-        )
+        """A SCOTUS docket alert sends the SCOTUS entries to v3 webhooks.
+
+        Earlier versions only know the RECAP results format.
+        """
+        for version in (WebhookVersions.v2, WebhookVersions.v3):
+            WebhookFactory(
+                user=self.user,
+                event_type=WebhookEventType.DOCKET_ALERT,
+                url=f"https://example.com/{version}",
+                enabled=True,
+                version=version,
+            )
         de = SCOTUSDocketEntryFactory(
             docket=self.docket, description="SCOTUS entry"
         )
@@ -1304,7 +1310,14 @@ class DocketAlertScotusTest(TestCase):
 
         send_alert_and_webhook(self.docket.pk, self.before)
 
-        content = WebhookEvent.objects.values_list("content", flat=True).get()
+        version, content = WebhookEvent.objects.values_list(
+            "webhook__version", "content"
+        ).get()
+        self.assertEqual(version, WebhookVersions.v3)
+        self.assertEqual(
+            content["payload"]["source"],
+            reverse("scotusdocketentry-list", kwargs={"version": "v4"}),
+        )
         results = content["payload"]["results"]
         self.assertEqual([e["description"] for e in results], ["SCOTUS entry"])
         self.assertEqual(
