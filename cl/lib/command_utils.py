@@ -22,9 +22,9 @@ class VerboseCommand(BaseCommand):
         """
         verbosity = options.get("verbosity")
         if not verbosity:
-            logger.setLevel(logging.WARN)
+            logger.setLevel(logging.WARNING)
         elif verbosity == 0:
-            logger.setLevel(logging.WARN)
+            logger.setLevel(logging.WARNING)
         elif verbosity == 1:  # default
             logger.setLevel(logging.INFO)
         elif verbosity > 1:

@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import (
     CIVIL_RIGHTS_ACCOMMODATIONS,
     CIVIL_RIGHTS_ADA_EMPLOYMENT,
@@ -61,12 +61,11 @@ NOS_EXCLUSIONS = [
 
 def get_fjc_rows():
     """Get the FJC IDB rows from the 2017 and 2020 civil datasets filed since 2014, excluding some natures of suit."""
-    items = FjcIntegratedDatabase.objects.exclude(
+    return FjcIntegratedDatabase.objects.exclude(
         nature_of_suit__in=NOS_EXCLUSIONS,
     ).filter(
         date_filed__gte="2014-01-01", dataset_source__in=[CV_2017, CV_2020]
     )
-    return items
 
 
 def get_everything_sample(options, sample_size):
@@ -143,26 +142,23 @@ def get_dockets(
 
         throttle.maybe_wait()
         params = make_fjc_idb_lookup_params(row)
-        session_data = SessionData(session.cookies, session.proxy_address)
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                    "doc_num_end": doc_num_end,
-                },
+                show_parties_and_counsel=True,
+                show_terminated_parties=True,
+                show_list_of_member_cases=False,
+                doc_num_end=doc_num_end,
             ).set(queue=q),
         ).apply_async()
 

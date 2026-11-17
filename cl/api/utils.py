@@ -605,8 +605,7 @@ class LoggingMixin:
         timing_key = f"{api_prefix}.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
-        results = pipe.execute()
-        return results
+        return pipe.execute()
 
     def _handle_events(self, results, user, api_version):
         total_count = results[0]
@@ -1933,10 +1932,7 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """
     INITIAL_TIME = 3  # minutes
     # Update new_next_retry_date exponentially
-    new_next_retry_date = now() + timedelta(
-        minutes=pow(INITIAL_TIME, retry_counter + 1)
-    )
-    return new_next_retry_date
+    return now() + timedelta(minutes=pow(INITIAL_TIME, retry_counter + 1))
 
 
 WEBHOOK_MAX_RETRY_COUNTER = 7
@@ -2096,12 +2092,11 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
     Returns:
         The ISO-8601 formatted date string with UTC timezone.
     """
-    deprecation_date = (
+    return (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
         .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         .isoformat()
     )
-    return deprecation_date
 
 
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
@@ -2160,8 +2155,7 @@ def log_webhook_event(webhook_user_id: int) -> list[int | float]:
     # the number of successful webhook request the user made in total.
     pipe.zincrby(f"{webhook_prefix}.user.counts", 1, webhook_user_id)
 
-    results = pipe.execute()
-    return results
+    return pipe.execute()
 
 
 def handle_webhook_events(results: list[int | float], user: User) -> None:

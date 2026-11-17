@@ -2,14 +2,19 @@
 
 import logging
 import sqlite3
-from typing import Any
+from typing import Any, override
 
 from juriscraper.state.docket import DocketEntryType, DocketType, PartyType
 
 from cl.corpus_importer.state.loader import JKentScrapeLoader, UnusableScrape
-from cl.corpus_importer.state.new_york.mergers import NYCoADocketMerger
+from cl.corpus_importer.state.merger import MergerState
+from cl.corpus_importer.state.new_york.mergers import (
+    NYCoADocketMerger,
+    is_publishable,
+)
 from cl.corpus_importer.state.new_york.nycourts_gov import NYCoACase
 from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
+from cl.corpus_importer.state.utils import NO_FILES, FileTally
 from cl.search.state.new_york.models import NYCoADocument
 
 logger = logging.getLogger(__name__)
@@ -310,6 +315,38 @@ class NYCoACourtPassLoader(JKentScrapeLoader[NYCoACase, NYCoADocketMerger]):
     merger = NYCoADocketMerger
     document_model = NYCoADocument
     private_prefix = PRIVATE_PREFIX
+
+    @classmethod
+    @override
+    def reconcile_files(
+        cls, scrape: NYCoACase, merger: NYCoADocketMerger
+    ) -> FileTally:
+        """Delete the files of the documents the merge removed, and count the files the scrape reported that can never be published.
+
+        :param scrape: The case that was merged.
+        :param merger: The merger, in the state the merge left it in.
+        :return: `missing` for each file the scrape could not vouch for whose
+            document has no file. One whose document already had a file is
+            not missing, since the merge keeps that path.
+        """
+        cls.delete_removed_files(merger.stored_files)
+        unvouched = [
+            file.file_name
+            for entry in scrape.entries
+            for file in entry.attachments
+            if file.available and file.local_path and not is_publishable(file)
+        ]
+        if not unvouched or not isinstance(
+            state := merger.state, MergerState.Complete
+        ):
+            return NO_FILES
+        return FileTally(
+            missing=NYCoADocument.objects.filter(
+                docket_entry__docket=state.output,
+                file_name__in=unvouched,
+                filepath_local="",
+            ).count()
+        )
 
     @staticmethod
     def _refuse_unread_file_list(

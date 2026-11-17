@@ -114,8 +114,7 @@ class MembershipWebhookViewSet(
             A dictionary containing the first address if available, otherwise a defaultdict.
         """
         if not addresses:
-            address = defaultdict(lambda: "")
-            return address
+            return defaultdict(lambda: "")
 
         return {
             # Neon API returns an array of addresses.
@@ -352,7 +351,7 @@ class MembershipWebhookViewSet(
             # issues.
             #
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-            return None
+            return
 
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
@@ -385,7 +384,7 @@ class MembershipWebhookViewSet(
                     email["from_email"],
                     [user.email],
                 )
-                return None
+                return
 
             if not user.profile.email_confirmed:
                 if user.profile.stub_account:
@@ -458,3 +457,4 @@ class MembershipWebhookViewSet(
             )
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
+        return None

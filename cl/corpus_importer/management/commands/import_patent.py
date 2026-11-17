@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -41,10 +41,9 @@ def get_dockets(options: dict) -> None:
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]
     START_DATE = "2012-01-01"
@@ -85,12 +84,10 @@ def get_dockets(options: dict) -> None:
                     court_id=item.district_id,
                     session_data=session_data,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                        "doc_num_end": "",  # No end doc num
-                    },
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
+                    doc_num_end="",  # No end doc num
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -103,11 +100,9 @@ def get_dockets(options: dict) -> None:
                     session_data=session_data,
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                    },
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
                 ).set(queue=q),
             ).apply_async()
 

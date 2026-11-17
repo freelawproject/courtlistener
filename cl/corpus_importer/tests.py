@@ -1126,12 +1126,11 @@ class HarvardTests(TestCase):
         cites = eyecite.get_citations(
             case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
         )
-        cite = Citation.objects.get(
+        return Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
             page=cites[0].groups["page"],
         )
-        return cite
 
     def assertSuccessfulParse(self, expected_count_diff, bankruptcy=False):
         pre_install_count = OpinionCluster.objects.all().count()

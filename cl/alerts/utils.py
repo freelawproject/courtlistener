@@ -402,10 +402,9 @@ def fetch_all_search_alerts_results(
         # Otherwise, increase search_after.
         if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
             break
-        else:
-            main_search_after = get_search_after(responses.main_response)
-            rd_search_after = get_search_after(responses.rd_response)
-            d_search_after = get_search_after(responses.d_response)
+        main_search_after = get_search_after(responses.main_response)
+        rd_search_after = get_search_after(responses.rd_response)
+        d_search_after = get_search_after(responses.d_response)
 
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 

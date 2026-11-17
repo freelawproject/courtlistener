@@ -105,10 +105,9 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
             return HttpResponseServerError("Failure. Form invalid")
 
         return HttpResponse("It worked")
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"}, content="Not an ajax request."
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"}, content="Not an ajax request."
+    )
 
 
 @login_required
@@ -139,10 +138,9 @@ def delete_note(request: HttpRequest) -> HttpResponse:
 
         return HttpResponse("It worked.")
 
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request."
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods=["POST"], content="Not an ajax request."
+    )
 
 
 async def view_tag(request, username, tag_name):
