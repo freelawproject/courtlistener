@@ -1,5 +1,8 @@
+"""Download dockets and metadata for the David Adelman project."""
+
 import csv
 import os
+from pathlib import Path
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
@@ -13,7 +16,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -23,16 +26,15 @@ PROJECT_TAG_NAME = "cmSyHgaaCIFnUOop"
 
 def download_dockets(options):
     """Download dockets listed in the spreadsheet."""
-    f = open(options["input_file"])
+    f = Path(options["input_file"]).open()
     dialect = csv.Sniffer().sniff(f.read(2048))
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -53,15 +55,13 @@ def download_dockets(options):
                     # Do not get the docket entries for now. We're only
                     # interested in the date terminated. If it's an open case,
                     # we'll handle that later.
-                    **{
-                        "show_docket_entries": False,
-                        "show_orig_docket": False,
-                        "show_prior_cases": False,
-                        "show_associated_cases": False,
-                        "show_panel_info": True,
-                        "show_party_atty_info": True,
-                        "show_caption": True,
-                    },
+                    show_docket_entries=False,
+                    show_orig_docket=False,
+                    show_prior_cases=False,
+                    show_associated_cases=False,
+                    show_panel_info=True,
+                    show_party_atty_info=True,
+                    show_caption=True,
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -82,14 +82,12 @@ def download_dockets(options):
                     court_id=row["cl_court"],
                     session_data=session_data,
                     tag_names=[PROJECT_TAG_NAME, row_tag],
-                    **{
-                        # No docket entries
-                        "doc_num_start": 10000,
-                        "doc_num_end": 10000,
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": True,
-                    },
+                    # No docket entries
+                    doc_num_start=10000,
+                    doc_num_end=10000,
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=True,
                 ).set(queue=q),
             ).apply_async()
 
@@ -97,6 +95,8 @@ def download_dockets(options):
 
 
 class Command(VerboseCommand, CommandUtils):
+    """Download the dockets listed in the David Adelman project's CSV."""
+
     help = "Download dockets and metadata for the David Adelman project"
 
     allowed_tasks = [
@@ -104,6 +104,7 @@ class Command(VerboseCommand, CommandUtils):
     ]
 
     def add_arguments(self, parser):
+        """Add the queue, input file, offset, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -136,6 +137,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
+        """Check the input file, then download its dockets."""
         super().handle(*args, **options)
         self.ensure_file_ok(options["input_file"])
         download_dockets(options)

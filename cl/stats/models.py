@@ -1,9 +1,13 @@
+"""Models for daily stat counts and logged events."""
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils.encoding import force_str
 
 
 class Stat(models.Model):
+    """A named count for one day."""
+
     name = models.CharField(max_length=50, db_index=True)
     date_logged = models.DateField(db_index=True)
     count = models.IntegerField()
@@ -18,6 +22,8 @@ class Stat(models.Model):
 
 
 class Event(models.Model):
+    """A logged event, optionally tied to a user."""
+
     date_created = models.DateTimeField(
         help_text="The moment when the event was logged", auto_now_add=True
     )

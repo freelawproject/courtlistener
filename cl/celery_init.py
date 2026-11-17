@@ -1,3 +1,5 @@
+"""The Celery app for CourtListener, configured from Django settings."""
+
 import os
 import sys
 
@@ -23,10 +25,12 @@ app.autodiscover_tasks()
 @app.task(bind=True)
 @throttle_task("2/4s")
 def debug_task(self) -> None:
+    """Print the task's request, throttled to two runs every four seconds."""
     print(f"Request: {self.request!r}")
 
 
 @app.task(bind=True)
 def fail_task(self) -> float:
+    """Raise a ZeroDivisionError on purpose."""
     # Useful for things like sentry
     return 1 / 0

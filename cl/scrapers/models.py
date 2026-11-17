@@ -1,3 +1,5 @@
+"""Models for scraper state: URL hashes, PACER free document logs, and scraper accounts."""
+
 from datetime import date
 
 from django.db import models
@@ -7,9 +9,10 @@ from cl.search.models import Court, Docket
 
 
 class UrlHash(models.Model):
-    """A class to hold URLs and the hash of their contents. This could be added
-    to the Court table, except that courts often have more than one URL they
-    parse.
+    """A class to hold URLs and the hash of their contents.
+
+    This could be added to the Court table, except that courts often have more
+    than one URL they parse.
     """
 
     id = models.CharField(
@@ -30,6 +33,8 @@ class UrlHash(models.Model):
 
 
 class PACERFreeDocumentLog(models.Model):
+    """A log of scraping one court's PACER free document report for a date."""
+
     SCRAPE_SUCCESSFUL = 1
     SCRAPE_IN_PROGRESS = 2
     SCRAPE_FAILED = 3
@@ -79,7 +84,7 @@ class PACERFreeDocumentRow(models.Model):
 
 
 class PACERMobilePageData(AbstractDateTimeModel):
-    """Status information about crawling the PACER Mobile UI for a docket"""
+    """Status information about crawling the PACER Mobile UI for a docket."""
 
     docket = models.OneToOneField(
         Docket,
@@ -107,10 +112,14 @@ class PACERMobilePageData(AbstractDateTimeModel):
 
 
 class Scraper(models.IntegerChoices):
+    """Sites we hold scraper accounts for."""
+
     TAMES = 1, "TAMES CaseMail"
 
 
 class AccountSubscription(AbstractDateTimeModel):
+    """An account on a scraped site, with its subscription dates."""
+
     scraper = models.IntegerField(
         help_text="The scraper/site the account is for.",
         choices=Scraper.choices,

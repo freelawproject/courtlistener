@@ -1,3 +1,5 @@
+"""REST API serializers for search and docket alerts."""
+
 from http import HTTPStatus
 from typing import Any
 
@@ -49,6 +51,7 @@ class BroadAlertQueryError(APIException):
     default_code = "broad_alert_query"
 
     def __init__(self, estimated_hits: int, detail: str) -> None:
+        """Build the error from the query's estimated hits and a message."""
         # Typed as dict[str, Any] because, unlike DRF's ErrorDetail-based
         # payloads, this intentionally carries a raw integer for the estimated
         # hits so it isn't coerced into a stringified list.
@@ -62,6 +65,12 @@ class BroadAlertQueryError(APIException):
 class SearchAlertSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for search alerts owned by the requesting user.
+
+    Validation enforces the user's alert quotas and rejects overly broad
+    queries.
+    """
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     alert_type = serializers.CharField(required=False)
 
@@ -76,10 +85,7 @@ class SearchAlertSerializer(
         )
 
     def validate(self, attrs):
-        """Validate the query type, set a default for alert_type if not
-        provided, enforce the user's alert creation quotas, and reject alerts
-        whose query is estimated to be too broad."""
-
+        """Validate the query type, set a default for alert_type if not provided, enforce the user's alert creation quotas, and reject alerts whose query is estimated to be too broad."""
         # The query provided in this request, if any. Used to decide when to
         # re-run the frequency estimation (only when the query is being set).
         request_query = attrs.get("query")
@@ -110,9 +116,12 @@ class SearchAlertSerializer(
     def _resolve_alert_type(attrs, query):
         """Determine the alert_type from the search query and request body.
 
-        :param attrs: The partially validated request data.
-        :param query: The alert's search query string.
-        :return: The resolved alert_type.
+        Args:
+            attrs: The partially validated request data.
+            query: The alert's search query string.
+
+        Returns:
+            The resolved alert_type.
         """
         qd = QueryDict(query.encode(), mutable=True)
         alert_type_query = qd.get("type")
@@ -161,16 +170,17 @@ class SearchAlertSerializer(
         return alert_type_request
 
     def _validate_alert_quota(self, attrs):
-        """Enforce the user's alert creation quotas based on their membership
-        status, mirroring CreateAlertForm.clean_rate.
+        """Enforce the user's alert creation quotas based on their membership status, mirroring CreateAlertForm.clean_rate.
 
         The shared business logic lives in cl.alerts.utils.check_alert_limits;
         here we only translate the result into the appropriate API error.
 
-        :param attrs: The partially validated request data.
-        :return: None
-        :raises PermissionDenied: If the request would exceed the user's quota
-        or the user isn't eligible to create a Real-Time alert.
+        Args:
+            attrs: The partially validated request data.
+
+        Raises:
+            PermissionDenied: If the request would exceed the user's quota
+                or the user isn't eligible to create a Real-Time alert.
         """
         # On PATCH requests, fall back to the instance values for fields that
         # aren't part of the request.
@@ -233,10 +243,12 @@ class SearchAlertSerializer(
         estimated number of hits is stashed so it can be included in the
         response on success, and surfaced in the error otherwise.
 
-        :param query: The alert's search query string.
-        :return: None
-        :raises ValidationError: If the query can't be validated by SearchForm
-        or is estimated to be too broad.
+        Args:
+            query: The alert's search query string.
+
+        Raises:
+            ValidationError: If the query can't be validated by SearchForm
+                or is estimated to be too broad.
         """
         qd = QueryDict(query.encode(), mutable=True)
         estimation = get_alert_estimation_count(qd, ALERT_ESTIMATION_DAY_COUNT)
@@ -265,8 +277,7 @@ class SearchAlertSerializer(
         self._alert_frequency_estimation = total_hits
 
     def to_representation(self, instance):
-        """Include the alert frequency estimation in the response when it was
-        computed during validation (i.e. on create/update)."""
+        """Include the alert frequency estimation in the response when it was computed during validation (i.e. on create/update)."""
         representation = super().to_representation(instance)
         estimation = getattr(self, "_alert_frequency_estimation", None)
         if estimation is not None:
@@ -274,9 +285,16 @@ class SearchAlertSerializer(
         return representation
 
     def create(self, validated_data):
+        """Create the alert."""
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        """Update the alert.
+
+        Raises:
+            serializers.ValidationError: If the alert type changes in a
+                disallowed way.
+        """
         # On alert updates, validates that the alert_type hasn't changed in a
         # disallowed way.
         alert_type = validated_data.get("alert_type")
@@ -294,10 +312,7 @@ class SearchAlertSerializer(
 class SearchAlertSerializerModel(
     DynamicFieldsMixin, serializers.ModelSerializer
 ):
-    """This serializer is used to serialize an alert when a webhook is sent
-    because SearchAlertSerializer inherits from HyperlinkedModelSerializerWithId
-    which requires an HTTP request to work.
-    """
+    """This serializer is used to serialize an alert when a webhook is sent because SearchAlertSerializer inherits from HyperlinkedModelSerializerWithId which requires an HTTP request to work."""
 
     class Meta:
         model = Alert
@@ -305,6 +320,8 @@ class SearchAlertSerializerModel(
 
 
 class DocketAlertSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
+    """Serializer for docket alerts owned by the requesting user."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -8,10 +9,12 @@ from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
+from django.utils.safestring import mark_safe
 from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
+from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -186,8 +189,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     async def test_spam_message_is_rejected(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Do we reject it if people put a phone number in the phone_number
-        field?
+        """Do we reject it if people put a phone number in the phone_number field?
 
         We should! The phone_number field is labeled as the Subject field in the
         UI. Anything putting a phone number in here is a bot to be rejected.
@@ -287,7 +289,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
 
 class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
-        """Make sure a page has a valid HTML title"""
+        """Make sure a page has a valid HTML title."""
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -304,9 +306,12 @@ class PageLoadTestMixin(TestCase):
     async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
-        :param reverse_param: Params that can be sent to Django's reverse
-        function to get a URL path.
-        :return: The response object.
+        Args:
+            reverse_param: Params that can be sent to Django's reverse
+                function to get a URL path.
+
+        Returns:
+            The response object.
         """
         path = reverse(**reverse_param)
         r = await self.async_client.get(path)
@@ -399,6 +404,9 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     Adding a page here is part of the definition of done for a
     redesigned template. The homepage is excluded — it has dedicated
     tests in cl/search/tests/test_v2_pages.py.
+
+    Unfinished pages go in WIP_PAGES instead, and move to V2_PAGES when
+    their template is promoted from the WIP prefix to v2_.
     """
 
     V2_PAGES: list[tuple[dict[str, Any], str]] = [
@@ -410,6 +418,14 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "court_index"}, "v2_jurisdictions.html"),
     ]
 
+    # (reverse_param, expected WIP template)
+    WIP_PAGES: list[tuple[dict[str, Any], str]] = []
+
+    # WIP pages that redirect anonymous visitors to sign in
+    AUTHENTICATED_WIP_PAGES: list[tuple[dict[str, Any], str]] = [
+        ({"viewname": "view_api"}, "wip_profile/api.html"),
+    ]
+
     @staticmethod
     def _get_legacy_counterpart(v2_template: str) -> str | None:
         """Returns the legacy template a v2 one replaces, None otherwise."""
@@ -419,6 +435,34 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             return legacy
         except TemplateDoesNotExist:
             return None
+
+    @staticmethod
+    def _get_wip_fallback(wip_template: str) -> str | None:
+        """Returns the template a WIP page shows without the WIP flag.
+
+        Mirrors the middleware: the page's v2_ template when it has one,
+        otherwise its legacy one. None means it has neither and is a 404.
+        """
+        name = wip_template.removeprefix(WIP_PROPS["prefix"])
+        for candidate in (f"v2_{name}", name):
+            try:
+                get_template(candidate)
+                return candidate
+            except TemplateDoesNotExist:
+                continue
+        return None
+
+    def _iter_wip_pages(self) -> Iterator[tuple[dict[str, Any], str]]:
+        """Yields every registered WIP page, anonymous ones first.
+
+        Logs self.client in before yielding AUTHENTICATED_WIP_PAGES, so
+        callers must request each page with self.client as they iterate.
+        """
+        yield from self.WIP_PAGES
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        yield from self.AUTHENTICATED_WIP_PAGES
 
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
@@ -446,6 +490,36 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
                     r, self._get_legacy_counterpart(v2_template) or v2_template
                 )
 
+    @override_flag(WIP_PROPS["flag"], active=True)
+    def test_wip_pages(self) -> None:
+        """Do all registered WIP pages load with both redesign flags?"""
+        for reverse_param, wip_template in self._iter_wip_pages():
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, wip_template)
+
+    @override_flag(WIP_PROPS["flag"], active=False)
+    def test_wip_pages_without_the_wip_flag(self) -> None:
+        """Do registered WIP pages stay hidden with only use_new_design?
+
+        Each one falls back to its v2_ template, then its legacy one, or is
+        a 404 when the page has neither.
+        """
+        for reverse_param, wip_template in self._iter_wip_pages():
+            with self.subTest(
+                "Checking WIP page", reverse_params=reverse_param
+            ):
+                r = self.client.get(reverse(**reverse_param))
+                fallback = self._get_wip_fallback(wip_template)
+                if fallback is None:
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    continue
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertTemplateUsed(r, fallback)
+
 
 @override_flag("use_new_design", True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_new_base_view_count_waffle")
@@ -458,8 +532,7 @@ class NewBaseViewCountTest(TestCase):
     """
 
     async def test_untracked_page_sends_no_view_count(self) -> None:
-        """A v2 page whose view is not decorated carries no label, no endpoint
-        and no store, so the browser makes no request."""
+        """A v2 page whose view is not decorated carries no label, no endpoint and no store, so the browser makes no request."""
         r = await self.async_client.get(reverse("help_home"))
         self.assertTemplateUsed(r, "new_base.html")
         html = r.content.decode()
@@ -780,16 +853,20 @@ class DialogComponentTest(SimpleTestCase):
 class TooltipComponentTest(SimpleTestCase):
     """The c-tooltip component renders a help button and its message."""
 
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
+    def render(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Compiles a Cotton snippet and renders it with an optional context."""
         compiled = CottonCompiler().process(source)
         template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
+        return template.render(
+            {"request": RequestFactory().get("/"), **(context or {})}
+        )
 
     def test_button_is_named_after_what_it_explains(self) -> None:
         """The icon-only button gets a name that says what it explains."""
         tree = fromstring(
-            self.render('<c-tooltip label="Last Updated">Message</c-tooltip>')
+            self.render('<c-tooltip label="Last Updated" message="Message" />')
         )
         button = tree.xpath("//button")[0]
         self.assertEqual(button.get("aria-label"), "More about Last Updated")
@@ -797,30 +874,31 @@ class TooltipComponentTest(SimpleTestCase):
 
     def test_button_exposes_whether_the_tooltip_is_open(self) -> None:
         """The button's aria-expanded is bound to the open state."""
-        html = self.render('<c-tooltip label="Item">Message</c-tooltip>')
+        html = self.render('<c-tooltip label="Item" message="Message" />')
         self.assertIn('x-bind:aria-expanded="isOpen"', html)
 
     def test_live_region_starts_empty(self) -> None:
         """The live region is empty until the tooltip opens, so the message is announced as new content."""
         tree = fromstring(
-            self.render('<c-tooltip label="Item">Message</c-tooltip>')
+            self.render('<c-tooltip label="Item" message="Message" />')
         )
         live = tree.xpath("//*[@role='status']")[0]
         self.assertEqual(len(live), 0)
         self.assertFalse((live.text or "").strip())
 
     def test_message_html_is_not_escaped(self) -> None:
-        """HTML in the message, such as the Last Updated <strong>, renders as markup."""
+        """A safe message, such as the Last Updated <strong>, renders as markup."""
         html = self.render(
-            '<c-tooltip label="Item">Updated by <strong>RECAP</strong></c-tooltip>'
+            '<c-tooltip label="Item" :message="message" />',
+            {"message": mark_safe("Updated by <strong>RECAP</strong>")},
         )
         self.assertIn("<strong>RECAP</strong>", html)
 
     def test_arrow_renders_only_when_requested(self) -> None:
         """has_arrow adds the arrow; leaving it out gives the no-arrow variant."""
         cases = [
-            ('<c-tooltip label="Item" has_arrow>Message</c-tooltip>', 1),
-            ('<c-tooltip label="Item">Message</c-tooltip>', 0),
+            ('<c-tooltip label="Item" has_arrow message="Message" />', 1),
+            ('<c-tooltip label="Item" message="Message" />', 0),
         ]
         for source, expected in cases:
             with self.subTest(source=source):
@@ -830,13 +908,13 @@ class TooltipComponentTest(SimpleTestCase):
     def test_description_renders_only_when_given(self) -> None:
         """A description adds supporting text and the roomier padding."""
         with_description = self.render(
-            '<c-tooltip label="Item" description="Supporting text">Message</c-tooltip>'
+            '<c-tooltip label="Item" description="Supporting text" message="Message" />'
         )
         self.assertIn("Supporting text", with_description)
         self.assertIn("p-3", with_description)
 
         without_description = self.render(
-            '<c-tooltip label="Item">Message</c-tooltip>'
+            '<c-tooltip label="Item" message="Message" />'
         )
         self.assertIn("px-3 py-2", without_description)
         self.assertNotIn("p-3", without_description)
@@ -845,11 +923,11 @@ class TooltipComponentTest(SimpleTestCase):
         """Dark is the default theme and light is opt-in."""
         cases = [
             (
-                '<c-tooltip label="Item">Message</c-tooltip>',
+                '<c-tooltip label="Item" message="Message" />',
                 "bg-greyscale-900",
             ),
             (
-                '<c-tooltip label="Item" variant="light">Message</c-tooltip>',
+                '<c-tooltip label="Item" variant="light" message="Message" />',
                 "bg-white",
             ),
         ]
@@ -858,17 +936,33 @@ class TooltipComponentTest(SimpleTestCase):
                 self.assertIn(background, self.render(source))
 
     def test_position_is_passed_to_the_anchor(self) -> None:
-        """The position prop sets the x-anchor placement, defaulting to bottom."""
+        """The position prop sets the x-anchor placement and its padding axis.
+
+        Defaults to bottom; only that axis is padded to bridge the hover gap.
+        """
         cases = [
-            ('<c-tooltip label="Item">Message</c-tooltip>', "bottom"),
             (
-                '<c-tooltip label="Item" position="right">Message</c-tooltip>',
+                '<c-tooltip label="Item" message="Message" />',
+                "bottom",
+                "py-1.5",
+            ),
+            (
+                '<c-tooltip label="Item" position="top-start" message="Message" />',
+                "top-start",
+                "py-1.5",
+            ),
+            (
+                '<c-tooltip label="Item" position="right" message="Message" />',
                 "right",
+                "px-1.5",
             ),
         ]
-        for source, position in cases:
+        for source, position, padding in cases:
             with self.subTest(position=position):
-                self.assertIn(
-                    f'x-anchor.{position}.offset.6="$refs.trigger"',
-                    self.render(source),
+                live = fromstring(self.render(source)).xpath(
+                    "//*[@role='status']"
+                )[0]
+                self.assertEqual(
+                    live.get(f"x-anchor.{position}"), "$refs.trigger"
                 )
+                self.assertIn(padding, live.get("class").split())

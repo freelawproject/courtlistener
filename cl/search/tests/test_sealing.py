@@ -67,9 +67,7 @@ from cl.users.factories import UserFactory
 
 
 class OpinionClusterSealClustersActionTest(TestCase):
-    """Full-coverage tests for the bulk "Seal selected opinion clusters"
-    admin action: sealing with and without a docket removal, and blocking
-    on related user data."""
+    """Full-coverage tests for the bulk "Seal selected opinion clusters" admin action: sealing with and without a docket removal, and blocking on related user data."""
 
     @classmethod
     def setUpTestData(cls):
@@ -135,7 +133,7 @@ class OpinionClusterSealClustersActionTest(TestCase):
         self.site = admin.site
 
     def test_seal_cluster_action(self):
-        """Test seal_clusters action in OpinionCluster admin page"""
+        """Test seal_clusters action in OpinionCluster admin page."""
         # Test 1: Can we seal cluster without any blockages and create redirection?
 
         cluster_pk = self.cluster_1.pk
@@ -348,8 +346,7 @@ class OpinionClusterAdminSealViewTest(TestCase):
 
 
 class OpinionClusterSealDocketBlockersTest(TestCase):
-    """Sealing a cluster must leave its docket alone when something still
-    points at the docket."""
+    """Sealing a cluster must leave its docket alone when something still points at the docket."""
 
     @classmethod
     def setUpTestData(cls):
@@ -358,7 +355,8 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
     def make_cluster(self) -> OpinionCluster:
         """Build a cluster on a docket of its own.
 
-        :return: The new OpinionCluster
+        Returns:
+            The new OpinionCluster
         """
         return OpinionClusterWithParentsFactory(
             docket=DocketFactory(
@@ -467,8 +465,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
     def test_seal_cluster_deletes_files_and_invalidates_cdn(
         self, mock_invalidate_cloudfront
     ):
-        """Sealing removes every FileField the cluster, its sub-opinions,
-        and its docket point at, and invalidates the CDN cache for each."""
+        """Sealing removes every FileField the cluster, its sub-opinions, and its docket point at, and invalidates the CDN cache for each."""
         docket = DocketFactory(
             court=self.court,
             case_name="Seal Files v. Test",
@@ -520,8 +517,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
     def test_seal_cluster_with_no_files_invalidates_nothing(
         self, mock_invalidate_cloudfront
     ):
-        """Sealing a cluster with no files attached is a no-op for storage
-        and the CDN, but still succeeds."""
+        """Sealing a cluster with no files attached is a no-op for storage and the CDN, but still succeeds."""
         cluster = OpinionClusterWithParentsFactory(
             docket=DocketFactory(
                 court=self.court, case_name="No Files v. Test"
@@ -557,8 +553,7 @@ class OpinionClusterSealFileCleanupTest(TestCase):
 class RECAPDocumentSealActionESTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
-    """Sealing a RECAPDocument through the admin action must scrub its
-    fields and propagate the change into Elasticsearch."""
+    """Sealing a RECAPDocument through the admin action must scrub its fields and propagate the change into Elasticsearch."""
 
     @classmethod
     def setUpClass(cls):
@@ -578,8 +573,7 @@ class RECAPDocumentSealActionESTest(
     def test_seal_documents_action(
         self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
     ):
-        """Confirm that seal_documents admin action updates related RDs in ES"""
-
+        """Confirm that seal_documents admin action updates related RDs in ES."""
         docket = DocketFactory(
             court=self.court,
             pacer_case_id="asdf",
@@ -680,9 +674,7 @@ class RECAPDocumentSealActionESTest(
     def test_seal_documents_removes_citations(
         self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
     ):
-        """Confirm that sealing a RECAPDocument drops the citations mined
-        from its text, in the DB and in ES."""
-
+        """Confirm that sealing a RECAPDocument drops the citations mined from its text, in the DB and in ES."""
         docket = DocketFactory(
             court=self.court,
             pacer_case_id="qwerty",
@@ -736,9 +728,7 @@ class RECAPDocumentSealActionESTest(
 
     @mock.patch("cl.search.deletion_utils.update_es_document")
     def test_uncited_documents_skip_the_es_update(self, mock_update_es):
-        """Confirm that a document with no citations doesn't enqueue an ES
-        update, since sealing runs over whole querysets at a time."""
-
+        """Confirm that a document with no citations doesn't enqueue an ES update, since sealing runs over whole querysets at a time."""
         docket = DocketFactory(
             court=self.court,
             pacer_case_id="asdfgh",

@@ -1,3 +1,5 @@
+"""Helpers for gathering homepage statistics."""
+
 from datetime import UTC, datetime, timedelta
 
 from cache_memoize import cache_memoize
@@ -39,9 +41,7 @@ def get_redis_stat_sum(
 
 @cache_memoize(5 * 60)
 def get_v2_homepage_stats():
-    """
-    Get all stats displayed in the new homepage and return them as a dict.
-    """
+    """Get all stats displayed in the new homepage and return them as a dict."""
     make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis (new system)
@@ -56,7 +56,7 @@ def get_v2_homepage_stats():
         minutes=Floor(Coalesce(Sum("duration"), Value(0)) / Value(60.0))
     )["minutes"]
 
-    homepage_stats = {
+    return {
         "alerts_in_last_ten": alerts_in_last_ten,
         "queries_in_last_ten": queries_in_last_ten,
         "api_in_last_ten": api_in_last_ten,
@@ -65,14 +65,11 @@ def get_v2_homepage_stats():
         "docket_count": get_total_estimate_count("search_docket"),
         "recap_doc_count": get_total_estimate_count("search_recapdocument"),
     }
-    return homepage_stats
 
 
 @cache_memoize(5 * 60)
 def get_homepage_stats():
-    """Get any stats that are displayed on the homepage and return them as a
-    dict
-    """
+    """Get any stats that are displayed on the homepage and return them as a dict."""
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis
@@ -90,7 +87,7 @@ def get_homepage_stats():
         date_created__gte=ten_days_ago
     ).count()
 
-    homepage_data = {
+    return {
         "alerts_in_last_ten": alerts_in_last_ten,
         "queries_in_last_ten": queries_in_last_ten,
         "api_in_last_ten": api_in_last_ten,
@@ -105,4 +102,3 @@ def get_homepage_stats():
         )["d"],
         "private": False,  # VERY IMPORTANT!
     }
-    return homepage_data

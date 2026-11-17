@@ -1,3 +1,5 @@
+"""Settings for the hosts, timeouts, and URLs of the microservices."""
+
 import environ
 
 env = environ.FileAwareEnv()
@@ -36,6 +38,10 @@ MICROSERVICE_URLS = {
     "document-extract-ocr": {
         "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 90,
+    },
+    "opinion-extract-structured": {
+        "url": f"{DOCTOR_HOST}/extract/opinion/structured/",
+        "timeout": 60 * 5,
     },
     "recap-extract": {
         "url": f"{DOCTOR_HOST}/extract/recap/text/",

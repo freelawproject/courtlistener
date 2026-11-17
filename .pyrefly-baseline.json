@@ -72,13 +72,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/ai/management/commands/check_gemini_batch_status.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name`",
-      "severity": "error"
-    },
-    {
       "column": 30,
       "path": "cl/alerts/api_serializers.py",
       "name": "missing-attribute",
@@ -247,20 +240,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_percolator_request`",
-      "severity": "error"
-    },
-    {
       "column": 36,
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
@@ -361,22 +340,8 @@
     {
       "column": 13,
       "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
       "name": "bad-return",
-      "concise_description": "Returned type `Unknown | None` is not assignable to declared return type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `aggregations`",
+      "concise_description": "Returned type `int | Unknown | None` is not assignable to declared return type `int`",
       "severity": "error"
     },
     {
@@ -950,7 +915,7 @@
       "column": 38,
       "path": "cl/corpus_importer/signals.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -1209,7 +1174,7 @@
       "column": 26,
       "path": "cl/favorites/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `datetime | int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `datetime | int | str | Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -1255,27 +1220,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.selectors.prayer_eligible`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.create_prayer`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.delete_prayer`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/favorites/views.py",
       "name": "missing-attribute",
@@ -1311,45 +1255,31 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/lib/elasticsearch_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 52,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
       "column": 27,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
       "column": 43,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
       "severity": "error"
     },
     {
       "column": 31,
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` in function `cl.search.tasks.get_es_doc_id_and_parent_id`",
+      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.search.tasks.get_es_doc_id_and_parent_id`",
       "severity": "error"
     },
     {
@@ -1518,20 +1448,6 @@
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `citation_depth`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/opinion_page/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `SCOTUSDocketEntry` has no attribute `recap_documents`",
       "severity": "error"
     },
     {
@@ -1874,7 +1790,7 @@
       "column": 41,
       "path": "cl/recap/mergers.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `int | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -1934,7 +1850,7 @@
       "severity": "error"
     },
     {
-      "column": 30,
+      "column": 26,
       "path": "cl/recap/mergers.py",
       "name": "unbound-name",
       "concise_description": "`main_rd` may be uninitialized",
@@ -2144,6 +2060,13 @@
       "severity": "error"
     },
     {
+      "column": 28,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-assignment",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "severity": "error"
+    },
+    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2305,101 +2228,10 @@
       "severity": "error"
     },
     {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `appellate` with type `bool` in function `download_pacer_pdf_and_save_to_pq`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_and_save_to_pq`",
       "severity": "error"
     },
     {
@@ -2410,150 +2242,52 @@
       "severity": "error"
     },
     {
-      "column": 14,
+      "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool` in function `download_pacer_pdf_and_save_to_pq`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `case_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 27,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_doc_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | list[DocketType] | str` is not assignable to parameter `acms` with type `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `bool`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "not-iterable",
-      "concise_description": "Type `bool` is not iterable",
-      "severity": "error"
-    },
-    {
-      "column": 28,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `get`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_doc_id` with type `str`",
       "severity": "error"
     },
     {
       "column": 59,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | DocketType | Unknown` is not assignable to parameter `docket_data` with type `dict[str, Any]`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
+      "concise_description": "Argument `DocketType` is not assignable to parameter `docket_data` with type `dict[str, Any]`",
       "severity": "error"
     },
     {
       "column": 25,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `list[DocketEntryType] | Unknown` is not assignable to parameter `docket_entries` with type `list[dict[str, Any]]`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-index",
-      "concise_description": "Cannot index into `str`",
+      "concise_description": "Argument `list[DocketEntryType]` is not assignable to parameter `docket_entries` with type `list[dict[str, Any]]`",
       "severity": "error"
     },
     {
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `document_url` with type `str`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `document_url` with type `str`",
       "severity": "error"
     },
     {
       "column": 17,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown | None` is not assignable to parameter `pacer_case_id` with type `str` in function `get_and_copy_recap_attachment_docs`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `get_and_copy_recap_attachment_docs`",
       "severity": "error"
     },
     {
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `list[str | Unknown | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
+      "concise_description": "Argument `list[str | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
       "severity": "error"
     },
     {
@@ -3106,14 +2840,14 @@
       "column": 44,
       "path": "cl/search/api_views.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str` in function `int.__new__`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
       "severity": "error"
     },
     {
       "column": 55,
       "path": "cl/search/api_views.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `ESList` is not assignable to parameter `queryset` with type `QuerySet[@_, @_]` in function `rest_framework.pagination.PageNumberPagination.paginate_queryset`",
+      "concise_description": "Argument `ESList` is not assignable to parameter `queryset` with type `QuerySet[@_, @_] | Sequence[@_]` in function `rest_framework.pagination.BasePagination.paginate_queryset`",
       "severity": "error"
     },
     {
@@ -3204,14 +2938,14 @@
       "column": 7,
       "path": "cl/search/documents.py",
       "name": "inconsistent-inheritance",
-      "concise_description": "Field `prepare_docket_child` has inconsistent types inherited from multiple base classes",
+      "concise_description": "Field `prepare_capital_case` has inconsistent types inherited from multiple base classes",
       "severity": "error"
     },
     {
       "column": 7,
       "path": "cl/search/documents.py",
       "name": "inconsistent-inheritance",
-      "concise_description": "Field `prepare_docket_child` has inconsistent types inherited from multiple base classes",
+      "concise_description": "Field `prepare_capital_case` has inconsistent types inherited from multiple base classes",
       "severity": "error"
     },
     {
@@ -3435,14 +3169,14 @@
       "column": 24,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
+      "concise_description": "Argument `int | Any` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
       "severity": "error"
     },
     {
       "column": 28,
       "path": "cl/search/management/commands/clean_docket_number_raw.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsFloat | SupportsIndex` in function `time.sleep`",
       "severity": "error"
     },
     {
@@ -3470,7 +3204,7 @@
       "column": 32,
       "path": "cl/search/management/commands/fix_rd_broken_links.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `seconds` with type `SupportsFloat | SupportsIndex` in function `time.sleep`",
       "severity": "error"
     },
     {
@@ -3554,7 +3288,7 @@
       "column": 24,
       "path": "cl/search/management/commands/pacer_bulk_fetch.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `int | Unknown | None` is not assignable to parameter `seconds` with type `SupportsIndex | float` in function `time.sleep`",
+      "concise_description": "Argument `int | Unknown | None` is not assignable to parameter `seconds` with type `SupportsFloat | SupportsIndex` in function `time.sleep`",
       "severity": "error"
     },
     {
@@ -3628,10 +3362,10 @@
       "severity": "error"
     },
     {
-      "column": 35,
+      "column": 16,
       "path": "cl/search/models.py",
       "name": "bad-return",
-      "concise_description": "Function declared to return `str`, but one or more paths are missing an explicit `return`",
+      "concise_description": "Returned type `None` is not assignable to declared return type `str`",
       "severity": "error"
     },
     {
@@ -3764,28 +3498,28 @@
       "column": 32,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `parties`",
+      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `parties`",
       "severity": "error"
     },
     {
       "column": 37,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
+      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
       "severity": "error"
     },
     {
       "column": 56,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `court_id`",
+      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `court_id`",
       "severity": "error"
     },
     {
       "column": 37,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `case_name`",
+      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
       "severity": "error"
     },
     {
@@ -3799,7 +3533,7 @@
       "column": 29,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument` has no attribute `docket_entry`",
+      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `docket_entry`",
       "severity": "error"
     },
     {
@@ -4013,13 +3747,6 @@
       "severity": "error"
     },
     {
-      "column": 40,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 41,
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
@@ -4031,13 +3758,6 @@
       "path": "cl/search/views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `ESSearchResult` is not assignable to parameter `search_results` with type `dict[Unknown, Unknown]` in function `cl.lib.search_utils.store_search_query`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -4601,7 +4321,7 @@
       "severity": "error"
     },
     {
-      "column": 30,
+      "column": 34,
       "path": "cl/users/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `profile`",

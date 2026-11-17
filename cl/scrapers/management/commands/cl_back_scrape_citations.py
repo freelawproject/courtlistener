@@ -1,7 +1,4 @@
-"""
-When opinions are first published on the courts' sites, they won't have
-all their citations assigned. Some courts will publish the citations
-in the same pages we scrape, but months later
+"""When opinions are first published on the courts' sites, they won't have all their citations assigned. Some courts will publish the citations in the same pages we scrape, but months later.
 
 This command re-uses the (back)scraper we use to get opinions, to get
 the lagged citations and associate them with the Opinions we first
@@ -26,6 +23,8 @@ from cl.search.models import Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
+    """Back-scrape opinion sites to add citations to the opinions they list."""
+
     scrape_target_descr = "citations"
     juriscraper_module_type = "opinions"
 
@@ -36,7 +35,8 @@ class Command(cl_back_scrape_opinions.Command):
         ocr_available: bool = True,
         backscrape: bool = False,
     ):
-        """
+        """Ingest citations for scraped cases that have citation data.
+
         If the scraped case has citation data
             Check for Opinion existence via content hash
             If we have the Opinion
@@ -46,8 +46,12 @@ class Command(cl_back_scrape_opinions.Command):
                 ingest the opinion with it's citation, that is to say,
                 use the regular scraping process!
 
-        :param site: scraper object that has already downloaded
-            it's case data
+        Args:
+            site: scraper object that has already downloaded
+                it's case data
+            backscrape: Unused.
+            ocr_available: Unused.
+            full_crawl: Unused.
         """
         court_str = site.court_id.split(".")[-1].split("_")[0]
         court = await Court.objects.aget(id=court_str)

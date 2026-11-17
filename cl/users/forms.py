@@ -1,3 +1,5 @@
+"""Forms for user profiles, registration, passwords, and webhooks."""
+
 import re
 from collections.abc import Iterator
 
@@ -33,6 +35,8 @@ from cl.users.utils import emails
 # https://html.spec.whatwg.org/multipage/forms.html#autofill, and enables them
 # to be autofilled in various ways.
 class ProfileForm(ModelForm):
+    """Form for editing a user's profile settings and address."""
+
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
@@ -96,7 +100,15 @@ class ProfileForm(ModelForm):
 
 
 class CleanEmailMixin:
+    """Form mixin that rejects emails from blocked domains."""
+
     def clean_email(self):
+        """Validate that the email's domain isn't blocked.
+
+        Raises:
+            forms.ValidationError: If the domain is a disposable email
+                provider or in ``BLOCKED_DOMAINS``.
+        """
         email = self.cleaned_data.get("email")
         user_part, domain_part = email.rsplit("@", 1)
         blocklist.update(settings.BLOCKED_DOMAINS)
@@ -109,6 +121,8 @@ class CleanEmailMixin:
 
 
 class UserForm(ModelForm, CleanEmailMixin):
+    """Form for editing a user's name and email."""
+
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
@@ -156,8 +170,8 @@ def validate_username_is_not_an_email(value: str) -> None:
     mistaken for an address at sign-in. Something like "mal@ory" is fine; it
     has no domain.
 
-    :param value: The submitted username.
-    :return: None
+    Args:
+        value: The submitted username.
     """
     if LOOKS_LIKE_EMAIL.match(value):
         raise ValidationError(
@@ -167,10 +181,7 @@ def validate_username_is_not_an_email(value: str) -> None:
 
 
 class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
-    """A bit of an unusual form because instead of creating it ourselves,
-    we are overriding the one from Django. Thus, instead of declaring
-    everything explicitly like we normally do, we just override the
-    specific parts we want to, after calling the super class's __init__().
+    """A bit of an unusual form because instead of creating it ourselves, we are overriding the one from Django. Thus, instead of declaring everything explicitly like we normally do, we just override the specific parts we want to, after calling the super class's __init__().
 
     Only one account may hold an email address, but the form never reports
     that an address is taken: "this email is already in use" would let anyone
@@ -190,6 +201,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
     email_taken: bool
 
     def __init__(self, *args, **kwargs):
+        """Build the form with stricter username validation, labels, and widget attributes."""
         super().__init__(*args, **kwargs)
         self.email_taken = False
         self.fields["username"].validators = [
@@ -245,8 +257,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         }
 
     def _email_is_taken(self, value: str) -> bool:
-        """Report whether an account other than the bound instance holds
-        `value` as its email address.
+        """Report whether an account other than the bound instance holds `value` as its email address.
 
         Address matching goes through filter_by_email, the one definition of
         "same address" that sign-in, confirmation and password reset share, so
@@ -257,8 +268,11 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         the form is bound to the stub that already holds the address, is not
         mistaken for a duplicate.
 
-        :param value: The string to compare against the email column.
-        :return: True if some other account already has that address.
+        Args:
+            value: The string to compare against the email column.
+
+        Returns:
+            True if some other account already has that address.
         """
         users = filter_by_email(User.objects.all(), value)
         if self.instance.pk:
@@ -266,8 +280,7 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         return users.exists()
 
     def clean_email(self) -> str:
-        """Run the shared email checks, then record whether another account
-        already holds this address in ``email_taken``.
+        """Run the shared email checks, then record whether another account already holds this address in ``email_taken``.
 
         A taken address is deliberately not a validation error. See the class
         docstring for why.
@@ -277,6 +290,12 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
         return email
 
     def clean_first_name(self):
+        """Validate that the first name has no special characters.
+
+        Raises:
+            forms.ValidationError: If the first name contains special
+                characters such as ``!``, ``@``, or ``.``.
+        """
         first_name = self.cleaned_data.get("first_name")
         if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
             raise forms.ValidationError(
@@ -286,6 +305,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
 
 
 class EmailConfirmationForm(forms.Form):
+    """Form for requesting an email confirmation link."""
+
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
@@ -300,6 +321,8 @@ class EmailConfirmationForm(forms.Form):
 
 
 class OptInConsentForm(forms.Form):
+    """Captcha-protected form for agreeing to the terms when creating an account."""
+
     consent = forms.BooleanField(
         error_messages={
             "required": "To create a new account, you must agree below.",
@@ -335,6 +358,15 @@ class PasswordConfirmForm(forms.Form):
         super().__init__(*args, **kwargs)
 
     def clean_password(self) -> dict[str, str]:
+        """Validate that the password, if given, is the logged-in user's.
+
+        Returns:
+            The form's cleaned data.
+
+        Raises:
+            ValidationError: If the password doesn't authenticate the
+                logged-in user.
+        """
         password = self.cleaned_data["password"]
 
         if password:
@@ -358,11 +390,7 @@ class PasswordConfirmForm(forms.Form):
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
-    """
-    A form that lets a user change his/her password by entering
-    their old password. Overrides Django default form to allow
-    the customization of attributes.
-    """
+    """A form that lets a user change his/her password by entering their old password. Overrides Django default form to allow the customization of attributes."""
 
     old_password = forms.CharField(
         label="Old password",
@@ -388,11 +416,10 @@ class CustomPasswordChangeForm(PasswordChangeForm):
 
 
 class CustomPasswordResetForm(PasswordResetForm):
-    """A simple subclassing of a Django form in order to change class
-    attributes.
-    """
+    """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, *args, **kwargs):
+        """Build the form with an empty account cache and styled email widget."""
         super().__init__(*args, **kwargs)
         # Set by accounts_at_address(), which is asked the same question more
         # than once per request.
@@ -420,8 +447,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         we have already asked, and this is an unauthenticated endpoint that
         shouldn't run the same query three times per request.
 
-        :param email: The submitted address.
-        :return: The matching accounts, each with its profile loaded.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The matching accounts, each with its profile loaded.
         """
         if self._accounts_at != email:
             self._accounts = [
@@ -439,13 +469,16 @@ class CustomPasswordResetForm(PasswordResetForm):
         select-relates it, so the two can't drift apart and turn this into a
         query per account.
 
-        :param email: The submitted address.
-        :return: The accounts at that address that have confirmed it.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The accounts at that address that have confirmed it.
         """
         return [
             user
             for user in self.accounts_at_address(email)
-            if user.profile.email_confirmed  # type: ignore
+            if user.profile.email_confirmed  # pyrefly: ignore[missing-attribute]
         ]
 
     def get_users(self, email: str) -> Iterator[User]:
@@ -462,8 +495,11 @@ class CustomPasswordResetForm(PasswordResetForm):
         ``email_confirmed`` (see ``cl.users.views.view_settings``), so this
         check bites the moment the address is repointed.
 
-        :param email: The submitted address.
-        :return: The accounts to mail a reset link to.
+        Args:
+            email: The submitted address.
+
+        Returns:
+            The accounts to mail a reset link to.
         """
         return iter(self.confirmed_accounts_at_address(email))
 
@@ -505,11 +541,10 @@ class CustomPasswordResetForm(PasswordResetForm):
 
 
 class CustomSetPasswordForm(SetPasswordForm):
-    """A simple subclassing of a Django form in order to change class
-    attributes.
-    """
+    """A simple subclassing of a Django form in order to change class attributes."""
 
     def __init__(self, user, *args, **kwargs):
+        """Build the form with styled password widgets."""
         super().__init__(user, *args, **kwargs)
 
         self.fields["new_password1"].widget.attrs.update(
@@ -525,7 +560,15 @@ class CustomSetPasswordForm(SetPasswordForm):
 
 
 class WebhookForm(ModelForm):
+    """Form for creating or updating a webhook."""
+
     def __init__(self, update=None, request_user=None, *args, **kwargs):
+        """Build the form, limiting the event type and version choices.
+
+        When updating, only the webhook's current event type and version are
+        offered, read-only. When creating, only event types that the user
+        doesn't yet have a webhook for in every version are offered.
+        """
         super().__init__(*args, **kwargs)
 
         # Determine the webhook type options to show accordingly.

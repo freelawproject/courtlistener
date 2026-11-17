@@ -324,10 +324,7 @@ class TestExtractWithLLM(TestCase):
     def test_extract_with_llm_handles_validation_error(
         self, mock_logger, mock_call_llm
     ):
-        """Test that extract_with_llm catches Pydantic ValidationError from call_llm and handles it correctly
-        by logging and returning without an exception
-        """
-
+        """Test that extract_with_llm catches Pydantic ValidationError from call_llm and handles it correctly by logging and returning without an exception."""
         mock_call_llm.side_effect = ValidationError.from_exception_data(
             "Invalid data", line_errors=[]
         )
@@ -476,11 +473,11 @@ class TestProcessLLMBatches(TestCase):
                 return (
                     self.extract_response_2
                 )  # Simulate results for first batch
-            elif batch == self.llm_batches[2:4]:
+            if batch == self.llm_batches[2:4]:
                 return (
                     self.extract_response_3
                 )  # Simulate partial results for second batch
-            elif batch == [self.llm_batches[3]]:
+            if batch == [self.llm_batches[3]]:
                 return (
                     self.extract_response_4
                 )  # Simulate results for retry on failed record
@@ -512,11 +509,11 @@ class TestProcessLLMBatches(TestCase):
                 return (
                     self.extract_response_2
                 )  # Simulate results for first batch
-            elif batch == self.llm_batches[2:4]:
+            if batch == self.llm_batches[2:4]:
                 return (
                     self.extract_response_3
                 )  # Simulate partial results for second batch
-            elif batch == [self.llm_batches[3]]:
+            if batch == [self.llm_batches[3]]:
                 return dict()  # Simulate no results for retry on failed record
             return dict()
 

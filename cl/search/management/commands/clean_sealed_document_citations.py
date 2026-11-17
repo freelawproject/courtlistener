@@ -1,3 +1,5 @@
+"""Delete citations left on RECAP documents that were sealed."""
+
 from django.conf import settings
 
 from cl.citations.models import UnmatchedCitationFromRECAPDocument
@@ -14,7 +16,8 @@ def get_sealed_documents_with_citations() -> list[int]:
     database only has to return the sealed documents that actually have
     something to clean up, instead of every sealed document.
 
-    :return: A sorted list of RECAPDocument IDs.
+    Returns:
+        A sorted list of RECAPDocument IDs.
     """
     cited_opinions = OpinionsCitedByRECAPDocument.objects.filter(
         citing_document__is_sealed=True
@@ -26,6 +29,8 @@ def get_sealed_documents_with_citations() -> list[int]:
 
 
 class Command(VerboseCommand):
+    """Delete the citations of sealed RECAP documents."""
+
     help = (
         "Delete the case law citations left behind on RECAPDocuments that "
         "were sealed before sealing began removing them. Sealing scrubs a "
@@ -34,6 +39,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser) -> None:
+        """Add the dry-run flag."""
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -42,6 +48,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Delete the citations of each sealed document that has any.
+
+        With ``--dry-run``, only logs the documents that would be cleaned up.
+        """
         super().handle(*args, **options)
 
         rd_ids = get_sealed_documents_with_citations()
