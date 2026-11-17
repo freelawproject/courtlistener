@@ -1,4 +1,4 @@
-{% load svg_tags %}
+{% load svg_tags %}{% spaceless %}
 
 {# Icon from cl/assets/static-global/svg/: sizes it, picks the filled or outline variant and hides it from assistive technology unless it has a label. #}
 <c-vars
@@ -24,3 +24,4 @@
   {% endif %}
 {% endwith %}
 {% endwith %}
+{% endspaceless %}

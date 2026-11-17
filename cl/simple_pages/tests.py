@@ -888,6 +888,12 @@ class IconComponentTest(SimpleTestCase):
         self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
         self.assertNotIn("<c>", html)
 
+    def test_renders_without_surrounding_whitespace(self) -> None:
+        """The icon can sit inline next to text without adding a space."""
+        html = self.render('<c-icon name="chevron" />')
+        self.assertTrue(html.startswith("<svg"), repr(html[:20]))
+        self.assertTrue(html.endswith("</svg>"), repr(html[-20:]))
+
     def test_bound_class_is_escaped(self) -> None:
         """A class bound from the context can't add attributes to the icon."""
         icon = fromstring(
