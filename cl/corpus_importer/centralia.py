@@ -464,6 +464,11 @@ def merge_structured_opinion_into_cl_opinion(
 
     with transaction.atomic():
         link_judges(cluster, [opinion, *siblings])
+        # link_judges credits a lone opinion with no author string to the
+        # judge named in the cluster's `judges`, even when it is per curiam
+        for merged in (opinion, *siblings):
+            if merged.per_curiam:
+                merged.author = None
         opinion.save(
             update_fields=[
                 "date_modified",
