@@ -1,3 +1,5 @@
+"""Client for the Neon CRM API."""
+
 from typing import Any, NotRequired, TypedDict
 
 import requests
@@ -9,10 +11,14 @@ NEON_API_URL = "https://api.neoncrm.com/v2"
 
 
 class NeonStateProvince(TypedDict):
+    """A state or province in a Neon address."""
+
     code: str
 
 
 class NeonAddress(TypedDict):
+    """An address in a Neon account."""
+
     isPrimaryAddress: NotRequired[bool]
     addressLine1: str
     addressLine2: str
@@ -22,6 +28,8 @@ class NeonAddress(TypedDict):
 
 
 class NeonContact(TypedDict):
+    """The primary contact of a Neon account."""
+
     firstName: str
     lastName: str
     email1: str
@@ -29,15 +37,17 @@ class NeonContact(TypedDict):
 
 
 class NeonClient:
+    """Client for reading and writing Neon accounts and memberships."""
+
     def __init__(self, timeout: int = 10) -> None:
+        """Build the client with a request timeout in seconds."""
         self._timeout = timeout
         self._basic = HTTPBasicAuth(
             settings.NEON_ORG_ID, settings.NEON_API_KEY
         )
 
     def get_account_by_id(self, account_id: int) -> dict:
-        """
-        Retrieves account data using the Neon API and the provided account ID.
+        """Retrieves account data using the Neon API and the provided account ID.
 
         Args:
             account_id (int): The ID of the account to retrieve.
@@ -76,9 +86,7 @@ class NeonClient:
     def get_primary_active_membership(
         self, account_id: str
     ) -> dict[str, Any] | None:
-        """
-        Retrieves the membership Neon considers an account's primary active
-        one, using the account membership-history endpoint.
+        """Retrieves the membership Neon considers an account's primary active one, using the account membership-history endpoint.
 
         The ``primaryActiveMembership`` filter mirrors the "Active member"
         flag on Neon's account detail page, which takes the instance's grace
@@ -111,9 +119,7 @@ class NeonClient:
         return memberships[0] if memberships else None
 
     def search_account_by_email(self, email: str) -> list[dict[str, str]]:
-        """
-        Searches for Neon accounts that match the provided email address using
-        the Neon API search endpoint.
+        """Searches for Neon accounts that match the provided email address using the Neon API search endpoint.
 
         Args:
             email (str): The email address to search for.
@@ -151,9 +157,7 @@ class NeonClient:
     def get_individual_account_payload(
         self, user: User
     ) -> dict[str, dict[str, NeonContact]]:
-        """
-        Extracts relevant data from the provided user object to form a payload
-        for creating or updating an individual account.
+        """Extracts relevant data from the provided user object to form a payload for creating or updating an individual account.
 
         Args:
             user (User): The user object containing the information to be
@@ -210,8 +214,7 @@ class NeonClient:
         return json_data["id"]
 
     def update_account(self, user: User, account_id: str) -> str:
-        """
-        Updates an existing Neon account using the Neon API.
+        """Updates an existing Neon account using the Neon API.
 
         Args:
             user (User): The user object containing the updated information for

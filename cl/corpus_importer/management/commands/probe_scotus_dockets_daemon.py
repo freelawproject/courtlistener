@@ -1,3 +1,5 @@
+"""Daemon that probes supremecourt.gov for new SCOTUS dockets."""
+
 import time
 
 from celery import chain
@@ -37,9 +39,9 @@ from cl.scrapers.tasks import subscribe_to_scotus_updates
 def process_scotus_hit(docket_number: str, content: str) -> None:
     """Store the raw JSON to S3, parse it, and enqueue ingestion.
 
-    :param docket_number: The docket number
-    :param content: The raw JSON
-    :returns: None
+    Args:
+        docket_number: The docket number
+        content: The raw JSON
     """
     logger.info("Processing SCOTUS hit for docket %s.", docket_number)
     save_scotus_raw_to_s3(
@@ -107,15 +109,18 @@ def _ingest_serial_range(
     between requests. HIGHEST_SCOTUS_KNOWN_SERIAL is advanced after each
     serial so a crash mid-loop leaves a safe resume point.
 
-    :param r: Redis interface.
-    :param field: Hash field (e.g. ``"low:25"``).
-    :param sequence: Docket-number sequence.
-    :param term_year_2digit: 2-digit SCOTUS term year.
-    :param from_serial: Last serial already ingested (exclusive lower bound).
-    :param to_serial: Highest observed serial (inclusive upper bound).
-    :param probe_cache: Optional mapping of docket-number → JSON content for
-        serials already fetched during the probe phase.
-    :return: ``(hits_count, blocked)``.
+    Args:
+        r: Redis interface.
+        field: Hash field (e.g. ``"low:25"``).
+        sequence: Docket-number sequence.
+        term_year_2digit: 2-digit SCOTUS term year.
+        from_serial: Last serial already ingested (exclusive lower bound).
+        to_serial: Highest observed serial (inclusive upper bound).
+        probe_cache: Optional mapping of docket-number → JSON content for
+            serials already fetched during the probe phase.
+
+    Returns:
+        ``(hits_count, blocked)``.
     """
     if probe_cache is None:
         probe_cache = {}
@@ -200,11 +205,14 @@ def _probe_scotus_sequence(
     ingesting at most ``SCOTUS_FIXED_SWEEP`` serials per iteration. Forward
     probing resumes once ``ingested`` catches up.
 
-    :param r: Redis interface.
-    :param sequence: The docket-number sequence.
-    :param term_year_2digit: 2-digit SCOTUS term year.
-    :param testing: When True jitter is disabled.
-    :return: ``(hits_count, blocked)``. When ``blocked`` is True the caller
+    Args:
+        r: Redis interface.
+        sequence: The docket-number sequence.
+        term_year_2digit: 2-digit SCOTUS term year.
+        testing: When True jitter is disabled.
+
+    Returns:
+        ``(hits_count, blocked)``. When ``blocked`` is True the caller
         must abort the overall iteration.
     """
     field = scotus_highest_known_field(sequence, term_year_2digit)
@@ -391,6 +399,8 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
 
 
 class Command(VerboseCommand):
+    """Continually probe for and ingest new SCOTUS dockets."""
+
     help = """Run the SCOTUS JSON docket probing daemon.
 
 The goal of this daemon is to discover and ingest new SCOTUS cases as they
@@ -413,6 +423,7 @@ iteration and skips probing until the ingested watermark catches up.
 """
 
     def add_arguments(self, parser):
+        """Add the testing-iterations option."""
         parser.add_argument(
             "--testing-iterations",
             type=int,
@@ -422,6 +433,11 @@ iteration and skips probing until the ingested watermark catches up.
         )
 
     def handle(self, *args, **options):
+        """Run probe iterations while the daemon is enabled in settings.
+
+        Iterations are skipped while the probe is paused. With
+        ``--testing-iterations``, stops after that many iterations.
+        """
         super().handle(*args, **options)
         testing_iterations = options["testing_iterations"]
         testing = bool(testing_iterations)

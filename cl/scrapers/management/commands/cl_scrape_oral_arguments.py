@@ -1,3 +1,5 @@
+"""Scrape and save new oral argument audio from court sites with Juriscraper."""
+
 from datetime import date
 from typing import Any, TypedDict
 
@@ -39,6 +41,11 @@ def save_everything(
     items: _OAItemDict,
     backscrape: bool = False,
 ) -> None:
+    """Save a scraped docket and its audio file, then add the matching judges to the panel.
+
+    SCOTUS panels come from the justices sitting on the argument date;
+    other panels are looked up from the audio's judges string.
+    """
     docket, af = items["docket"], items["audio_file"]
     docket.save()
     af.docket = docket
@@ -63,6 +70,14 @@ def make_objects(
     sha1_hash: str,
     content: bytes,
 ) -> tuple[Docket, Audio]:
+    """Build a docket and an unsaved audio file from a scraped item.
+
+    The docket is updated or created, and the audio's content is stored in
+    its original file field without saving the audio.
+
+    Returns:
+        The docket and the audio file.
+    """
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -108,6 +123,8 @@ def make_objects(
 
 
 class Command(cl_scrape_opinions.Command):
+    """Scrape new oral arguments from one or more courts, once or in a loop."""
+
     scrape_target_descr = "oral arguments"
     juriscraper_module_type = "oral_args"
 
@@ -121,6 +138,13 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
+        """Download, save, and queue processing of a scraped oral argument.
+
+        Raises:
+            SingleDuplicateError: If the audio is a duplicate.
+            ConsecutiveDuplicatesError: If the scraper should stop because
+                of duplicates.
+        """
         content = await site.download_content(
             item["download_urls"], media_root=settings.MEDIA_ROOT
         )

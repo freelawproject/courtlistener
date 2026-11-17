@@ -1,3 +1,5 @@
+"""Email the partnership address the last day's global, webhook, and V3 API events."""
+
 from datetime import timedelta
 
 from django.conf import settings
@@ -10,9 +12,15 @@ from cl.stats.models import Event
 
 
 class Command(VerboseCommand):
+    """Email the events from the last day."""
+
     help = """Send an email to partnership managers with usage statistics"""
 
     def handle(self, *args, **options) -> None:
+        """Email the last day's events that are global, about webhooks, or about V3.
+
+        Sends nothing if there are no such events.
+        """
         super().handle(*args, **options)
         today = now()
         yesterday = today - timedelta(days=1)

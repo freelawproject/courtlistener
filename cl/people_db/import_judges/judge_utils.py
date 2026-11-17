@@ -1,5 +1,4 @@
-"""
-Created on Wed Feb 17 12:31:34 2016
+"""Created on Wed Feb 17 12:31:34 2016.
 
 @author: elliott
 """
@@ -17,7 +16,7 @@ from cl.people_db.models import (
 
 
 def process_date(year, month, day):
-    """return date object and accompanying granularity"""
+    """Return date object and accompanying granularity."""
     if not year or year in ["n/a", "N/A", "present"]:
         pdate = None
         granularity = ""
@@ -34,20 +33,17 @@ def process_date(year, month, day):
 
 
 def process_date_string(date_input):
-    """Return date as YYYY-MM-DD"""
+    """Return date as YYYY-MM-DD."""
     if not date_input:
         return None
-    date_object = datetime.strptime(date_input, "%Y-%m-%d")
-    return date_object
+    return datetime.strptime(date_input, "%Y-%m-%d")
 
 
 C = Counter()  # for fixing school names.
 
 
 def get_school(schoolname, testing=False):
-    """Takes the name of a school from judges data and tries to match to a
-    unique School object."""
-
+    """Takes the name of a school from judges data and tries to match to a unique School object."""
     if schoolname.isspace():
         return None
 
@@ -56,8 +52,7 @@ def get_school(schoolname, testing=False):
         school = schools[0]
         if school.is_alias_of is not None:
             return school.is_alias_of
-        else:
-            return school
+        return school
 
     # print('No exact matches: ' + schoolname + '. Running "contains".')
 
@@ -69,9 +64,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -98,9 +92,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple normalized matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -111,6 +104,13 @@ def get_school(schoolname, testing=False):
 
 
 def get_degree_level(degstr):
+    """Map a degree string to its degree level code.
+
+    Returns:
+        The degree level code, falling back to matching the degree's
+        prefix, or an empty string if the degree is empty or matches
+        nothing.
+    """
     if not degstr or degstr == "":
         return ""
     degdict = {
@@ -188,6 +188,11 @@ def get_degree_level(degstr):
 
 
 def get_party(partystr):
+    """Map a political party name to its party code.
+
+    Raises:
+        KeyError: If the party name is unknown.
+    """
     partydict = dict(
         [
             (v, k)
@@ -208,10 +213,16 @@ def get_party(partystr):
 
 
 def get_appointer(appointstr):
+    """Return the appointer string unchanged."""
     return appointstr
 
 
 def get_suffix(suffstr):
+    """Map a name suffix to its suffix code.
+
+    As written, any non-empty suffix maps to an empty string, and an empty
+    suffix is looked up in the suffix map, raising ``KeyError``.
+    """
     suffdict = {
         "Jr": "jr",
         "Jr.": "jr",
@@ -224,11 +235,15 @@ def get_suffix(suffstr):
     }
     if suffstr:
         return ""
-    else:
-        return suffdict[suffstr]
+    return suffdict[suffstr]
 
 
 def get_races(str_race):
+    """Map a slash-separated race string to a list of race codes.
+
+    Raises:
+        KeyError: If any race is unknown.
+    """
     racedict = {
         "White": "w",
         "Black": "b",
@@ -257,6 +272,11 @@ def get_races(str_race):
 
 
 def get_aba(abastr):
+    """Map an ABA rating name to its rating code, or None if the rating is empty.
+
+    Raises:
+        KeyError: If the rating name is unknown.
+    """
     abadict = dict(
         [
             (v, k)
@@ -271,19 +291,23 @@ def get_aba(abastr):
     )
     if not abastr:
         return None
-    aba = abadict[abastr]
-    return aba
+    return abadict[abastr]
 
 
 def get_select(state, year):
+    """Return ``"P"`` as the selection method, regardless of state and year."""
     return "P"
 
 
 def get_gender(gender_str):
+    """Map a gender name to its gender code.
+
+    Raises:
+        KeyError: If the gender name is unknown.
+    """
     gender_dict = {
         "Female": "f",
         "Male": "m",
         "Other": "o",
     }
-    gender = gender_dict[gender_str]
-    return gender
+    return gender_dict[gender_str]

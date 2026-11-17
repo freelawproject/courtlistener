@@ -1,3 +1,5 @@
+"""REST API serializers for financial disclosures and their parts."""
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -26,6 +28,8 @@ class AgreementSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed agreements."""
+
     class Meta:
         model = Agreement
         fields = "__all__"
@@ -36,6 +40,8 @@ class DebtSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed debts."""
+
     class Meta:
         model = Debt
         fields = "__all__"
@@ -46,6 +52,8 @@ class InvestmentSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed investments."""
+
     class Meta:
         model = Investment
         fields = "__all__"
@@ -56,6 +64,8 @@ class GiftSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed gifts."""
+
     class Meta:
         model = Gift
         fields = "__all__"
@@ -66,6 +76,8 @@ class NonInvestmentIncomeSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed non-investment income."""
+
     class Meta:
         model = NonInvestmentIncome
         fields = "__all__"
@@ -76,10 +88,12 @@ class PositionSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed positions."""
+
     resource_uri = serializers.SerializerMethodField()
 
     def get_resource_uri(self, position: Position) -> str:
-        """Override incorrect resource uri in disclousre-position api
+        """Override incorrect resource uri in disclousre-position api.
 
         This 'hack' is used to correctly generate the resource_uri field
         in the api. Currently django-rest-framework auto-generates the
@@ -88,10 +102,12 @@ class PositionSerializer(
         Here we are simply overriding the incorrect field with the correct one
         by passing in the correct path and id.
 
-        :param position: The position object
-        :return: Corrected resouce_uri
-        """
+        Args:
+            position: The position object
 
+        Returns:
+            Corrected resouce_uri
+        """
         path = f"/api/rest/v3/disclosure-positions/{position.id}/"
         return self.context["request"].build_absolute_uri(path)
 
@@ -105,6 +121,8 @@ class ReimbursementSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed reimbursements."""
+
     class Meta:
         model = Reimbursement
         fields = "__all__"
@@ -115,6 +133,8 @@ class SpouseIncomeSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for disclosed spouse income."""
+
     class Meta:
         model = SpouseIncome
         fields = "__all__"
@@ -125,6 +145,8 @@ class FinancialDisclosureSerializer(
     NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for financial disclosures, with their parts nested."""
+
     agreements = AgreementSerializer(many=True, read_only=True)
     debts = DebtSerializer(many=True, read_only=True)
     gifts = GiftSerializer(many=True, read_only=True)
@@ -149,9 +171,11 @@ class FinancialDisclosureSerializer(
         exclude = ("download_filepath",)
 
     def get_filepath(self, disclosure):
+        """Get the disclosure PDF's URL in storage."""
         return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
 
     def get_thumbnail(self, disclosure):
+        """Get the disclosure thumbnail's URL in storage."""
         return (
             f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.thumbnail}"
         )

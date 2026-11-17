@@ -1,3 +1,5 @@
+"""Models for search alerts, docket alerts, and scheduled alert hits."""
+
 from datetime import datetime
 
 import pghistory
@@ -19,9 +21,12 @@ def check_valid_alert_type_or_raise_error(
 ) -> None:
     """Validate the alert type against allowed values.
 
-    :param value: The alert type to validate.
-    :param valid_types: A Dict containing the allowed alert types.
-    :return: None. Raises a ValidationError if the alert type is not supported.
+    Args:
+        value: The alert type to validate.
+        valid_types: A Dict containing the allowed alert types.
+
+    Returns:
+        None. Raises a ValidationError if the alert type is not supported.
     """
     if value not in valid_types:
         raise ValidationError(f"Unsupported alert type: {value}")
@@ -29,8 +34,9 @@ def check_valid_alert_type_or_raise_error(
 
 def validate_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported.
-    :param value: The alert type to validate.
-    :return: None.
+
+    Args:
+        value: The alert type to validate.
     """
     valid_types = dict(SEARCH_TYPES.SUPPORTED_ALERT_TYPES)
     check_valid_alert_type_or_raise_error(value, valid_types)
@@ -38,8 +44,9 @@ def validate_alert_type(value: str) -> None:
 
 def validate_recap_alert_type(value: str) -> None:
     """Validate if the provided alert type is supported RECAP type.
-    :param value: The alert type to validate.
-    :return: None.
+
+    Args:
+        value: The alert type to validate.
     """
     valid_types = dict(SEARCH_TYPES.RECAP_ALERT_TYPES)
     check_valid_alert_type_or_raise_error(value, valid_types)
@@ -47,6 +54,8 @@ def validate_recap_alert_type(value: str) -> None:
 
 @pghistory.track()
 class Alert(AbstractDateTimeModel):
+    """A user's saved search query, sent to them at a chosen rate."""
+
     REAL_TIME = "rt"
     DAILY = "dly"
     WEEKLY = "wly"
@@ -114,7 +123,9 @@ class Alert(AbstractDateTimeModel):
         Raises ValidationError: If alert_type was changed from or to a non-RECAP
          or non-DOCKET type. This prevents alerts from being indexed into an
          incompatible percolator index while still remaining in the old one.
-        :return: None if alert_type hasn't changed or change is allowed.
+
+        Returns:
+            None if alert_type hasn't changed or change is allowed.
         """
         if self.pk is None or not self.tracker.has_changed("alert_type"):
             return
@@ -133,12 +144,17 @@ class Alert(AbstractDateTimeModel):
 
 
 class DocketAlertManager(models.Manager):
+    """Manager for docket alerts."""
+
     def subscriptions(self):
+        """Return only the subscription alerts."""
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
 @pghistory.track()
 class DocketAlert(AbstractDateTimeModel):
+    """A user's subscription, or unsubscription, to a docket's updates."""
+
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
     TYPES = (
@@ -188,14 +204,17 @@ class DocketAlert(AbstractDateTimeModel):
 
 
 class DateJSONEncoder(DjangoJSONEncoder):
+    """JSON encoder that writes datetimes in full ISO format."""
+
     def default(self, o):
+        """Encode datetimes with ``isoformat``, deferring other types to Django."""
         if isinstance(o, datetime):
             return o.isoformat()
         return super().default(o)
 
 
 class SCHEDULED_ALERT_HIT_STATUS:
-    """ScheduledAlertHit Status Types"""
+    """ScheduledAlertHit Status Types."""
 
     SCHEDULED = 0
     SENT = 1
@@ -206,9 +225,7 @@ class SCHEDULED_ALERT_HIT_STATUS:
 
 
 class ScheduledAlertHit(AbstractDateTimeModel):
-    """Store alert hits triggered by a percolated document in Elasticsearch,to
-    be sent later according to the user-defined rate.
-    """
+    """Store alert hits triggered by a percolated document in Elasticsearch,to be sent later according to the user-defined rate."""
 
     alert = models.ForeignKey(
         Alert,

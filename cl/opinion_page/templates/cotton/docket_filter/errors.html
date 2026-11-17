@@ -1,0 +1,6 @@
+{# The filter error notice, shown above the toolbar and at the top of the mobile dialog. #}
+<c-vars form class=""/>
+
+{% if form.errors %}
+  <p class="text-sm text-red-700 {{ class }}">There were errors applying your filters.</p>
+{% endif %}

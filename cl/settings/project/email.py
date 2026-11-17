@@ -1,3 +1,5 @@
+"""Settings for email backends, addresses, and bounce and send-volume thresholds."""
+
 import environ
 
 env = environ.FileAwareEnv()

@@ -1,3 +1,5 @@
+"""Celery tasks for archiving, downsizing, and transcribing oral argument audio."""
+
 from contextlib import ExitStack
 from math import ceil
 
@@ -38,6 +40,11 @@ from cl.lib.recap_utils import get_bucket_name
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
 def upload_audio_to_ia(self, af_pk: int) -> None:
+    """Upload an audio file's original file to the Internet Archive.
+
+    On success, the archive URL is saved on the audio and its failure count
+    is cleared. On failure, its failure count is incremented.
+    """
     af = Audio.objects.get(pk=af_pk)
     d = af.docket
     file_name = make_af_filename(
@@ -88,10 +95,13 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
     logger=logger,
 )
 def downsize_audio_file(audio: Audio) -> Response:
-    """Call downsize-audio service from doctor with retries
+    """Call downsize-audio service from doctor with retries.
 
-    :param audio: the audio file to downsize
-    :return: Response object
+    Args:
+        audio: the audio file to downsize
+
+    Returns:
+        Response object
     """
     response = async_to_sync(microservice)(
         service="downsize-audio",
@@ -109,7 +119,7 @@ def downsize_audio_file(audio: Audio) -> Response:
     retry_backoff=10,
 )
 def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
-    """Get transcription from OpenAI API whisper-1 model
+    """Get transcription from OpenAI API whisper-1 model.
 
     openai.OpenAI() client expects the environment
     variable OPENAI_API_KEY to be set
@@ -117,7 +127,10 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     If successful, updates Audio object and creates
     related AudioTranscriptionMetadata object
 
-    :param audio_pk: audio object primary key
+    Args:
+        self: The bound Celery task.
+        audio_pk: audio object primary key
+        dont_retry: Whether to skip retrying the task when the API call fails.
     """
     audio = Audio.objects.get(pk=audio_pk)
     logger.info(

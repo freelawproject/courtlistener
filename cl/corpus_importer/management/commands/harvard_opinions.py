@@ -1,11 +1,12 @@
+"""Import the downloaded Harvard Caselaw Access Project corpus."""
+
 import difflib
 import itertools
 import json
 import logging
-import os
 import re
 from datetime import date, datetime, timedelta
-from glob import glob
+from pathlib import Path
 from typing import Any, TypedDict, cast
 
 import requests
@@ -26,13 +27,15 @@ from cl.corpus_importer.utils import (
     match_based_text,
 )
 from cl.lib.argparse_types import _argparse_volumes
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import trunc
-from cl.lib.utils import human_sort
+from cl.lib.utils import glob_files, human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -40,16 +43,19 @@ cnt = CaseNameTweaker()
 
 
 def validate_dt(date_str: str) -> tuple[date | None, bool]:
-    """
-    Check if the date string is only year-month or year.
-    If partial date string, make date string the first of the month
-    and mark the date as an estimate.
+    """Check if the date string is only year-month or year.
+
+    If partial date string, make date string the first of the month and mark
+    the date as an estimate.
 
     If unable to validate date return an empty string, True tuple.
 
-    :param date_str: a date string we receive from the harvard corpus
-    :returns: Tuple of date obj or date obj estimate
-    and boolean indicating estimated date or actual date.
+    Args:
+        date_str: a date string we receive from the harvard corpus
+
+    Returns:
+        Tuple of date obj or date obj estimate
+        and boolean indicating estimated date or actual date.
     """
     date_obj, date_approx = None, False
     add_ons = ["", "-15", "-07-01"]
@@ -76,44 +82,26 @@ def _make_glob_from_args(
     volumes: range | None,
     page: str | None,
 ) -> list[str]:
-    """Make list of glob paths
+    """Make list of glob patterns relative to the Harvard corpus directory.
 
-    :param reporter: The reporter to filter if any
-    :param volumes: The volumes of the reporter to filter to, if any
-    :return: A list of glob paths
+    Args:
+        reporter: The reporter to filter if any
+        volumes: The volumes of the reporter to filter to, if any
+        page: The page to filter to, if any
+
+    Returns:
+        A list of glob patterns
     """
-
     if reporter and volumes and page:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"law.free.cap.{reporter}.{volumes[0]}",
-            f"{page}.*.json",
-        )
-        return [glob_path]
-    elif reporter and volumes:
-        glob_paths = []
-        for volume in volumes:
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"law.free.cap.{reporter}.{volume}",
-                "*.json",
-            )
-            glob_paths.append(glob_path)
-        return glob_paths
-    elif reporter:
+        return [f"law.free.cap.{reporter}.{volumes[0]}/{page}.*.json"]
+    if reporter and volumes:
+        return [
+            f"law.free.cap.{reporter}.{volume}/*.json" for volume in volumes
+        ]
+    if reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"{reporter_key}.*/*.json",
-        )
-    else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-        )
-    return [glob_path]
+        return [f"{reporter_key}.*/*.json"]
+    return ["law.free.cap.*/*.json"]
 
 
 def filepath_list(
@@ -121,7 +109,7 @@ def filepath_list(
     volumes: range | None,
     page: str | None,
 ) -> list[str]:
-    """Given a reporter and volume, return a sorted list of files to process
+    """Given a reporter and volume, return a sorted list of files to process.
 
     Make a list of file paths accordingly:
      - If neither a reporter nor a volume are given, do all cases from all
@@ -131,31 +119,37 @@ def filepath_list(
      - If a reporter and volume are both given, only do cases from that volume
        of that reporter.
 
-    :param reporter: The reporter to filter to (optional)
-    :param volumes: The volumes of the reporter to filter to (optional)
-    :param page: The page of the reporter's volume to filter to (optional)
-    :return: A sorted list of file paths
-    """
+    Args:
+        reporter: The reporter to filter to (optional)
+        volumes: The volumes of the reporter to filter to (optional)
+        page: The page of the reporter's volume to filter to (optional)
 
+    Returns:
+        A sorted list of file paths
+    """
     files = []
-    glob_paths = _make_glob_from_args(reporter, volumes, page)
-    for glob_path in glob_paths:
-        files.extend(glob(glob_path))
-    files = human_sort(files, key=None)  # type: ignore
-    return files  # type: ignore
+    corpus_dir = Path(settings.MEDIA_ROOT) / "harvard_corpus"
+    for glob_pattern in _make_glob_from_args(reporter, volumes, page):
+        files.extend(
+            str(path) for path in glob_files(corpus_dir, glob_pattern)
+        )
+    return human_sort(files, key=None)  # type: ignore
 
 
 def check_for_match(new_case: str, possibilities: list[str]) -> bool:
-    """Check for matches based on case names
+    """Check for matches based on case names.
 
     This code is a variation of get_closest_match_index used in juriscraper.
     It checks if the case name we are trying to add matches any duplicate
     citation cases already in the system.
 
-    :param new_case: The importing case name
-    :param possibilities: The array of cases already in the
-    system with the same citation
-    :return: Returns the match if any, otherwise returns None.
+    Args:
+        new_case: The importing case name
+        possibilities: The array of cases already in the
+            system with the same citation
+
+    Returns:
+        Returns the match if any, otherwise returns None.
     """
     new_case = normalize_phrase(new_case)
     possibilities = [normalize_phrase(x) for x in possibilities]
@@ -170,10 +164,13 @@ def check_for_match(new_case: str, possibilities: list[str]) -> bool:
 
 
 def map_opinion_type(harvard_opinion_type: str) -> str:
-    """Map Harvard opinion types to CL ones
+    """Map Harvard opinion types to CL ones.
 
-    :param harvard_opinion_type: The type field of the Harvard opinion
-    :return: The type field from our schema
+    Args:
+        harvard_opinion_type: The type field of the Harvard opinion
+
+    Returns:
+        The type field from our schema
     """
     type_map: dict[str, str] = {
         "unanimous": Opinion.UNANIMOUS,
@@ -191,16 +188,17 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
 
 
 def parse_extra_fields(soup, fields, long_field=False) -> dict:
-    """Parse the remaining extra fields into long or short strings
-    returned as dict
+    """Parse the remaining extra fields into long or short strings returned as dict.
 
-    :param soup: The bs4 representation of the case data xml
-    :param fields: An array of strings names for fields to parse
-    :param long_field: A boolean decides to parse the field into <p> or simple
-    text.
-    :return: Returns dictionary of string values to be stored in opinion
+    Args:
+        soup: The bs4 representation of the case data xml
+        fields: An array of strings names for fields to parse
+        long_field: A boolean decides to parse the field into <p> or simple
+            text.
+
+    Returns:
+        Returns dictionary of string values to be stored in opinion
     """
-
     data_set = {}
     for field in fields:
         elements = []
@@ -226,6 +224,8 @@ def parse_extra_fields(soup, fields, long_field=False) -> dict:
 
 
 class OptionsType(TypedDict):
+    """The command options used when parsing Harvard opinions."""
+
     reporter: str
     volumes: range | None
     page: str
@@ -237,7 +237,8 @@ class OptionsType(TypedDict):
 def get_fix_list() -> list[str]:
     """Download the fix list for harvard data.
 
-    :return:List of files to fix
+    Returns:
+        List of files to fix
     """
     data = requests.get(
         "https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/missing-files.json",
@@ -247,11 +248,14 @@ def get_fix_list() -> list[str]:
 
 
 def merge_fixes(data: dict[str, Any], identifier: str) -> dict[str, Any]:
-    """Merge fixes into the data
+    """Merge fixes into the data.
 
-    :param data: The Harvard data
-    :param identifier: The filepath of the data to fix.
-    :return: a dict with updated data
+    Args:
+        data: The Harvard data
+        identifier: The filepath of the data to fix.
+
+    Returns:
+        a dict with updated data
     """
     fix = requests.get(
         f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{identifier}",
@@ -262,26 +266,29 @@ def merge_fixes(data: dict[str, Any], identifier: str) -> dict[str, Any]:
 
 
 def read_json(file_path: str, ia_download_url: str) -> Any | None:
-    """Read JSON file and throw a warning if exceptions occur
+    """Read JSON file and throw a warning if exceptions occur.
 
-    :param file_path: Filepath to JSON
-    :param ia_download_url: URL of file
-    :return: JSON object if available
+    Args:
+        file_path: Filepath to JSON
+        ia_download_url: URL of file
+
+    Returns:
+        JSON object if available
     """
     try:
-        with open(file_path) as f:
+        with Path(file_path).open() as f:
             data = json.load(f)
     except ValueError:
-        logger.warning(f"Empty json: missing case at: {ia_download_url}")
+        logger.warning("Empty json: missing case at: %s", ia_download_url)
         return None
     except Exception as e:
-        logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        logger.warning("Unknown error %s for: %s", e, ia_download_url)
         return None
     return data
 
 
 def parse_harvard_opinions(options: OptionsType) -> None:
-    """Parse Harvard Opinions
+    """Parse Harvard Opinions.
 
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
     database.
@@ -293,11 +300,10 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
     If neither is provided, code will cycle through all downloaded files.
 
-    :param options: The command line options including (reporter,
-    volume and court_id)
-    :return: None
+    Args:
+        options: The command line options including (reporter,
+            volume and court_id)
     """
-
     reporter = options["reporter"]
     volumes = options["volumes"]
     page = options["page"]
@@ -312,7 +318,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     fix_list = get_fix_list()
 
     for file_path in filepaths:
-        logger.info(f"Processing opinion at {file_path}")
+        logger.info("Processing opinion at %s", file_path)
 
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
@@ -321,7 +327,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         oc = OpinionCluster.objects.filter(filepath_json_harvard=file_path)
         if len(oc) > 0:
             logger.info(
-                f"Skipping {oc[0].id} - already in system {ia_download_url}"
+                "Skipping %s - already in system %s", oc[0].id, ia_download_url
             )
             continue
 
@@ -331,7 +337,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         identifier = "/".join(file_path.rsplit("/", 2)[1:])
         if identifier in fix_list:
-            logger.info(f"Fetching fixes and merging data at {file_path}")
+            logger.info("Fetching fixes and merging data at %s", file_path)
             data = merge_fixes(data, identifier)
 
         # Cleanup whitespace on citations
@@ -339,7 +345,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         cites = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
-            logger.warning(f"No citation found for {clean_cite}")
+            logger.warning("No citation found for %s", clean_cite)
             continue
 
         case_name = harmonize(data["name_abbreviation"])
@@ -358,7 +364,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 location=options["location"],
             )
             if len(found_court) != 1:
-                logging.warning(
+                logger.warning(
                     "Court not found for %s at %s",
                     data["court"]["name"],
                     file_path,
@@ -367,14 +373,14 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             court_id = found_court[0]
 
         if not Court.objects.filter(id=court_id).exists():
-            logger.warning(f"Court not found in Courtlistener: {court_id}")
+            logger.warning("Court not found in Courtlistener: %r", court_id)
             continue
 
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         if not date_filed:
             logger.warning(
-                f"No date found for {data['decision_date']} at {file_path}"
+                "No date found for %s at %s", data["decision_date"], file_path
             )
             continue
         case_body = data["casebody"]["data"]
@@ -383,7 +389,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
-            logger.warning(f"No opinion in Harvard XML at {file_path}")
+            logger.warning("No opinion in Harvard XML at %s", file_path)
             continue
 
         previously_imported_case = find_previously_imported_cases(
@@ -404,14 +410,16 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                     cluster_id=previously_imported_case.id,
                 )
                 logger.info(
-                    f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
+                    "Adding citations for case at https://www.courtlistener.com/opinion/%s/%s",
+                    previously_imported_case.id,
+                    previously_imported_case.slug,
                 )
                 # Add the filepath to the harvard file for the associated opinion
                 previously_imported_case.filepath_json_harvard = file_path
                 previously_imported_case.save()
             continue
 
-        logger.info(f"Adding case {case_name_full}")
+        logger.info("Adding case %s", case_name_full)
         add_new_case(
             data,
             case_body,
@@ -438,19 +446,19 @@ def add_new_case(
     court_id: str | None,
     file_path: str,
 ) -> None:
-    """Add new case to Courtlistener.com
+    """Add new case to Courtlistener.com.
 
-    :param data: The Harvard data JSON object
-    :param case_body: The Harvard Case body
-    :param case_name: The case name
-    :param case_name_full: The full case name
-    :param case_name_short: The case name abbreviation
-    :param date_filed: The date the case was filed
-    :param is_approximate: Is the case date filed approximate
-    :param citation: The citation we use in logging and first citation parsed
-    :param court_id: The CL Court ID
-    :param file_path: The path to the Harvard JSON
-    :return: None
+    Args:
+        data: The Harvard data JSON object
+        case_body: The Harvard Case body
+        case_name: The case name
+        case_name_full: The full case name
+        case_name_short: The case name abbreviation
+        date_filed: The date the case was filed
+        is_approximate: Is the case date filed approximate
+        citation: The citation we use in logging and first citation parsed
+        court_id: The CL Court ID
+        file_path: The path to the Harvard JSON
     """
     soup = BeautifulSoup(case_body, "lxml")
 
@@ -496,7 +504,9 @@ def add_new_case(
 
     with transaction.atomic():
         logger.info(
-            f"Adding docket for {case_name}: {citation.corrected_citation()}"
+            "Adding docket for %s: %s",
+            case_name,
+            citation.corrected_citation(),
         )
         docket = update_or_create_docket(
             case_name,
@@ -558,19 +568,24 @@ def add_new_case(
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
-        f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
+        "Finished adding case at https://www.courtlistener.com/opinion/%s/%s",
+        cluster.id,
+        cluster.slug,
     )
 
 
 def add_opinions(
     soup: BeautifulSoup, cluster_id: int, citation: FullCaseCitation
 ) -> list[int]:
-    """Add opinions to Cluster
+    """Add opinions to Cluster.
 
-    :param soup: The bs4 representation of the case data xml
-    :param cluster_id: The cluster ID
-    :param citation: Citation object
-    :return: Opinion IDs in a list
+    Args:
+        soup: The bs4 representation of the case data xml
+        cluster_id: The cluster ID
+        citation: Citation object
+
+    Returns:
+        Opinion IDs in a list
     """
     new_op_pks = []
     # We look for opinion tags without data-type or tags with data-type == "opinion"
@@ -625,17 +640,19 @@ def find_previously_imported_cases(
     case_name_full: str,
     citation: FullCaseCitation,
 ) -> OpinionCluster | None:
-    """Check if opinion is in Courtlistener
+    """Check if opinion is in Courtlistener.
 
-    :param data: The harvard data
-    :param court_id: Court ID
-    :param date_filed: The date filed
-    :param harvard_characters: Harvard stripped down characters
-    :param case_name_full: The full case name from Harvard
-    :param citation: CL Citation object
-    :return: The matching opinion cluster in CL or None
+    Args:
+        data: The harvard data
+        court_id: Court ID
+        date_filed: The date filed
+        harvard_characters: Harvard stripped down characters
+        case_name_full: The full case name from Harvard
+        citation: CL Citation object
+
+    Returns:
+        The matching opinion cluster in CL or None
     """
-
     # Match against known citations.
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"], tokenizer=HYPERSCAN_TOKENIZER)
@@ -701,9 +718,12 @@ def find_previously_imported_cases(
 
 
 class Command(VerboseCommand):
+    """Parse downloaded Harvard opinions into the database."""
+
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        """Add the volume, reporter, page, court, location, bankruptcy, and debug options."""
         parser.add_argument(
             "--volumes",
             required=False,
@@ -751,6 +771,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Parse the selected Harvard opinions."""
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
         parse_harvard_opinions(options)
