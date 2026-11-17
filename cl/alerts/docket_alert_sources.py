@@ -3,7 +3,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from django.db.models import Prefetch, QuerySet
+from rest_framework.serializers import ModelSerializer
 
+from cl.corpus_importer.api_serializers import (
+    DocketEntrySerializer,
+    SCOTUSDocketEntrySerializer,
+)
 from cl.search.models import (
     Docket,
     DocketEntry,
@@ -15,7 +20,7 @@ from cl.search.models import (
 
 @dataclass(frozen=True)
 class DocketAlertSource:
-    """Describes how one "flavor" of docket resolves the entries a docket alert should notify about, and which templates render its email. RECAP/PACER is the default; SCOTUS is the first override.
+    """Describes how one "flavor" of docket resolves the entries a docket alert should notify about, which templates render its email, and which serializer builds its webhook payload. RECAP/PACER is the default; SCOTUS is the first override.
 
     ``entries_by_pk`` resolves a precise list of entry pks into a queryset --
     used for RECAP's recap.email re-notify case, where the caller already
@@ -26,18 +31,26 @@ class DocketAlertSource:
 
     ``email_txt_template``/``email_html_template`` name the templates
     make_alert_messages renders for this source.
+
+    ``webhook_serializer`` serializes each entry from ``entries_by_pk`` for
+    send_docket_alert_webhook_events.
     """
 
     entries_by_pk: Callable[[list[int]], QuerySet]
     entries_since: Callable[[Docket, datetime], QuerySet]
     email_txt_template: str
     email_html_template: str
+    webhook_serializer: type[ModelSerializer]
 
 
 def _with_email_relations(
     qs: QuerySet, documents_attr: str, documents: QuerySet
 ) -> QuerySet:
     """Preload what a docket alert email renders -- each entry's docket (with its court, which DocketEntry.datetime_filed reads for the timezone) and documents, minus their potentially huge plain_text -- in a fixed number of queries, however many entries there are. Re-rendering the evaluated entries, as make_alert_messages does per recipient, adds no queries.
+
+    Docket alert webhooks serialize the same entries (see
+    DocketAlertSource.webhook_serializer), so their payloads rely on this
+    preloading too.
 
     Args:
         qs: The entries queryset.
@@ -81,6 +94,7 @@ RECAP_ALERT_SOURCE = DocketAlertSource(
     entries_since=_recap_entries_since,
     email_txt_template="docket_alert_email.txt",
     email_html_template="docket_alert_email.html",
+    webhook_serializer=DocketEntrySerializer,
 )
 
 
@@ -119,6 +133,7 @@ SCOTUS_ALERT_SOURCE = DocketAlertSource(
     entries_since=_scotus_entries_since,
     email_txt_template="docket_alert_email_scotus.txt",
     email_html_template="docket_alert_email_scotus.html",
+    webhook_serializer=SCOTUSDocketEntrySerializer,
 )
 
 

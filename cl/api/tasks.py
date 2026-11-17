@@ -4,6 +4,7 @@ from elasticsearch.dsl.response import Hit
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
+from cl.alerts.docket_alert_sources import RECAP_ALERT_SOURCE
 from cl.alerts.models import Alert
 from cl.api.models import (
     Webhook,
@@ -14,7 +15,6 @@ from cl.api.models import (
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.favorites.api_serializers import PrayerSerializer
 from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
@@ -25,7 +25,7 @@ from cl.search.api_serializers import (
     V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
-from cl.search.models import SEARCH_TYPES, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument
 
 
@@ -52,22 +52,31 @@ def send_test_webhook_event(
 def send_docket_alert_webhook_events(
     des_pks: list[int],
     webhook_recipients_pks: list[int],
+    docket_pk: int | None = None,
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s).
 
     Args:
         des_pks: The list of docket entries primary keys.
         webhook_recipients_pks: A list of User pks to send the webhook to.
+        docket_pk: The docket of the entries, which picks the table to look
+            them up in, since entry pks of different sources can collide.
+            Without it, they're looked up as RECAP entries.
     """
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
         user_id__in=webhook_recipients_pks,
         enabled=True,
     )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+    source = (
+        Docket.objects.get(pk=docket_pk).get_alert_source()
+        if docket_pk
+        else RECAP_ALERT_SOURCE
+    )
+    serialized_docket_entries = [
+        source.webhook_serializer(de).data
+        for de in source.entries_by_pk(des_pks)
+    ]
 
     for webhook in webhooks:
         post_content = {
