@@ -296,7 +296,9 @@ class _DatabaseProxy(AttributeMerger):
             field = attribute.field
         else:
             field = attribute
-        getter = operator.attrgetter(field.name)
+        # Read the column itself, so a foreign key yields its ID rather than
+        # fetching the related row.
+        getter = operator.attrgetter(field.attname)
         self._field: Field = field
         self._transform = lambda s, p, m: getter(m) if m is not None else None
         self._db_fields = (*self._db_fields, field.name)

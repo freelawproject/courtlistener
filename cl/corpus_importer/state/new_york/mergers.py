@@ -125,21 +125,6 @@ def _storable_number(
     return None
 
 
-def _keep_stored_file(scrape: str, db: FieldFile | None) -> str:
-    """Merge strategy that keeps the path already stored for a document when this scrape has no published one to put there.
-
-    Args:
-        scrape: The path this scrape published to, if any.
-        db: The path already stored for the document.
-
-    Returns:
-        The path to store.
-    """
-    if db is None:
-        return scrape or ""
-    return scrape or (db.name or "")
-
-
 def _stated(reading: CourtVocabulary | Unclassified) -> str:
     """The Court-PASS value to store for a field read off a file name.
 
@@ -167,6 +152,41 @@ def is_publishable(file: NYCoAFile) -> bool:
     :return: Whether the file may be stored for publishing.
     """
     return is_scraped(file.local_path) and bool(file.content_hash)
+
+
+def _vouched[T](file: NYCoAFile, value: T) -> T | None:
+    """A value describing a scraped file, unless the scrape cannot vouch for the file it downloaded.
+
+    Args:
+        file: The file Court-PASS listed.
+        value: What the scrape read about the file's download.
+
+    Returns:
+        `value`, or `None` when the scrape downloaded a file that is not
+        publishable, so that whatever is already stored is kept.
+    """
+    return value if not file.local_path or is_publishable(file) else None
+
+
+def _republished_path(
+    file: NYCoAFile, stored: FieldFile | None, stored_hash: str | None
+) -> str | None:
+    """The published path of a file this scrape downloaded again unchanged.
+
+    Args:
+        file: The file Court-PASS listed.
+        stored: The file already stored for the document, if any.
+        stored_hash: The hash already stored for the document, if any.
+
+    Returns:
+        The stored path when the document has already published the file this
+        scrape downloaded, or `None` otherwise.
+    """
+    if stored is None or not (file.local_path and file.content_hash):
+        return None
+    if stored_hash != file.content_hash or not is_published(stored.name or ""):
+        return None
+    return stored.name
 
 
 class NYCoADocumentMerger[ParamType](
@@ -202,17 +222,28 @@ class NYCoADocumentMerger[ParamType](
     part: int | None = Fn(_storable_number)(
         Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
     )
-    filepath_local: str = Fn(_keep_stored_file)(
-        Scrape(NYCoAFile).local_path,
+    # Normally the scraper's key in the private bucket, which the loader
+    # publishes after the merge. A file this document has already published is
+    # kept where it is, and a file the scrape cannot vouch for is not stored,
+    # leaving the document with whatever file it already has.
+    filepath_local: str = Coalesce(
+        Fn(_republished_path)(
+            Scrape(NYCoAFile),
+            Database(NYCoADocument.filepath_local),
+            Database(NYCoADocument.sha256),
+        ),
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).local_path),
         Database(NYCoADocument.filepath_local),
+        default="",
     )
     sha256: str = Coalesce(
-        Scrape(NYCoAFile).content_hash,
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).content_hash),
         Database(NYCoADocument.sha256),
         default="",
     )
     file_size: int | None = Coalesce(
-        Scrape(NYCoAFile).file_size, Database(NYCoADocument.file_size)
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).file_size),
+        Database(NYCoADocument.file_size),
     )
 
     @override
@@ -224,8 +255,8 @@ class NYCoADocumentMerger[ParamType](
     ) -> MergerState.CreateOutput[
         NYCoAFile, RelatedParams[ParamType], NYCoADocument
     ]:
-        """Settle which path to store for the file, then write the document."""
-        self._accept_file(state.scrape, None)
+        """Dispose of the scraper's copy of the file, then write the document."""
+        self._dispose_of_scraped_copy(state.scrape, None)
         return super().create(state)
 
     @override
@@ -237,8 +268,8 @@ class NYCoADocumentMerger[ParamType](
     ) -> MergerState.UpdateOutput[
         NYCoAFile, RelatedParams[ParamType], NYCoADocument
     ]:
-        """Settle which path to store for the file, then write the document."""
-        self._accept_file(state.scrape, state.instance)
+        """Dispose of the scraper's copy of the file, then write the document."""
+        self._dispose_of_scraped_copy(state.scrape, state.instance)
 
         save_state = super().update(state)
 
@@ -257,23 +288,14 @@ class NYCoADocumentMerger[ParamType](
 
         return state.save(instance, updated_fields, save_state.result)
 
-    def _scrub_fileinfo(self) -> None:
-        """Remove info relevant to file."""
-        self.filepath_local = ""
-        self.sha256 = ""
-        self.file_size = None
-
-    def _accept_file(
+    def _dispose_of_scraped_copy(
         self, scrape: NYCoAFile, existing: NYCoADocument | None
     ) -> None:
-        """Decide what the document's `filepath_local` should hold.
+        """Handle a scraped copy of the file that the document will not store.
 
-        Normally that is the scraper's key in the private bucket, which the
-        loader publishes after the merge. Two exceptions: a file this document
-        has already published is kept where it is, and the scraper's copy of it
-        is deleted once the merge commits, since nothing will ever point at it;
-        and a file the scrape cannot vouch for is not stored at all, which
-        leaves the document with whatever file it already has.
+        A copy of a file this document has already published is deleted once
+        the merge commits, since nothing will ever point at it. A copy the
+        scrape cannot vouch for is logged.
 
         Args:
             scrape: The file Court-PASS listed.
@@ -282,14 +304,9 @@ class NYCoADocumentMerger[ParamType](
         private_key = scrape.local_path
         if not private_key:
             return
-        stored = (existing.filepath_local.name or "") if existing else ""
-        if (
-            existing is not None
-            and scrape.content_hash
-            and existing.sha256 == scrape.content_hash
-            and is_published(stored)
+        if existing is not None and _republished_path(
+            scrape, existing.filepath_local, existing.sha256
         ):
-            self.filepath_local = stored
             if is_scraped(private_key):
                 transaction.on_commit(
                     partial(
@@ -307,7 +324,6 @@ class NYCoADocumentMerger[ParamType](
             scrape.file_name,
             private_key,
         )
-        self._scrub_fileinfo()
 
 
 def _served_attachments(
