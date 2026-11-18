@@ -4,7 +4,7 @@ import logging
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
 from typing import Any, TypedDict
@@ -1773,7 +1773,7 @@ def invert_user_logs(
     for k, v in out.items():
         try:
             user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
+        except User.DoesNotExist, ValueError:
             user_keyed_out[k] = v
         else:
             user_keyed_out[user.username] = v
@@ -2245,7 +2245,6 @@ class DynamicFieldsMixin:
             allowed = set(filter(None, filter_fields))
 
         # omit fields in the `omit` argument.
-        # TODO: Typing this correctly involves going through a long chain of things that probably also need to be typed
         omitted = set(filter(None, omit_fields))
 
         for field in existing:
@@ -2257,9 +2256,14 @@ class DynamicFieldsMixin:
 
         return fields
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> set[str] | Default:
         """Split a comma-separated fields parameter, or return ``default`` if it is missing."""
         try:
             return params.split(",")
@@ -2296,9 +2300,14 @@ class NestedDynamicFieldsMixin(DynamicFieldsMixin):
         """Always False, so every nesting level filters its fields."""
         return False
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> set[str] | Default:
         """Parse the raw `fields` parameter and return the subset of fields that apply at this serializer’s nesting level under the given source prefix."""
         fields = super().get_filter_fields(
             params, level, source, default, include_parent
@@ -2324,15 +2333,23 @@ def get_source_path(serializer) -> str:
     return f"{parent_path}__{name}" if parent_path else name
 
 
-def get_fields_for_level_and_prefix(
-    fields_list, level, source, include_parent, default
-):
+def get_fields_for_level_and_prefix[
+    Fields: Iterable[str] | None,
+    Default: Iterable[str] | None,
+](
+    fields_list: Fields,
+    level: int,
+    source: str,
+    include_parent: bool,
+    default: Default,
+) -> set[str] | Default:
     """Extract the field names relevant to a specific nesting depth from a list of double‑underscore lookup strings."""
     if not fields_list:
         return default
 
     prefix = source.split("__") if source else []
     allowed = set()
+    # pyrefly:ignore[not-iterable]
     for f in fields_list:
         parts = f.split("__")
 
