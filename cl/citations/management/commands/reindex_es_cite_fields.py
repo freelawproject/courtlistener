@@ -11,6 +11,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.documents import OpinionClusterDocument, OpinionDocument
 from cl.search.models import Opinion, OpinionCluster
 from cl.search.tasks import (
+    CiteCountUpdateDict,
     build_bulk_cites_doc,
     build_cite_count_update,
     index_documents_in_bulk,
@@ -147,18 +148,25 @@ class Command(VerboseCommand):
         Args:
             opinion_ids: the opinion ids
         """
-        base_doc = {
-            "_op_type": "update",
-            "_index": OpinionClusterDocument._index._name,
-        }
+        _op_type = "update"
+        _index = OpinionClusterDocument._index._name
 
-        documents_to_update = []
+        documents_to_update: list[CiteCountUpdateDict] = []
         for child_id in opinion_ids:
             cites_doc_to_update, _ = build_bulk_cites_doc(
                 OpinionDocument, child_id, Opinion
             )
-            cites_doc_to_update.update(base_doc)
-            documents_to_update.append(cites_doc_to_update)
+            if not cites_doc_to_update:
+                continue
+            documents_to_update.append(
+                {
+                    "_id": cites_doc_to_update["_id"],
+                    "_op_type": _op_type,
+                    "_index": _index,
+                    "_routing": cites_doc_to_update["_routing"],
+                    "doc": cites_doc_to_update["doc"],
+                }
+            )
 
         index_documents_in_bulk(documents_to_update)
 

@@ -13,6 +13,7 @@ from elasticsearch.helpers import BulkIndexError, bulk
 
 from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
+from cl.search.tasks import CiteCountUpdateDict
 
 
 def extract_field_values[M: Model](
@@ -161,7 +162,9 @@ def check_bulk_indexing_exceptions(
     return conflict_found, raise_error
 
 
-def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
+def index_documents_in_bulk(
+    documents_to_index: list[CiteCountUpdateDict],
+) -> None:
     """Index documents in Elasticsearch using the bulk API.
 
     Args:
@@ -172,6 +175,7 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
     # Execute the bulk update
     ids = [doc["_id"] for doc in documents_to_index]
     try:
+        # pyrefly:ignore[bad-argument-type]
         bulk(client, documents_to_index)
     except BulkIndexError as exc:
         # Catch any BulkIndexError exceptions to handle specific error message.

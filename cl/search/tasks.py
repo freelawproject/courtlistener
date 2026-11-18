@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Literal, Never, NotRequired, TypedDict
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -1478,11 +1478,17 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
+class _CiteCountUpdateDictPartial(TypedDict):
+    _id: int | str
+    _routing: int
+    doc: dict
+
+
 def build_bulk_cites_doc[ModelT: ESModelType](
     es_child_doc_class: type[ESDocumentType],
     child_id: int,
     child_doc_model: type[ModelT],
-) -> tuple[ESDictDocument, ModelT | None]:
+) -> tuple[_CiteCountUpdateDictPartial | dict[Never, Never], ModelT | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     Args:
@@ -1521,7 +1527,7 @@ def build_bulk_cites_doc[ModelT: ESModelType](
             {"id": child_instance.pk},
         )
 
-    doc_to_update = {
+    doc_to_update: _CiteCountUpdateDictPartial = {
         "_id": doc_id,
         "_routing": parent_document_id,
         "doc": {"cites": cites_prepared},
@@ -1552,7 +1558,9 @@ def percolate_document(
     ).apply_async()
 
 
-class _CiteCountUpdateDict(TypedDict):
+class CiteCountUpdateDict(TypedDict):
+    """TypedDict for the output from `build_cite_count_update`."""
+
     _id: int | str
     _op_type: Literal["update"]
     _index: str
@@ -1562,7 +1570,7 @@ class _CiteCountUpdateDict(TypedDict):
 
 def build_cite_count_update(
     cluster_ids_to_update: list[int],
-) -> list[_CiteCountUpdateDict]:
+) -> list[CiteCountUpdateDict]:
     """Create update documents for OpinionClusterDocument.citeCount.
 
     Args:
@@ -1594,7 +1602,7 @@ def build_cite_count_update(
             )
 
         # Build the OpinionCluster dicts for updating the citeCount.
-        doc_to_update: _CiteCountUpdateDict = {
+        doc_to_update: CiteCountUpdateDict = {
             "_id": cluster.pk,
             "doc": {"citeCount": cluster.citation_count},
             "_op_type": "update",
@@ -1668,10 +1676,9 @@ def index_related_cites_fields(
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            base_doc = {
-                "_op_type": "update",
-                "_index": OpinionClusterDocument._index._name,
-            }
+            _op_type = "update"
+            _index = OpinionClusterDocument._index._name
+
             documents_to_update.extend(
                 build_cite_count_update(cluster_ids_to_update or [])
             )
@@ -1685,25 +1692,35 @@ def index_related_cites_fields(
 
         case OpinionsCitedByRECAPDocument.__name__:
             # Build the RECAPDocument dict for updating the cites.
-            base_doc = {
-                "_op_type": "update",
-                "_index": DocketDocument._index._name,
-            }
+            _op_type = "update"
+            _index = OpinionClusterDocument._index._name
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
             cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
+        case _:
+            # TODO: This whole match is weird
+            raise NotImplementedError(
+                "Only OpinionsCited and OpinionsCitedByRECAPDocument are supported"
+            )
 
     if cites_doc_to_update and base_doc:
-        cites_doc_to_update.update(base_doc)
-        documents_to_update.append(cites_doc_to_update)
+        documents_to_update.append(
+            {
+                "_op_type": _op_type,
+                "_index": _index,
+                "_id": cites_doc_to_update["_id"],
+                "_routing": cites_doc_to_update["_routing"],
+                "doc": cites_doc_to_update["doc"],
+            }
+        )
 
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -2231,11 +2248,10 @@ def index_embeddings(
     Returns:
         None if there are no documents to update.
     """
-    base_doc = {
-        "_op_type": "update",
-        "_index": OpinionClusterDocument._index._name,
-    }
-    documents_to_update = []
+    _op_type = "update"
+    _index = OpinionClusterDocument._index._name
+
+    documents_to_update: list[CiteCountUpdateDict] = []
     for embeddings_item in embeddings:
         opinion_id = embeddings_item["id"]
         opinion_instance = (
@@ -2247,16 +2263,18 @@ def index_embeddings(
             # The opinion has been removed from the DB or has a main version
             continue
 
-        doc_to_update = {
-            "_id": ES_CHILD_ID(opinion_id).OPINION,
-            "_routing": opinion_instance.cluster_id,
-            "doc": {
-                "embeddings": embeddings_item["embeddings"],
-                "timestamp": datetime.now(UTC),
-            },
-        }
-        doc_to_update.update(base_doc)
-        documents_to_update.append(doc_to_update)
+        documents_to_update.append(
+            {
+                "_id": ES_CHILD_ID(opinion_id).OPINION,
+                "_routing": opinion_instance.cluster_id,
+                "doc": {
+                    "embeddings": embeddings_item["embeddings"],
+                    "timestamp": datetime.now(UTC),
+                },
+                "_op_type": _op_type,
+                "_index": _index,
+            }
+        )
 
     if not documents_to_update:
         return
