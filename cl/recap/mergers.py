@@ -433,7 +433,7 @@ def add_attorney(atty, p, d):
     elif count == 1:
         # Nailed it.
         a = attys[0]
-    elif count >= 2:
+    else:
         # Too many found, choose the most recent attorney.
         logger.info(
             "Got too many results for atty: '%s'. Picking earliest.", atty
@@ -1859,13 +1859,16 @@ def add_parties_and_attorneys(d: Docket, parties: list[dict]) -> None:
             except IntegrityError:
                 # Race condition. Object was created after our get and before
                 # our create. Try to get it again.
-                ps = Party.objects.filter(
-                    name=party["name"], party_types__docket=d
-                ).distinct()
-                count = ps.count()
-        if count == 1:
+                p = (
+                    Party.objects.filter(
+                        name=party["name"], party_types__docket=d
+                    )
+                    .distinct()
+                    .earliest("date_created")
+                )
+        elif count == 1:
             p = ps[0]
-        elif count >= 2:
+        else:
             p = ps.earliest("date_created")
         updated_parties.add(p.pk)
 
@@ -2366,7 +2369,7 @@ async def merge_attachment_page_data(
             # with the wrong case. We must punt.
             raise exc
     except RECAPDocument.DoesNotExist as exc:
-        found_main_rd = False
+        main_rd = None
         migrated_description = ""
         if not is_acms_attachment:
             for attachment in attachment_dicts:
@@ -2383,7 +2386,6 @@ async def merge_attachment_page_data(
                         main_rd.document_type = RECAPDocument.ATTACHMENT
                         migrated_description = main_rd.description
                         await main_rd.asave()
-                    found_main_rd = True
                     break
                 except RECAPDocument.MultipleObjectsReturned as exc:
                     if pacer_case_id:
@@ -2398,7 +2400,6 @@ async def merge_attachment_page_data(
                             main_rd.document_type = RECAPDocument.ATTACHMENT
                             migrated_description = main_rd.description
                             await main_rd.asave()
-                        found_main_rd = True
                         break
                     # Unclear how to proceed and we don't want to associate
                     # this data with the wrong case. We must punt.
@@ -2410,7 +2411,7 @@ async def merge_attachment_page_data(
         # and to then add them here, as we do when adding dockets. This need is
         # particularly acute for those that get free look emails and then go to
         # the attachment page.
-        if not found_main_rd:
+        if main_rd is None:
             raise exc
         rd = RECAPDocument(
             docket_entry=main_rd.docket_entry,
