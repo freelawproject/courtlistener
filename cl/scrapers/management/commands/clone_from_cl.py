@@ -272,8 +272,10 @@ def clone_opinion_cluster(
                         path = pathlib.PurePath(
                             cluster_data.get("filepath_json_harvard")
                         )
-                        json_path = os.path.join(
-                            "harvard_corpus", path.parent.name, path.name
+                        json_path = str(
+                            pathlib.PurePath(
+                                "harvard_corpus", path.parent.name, path.name
+                            )
                         )
                         opinion_cluster.filepath_json_harvard.save(
                             json_path, ContentFile(json_harvard_content)
@@ -409,7 +411,6 @@ def clone_opinion(
             print(
                 ">> Can't download file, check that your API keys are set and not expired to save the file."
             )
-            pass
 
     action = "Created" if created else "Updated"
     print(f"({action}) Opinion id: {op.pk}")

@@ -332,9 +332,8 @@ def es_save_document(
             document_content=doc,
             app_label=app_label,
         )
-    else:
-        self.request.chain = None
-        return None
+    self.request.chain = None
+    return None
 
 
 def document_fields_to_update(
@@ -606,7 +605,7 @@ def update_es_document(
         storage = AWSMediaStorage()
         embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
-            logging.error(
+            logger.error(
                 "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
@@ -2155,8 +2154,7 @@ def download_embedding(
     try:
         with storage.open(file_path, "rb") as f:
             file_contents = f.read().decode("utf-8")
-        embedding_data = json.loads(file_contents)
-        return embedding_data
+        return json.loads(file_contents)
     except FileNotFoundError:
         logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
         return None

@@ -286,10 +286,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("court_publish_page", kwargs={"pk": pk})
             )
-        else:
-            messages.info(
-                request, "Error submitting form, please review below."
-            )
+        messages.info(request, "Error submitting form, please review below.")
     return TemplateResponse(
         request,
         "publish.html",
@@ -803,12 +800,11 @@ async def recap_document_context(
         # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        else:
-            external_url = source.document_external_url(rd)
-            if external_url and rd_download_redirect:
-                return HttpResponseRedirect(external_url)
-            if source.has_pay_and_pray and external_url and redirect_or_modal:
-                redirect_to_pacer_modal = True
+        external_url = source.document_external_url(rd)
+        if external_url and rd_download_redirect:
+            return HttpResponseRedirect(external_url)
+        if source.has_pay_and_pray and external_url and redirect_or_modal:
+            redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
@@ -1561,8 +1557,7 @@ async def make_reporter_dict() -> dict:
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
                 reporters[name].append(abbrev)
-    reporters = OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
-    return reporters
+    return OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
 
 
 async def citation_handler(
@@ -1658,7 +1653,7 @@ async def attempt_reporter_variation(
             {"no_reporters": True, "reporter": reporter, "private": True},
         )
 
-    elif len(possible_canonicals) == 1:
+    if len(possible_canonicals) == 1:
         # Unambiguous reporter variation. Great. Redirect to the canonical
         # reporter
         return HttpResponseRedirect(
@@ -1670,7 +1665,7 @@ async def attempt_reporter_variation(
             ),
         )
 
-    elif len(possible_canonicals) > 1:
+    if len(possible_canonicals) > 1:
         # The reporter variation is ambiguous b/c it can refer to more than
         # one reporter. Abort with a 300 status.
         return TemplateResponse(
@@ -1684,8 +1679,7 @@ async def attempt_reporter_variation(
             },
             status=HTTPStatus.MULTIPLE_CHOICES,
         )
-    else:
-        return HttpResponse(status=500)
+    return HttpResponse(status=500)
 
 
 async def citation_redirector(
@@ -1726,11 +1720,11 @@ async def citation_redirector(
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:
         return await citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
+    if proper_reporter and volume and page is None:
         return await reporter_or_volume_handler(
             request, proper_reporter, volume
         )
-    elif proper_reporter and volume is None and page is None:
+    if proper_reporter and volume is None and page is None:
         return await reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
@@ -1764,13 +1758,12 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
-        else:
-            # Error in form, somehow.
-            return TemplateResponse(
-                request,
-                "citation_redirect_info_page.html",
-                {"show_homepage": True, "form": form, "private": False},
-            )
+        # Error in form, somehow.
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {"show_homepage": True, "form": form, "private": False},
+        )
 
     form = CitationRedirectorForm()
     reporter_dict = await make_reporter_dict()

@@ -35,7 +35,7 @@ REDIS_CLIENTS = {
     f"{name}-{decode}": Redis(
         host=REDIS_HOST,
         port=REDIS_PORT,
-        db=db,  # type: ignore
+        db=db,
         decode_responses=decode,
         retry=retry,
         retry_on_timeout=True,

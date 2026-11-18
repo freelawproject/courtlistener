@@ -3,6 +3,7 @@
 import argparse
 import os
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware
@@ -44,16 +45,15 @@ def readable_dir(prospective_dir: str) -> str:
         argparse.ArgumentTypeError: If the path isn't a directory or isn't
             readable.
     """
-    if not os.path.isdir(prospective_dir):
+    if not Path(prospective_dir).is_dir():
         raise argparse.ArgumentTypeError(
             f"readable_dir:{prospective_dir} is not a valid path"
         )
     if os.access(prospective_dir, os.R_OK):
         return prospective_dir
-    else:
-        raise argparse.ArgumentTypeError(
-            f"readable_dir:{prospective_dir} is not a readable dir"
-        )
+    raise argparse.ArgumentTypeError(
+        f"readable_dir:{prospective_dir} is not a readable dir"
+    )
 
 
 def _argparse_volumes(volumes_arg: str) -> list[int]:

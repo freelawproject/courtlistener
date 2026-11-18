@@ -86,10 +86,9 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
                 status=HTTPStatus.BAD_REQUEST,
                 headers=headers,
             )
-        else:
-            return Response(
-                serializer.data, status=HTTPStatus.CREATED, headers=headers
-            )
+        return Response(
+            serializer.data, status=HTTPStatus.CREATED, headers=headers
+        )
 
     def perform_create(self, serializer):
         """Save the visualization with its endpoints in date order, then build it.

@@ -214,9 +214,8 @@ class RandomChoiceField(ChoiceField):
             if value.startswith("random_"):
                 # Such values are OK. Just return.
                 return
-            else:
-                raise ValidationError(
-                    self.error_messages["invalid_choice"],
-                    code="invalid_choice",
-                    params={"value": value},
-                )
+            raise ValidationError(
+                self.error_messages["invalid_choice"],
+                code="invalid_choice",
+                params={"value": value},
+            )

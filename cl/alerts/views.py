@@ -75,8 +75,7 @@ def delete_alert(request, pk):
     )
     if request.POST.get("redirect_to_search_page", None):
         return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
-    else:
-        return HttpResponseRedirect(reverse("profile_search_alerts"))
+    return HttpResponseRedirect(reverse("profile_search_alerts"))
 
 
 @login_required
@@ -356,10 +355,9 @@ def _toggle_docket_alert_legacy(
             msg = "Alerts are now enabled for this docket"
 
         return HttpResponse(msg)
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"}, content="Not an ajax POST request."
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"}, content="Not an ajax POST request."
+    )
 
 
 async def new_docket_alert(

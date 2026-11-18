@@ -418,17 +418,16 @@ def extract_judge_last_name(
     # identify which names are first and last names
     if len(names) == 0:
         return []
-    elif len(names) == 1:
+    if len(names) == 1:
         return names
-    else:
-        last_names = [names[0]]
-        for i in range(len(names))[1:]:
-            first_last = f"{names[i - 1]} {names[i]}"
-            first_m_last = rf"{names[i - 1]} [a-z]\.? {names[i]}"
-            if re.search(f"{first_last}|{first_m_last}", text):
-                last_names[-1] = names[i]
-                continue
-            last_names.append(names[i])
+    last_names = [names[0]]
+    for i in range(len(names))[1:]:
+        first_last = f"{names[i - 1]} {names[i]}"
+        first_m_last = rf"{names[i - 1]} [a-z]\.? {names[i]}"
+        if re.search(f"{first_last}|{first_m_last}", text):
+            last_names[-1] = names[i]
+            continue
+        last_names.append(names[i])
     return last_names
 
 
@@ -557,7 +556,7 @@ async def lookup_judge_by_full_name(
         if count == 0:
             # No luck finding somebody. Abort.
             return None
-        elif count == 1:
+        if count == 1:
             # Got somebody unique!
             return await candidates.afirst()
     return None

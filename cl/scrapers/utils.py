@@ -244,6 +244,7 @@ def get_existing_docket(
             docket_number,
         )
         return queryset[0]
+    return None
 
 
 def case_names_are_too_different(

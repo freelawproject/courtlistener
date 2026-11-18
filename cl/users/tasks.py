@@ -30,8 +30,7 @@ def abort_or_retry(task, exc):
     """Abort a task if we've run out of retries. Else, retry it."""
     if task.request.retries == task.max_retries:
         return
-    else:
-        raise task.retry(exc=exc)
+    raise task.retry(exc=exc)
 
 
 @app.task(
@@ -72,7 +71,7 @@ def create_neon_account(self: Task, user_id: int) -> None:
         )
         return
 
-    profile = user.profile  # type: ignore
+    profile = user.profile  # pyrefly: ignore[missing-attribute]
     if len(neon_accounts) == 1:
         # We found an existing account that matches the email address. we'll
         # use that one instead of creating a new one to avoid potential future
@@ -122,7 +121,7 @@ def send_new_account_emails(user_id: int) -> None:
     # (via cl.api.utils), and cl.users.utils imports cl.users.models.
     from cl.users.utils import emails
 
-    profile = user.profile  # type: ignore
+    profile = user.profile  # pyrefly: ignore[missing-attribute]
     confirm_email = emails["confirm_your_new_account"]
     send_mail(
         confirm_email["subject"],
@@ -185,7 +184,7 @@ def update_neon_account(self: Task, user_id: int) -> None:
 
     """
     user = User.objects.select_related("profile").get(pk=user_id)
-    profile = user.profile  # type: ignore
+    profile = user.profile  # pyrefly: ignore[missing-attribute]
     neon_client = NeonClient()
     neon_client.update_account(user, profile.neon_account_id)
 

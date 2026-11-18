@@ -114,8 +114,7 @@ class MembershipWebhookViewSet(
             A dictionary containing the first address if available, otherwise a defaultdict.
         """
         if not addresses:
-            address = defaultdict(lambda: "")
-            return address
+            return defaultdict(lambda: "")
 
         return {
             # Neon API returns an array of addresses.
@@ -458,3 +457,4 @@ class MembershipWebhookViewSet(
             )
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
+        return None

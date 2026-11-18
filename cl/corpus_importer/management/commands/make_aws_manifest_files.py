@@ -8,7 +8,7 @@ from itertools import batched
 from typing import Any
 
 import boto3
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django.db import connections
 from django.db.models import Q
 from django.utils import timezone
@@ -852,3 +852,4 @@ class Command(VerboseCommand):
         # Store the timestamp of the last successful bulk import for this
         # record type, expiring after 45 days.
         r.set(last_export_key, str(timezone.now()), 60 * 60 * 24 * 45)
+        return None

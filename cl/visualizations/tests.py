@@ -260,8 +260,7 @@ class APIVisualizationTestCase(APITestCase):
                 kwargs={"version": "v3", "pk": self.cluster_end.pk},
             ),
         }
-        response = await self.client.post(self.path, data, format="json")
-        return response
+        return await self.client.post(self.path, data, format="json")
 
     async def test_no_title_visualization_post(self) -> None:
         data = {

@@ -107,7 +107,7 @@ class Command(VerboseCommand):
             queue_name=ingesting_queue,
         )
 
-        with open(inventory_path) as f:
+        with inventory_path.open() as f:
             reader = csv.reader(f)
             for row_idx, row in enumerate(reader):
                 if row_idx < start_row:

@@ -124,11 +124,11 @@ NEXT STEPS AFTER RUNNING:
 """
 
 import logging
-import os
 import tempfile
 import uuid
 from collections.abc import Generator, Iterator
 from itertools import islice
+from pathlib import Path
 
 import boto3
 import environ
@@ -357,14 +357,14 @@ def create_tasks_from_files(
 
         if store_files:
             task.input_file.save(filename, ContentFile(file_content))
-            logger.info(f"  - Stored file: {filename}")
+            logger.info("  - Stored file: %s", filename)
         else:
             task.input_file.name = s3_key
             task.save()
-            logger.info(f"  - Referenced S3 file: {s3_key}")
+            logger.info("  - Referenced S3 file: %s", s3_key)
 
         with tempfile.NamedTemporaryFile(
-            delete=False, suffix=os.path.splitext(filename)[1]
+            delete=False, suffix=Path(filename).suffix
         ) as temp_file:
             temp_files.append(temp_file.name)
             temp_file.write(file_content)
@@ -375,7 +375,7 @@ def create_tasks_from_files(
 
     llm_request.total_tasks = len(tasks_data)
     llm_request.save()
-    logger.info(f"Created {llm_request.total_tasks} LLMTask objects.")
+    logger.info("Created %d LLMTask objects.", llm_request.total_tasks)
 
     return tasks_data
 
@@ -424,7 +424,7 @@ def submit_batch(
     llm_request.batch_id = batch_id
     llm_request.save()
 
-    logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
+    logger.info("Batch job sent to provider. Batch ID: %r", batch_id)
     return batch_id
 
 
@@ -440,11 +440,11 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
     logger.info("Cleaning up temporary files...")
     for temp_file_path in temp_files:
         try:
-            os.remove(temp_file_path)
+            Path(temp_file_path).unlink()
         except OSError as e:
             if e.errno != 2:  # errno.ENOENT
                 logger.warning(
-                    f"Failed to remove temp file {temp_file_path}: {e}"
+                    "Failed to remove temp file %r: %r", temp_file_path, e
                 )
 
 
@@ -508,7 +508,7 @@ def filter_already_processed(
             continue
         yield filename, file_content, s3_key
     if skipped:
-        logger.info(f"Skipped {skipped} already-processed file(s).")
+        logger.info("Skipped %d already-processed file(s).", skipped)
 
 
 class Command(VerboseCommand):
@@ -600,7 +600,7 @@ class Command(VerboseCommand):
         except ValueError as e:
             raise CommandError(str(e))
 
-        logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
+        logger.info("Fetching PDF files from S3: s3://%s/%s", bucket, s3_path)
         s3_files = get_s3_file_list(
             s3_path=s3_path,
             bucket_name=bucket,
@@ -615,8 +615,8 @@ class Command(VerboseCommand):
             )
             if already_processed:
                 logger.info(
-                    f"Found {len(already_processed)} previously processed "
-                    "file(s). Use --force to reprocess."
+                    "Found %d previously processed file(s). Use --force to reprocess.",
+                    len(already_processed),
                 )
             s3_files = filter_already_processed(s3_files, already_processed)
 
@@ -644,8 +644,10 @@ class Command(VerboseCommand):
                         )
                         llm_request.prompts.set([system_prompt, user_prompt])
                         logger.info(
-                            f"Created LLMRequest {llm_request.pk} "
-                            f"(batch {batch_number}, {len(chunk)} files)"
+                            "Created LLMRequest %r (batch %r, %d files)",
+                            llm_request.pk,
+                            batch_number,
+                            len(chunk),
                         )
 
                         tasks_data = create_tasks_from_files(
@@ -688,11 +690,14 @@ class Command(VerboseCommand):
 
         succeeded = batch_number - failed_batches
         logger.info(
-            f"Finished: {succeeded}/{batch_number} batch(es) submitted "
-            f"successfully, {failed_batches} failed."
+            "Finished: %d/%d batch(es) submitted successfully, %d failed.",
+            succeeded,
+            batch_number,
+            failed_batches,
         )
         if failed_batches:
             raise CommandError(
-                f"{failed_batches}/{batch_number} batch(es) failed. "
-                "Check logs for details."
+                "%d/%d batch(es) failed. Check logs for details.",
+                failed_batches,
+                batch_number,
             )
