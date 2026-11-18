@@ -366,13 +366,6 @@
       "severity": "error"
     },
     {
-      "column": 62,
-      "path": "cl/api/utils.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
@@ -1682,13 +1675,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "not-iterable",
-      "concise_description": "`in` is not supported between `Unknown` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "missing-attribute",
@@ -2886,17 +2872,10 @@
       "severity": "error"
     },
     {
-      "column": 54,
+      "column": 58,
       "path": "cl/search/api_utils.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `skip_empty` in function `elasticsearch.dsl.utils.AttrDict.to_dict`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/api_utils.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
       "severity": "error"
     },
     {
@@ -3933,13 +3912,6 @@
       "path": "cl/stats/metrics.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `CollectorRegistry` has no attribute `_cl_celery_queue_collector_registered`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/stats/utils.py",
-      "name": "not-iterable",
-      "concise_description": "Type `None` is not iterable",
       "severity": "error"
     },
     {

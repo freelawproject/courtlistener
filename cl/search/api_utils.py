@@ -157,7 +157,7 @@ class ESList:
             start_time = time.perf_counter()
             results = self.main_query.execute()
             duration = time.perf_counter() - start_time
-        except (TransportError, ConnectionError, RequestError):
+        except TransportError, ConnectionError, RequestError:
             error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
@@ -332,7 +332,7 @@ class CursorESList:
             cardinality_count_response = responses[1]
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
-        except (TransportError, ConnectionError, RequestError):
+        except TransportError, ConnectionError, RequestError:
             error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
@@ -432,10 +432,14 @@ class CursorESList:
 
         self.process_results(self.results)
 
-        es_results_items = [
-            defaultdict(lambda: None, result.to_dict(skip_empty=False))
-            for result in self.results
-        ]
+        es_results_items = (
+            [
+                defaultdict(lambda: None, result.to_dict(skip_empty=False))
+                for result in self.results
+            ]
+            if self.results
+            else []
+        )
         return (
             es_results_items,
             main_query_hits,
