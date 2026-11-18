@@ -134,7 +134,7 @@ class _ResponseValidator:
         try:
             normalized = _ResponseValidator.normalize_response(result)
             return normalized["candidates"][0]["content"]["parts"][0]["text"]
-        except (IndexError, KeyError, TypeError):
+        except IndexError, KeyError, TypeError:
             return None
 
     @staticmethod
@@ -330,7 +330,7 @@ class GoogleGenAIBatchWrapper:
         self,
         requests: list[BatchRequest],
         system_prompt: str | None = None,
-        cache_display_name: str | None = "cl-default-cache",
+        cache_display_name: str = "cl-default-cache",
         batch_display_name: str | None = "CourtListener Batch Job",
     ) -> str:
         """Creates and executes a batch job with Google GenAI.
@@ -383,6 +383,10 @@ class GoogleGenAIBatchWrapper:
             )
 
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
+
+        # In practice this won't happen, but the type checker needs it
+        if jsonl_file.name is None:
+            raise ValueError("Google returned a JSON file without a name.")
 
         job = self.client.batches.create(
             model=self.model_name,
