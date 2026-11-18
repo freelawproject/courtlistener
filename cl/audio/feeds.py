@@ -28,7 +28,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         _, court = obj
         return f"Oral Arguments for the {court.full_name}"
 
-    def description(self, obj):
+    def description(self, obj) -> str:
         """Describe the podcast."""
         return (
             "A chronological podcast of oral arguments with improved "

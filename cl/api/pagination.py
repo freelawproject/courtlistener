@@ -306,7 +306,7 @@ class ESCursorPagination(BasePagination):
 
         return self.request_date
 
-    def paginate_queryset(
+    def paginate_es_list(
         self, queryset: CursorESList, request: Request, view=None
     ) -> tuple[list[defaultdict], bool]:
         """Paginate the Elasticsearch query and retrieve the results.
@@ -339,7 +339,7 @@ class ESCursorPagination(BasePagination):
         self.child_results_count = child_cardinality_count
         return results, cached_response
 
-    def get_paginated_response(
+    def get_es_paginated_response(
         self, data: list[dict], cached_response: bool
     ) -> Response:
         """Generate a custom paginated response using the provided data.
