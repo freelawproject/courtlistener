@@ -87,8 +87,7 @@ class RECAPDocumentReceiverTests(TestCase):
                         mock_apply.assert_not_called()
 
     def test_receiver_honors_citation_queue_override(self):
-        """A batch job can steer the citation task off the default queue by
-        setting ``citation_queue`` on the instance before saving."""
+        """A batch job can steer the citation task off the default queue by setting ``citation_queue`` on the instance before saving."""
         with patch(
             "cl.citations.tasks.find_citations_and_parantheticals_for_recap_documents.apply_async"
         ) as mock_apply:

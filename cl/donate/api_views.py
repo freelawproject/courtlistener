@@ -1,3 +1,5 @@
+"""REST API endpoint that processes Neon membership webhooks."""
+
 import datetime
 import logging
 from collections import defaultdict
@@ -42,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
+    """A Neon membership webhook payload."""
+
     eventTrigger = serializers.CharField(required=True)
     eventTimestamp = serializers.DateTimeField(required=True)
     data = serializers.DictField()
@@ -50,6 +54,8 @@ class NeonMembershipWebhookSerializer(serializers.Serializer):
 class MembershipWebhookViewSet(
     mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
+    """API endpoint that receives membership webhooks from Neon."""
+
     permission_classes = [AllowNeonWebhook]
     # Neon posts from a few fixed addresses with no API user, so the
     # default anonymous throttles count every webhook it sends against a
@@ -62,8 +68,7 @@ class MembershipWebhookViewSet(
     queryset = NeonMembership.objects.all()
 
     def create(self, request: Request, *args, **kwargs):
-        """
-        Processes membership webhooks received from Neon CRM.
+        """Processes membership webhooks received from Neon CRM.
 
         This method handles POST requests containing JSON data from Neon CRM.
         It extracts relevant information from the data and updates the
@@ -71,6 +76,8 @@ class MembershipWebhookViewSet(
 
         Args:
             request (Request): A request object containing the webhook data.
+            *args: Unused.
+            **kwargs: Unused.
 
         Returns:
             Response: A HttpResponse object with status code 200 if successful,
@@ -98,8 +105,7 @@ class MembershipWebhookViewSet(
         return Response(status=HTTPStatus.CREATED)
 
     def _get_address_from_neon_response(self, addresses: list[dict[str, str]]):
-        """
-        Retrieves an address from the Neon response.
+        """Retrieves an address from the Neon response.
 
         Args:
             addresses: An array of dictionaries representing addresses.
@@ -108,8 +114,7 @@ class MembershipWebhookViewSet(
             A dictionary containing the first address if available, otherwise a defaultdict.
         """
         if not addresses:
-            address = defaultdict(lambda: "")
-            return address
+            return defaultdict(lambda: "")
 
         return {
             # Neon API returns an array of addresses.
@@ -121,8 +126,7 @@ class MembershipWebhookViewSet(
         }
 
     def _get_member_record(self, account_id: str) -> User:
-        """
-        Retrieves a user record associated with a Neon CRM account ID.
+        """Retrieves a user record associated with a Neon CRM account ID.
 
         This method attempts to find a matching Django user in two ways:
 
@@ -148,7 +152,9 @@ class MembershipWebhookViewSet(
             User: User object associated with the Neon account
         """
         try:
-            user = User.objects.select_for_update().get(
+            # FOR NO KEY UPDATE for the same reason as in _lock_membership:
+            # FOR UPDATE would deadlock with sync_neon_memberships.
+            user = User.objects.select_for_update(no_key=True).get(
                 profile__neon_account_id=account_id
             )
         except User.DoesNotExist:
@@ -188,8 +194,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
-        """
-        Extracts relevant membership information from a Neon webhook payload.
+        """Extracts relevant membership information from a Neon webhook payload.
 
         Args:
             webhook_data (dict[str, str]): The payload received from a Neon
@@ -241,10 +246,7 @@ class MembershipWebhookViewSet(
 
     @staticmethod
     def _map_trigger_value(trigger_event: str) -> int:
-        """
-        Maps a string trigger event received from a Neon webhook to the
-        corresponding integer value representing the trigger event type in
-        the NeonWebhookEvent model.
+        """Maps a string trigger event received from a Neon webhook to the corresponding integer value representing the trigger event type in the NeonWebhookEvent model.
 
         Args:
             trigger_event (str): The string representing the trigger event
@@ -279,6 +281,44 @@ class MembershipWebhookViewSet(
             trigger=trigger,
         )
 
+    @staticmethod
+    def _lock_membership(neon_id: str) -> NeonMembership | None:
+        """Lock a membership's user, then the membership, and return it.
+
+        Use this before changing or deleting a membership. Must be called
+        inside a transaction.
+
+        Every handler must lock the User before the membership. Creation
+        locks the User first via _get_member_record, so a handler that
+        locked the membership first could deadlock with an overlapping
+        webhook for the same user. That includes a handler that only writes
+        APIThrottle rows, whose foreign key check locks the User at commit.
+
+        Both locks are FOR NO KEY UPDATE. That foreign key check takes
+        FOR KEY SHARE on the User, which conflicts with FOR UPDATE but not
+        with FOR NO KEY UPDATE. The sync_neon_memberships command locks the
+        membership and then writes APIThrottle rows without locking the
+        User, so a FOR UPDATE lock on the User here would deadlock with it.
+
+        :param neon_id: The Neon membership ID.
+        :return: The locked membership, or None if no membership has this
+        ID once the locks are held, e.g. because a concurrent
+        createMembership replaced it.
+        """
+        user_id = (
+            NeonMembership.objects.filter(neon_id=neon_id)
+            .values_list("user_id", flat=True)
+            .first()
+        )
+        if user_id is None:
+            return None
+        User.objects.select_for_update(no_key=True).filter(pk=user_id).first()
+        return (
+            NeonMembership.objects.select_for_update(no_key=True)
+            .filter(neon_id=neon_id)
+            .first()
+        )
+
     def _handle_membership_update(self, webhook_data) -> None:
         """Apply an updateMembership/editMembership webhook to its local record.
 
@@ -288,12 +328,13 @@ class MembershipWebhookViewSet(
         row stays locked until the webhook commits.
         """
         membership_data = self._get_membership_data(webhook_data)
-        # Lock the row so this read waits for any concurrent writer, such as
-        # the sync_neon_memberships command, and sees its result.
-        neon_membership = (
-            NeonMembership.objects.select_for_update(no_key=True)
-            .filter(neon_id=membership_data["membershipId"])
-            .first()
+        # Lock the row so a concurrent writer can't change it between this
+        # read and the save below. That writer can be a createMembership
+        # webhook for the same upgrade or the sync_neon_memberships command.
+        # Without the lock, this handler could save stale data over theirs,
+        # or find the row gone and crash.
+        neon_membership = self._lock_membership(
+            membership_data["membershipId"]
         )
         if neon_membership is None:
             # Prevents an existing membership from being overwritten by data
@@ -310,7 +351,7 @@ class MembershipWebhookViewSet(
             # issues.
             #
             # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
-            return None
+            return
 
         membership_level = NeonMembershipLevel.TYPES_INVERTED[
             membership_data["membershipName"]
@@ -343,7 +384,7 @@ class MembershipWebhookViewSet(
                     email["from_email"],
                     [user.email],
                 )
-                return None
+                return
 
             if not user.profile.email_confirmed:
                 if user.profile.stub_account:
@@ -403,17 +444,17 @@ class MembershipWebhookViewSet(
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
-        try:
-            # Locked for the same reason as in _handle_membership_update: the
-            # row is deleted by primary key, so a stale read could remove a
-            # membership the sync command has just renewed.
-            neon_membership = NeonMembership.objects.select_for_update(
-                no_key=True
-            ).get(neon_id=membership_data["membershipId"])
-        except NeonMembership.DoesNotExist:
+        # Locked for the same reason as in _handle_membership_update: the
+        # row is deleted by primary key, so a stale read could remove a
+        # membership the sync command has just renewed.
+        neon_membership = MembershipWebhookViewSet._lock_membership(
+            membership_data["membershipId"]
+        )
+        if neon_membership is None:
             return HttpResponse(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
+        return None

@@ -1,3 +1,5 @@
+"""REST API authentication classes that route eligible reads to a replica."""
+
 from contextvars import Token
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
@@ -25,8 +27,7 @@ def _activate_replica_routing(
     request: Request,
     user: AbstractBaseUser | AnonymousUser | None = None,
 ) -> None:
-    """
-    Enables replica routing for eligible requests.
+    """Enables replica routing for eligible requests.
 
     This helper evaluates whether the current request should be routed to
     a read replica. It is intended to be called *after* DRF authentication,
@@ -36,10 +37,11 @@ def _activate_replica_routing(
     If enabled, the resulting ContextVar token is stored on the underlying
     Django request object so that middleware can reset it after the response.
 
-    :param request: The DRF request instance.
-    :param user: The authenticated user resolved by DRF. Must be passed
-        explicitly because ``request.user`` is not yet assigned when
-        ``authenticate()`` returns.
+    Args:
+        request: The DRF request instance.
+        user: The authenticated user resolved by DRF. Must be passed
+            explicitly because ``request.user`` is not yet assigned when
+            ``authenticate()`` returns.
     """
     django_request: HttpRequest = request._request
 
@@ -73,6 +75,7 @@ class ReplicaRoutingBasicAuthentication(BasicAuthentication):
     """BasicAuthentication that activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing if a user was found."""
         result = super().authenticate(request)
         if result is not None:
             _activate_replica_routing(request, result[0])
@@ -83,6 +86,7 @@ class ReplicaRoutingTokenAuthentication(TokenAuthentication):
     """TokenAuthentication that activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing if a user was found."""
         result = super().authenticate(request)
         if result is not None:
             _activate_replica_routing(request, result[0])
@@ -96,11 +100,16 @@ class InsufficientScope(exceptions.PermissionDenied):
 
 
 class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
-    """OAuth2Authentication that requires the ``api`` scope and activates
-    replica routing after auth.
-    """
+    """OAuth2Authentication that requires the ``api`` scope and activates replica routing after auth."""
 
     def authenticate(self, request: Request):
+        """Authenticate a bearer token, then activate replica routing.
+
+        Raises:
+            InsufficientScope: If the token lacks the ``api`` scope.
+            exceptions.AuthenticationFailed: If a bearer token was sent but
+                is invalid or expired.
+        """
         result = super().authenticate(request)
         if result is not None:
             user, token = result
@@ -127,6 +136,7 @@ class ReplicaRoutingSessionAuthentication(SessionAuthentication):
     """
 
     def authenticate(self, request: Request):
+        """Authenticate, then activate replica routing even if no user was found."""
         result = super().authenticate(request)
         _activate_replica_routing(
             request, result[0] if result is not None else None

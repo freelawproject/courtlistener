@@ -1,3 +1,5 @@
+"""Remind users to confirm their accounts and delete accounts never confirmed."""
+
 import datetime
 
 from django.contrib.sites.models import Site
@@ -12,12 +14,15 @@ from cl.users.utils import emails
 
 
 class Command(VerboseCommand):
+    """Notify users with unconfirmed accounts, or delete old unconfirmed accounts."""
+
     help = (
         "Notify users of unconfirmed accounts and delete accounts that "
         "were never confirmed"
     )
 
     def add_arguments(self, parser):
+        """Add the notify, delete, simulate, and verbose flags."""
         parser.add_argument(
             "--notify",
             action="store_true",
@@ -46,6 +51,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Delete old accounts with ``--delete``, then notify users with ``--notify``."""
         super().handle(*args, **options)
         self.options = options
         if options["delete"]:
@@ -58,12 +64,10 @@ class Command(VerboseCommand):
             print("**************************************")
 
     def delete_old_accounts(self) -> None:
-        """Delete old, unused accounts
+        """Delete old, unused accounts.
 
         Delete accounts older than 60 days that lack a confirmed email
         address and never logged in.
-
-        :return None
         """
         two_months_ago = now() - datetime.timedelta(60)
         unconfirmed_ups = UserProfile.objects.filter(
@@ -83,8 +87,7 @@ class Command(VerboseCommand):
                 print(f"User {up.user.username} deleted")
 
     def notify_unconfirmed_accounts(self) -> None:
-        """This function will notify people who have not confirmed their
-        accounts that they must do so for fear of deletion.
+        """This function will notify people who have not confirmed their accounts that they must do so for fear of deletion.
 
         This function should be run once a week, or so.
 
@@ -97,7 +100,6 @@ class Command(VerboseCommand):
         their key will be old again, and they will be selected. It's not ideal,
         but it's OK.
         """
-
         # if your account is more than a week old, and you have not confirmed
         # it, we will send you a notification, requesting that you confirm it.
         a_week_ago = now() - datetime.timedelta(7)

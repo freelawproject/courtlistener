@@ -1,23 +1,27 @@
 """Per-source configuration for fetching and rendering docket entries.
 
-The source instances (``RECAP``, ``SCOTUS``) and the ``BY_COURT_ID`` map are
-meant to be read through the module, as ``docket_entry_sources.RECAP``, so
-they stay visually distinct from the unrelated docket *data* sources in
-``cl.search.docket_sources`` (``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
+The source instances (``RECAP``, ``SCOTUS``), the ``BY_COURT_ID`` map and
+``source_for_court_id`` are meant to be read through the module, as
+``docket_entry_sources.RECAP``, so they stay visually distinct from the
+unrelated docket *data* sources in ``cl.search.docket_sources``
+(``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
 """
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, NamedTuple, NotRequired, TypedDict
+from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
-from django.db.models import Exists, OuterRef, Prefetch, QuerySet
+from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from django.urls import reverse
 from django.utils.formats import date_format
 
 from cl.custom_filters.templatetags.extras import http_url
+from cl.search.constants import SCOTUS_COURT_IDS
 from cl.search.models import (
+    Court,
     Docket,
     DocketEntry,
+    FederalCourtsQuerySet,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
     SCOTUSDocketEntry,
@@ -31,8 +35,9 @@ type SourceDocument = RECAPDocument | SCOTUSDocument
 
 
 class MetadataItem(TypedDict):
-    """Shape of a single item in a metadata description list. Rendered by
-    both the c-metadata-section cotton component and
+    """Shape of a single item in a metadata description list.
+
+    Rendered by both the c-metadata-section cotton component and
     includes/metadata_section.html.
 
     one_click_select/has_tooltip/tooltip_message are flags + plain content,
@@ -62,10 +67,12 @@ class MetadataItem(TypedDict):
 
 
 class MetadataSection(TypedDict):
-    """Shape of one rendered metadata section. Rendered by both the
-    c-metadata-section cotton component and includes/metadata_section.html.
-    A section with no items renders nothing, so callers MAY return empty
-    sections rather than filtering them out."""
+    """Shape of one rendered metadata section.
+
+    Rendered by both the c-metadata-section cotton component and
+    includes/metadata_section.html. A section with no items renders nothing, so
+    callers MAY return empty sections rather than filtering them out.
+    """
 
     items: list[MetadataItem]
     title: NotRequired[str]
@@ -123,13 +130,22 @@ def build_scotus_metadata(
 
 
 class AdminNames(NamedTuple):
-    """Admin URL/permission names for one of the two admin links
-    rd_admin_tools.html shows -- one for the docket entry, one for the
-    document itself.
-    """
+    """Admin URL/permission names for one of the two admin links rd_admin_tools.html shows -- one for the docket entry, one for the document itself."""
 
     entry: str
     document: str
+
+
+class InitialDocumentButton(NamedTuple):
+    """The initial-document button of one docket in the search results.
+
+    ``url`` links to our own page for the document, and ``external_url``
+    to the document outside CourtListener. ``text`` is the button label.
+    """
+
+    url: str | None
+    external_url: str | None
+    text: str
 
 
 def _always_has_actions(document: Any) -> bool:
@@ -137,24 +153,24 @@ def _always_has_actions(document: Any) -> bool:
     return True
 
 
+def _always_listed(document: Any) -> bool:
+    """Return True: by default every document is listed under its entry."""
+    return True
+
+
 def _no_metadata_items(docket: Docket) -> list[MetadataItem]:
-    """Return no items: by default a source adds nothing to the core
-    docket metadata block."""
+    """Return no items: by default a source adds nothing to the core docket metadata block."""
     return []
 
 
 def _no_metadata_sections(docket: Docket) -> list[MetadataSection]:
-    """Return no sections: by default a source adds no metadata sections
-    of its own."""
+    """Return no sections: by default a source adds no metadata sections of its own."""
     return []
 
 
 @dataclass(frozen=True)
 class DocketEntrySource:
-    """Describes how to fetch, sort, and display docket entries and
-    documents for one 'flavor' of docket. RECAP/PACER is the default;
-    SCOTUS is the first override. A future state-specific model plugs in
-    by adding one more instance and a court_id mapping below.
+    """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
 
     ``empty_message`` is the sentence shown in place of the entry list
     when the docket has no entries at all. It carries no wrapper, so the
@@ -196,9 +212,18 @@ class DocketEntrySource:
     ``docket.pacer_docket_url`` there would hide the toolbar for every
     non-PACER source.
 
+    ``initial_document_buttons`` takes docket ids and returns the
+    initial-document button for each docket that has one, keyed by docket
+    id. The search results use it, so it MUST answer for a whole page of
+    dockets in a constant number of queries.
+
     ``main_docs_prefetch`` returns a Prefetch that populates ``main_docs``
     with the one document representing an entry in the docket RSS feed
     (DocketFeed.items()).
+
+    ``document_is_listed`` decides whether the docket page lists a
+    document under its entry. A source returns False for documents that
+    only exist to index their entry, like SCOTUS placeholders.
 
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
@@ -221,6 +246,9 @@ class DocketEntrySource:
     docket_url: Callable[[Docket], str | None]
     component: str
     empty_message: str
+    initial_document_buttons: Callable[
+        [Iterable[int]], dict[int, InitialDocumentButton]
+    ]
     has_pay_and_pray: bool = True
     admin_url_names: AdminNames = AdminNames(
         entry="admin:search_docketentry_change",
@@ -234,6 +262,7 @@ class DocketEntrySource:
     )
     admin_document_label: str = "RECAP Document"
     document_has_actions: Callable[[Any], bool] = _always_has_actions
+    document_is_listed: Callable[[Any], bool] = _always_listed
     metadata_items: Callable[[Docket], list[MetadataItem]] = _no_metadata_items
     metadata_sections: Callable[[Docket], list[MetadataSection]] = (
         _no_metadata_sections
@@ -253,8 +282,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
 
 
 def _recap_entries(docket: Docket) -> QuerySet[DocketEntry]:
-    """Return this docket's DocketEntry queryset, with recap_documents
-    prefetched for the docket page's entry list."""
+    """Return this docket's DocketEntry queryset, with recap_documents prefetched for the docket page's entry list."""
     return docket.docket_entries.all().prefetch_related(
         Prefetch(
             "recap_documents",
@@ -269,8 +297,10 @@ def _recap_documents_for_entry(de: DocketEntry) -> QuerySet[RECAPDocument]:
 
 
 def _recap_main_docs_prefetch() -> Prefetch:
-    """Prefetch each entry's main document into `main_docs`, for the
-    docket RSS feed's description and enclosure."""
+    """Prefetch each entry's main document into `main_docs`.
+
+    Used for the docket RSS feed's description and enclosure.
+    """
     return Prefetch(
         "recap_documents",
         queryset=RECAPDocument.objects.filter(
@@ -288,8 +318,7 @@ def _recap_docket_url(docket: Docket) -> str | None:
 
 
 def _recap_document_is_attachment(document: RECAPDocument) -> bool:
-    """Return whether one RECAP document is an attachment (vs. the main
-    document) within its entry."""
+    """Return whether one RECAP document is an attachment (vs. the main document) within its entry."""
     return document.document_type == document.ATTACHMENT
 
 
@@ -301,8 +330,7 @@ def _recap_document_label(document: RECAPDocument) -> str:
 
 
 def _recap_document_detail_url(document: RECAPDocument) -> str | None:
-    """Return the URL of the CourtListener page for one RECAP document, or
-    None if we don't have the file yet."""
+    """Return the URL of the CourtListener page for one RECAP document, or None if we don't have the file yet."""
     if not document.filepath_local:
         return None
     # Numberless minute entries have no URL of their own; get_absolute_url
@@ -311,8 +339,7 @@ def _recap_document_detail_url(document: RECAPDocument) -> str | None:
 
 
 def _recap_document_external_url(document: RECAPDocument) -> str | None:
-    """Return the PACER URL for one RECAP document, or None if it has
-    none."""
+    """Return the PACER URL for one RECAP document, or None if it has none."""
     return document.pacer_url or None
 
 
@@ -345,17 +372,14 @@ def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
 def _recap_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet[RECAPDocument]:
-    """Look up RECAPDocuments by docket and document_number, for the
-    document detail page."""
+    """Look up RECAPDocuments by docket and document_number, for the document detail page."""
     return RECAPDocument.objects.filter(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
 
 
 async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
-    """Fetch a single RECAPDocument for the document detail page, with
-    the docket/court relation and the authorities annotation it needs
-    already loaded."""
+    """Fetch a single RECAPDocument for the document detail page, with the docket/court relation and the authorities annotation it needs already loaded."""
     return (
         await RECAPDocument.objects.select_related(
             "docket_entry__docket__court"
@@ -369,6 +393,77 @@ async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
         )
         .aget(pk=pk)
     )
+
+
+def _recap_initial_document_buttons(
+    docket_ids: Iterable[int],
+) -> dict[int, InitialDocumentButton]:
+    """Return the initial-document button of each RECAP docket: a link to document #1 when we have its PDF, otherwise a link to buy it on PACER."""
+    # This query retrieves initial documents considering two
+    # possibilities:
+    # 1. For district, bankruptcy, and appellate entries where we don't know
+    #    if the entry contains attachments, it considers:
+    #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
+    #    This represents the main document with document_number 1.
+    # 2. For appellate entries where the attachment page has already been
+    #    merged, it considers:
+    #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
+    #    This represents document_number 1 that has been converted to an attachment.
+
+    # federal_courts is typed as a plain Manager, which hides the
+    # FederalCourtsQuerySet methods from the type checker.
+    federal_courts = cast(FederalCourtsQuerySet, Court.federal_courts)
+    appellate_court_ids = federal_courts.appellate_courts().values_list(
+        "pk", flat=True
+    )
+    initial_documents = (
+        RECAPDocument.objects.filter(
+            Q(
+                Q(
+                    attachment_number=None,
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                )
+                | Q(
+                    attachment_number=1,
+                    document_type=RECAPDocument.ATTACHMENT,
+                    docket_entry__docket__court_id__in=appellate_court_ids,
+                )
+            ),
+            docket_entry__docket_id__in=docket_ids,
+            document_number="1",
+        )
+        .select_related(
+            "docket_entry",
+            "docket_entry__docket",
+            "docket_entry__docket__court",
+        )
+        .only(
+            "pk",
+            "document_type",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "is_available",
+            "filepath_local",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court_id",
+        )
+    )
+    buttons: dict[int, InitialDocumentButton] = {}
+    for initial_document in initial_documents:
+        if initial_document.has_valid_pdf:
+            button = InitialDocumentButton(
+                initial_document.get_absolute_url(), None, "Initial Document"
+            )
+        else:
+            button = InitialDocumentButton(
+                None, initial_document.pacer_url, "Buy Initial Document"
+            )
+        buttons[initial_document.docket_entry.docket_id] = button
+    return buttons
 
 
 RECAP: DocketEntrySource = DocketEntrySource(
@@ -391,16 +486,16 @@ RECAP: DocketEntrySource = DocketEntrySource(
     ),
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
+    initial_document_buttons=_recap_initial_document_buttons,
 )
 
 
 # SCOTUS
 def _scotus_entries(docket: Docket) -> QuerySet[SCOTUSDocketEntry]:
-    """Return this docket's SCOTUSDocketEntry queryset, with
-    scotusdocument_set prefetched for the docket page's entry list."""
-    return docket.scotusdocketentry_set.all().prefetch_related(
+    """Return this docket's SCOTUSDocketEntry queryset, with scotus_documents prefetched for the docket page's entry list."""
+    return docket.scotus_docket_entries.all().prefetch_related(
         Prefetch(
-            "scotusdocument_set",
+            "scotus_documents",
             queryset=SCOTUSDocument.objects.defer("plain_text"),
         )
     )
@@ -410,22 +505,20 @@ def _scotus_documents_for_entry(
     de: SCOTUSDocketEntry,
 ) -> QuerySet[SCOTUSDocument]:
     """Return the SCOTUSDocuments attached to this docket entry."""
-    return de.scotusdocument_set.all()
+    return de.scotus_documents.all()
 
 
 def _scotus_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet[SCOTUSDocument]:
-    """Look up SCOTUSDocuments by docket and document_number, for the
-    document detail page."""
+    """Look up SCOTUSDocuments by docket and document_number, for the document detail page."""
     return SCOTUSDocument.objects.filter(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
 
 
 async def _get_scotus_document_for_render(pk: int) -> SCOTUSDocument:
-    """Fetch a single SCOTUSDocument for the document detail page, with
-    the docket/court relation it needs already loaded."""
+    """Fetch a single SCOTUSDocument for the document detail page, with the docket/court relation it needs already loaded."""
     return await SCOTUSDocument.objects.select_related(
         "docket_entry__docket__court"
     ).aget(pk=pk)
@@ -434,7 +527,7 @@ async def _get_scotus_document_for_render(pk: int) -> SCOTUSDocument:
 def document_url(
     docket_id: int, slug: str, doc_num: str, att_num: int | None
 ) -> str:
-    "Build a document/attachment page URL."
+    """Build a document/attachment page URL."""
     kwargs: dict[str, Any] = {
         "docket_id": docket_id,
         "doc_num": doc_num,
@@ -447,12 +540,13 @@ def document_url(
 
 
 def _scotus_main_docs_prefetch() -> Prefetch:
-    """Prefetch the lowest-attachment_number document per entry into
-    `main_docs`, for the docket RSS feed's description and enclosure.
-    A SCOTUS entry has no designated main document, so its lowest
-    attachment_number stands in."""
+    """Prefetch the lowest-attachment_number document per entry into `main_docs`.
+
+    Used for the docket RSS feed's description and enclosure. A SCOTUS entry
+    has no designated main document, so its lowest attachment_number stands in.
+    """
     return Prefetch(
-        "scotusdocument_set",
+        "scotus_documents",
         queryset=SCOTUSDocument.objects.defer("plain_text").order_by(
             "attachment_number", "date_created"
         )[:1],
@@ -461,9 +555,13 @@ def _scotus_main_docs_prefetch() -> Prefetch:
 
 
 def _scotus_document_is_attachment(document: SCOTUSDocument) -> bool:
-    """Return True always: SCOTUSDocument has no "main document" concept,
-    every SCOTUS document is an attachment."""
+    """Return True always: SCOTUSDocument has no "main document" concept, every SCOTUS document is an attachment."""
     return True
+
+
+def _scotus_document_is_listed(document: SCOTUSDocument) -> bool:
+    """Return False for placeholders: their entry is already listed, and they have no file or page of their own to show under it."""
+    return not document.is_placeholder
 
 
 def _scotus_document_label(document: SCOTUSDocument) -> str:
@@ -479,8 +577,7 @@ def _scotus_document_label(document: SCOTUSDocument) -> str:
 
 
 def _scotus_document_detail_url(document: SCOTUSDocument) -> str | None:
-    """Return the URL of the CourtListener page for one SCOTUS document, or
-    None if we don't have the file yet."""
+    """Return the URL of the CourtListener page for one SCOTUS document, or None if we don't have the file yet."""
     if not document.filepath_local:
         return None
     return document.get_absolute_url() or None
@@ -496,16 +593,59 @@ def _scotus_document_external_url(document: SCOTUSDocument) -> str | None:
 
 
 def _scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
-    """Build the SCOTUS-specific items appended to the core docket
-    metadata, so they render inside that block rather than as a section
-    of their own."""
+    """Build the SCOTUS-specific items appended to the core docket metadata, so they render inside that block rather than as a section of their own."""
     return build_scotus_metadata(getattr(docket, "scotus_metadata", None))
 
 
 def _scotus_docket_url(docket: Docket) -> str | None:
-    """Return the docket's page on supremecourt.gov, or None when the
-    docket has no docket_number to build it from."""
+    """Return the docket's page on supremecourt.gov, or None when the docket has no docket_number to build it from."""
     return docket.scotus_docket_url or None
+
+
+def _scotus_initial_document_buttons(
+    docket_ids: Iterable[int],
+) -> dict[int, InitialDocumentButton]:
+    """Return the initial-document button of each SCOTUS docket.
+
+    The initial document is the first attachment of the docket's earliest
+    entry that has documents. SCOTUS documents are free, so the button
+    links to our copy when we have it and to supremecourt.gov otherwise.
+    """
+    # distinct() on the docket keeps the first row of each docket in the
+    # order_by below: its earliest entry, then its lowest attachment. pk
+    # breaks ties, so the same document wins on every search.
+    initial_documents = (
+        SCOTUSDocument.objects.filter(docket_entry__docket_id__in=docket_ids)
+        .select_related("docket_entry__docket")
+        .order_by(
+            "docket_entry__docket_id",
+            "docket_entry__sequence_number",
+            "attachment_number",
+            "pk",
+        )
+        .distinct("docket_entry__docket_id")
+        .only(
+            "pk",
+            "document_number",
+            "attachment_number",
+            "url",
+            "filepath_local",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+        )
+    )
+    buttons: dict[int, InitialDocumentButton] = {}
+    for initial_document in initial_documents:
+        url = _scotus_document_detail_url(initial_document)
+        external_url = (
+            None if url else _scotus_document_external_url(initial_document)
+        )
+        if not url and not external_url:
+            continue
+        buttons[initial_document.docket_entry.docket_id] = (
+            InitialDocumentButton(url, external_url, "Initial Document")
+        )
+    return buttons
 
 
 SCOTUS: DocketEntrySource = DocketEntrySource(
@@ -515,6 +655,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     order_by_asc=("sequence_number",),
     order_by_desc=("-sequence_number",),
     document_is_attachment=_scotus_document_is_attachment,
+    document_is_listed=_scotus_document_is_listed,
     document_label=_scotus_document_label,
     document_detail_url=_scotus_document_detail_url,
     document_external_url=_scotus_document_external_url,
@@ -522,6 +663,7 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     get_document_for_render=_get_scotus_document_for_render,
     docket_url=_scotus_docket_url,
     metadata_items=_scotus_metadata_items,
+    initial_document_buttons=_scotus_initial_document_buttons,
     has_pay_and_pray=False,
     component="scotus",
     empty_message="There are no entries for this docket yet.",
@@ -536,6 +678,13 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     admin_document_label="SCOTUS Document",
 )
 
-# Courts whose dockets use a source other than RECAP. Docket.get_entry_source
+# Courts whose dockets use a source other than RECAP. source_for_court_id
 # falls back to RECAP for any court not listed here.
-BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS}
+BY_COURT_ID: dict[str, DocketEntrySource] = {
+    court_id: SCOTUS for court_id in SCOTUS_COURT_IDS
+}
+
+
+def source_for_court_id(court_id: str) -> DocketEntrySource:
+    """Return the DocketEntrySource of a court's dockets, RECAP by default."""
+    return BY_COURT_ID.get(court_id, RECAP)

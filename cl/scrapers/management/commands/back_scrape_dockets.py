@@ -266,6 +266,7 @@ def save_docket_response(
         court_id: Court identifier extracted from response data
         case_meta: Optional metadata dict from the scraper (e.g., case_number,
             date_filed, etc.) to save alongside the response
+        skip_meta: Don't save case_meta, for callers that save it separately
 
     Returns:
         Tuple of (bucket_name, base_key) for locating stored files. HTML
@@ -402,7 +403,6 @@ def _checkpoint_and_sleep(
     sleep_minutes: int,
 ) -> None:
     """Checkpoint to Redis and sleep at every batch boundary."""
-
     logger.info("Processed %d cases", case_count)
 
     if auto_resume:
@@ -418,9 +418,12 @@ def _checkpoint_and_sleep(
 
 
 class Command(StateBackScrapeCommand):
+    """Backfill dockets over a date range with a state scraper."""
+
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
 
     def add_arguments(self, parser):
+        """Add the scraper, rate limit, backoff, resume, sleep, and batch size options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--scraper",

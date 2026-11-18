@@ -1,0 +1,22 @@
+{# htmx response: the new form replaces the old one, and the status message is announced by the live region that <c-pray-button> keeps on the page. #}
+<c-pray-button-form
+  :document_id="document_id"
+  :count="count"
+  :prayer_exists="prayer_exists"
+  :daily_limit_reached="daily_limit_reached"
+/>
+{# Each outcome gets its own branch, with no catch-all else, so an outcome the view and template don't agree on shows a missing message instead of a wrong one. #}
+{% with added="was added." already_added="was already added." not_added="wasn't added because the document is already available." limit="wasn't added because you reached your daily limit." removed="was removed." already_removed="was already removed." not_removed="can't be removed because it was already granted." %}
+  <span id="pray_status_{{ document_id }}" hx-swap-oob="innerHTML">
+    Your prayer for
+    {% if document_number %}document {{ document_number }}{% if attachment_number %}, attachment {{ attachment_number }}{% endif %}{% else %}this document{% endif %}
+    {% if outcome == "added" %}{{ added }}
+    {% elif outcome == "already_added" %}{{ already_added }}
+    {% elif outcome == "not_added" %}{{ not_added }}
+    {% elif outcome == "limit" %}{{ limit }}
+    {% elif outcome == "removed" %}{{ removed }}
+    {% elif outcome == "already_removed" %}{{ already_removed }}
+    {% elif outcome == "not_removed" %}{{ not_removed }}{% endif %}
+    {{ count }} prayer{{ count|pluralize }} so far.
+  </span>
+{% endwith %}

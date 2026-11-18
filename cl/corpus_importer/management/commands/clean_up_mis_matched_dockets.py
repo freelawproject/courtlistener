@@ -1,4 +1,5 @@
 # !/usr/bin/python
+"""Find and fix opinion dockets mis-matched by the Harvard importer."""
 
 import requests
 from django.db.utils import OperationalError
@@ -17,10 +18,12 @@ cnt = CaseNameTweaker()
 def download_file(file_path: str) -> dict[str, str | int]:
     """Download the opinion from IA.
 
-    :param file_path: The opinion file path to download.
-    :return: A dict containing the opinion content.
-    """
+    Args:
+        file_path: The opinion file path to download.
 
+    Returns:
+        A dict containing the opinion content.
+    """
     ia_path = file_path.split("/storage/harvard_corpus/")[1]
     url = f"https://archive.org/download/{ia_path}"
     logger.info(f"Downloading: {url}")
@@ -46,13 +49,13 @@ def add_docket(
 ):
     """Create a new docket from the opinion data.
 
-    :param case_name: The docket case name
-    :param case_name_short: The docket case name short
-    :param case_name_full: The docket case name full
-    :param docket_number: The docket number
-    :param court_id: The docket court id
+    Args:
+        case_name: The docket case name
+        case_name_short: The docket case name short
+        case_name_full: The docket case name full
+        docket_number: The docket number
+        court_id: The docket court id
     """
-
     docket = Docket(
         case_name=case_name,
         case_name_short=case_name_short,
@@ -84,11 +87,13 @@ def add_docket(
 def find_and_fix_mis_matched_dockets(fix: bool) -> list[Docket]:
     """Find and fix mis matched opinion dockets added by Harvard importer.
 
-    :param fix: True if the mis matched docket should be fixed, otherwise it
-    will only show a report.
-    :return: A list of mis matched dockets.
-    """
+    Args:
+        fix: True if the mis matched docket should be fixed, otherwise it
+            will only show a report.
 
+    Returns:
+        A list of mis matched dockets.
+    """
     logger.info("Finding mis matched dockets ...")
     dockets = Docket.objects.filter(
         source=Docket.HARVARD, pacer_case_id__isnull=False
@@ -154,9 +159,12 @@ def find_and_fix_mis_matched_dockets(fix: bool) -> list[Docket]:
 
 
 class Command(VerboseCommand):
+    """Report mis-matched dockets, fixing them if requested."""
+
     help = "Find mis matched opinions/dockets and fix them."
 
     def add_arguments(self, parser):
+        """Add the ``--fix`` flag."""
         parser.add_argument(
             "--fix",
             action="store_true",
@@ -165,6 +173,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Find mis-matched dockets, fixing them only with ``--fix``."""
         if options["fix"]:
             find_and_fix_mis_matched_dockets(fix=True)
         else:

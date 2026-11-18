@@ -1,6 +1,4 @@
-"""
-Base class(es) for functional testing CourtListener using Selenium and PhantomJS
-"""
+"""Base class(es) for functional testing CourtListener using Selenium and PhantomJS."""
 
 import os
 import socket
@@ -38,7 +36,10 @@ if "SELENIUM_TIMEOUT" in os.environ:
 class BaseSeleniumTest(
     SerializeLockFileTestMixin, StaticLiveServerTestCase, ESIndexTestCase
 ):
-    """Base class for Selenium Tests. Sets up a few attributes:
+    """Base class for Selenium Tests.
+
+    Sets up a few attributes:
+
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
       * Also sets window size to default of 1024x768.
@@ -94,22 +95,26 @@ class BaseSeleniumTest(
     def assert_text_in_node(self, text: str, tag_name: str) -> None:
         """Is the text in a given node?
 
-        :param text: The text you want to look for
-        :param tag_name: The node in the HTML you want to check
-        :raises: AssertionError if the text cannot be found
-        :returns None
+        Args:
+            text: The text you want to look for
+            tag_name: The node in the HTML you want to check
+
+        Raises:
+            AssertionError: if the text cannot be found
         """
         node = self.browser.find_element(By.TAG_NAME, tag_name)
         self.assertIn(text, node.text)
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_not_in_node(self, text: str, tag_name: str) -> None:
-        """Assert that text is not in a node by name
+        """Assert that text is not in a node by name.
 
-        :param text: The text you want not to appear
-        :param tag_name: The node in your HTML you want to check
-        :raises: AssertionError if the text is NOT in the node
-        :return: None
+        Args:
+            text: The text you want not to appear
+            tag_name: The node in your HTML you want to check
+
+        Raises:
+            AssertionError: if the text is NOT in the node
         """
         node = self.browser.find_element(By.TAG_NAME, tag_name)
         self.assertNotIn(text, node.text)
@@ -118,10 +123,12 @@ class BaseSeleniumTest(
     def assert_text_in_node_by_id(self, text: str, tag_id: str) -> None:
         """Is the text in a node selected by ID?
 
-        :param text: The text you want to look for
-        :param tag_id: The ID of the node in the HTML you want to check
-        :raises: AssertionError if the text cannot be found
-        :returns None
+        Args:
+            text: The text you want to look for
+            tag_id: The ID of the node in the HTML you want to check
+
+        Raises:
+            AssertionError: if the text cannot be found
         """
         node = self.browser.find_element(By.ID, tag_id)
         self.assertIn(text, node.text)
@@ -133,9 +140,12 @@ class BaseSeleniumTest(
         This only exists to add the retry functionality, without which, things
         break, likely due to timing errors.
 
-        :param node: The node under which we search for the element.
-        :param id_: The ID of the element to find.
-        :return: The element found.
+        Args:
+            node: The node under which we search for the element.
+            id_: The ID of the element to find.
+
+        Returns:
+            The element found.
         """
         return node.find_element(By.ID, id_)
 
