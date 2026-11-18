@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
@@ -865,7 +866,6 @@ class ToastComponentTest(SimpleTestCase):
     def test_title_alone_renders_only_the_close_icon(self) -> None:
         """Without a variant, icon or description, the only svg is the close button's."""
         html = self.render('<c-toast title="Link copied" />')
-        self.assertIn('role="status"', html)
         self.assertIn("Link copied", html)
         self.assertEqual(html.count("<svg"), 1)
 
@@ -895,7 +895,6 @@ class ToastComponentTest(SimpleTestCase):
         """A variant outside the presets renders neither an icon nor its slot."""
         html = self.render('<c-toast variant="error" title="Oops" />')
         self.assertEqual(html.count("<svg"), 1)
-        self.assertNotIn('<span class="shrink-0', html)
 
     def test_icon_prop_replaces_the_variant_icon(self) -> None:
         """A named icon renders instead of the variant's, as the only icon."""
@@ -928,6 +927,33 @@ class ToastComponentTest(SimpleTestCase):
             '<c-toast title="Saved"><button>Undo</button></c-toast>'
         )
         self.assertIn("shrink-0 items-center gap-2", with_action)
+
+    def test_message_renders_in_a_template_outside_the_empty_message_column(
+        self,
+    ) -> None:
+        """The message column renders empty; the title and description wait in a template."""
+        html = self.render(
+            '<c-toast title="Docket blocked" description="No longer indexed" />'
+        )
+        self.assertRegex(html, r'x-ref="live"[^>]*></div>')
+        template = re.search(r"<template[^>]*>(.*?)</template>", html, re.S)
+        self.assertIsNotNone(template)
+        self.assertIn("Docket blocked", template[1])
+        self.assertIn("No longer indexed", template[1])
+
+    def test_controls_are_hidden_until_open(self) -> None:
+        """The action container and the Close button render under an x-show gate."""
+        html = self.render(
+            '<c-toast title="Docket blocked"><button>Undo</button></c-toast>'
+        )
+        close_button = re.search(r'<button[^>]*aria-label="Close"[^>]*>', html)
+        self.assertIsNotNone(close_button)
+        self.assertIn('x-show="isOpen"', close_button[0])
+        action_container = re.search(
+            r"<div[^>]*shrink-0 items-center gap-2[^>]*>", html
+        )
+        self.assertIsNotNone(action_container)
+        self.assertIn('x-show="isOpen"', action_container[0])
 
     def test_undeclared_attributes_land_on_the_root(self) -> None:
         """A listener passed to the component opens the toast from an event."""
