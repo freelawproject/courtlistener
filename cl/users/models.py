@@ -370,9 +370,9 @@ class EmailFlag(AbstractDateTimeModel):
         Returns:
             bool: True if so, False if not.
         """
-        if now() < self.next_retry_date:
-            return True
-        return False
+        return (
+            self.next_retry_date is not None and now() < self.next_retry_date
+        )
 
     def __str__(self) -> str:
         return f"{self.get_flag_type_display()} for {self.email_address}"
