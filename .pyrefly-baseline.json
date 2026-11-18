@@ -2984,13 +2984,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/search/forms.py",
-      "name": "unsupported-operation",
-      "concise_description": "`<` is not supported between `None` and `None`",
-      "severity": "error"
-    },
-    {
       "column": 34,
       "path": "cl/search/forms.py",
       "name": "unsupported-operation",
@@ -3940,13 +3933,6 @@
       "path": "cl/users/models.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `dict[str, dict[str, int]]`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/users/models.py",
-      "name": "unsupported-operation",
-      "concise_description": "`<` is not supported between `datetime` and `None`",
       "severity": "error"
     },
     {

@@ -742,16 +742,12 @@ class SearchForm(forms.Form):
             before = cleaned_data.get(f"{field_name}_before")
             after = cleaned_data.get(f"{field_name}_after")
             if (
-                all(
-                    (
-                        before,
-                        after,
-                        not isinstance(
-                            before, str
-                        ),  # Ignore combinations of absolute and relative dates.
-                        not isinstance(after, str),
-                    )
-                )
+                before
+                and after
+                and not isinstance(
+                    before, str
+                )  # Ignore combinations of absolute and relative dates.
+                and not isinstance(after, str)
                 and before < after
             ):
                 # The user is requesting dates like this: <--b  a-->. Switch
