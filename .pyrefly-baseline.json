@@ -277,7 +277,7 @@
     {
       "column": 9,
       "path": "cl/api/pagination.py",
-      "name": "bad-override-param-name",
+      "name": "bad-override",
       "concise_description": "Class member `ESCursorPagination.paginate_queryset` overrides parent class `BasePagination` in an inconsistent manner",
       "severity": "error"
     },
@@ -1147,13 +1147,6 @@
       "path": "cl/donate/signals.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/favorites/api_serializers.py",
-      "name": "bad-override-param-name",
-      "concise_description": "Class member `PrayerSerializer.validate` overrides parent class `ModelSerializer` in an inconsistent manner",
       "severity": "error"
     },
     {
