@@ -186,7 +186,7 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             queue_name=ingesting_queue,
         )
 
-        with open(inventory_path, encoding="utf-8") as f:
+        with inventory_path.open(encoding="utf-8") as f:
             download_inputs = self.transform_inventory_iterator(csv.reader(f))
             if options["test_random"]:
                 logger.warning(

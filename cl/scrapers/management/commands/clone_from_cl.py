@@ -272,8 +272,10 @@ def clone_opinion_cluster(
                         path = pathlib.PurePath(
                             cluster_data.get("filepath_json_harvard")
                         )
-                        json_path = os.path.join(
-                            "harvard_corpus", path.parent.name, path.name
+                        json_path = str(
+                            pathlib.PurePath(
+                                "harvard_corpus", path.parent.name, path.name
+                            )
                         )
                         opinion_cluster.filepath_json_harvard.save(
                             json_path, ContentFile(json_harvard_content)

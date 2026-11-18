@@ -7,6 +7,7 @@ import socket
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import TypedDict, cast
 
 import requests
@@ -278,8 +279,7 @@ def process_docket_data(
         )
 
     if filepath:
-        with open(filepath) as f:
-            text = f.read()
+        text = Path(filepath).read_text()
     else:
         # This is an S3 path, so get it remotely.
         text = d.filepath_local.read().decode()

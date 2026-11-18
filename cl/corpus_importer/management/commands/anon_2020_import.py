@@ -3,7 +3,7 @@
 import json
 import re
 from datetime import date, datetime
-from glob import iglob
+from pathlib import Path
 from typing import Any, cast
 
 from bs4 import BeautifulSoup as bs4
@@ -18,6 +18,7 @@ from reporters_db import REPORTERS
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
+from cl.lib.utils import glob_files
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 
@@ -405,18 +406,19 @@ def import_anon_2020_db(
         import_dir: Location of directory of import data.
         skip_until: ID for case we should begin processing, if any.
     """
-    directories = iglob(f"{import_dir}/*/????-*.json")
-    for dir in directories:
-        logger.info(f"Importing case id: {dir.split('/')[-2]}")
+    case_json_files = glob_files(Path(import_dir), "*/????-*.json")
+    for json_file in case_json_files:
+        logger.info(f"Importing case id: {json_file.parent.name}")
         if skip_until:
-            if skip_until in dir:
+            if skip_until in str(json_file):
                 skip_until = ""
             continue
 
         # Prepare data and html
-        with open(dir, "rb") as f:
+        with json_file.open("rb") as f:
             data = json.load(f)
-        with open(dir.replace("json", "html"), "rb") as f:
+        html_file = Path(str(json_file).replace("json", "html"))
+        with html_file.open("rb") as f:
             soup = bs4(f.read(), "html.parser")
 
         case_names = do_case_name(soup, data)

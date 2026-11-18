@@ -1,9 +1,9 @@
 """File storage backends for S3 buckets and static files."""
 
 import itertools
-import os
 import uuid
 from collections.abc import Callable
+from pathlib import PurePosixPath
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -62,12 +62,12 @@ def get_name_by_incrementing(
     Returns:
         The filepath
     """
-    dir_name, file_name = os.path.split(name)
-    file_root, file_ext = os.path.splitext(file_name)
+    # Storage names are POSIX-style keys regardless of the host OS.
+    path = PurePosixPath(name)
     count = itertools.count(1)
     while instance.exists(name):
-        # file_ext includes the dot.
-        name = os.path.join(dir_name, f"{file_root}_{next(count)}{file_ext}")
+        # path.suffix includes the dot.
+        name = str(path.with_name(f"{path.stem}_{next(count)}{path.suffix}"))
     return name
 
 
@@ -196,9 +196,8 @@ class S3PrivateUUIDStorage(S3Storage):
         max_length: int | None = None,
     ) -> str:
         """Replace the file name with a random UUID, keeping its directory and extension."""
-        dir_name, file_name = os.path.split(name)
-        _, file_ext = os.path.splitext(file_name)
-        return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
+        path = PurePosixPath(name)
+        return str(path.with_name(uuid.uuid4().hex + path.suffix))
 
 
 class S3GlacierInstantRetrievalStorage(S3Storage):
