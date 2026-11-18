@@ -1,3 +1,5 @@
+"""Middleware that routes API read requests to a database replica."""
+
 from collections.abc import Awaitable
 from inspect import iscoroutinefunction
 
@@ -26,6 +28,7 @@ class ReplicaRoutingMiddleware:
     async_capable = True
 
     def __init__(self, get_response) -> None:
+        """Wrap ``get_response``, running in async mode if it is a coroutine function."""
         self.get_response = get_response
         self.async_mode = iscoroutinefunction(self.get_response)
 
@@ -37,6 +40,7 @@ class ReplicaRoutingMiddleware:
     def __call__(
         self, request: HttpRequest
     ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
+        """Handle the request, routing it to the replica if eligible."""
         if self.async_mode:
             return self.__acall__(request)
         if self._should_route_to_replica(request):

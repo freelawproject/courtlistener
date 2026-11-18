@@ -1,3 +1,5 @@
+"""Build and send webhook events to users' endpoints."""
+
 import json
 import random
 
@@ -43,7 +45,7 @@ def send_webhook_event(
             the webhook is sent.
     """
     proxy_server = {
-        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),  # type: ignore
+        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),
     }
     headers = {
         "Content-type": "application/json",

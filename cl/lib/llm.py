@@ -1,3 +1,5 @@
+"""Helpers for calling LLM chat models and OpenAI transcription models."""
+
 from typing import IO, overload
 
 import instructor
@@ -82,13 +84,12 @@ def call_llm[T: BaseModel](
         {"role": "user", "content": user_content},
     ]
 
-    response = client.chat.completions.create(
+    return client.chat.completions.create(
         messages=messages,
         temperature=temperature,
         max_tokens=max_completion_tokens,
         response_model=response_model,
     )
-    return response
 
 
 def call_llm_transcription(

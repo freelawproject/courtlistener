@@ -1,3 +1,5 @@
+"""Models for Los Angeles Superior Court dockets and their contents."""
+
 from pathlib import Path
 
 from django.contrib.contenttypes.fields import (
@@ -16,6 +18,8 @@ from cl.lib.string_utils import trunc
 
 
 class UPLOAD_TYPE:
+    """Types of uploaded LASC JSON files."""
+
     DOCKET = 1
     NAMES = ((DOCKET, "JSON Docket"),)
 
@@ -123,6 +127,7 @@ class QueuedCase(AbstractDateTimeModel):
 
     @property
     def case_url(self):
+        """The LASC API URL for the case."""
         return "/".join(
             ["https://media.lacourt.org/api/AzureApi", self.internal_case_id]
         )
@@ -147,6 +152,7 @@ class CaseIDQuerySet(models.query.QuerySet):
     """
 
     def filter(self, *args, **kwargs):
+        """Filter as usual, also accepting a ``case_id`` keyword."""
         clone = self._clone()
         case_id = kwargs.pop("case_id", None)
         if case_id:
@@ -268,6 +274,7 @@ class Docket(AbstractDateTimeModel):
 
     @property
     def case_id(self):
+        """The docket number, district, and division code, joined by semicolons."""
         return ";".join(
             [self.docket_number, self.district, self.division_code]
         )
@@ -298,6 +305,7 @@ class QueuedPDF(AbstractDateTimeModel):
 
     @property
     def document_url(self):
+        """The LASC API URL for viewing the document."""
         return "/".join(
             [
                 "https://media.lacourt.org/api/AzureApi/ViewDocument",
@@ -632,6 +640,8 @@ class Party(AbstractDateTimeModel):
 
 
 class TIME_CHOICES:
+    """Whether a proceeding is in the past or the future."""
+
     PAST = 1
     FUTURE = 2
     NAMES = (
@@ -641,13 +651,19 @@ class TIME_CHOICES:
 
 
 class PastProceedingManager(models.Manager):
+    """Manager for proceedings in the past."""
+
     def get_queryset(self):
+        """Get only past proceedings."""
         super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.PAST)
 
 
 class FutureProceedingManager(models.Manager):
+    """Manager for proceedings in the future."""
+
     def get_queryset(self):
+        """Get only future proceedings."""
         super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.FUTURE)
 

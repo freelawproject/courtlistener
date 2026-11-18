@@ -7953,13 +7953,11 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             xml_tree.xpath(
                 "//atom:entry[2]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         second_item_published_str = str(
             xml_tree.xpath(
                 "//atom:entry[3]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         first_item_published_dt = datetime.datetime.strptime(
             first_item_published_str, published_format

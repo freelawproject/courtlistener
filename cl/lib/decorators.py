@@ -1,3 +1,5 @@
+"""Decorators for caching, retrying, timing, and documenting models."""
+
 import asyncio
 import logging
 import re
@@ -216,22 +218,21 @@ def retry[**P, R](
                 return await f(*args, **kwargs)
 
             return cast(Callable[P, R], f_retry)  # true decorator
-        else:
 
-            @wraps(f)
-            def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
-                mtries, mdelay = tries, delay
-                while mtries > 1:
-                    try:
-                        return f(*args, **kwargs)
-                    except ExceptionToCheck as e:
-                        _log_wait(e, mdelay)
-                        time.sleep(mdelay)
-                        mtries -= 1
-                        mdelay *= backoff
-                return f(*args, **kwargs)
+        @wraps(f)
+        def f_retry(*args: P.args, **kwargs: P.kwargs) -> R:
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except ExceptionToCheck as e:
+                    _log_wait(e, mdelay)
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+            return f(*args, **kwargs)
 
-            return f_retry  # true decorator
+        return f_retry  # true decorator
 
     return deco_retry
 
@@ -388,6 +389,8 @@ def document_model[M: models.Model](model: type[M]) -> type[M]:
 def time_call[**P, R](
     fn_logger: logging.Logger,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Make a decorator that logs how long each call that returns takes, at debug level."""
+
     def decorator(
         f: Callable[P, R],
     ) -> Callable[P, R]:

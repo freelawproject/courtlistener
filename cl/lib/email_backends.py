@@ -1,3 +1,5 @@
+"""Email backend that filters, stores, and rate-limits outgoing messages."""
+
 import time
 from collections.abc import Sequence
 
@@ -37,7 +39,8 @@ def incr_email_counters(pipe: Pipeline) -> None:
         pipe (Pipeline): A pipeline object.
     """
     prefix = get_email_prefix()
-    temp_counter = int(pipe.get(f"{prefix}:temp_counter") or 0)  # type: ignore
+    # pyrefly: ignore[bad-argument-type]
+    temp_counter = int(pipe.get(f"{prefix}:temp_counter") or 0)
     pipe.multi()
     if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
         current_time = time.time_ns()
@@ -162,6 +165,14 @@ class EmailBackend(BaseEmailBackend):
         self,
         email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
     ) -> int:
+        """Store and send messages through the base backend.
+
+        Banned recipients are dropped, and recipients under a backoff period
+        get the message queued instead of sent.
+
+        Returns:
+            The number of messages sent.
+        """
         if not email_messages:
             return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).

@@ -1,3 +1,5 @@
+"""Helpers for notes, prayers, and prayer statistics and emails."""
+
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -142,6 +144,11 @@ async def create_prayer(
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
+    """Delete a user's waiting prayer for a document.
+
+    Returns:
+        Whether a prayer was deleted.
+    """
     deleted, _ = await Prayer.objects.filter(
         user=user, recap_document=recap_document, status=Prayer.WAITING
     ).adelete()
@@ -219,7 +226,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     )
 
     # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
-    documents = (
+    return (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
         .select_related(
             "docket_entry",
@@ -266,17 +273,20 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         )
     )
 
-    return documents
-
 
 async def get_user_prayers(
     user: User, status: str | None = None
 ) -> QuerySet[RECAPDocument]:
+    """Get the documents a user prayed for, most recent prayer first.
+
+    Optionally only includes prayers with the given status. Each document
+    is annotated with its prayer's status and creation date.
+    """
     filters = Q(prayers__user=user)
     if status is not None:
         filters &= Q(prayers__status=status)
 
-    documents = (
+    return (
         RECAPDocument.objects.filter(filters)
         .select_related(
             "docket_entry",
@@ -315,8 +325,6 @@ async def get_user_prayers(
         .order_by("-prayers__date_created")
     )
 
-    return documents
-
 
 async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
     """Computes the total cost of a given queryset of Prayer objects.
@@ -350,6 +358,12 @@ async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
+    """Grant a document's waiting prayers and notify the users of all its granted prayers.
+
+    Queues each user's enabled pray-and-pay webhooks, clears the document's
+    availability record, and emails the users. Does nothing if no prayers
+    were waiting.
+    """
     # Update prayers to GRANTED status and check if any were updated
     updated_count = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
@@ -422,6 +436,8 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
 @dataclass
 class PrayerStats:
+    """Counts and total cost of a set of prayers."""
+
     prayer_count: int
     total_cost: str
     distinct_count: int | None = None
@@ -429,6 +445,7 @@ class PrayerStats:
 
 
 async def get_user_prayer_history(user: User) -> PrayerStats:
+    """Get the count and total cost of a user's granted prayers, cached for a minute."""
     cache_key = f"prayer-stats-{user}"
 
     data = await cache.aget(cache_key)
@@ -459,6 +476,11 @@ async def get_lifetime_prayer_stats(
 ) -> (
     PrayerStats
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+    """Get stats for all prayers with a status, cached for a minute.
+
+    Includes the number of prayers, distinct documents, distinct users, and
+    the total cost.
+    """
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
@@ -493,6 +515,10 @@ async def get_lifetime_prayer_stats(
 
 
 def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
+    """Email a user that the document they prayed for can't be bought.
+
+    Does nothing if the user has no waiting prayer for the document.
+    """
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
     ).select_related("user")

@@ -1,3 +1,5 @@
+"""Download and extract the PDFs of SCOTUS documents."""
+
 import time
 from itertools import batched
 
@@ -144,6 +146,8 @@ def extract_scotus_pdfs(
 
 
 class Command(VerboseCommand):
+    """Queue SCOTUS document PDFs for download or text extraction."""
+
     help = (
         "Download and extract PDFs for SCOTUSDocument instances. "
         "By default, downloads missing PDFs. "
@@ -152,6 +156,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the queue, extraction mode, chunking, delay, order, and resume options."""
         parser.add_argument(
             "--download-queue",
             type=str,
@@ -206,6 +211,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Extract already-downloaded PDFs with ``--only-extraction``, otherwise download missing PDFs."""
         super().handle(*args, **options)
 
         delay = options["delay"]

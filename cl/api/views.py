@@ -1,3 +1,5 @@
+"""API views for the court index, wiki coverage data, result counts, and usage reporting."""
+
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -37,6 +39,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.selectors import get_total_estimate_count
 from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.views import get_coverage_data_fds
 from cl.stats.constants import StatMetric
@@ -66,7 +69,7 @@ async def get_cached_court_counts(
         cache.set(
             cache_key,
             court_counts,
-            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
+            timeout=settings.QUERY_RESULTS_CACHE,
         )
     return court_counts or {}
 
@@ -165,6 +168,7 @@ async def get_result_count(request, version, day_count):
 
 
 async def deprecated_api(request, v):
+    """Respond with 410 Gone and a message to upgrade to the newest API version."""
     return JsonResponse(
         {
             "meta": {
@@ -335,7 +339,10 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).acount()
-    citation_count = await Citation.objects.acount()
+    # Do an estimate, since an exact count is too slow on this table
+    citation_count = await sync_to_async(get_total_estimate_count)(
+        Citation._meta.db_table
+    )
 
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
@@ -376,7 +383,7 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     }
     prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
-    data = {
+    return {
         "court_count": court_count,
         "citation_count": citation_count,
         "alerts_sent_count": alerts_sent_count,
@@ -421,7 +428,6 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
             ),
         },
     }
-    return data
 
 
 async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
@@ -531,6 +537,7 @@ class ApiUsageViewSet(ViewSet):
         return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
+        """Report the user's current throttle usage, recent usage, and membership."""
         # IsAuthenticated permission class rules out AnonymousUser at runtime.
         user = cast(User, request.user)
         return Response(

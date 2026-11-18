@@ -1,3 +1,5 @@
+"""Sitemap of simple, help, search, and user pages."""
+
 from django.contrib import sitemaps
 from django.urls import reverse
 
@@ -7,6 +9,7 @@ def make_url_dict(
     changefreq: str = "yearly",
     priority: float = 0.5,
 ) -> dict[str, float | str]:
+    """Make a sitemap item for a view."""
     return {
         "view_name": view_name,
         "changefreq": changefreq,
@@ -15,7 +18,10 @@ def make_url_dict(
 
 
 class SimpleSitemap(sitemaps.Sitemap):
+    """Sitemap of a fixed list of simple pages."""
+
     def items(self) -> list[dict[str, str | float]]:
+        """List the pages in the sitemap."""
         return [
             # Simple pages
             make_url_dict(
@@ -36,13 +42,16 @@ class SimpleSitemap(sitemaps.Sitemap):
         ]
 
     def changefreq(self, obj: dict[str, str | float]) -> str | float:
+        """Get the page's change frequency."""
         return obj["changefreq"]
 
     def priority(self, obj: dict[str, str | float]) -> str | float:
+        """Get the page's priority as a string."""
         return str(obj["priority"])
 
     def location(  # type: ignore[override]
         self,
         obj: dict[str, str | float],
     ) -> str:
+        """Get the URL of the view named by the item's ``view_name``."""
         return reverse(str(obj["view_name"]))

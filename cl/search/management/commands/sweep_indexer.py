@@ -1,3 +1,5 @@
+"""Daemon that sweeps through models and re-indexes their Elasticsearch documents."""
+
 import time
 from collections.abc import Iterable, Mapping
 from datetime import datetime
@@ -28,7 +30,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import ESDocumentType
 
-supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS  # type: ignore
+supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS
 r = get_redis_interface("CACHE")
 
 
@@ -162,18 +164,20 @@ def build_parent_model_queryset(
         # If the model is Docket, incorporate a source filter to only match
         # Dockets that belong to the RECAP collection.
         query_args["source__in"] = Docket.RECAP_SOURCES()
-    queryset = (
+    return (
         model.objects.filter(**query_args)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    return queryset
 
 
 class Command(VerboseCommand):
+    """Run sweep indexing cycles over the supported models."""
+
     help = "Sweep indexer for Elasticsearch documents."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with the sweep indexer's settings."""
         super().__init__(*args, **kwargs)
         self.options = {}
         self.sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
@@ -184,6 +188,7 @@ class Command(VerboseCommand):
         )
 
     def add_arguments(self, parser):
+        """Add the testing-mode flag."""
         parser.add_argument(
             "--testing-mode",
             action="store_true",
@@ -191,6 +196,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run sweep indexing cycles forever, or once in testing mode."""
         super().handle(*args, **options)
         self.options = options
 
@@ -360,7 +366,7 @@ class Command(VerboseCommand):
         processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
-            poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,  # type: ignore
+            poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
@@ -417,7 +423,7 @@ class Command(VerboseCommand):
                     # maintaining an index rate of 100 documents per second.
                     time.sleep(
                         1
-                        / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
+                        / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS
                     )
                 self.stdout.write(
                     f"\rProcessed {processed_count}/{count}, ({processed_count * 1.0 / count:.0%}), last {app_label} ID indexed: {item_id},"

@@ -1,5 +1,8 @@
-from collections.abc import Callable, Iterable
+"""Signal handlers that keep Elasticsearch documents in sync with their models."""
+
+from collections.abc import Callable, Iterable, Mapping
 from functools import partial
+from typing import Literal
 
 from celery.canvas import chain
 from django.conf import settings
@@ -66,7 +69,10 @@ from cl.search.types import (
     ESModelType,
 )
 
-type DocumentModelMapping = dict[str, dict[type[Model], dict]]
+type DocumentModelMapping = Mapping[
+    Literal["save", "delete", "m2m", "reverse", "reverse-delete"],
+    Mapping[type[Model], dict],
+]
 
 
 def check_fields_that_changed(
@@ -161,8 +167,7 @@ def updated_fields(
         return []
 
     # Check each tracked field to see if it has changed
-    changed_fields = check_fields_that_changed(instance, tracked_set)
-    return changed_fields
+    return check_fields_that_changed(instance, tracked_set)
 
 
 def get_fields_to_update(
@@ -254,7 +259,7 @@ def update_es_documents(
                 if should_compute_embeddings:
                     c = compute_single_opinion_embeddings.si(instance.pk) | c
                 transaction.on_commit(partial(c.apply_async))
-            case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
+            case OpinionCluster() if es_document is OpinionDocument:
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -264,7 +269,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case Docket() if es_document is OpinionDocument:  # type: ignore
+            case Docket() if es_document is OpinionDocument:
                 related_record = OpinionCluster.objects.filter(
                     **{query: instance}
                 )
@@ -280,7 +285,7 @@ def update_es_documents(
                     )
             case Person() if (
                 es_document is PositionDocument and query == "person"
-            ):  # type: ignore
+            ):
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
@@ -298,7 +303,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case School() if es_document is PositionDocument:  # type: ignore
+            case School() if es_document is PositionDocument:
                 """
                 This code handles the update of fields that belongs to records associated with
                 the parent document using ForeignKeys.
@@ -321,7 +326,7 @@ def update_es_documents(
                             fields_map,
                         )
                     )
-            case Docket() if es_document is ESRECAPDocument:  # type: ignore
+            case Docket() if es_document is ESRECAPDocument:
                 # The related name must come from this source's own
                 # config -- a hardcoded RECAP name would silently miss
                 # every other source.
@@ -341,7 +346,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case Person() if es_document is ESRECAPDocument:  # type: ignore
+            case Person() if es_document is ESRECAPDocument:
                 if main_model not in SOURCE_BY_MODEL:
                     continue
                 source = SOURCE_BY_MODEL[main_model]
@@ -532,7 +537,7 @@ def update_reverse_related_documents(
     match instance:
         case ABARating() | PoliticalAffiliation() | Education() if (
             es_document is PersonDocument
-        ):  # type: ignore
+        ):
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
@@ -549,7 +554,7 @@ def update_reverse_related_documents(
                         affected_fields,
                     )
                 )
-        case Citation() | Opinion() if es_document is OpinionClusterDocument:  # type: ignore
+        case Citation() | Opinion() if es_document is OpinionClusterDocument:
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -561,7 +566,7 @@ def update_reverse_related_documents(
             )
         case _ if (
             type(instance) in SOURCE_BY_MODEL and es_document is DocketDocument
-        ):  # type: ignore
+        ):
             # Always a metadata-model instance here.
             source = SOURCE_BY_MODEL[type(instance)]
             # docket is a real FK on every metadata model.
@@ -599,7 +604,7 @@ def delete_reverse_related_documents(
             the instance.
     """
     match instance:
-        case Person() if es_document is PersonDocument:  # type: ignore
+        case Person() if es_document is PersonDocument:
             # Update the Person document after the reverse instanced is deleted
             # Update parent document in ES.
             transaction.on_commit(
@@ -625,7 +630,7 @@ def delete_reverse_related_documents(
                     affected_fields,
                 )
             )
-        case Docket() if es_document is DocketDocument:  # type: ignore
+        case Docket() if es_document is DocketDocument:
             # Update the Docket document after the reverse instanced is deleted
 
             # Update parent document in ES.
@@ -656,7 +661,7 @@ def delete_reverse_related_documents(
                     affected_fields,
                 )
             )
-        case OpinionCluster() if es_document is OpinionClusterDocument:  # type: ignore
+        case OpinionCluster() if es_document is OpinionClusterDocument:
             # Update parent document in ES.
             transaction.on_commit(
                 partial(
@@ -775,6 +780,7 @@ class ESSignalProcessor:
         es_document: type[ESDocumentType],
         documents_model_mapping: DocumentModelMapping,
     ):
+        """Build the processor and connect its signal handlers."""
         self.main_model = main_model
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
@@ -782,6 +788,7 @@ class ESSignalProcessor:
         self.setup()
 
     def setup(self):
+        """Connect the save, delete, many-to-many, and reverse relation handlers for the mapped models."""
         models_save = list(self.documents_model_mapping["save"].keys())
         models_delete = list(self.documents_model_mapping["delete"].keys())
         models_m2m = list(self.documents_model_mapping["m2m"].keys())
@@ -867,7 +874,7 @@ class ESSignalProcessor:
             # If the save includes 'view_count' in the update fields, abort
             # the operation.This indicates that a user view is incrementing
             # the 'view_count' for dockets and opinions.
-            return None
+            return
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
@@ -986,7 +993,7 @@ class ESSignalProcessor:
                 case _ if (
                     type(instance) in SOURCE_BY_MODEL
                     and self.es_document is DocketDocument
-                ):  # type: ignore
+                ):
                     # Sender is always a registered metadata model here.
                     # Every registered metadata model (BankruptcyInformation,
                     # ScotusDocketMetadata, ...) is a one-to-one relation
@@ -998,14 +1005,14 @@ class ESSignalProcessor:
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
-                case Opinion() if self.es_document is OpinionClusterDocument:  # type: ignore
+                        return
+                case Opinion() if self.es_document is OpinionClusterDocument:
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map
                     )
                     if not affected_fields:
-                        return None
+                        return
                 case _:
                     try:
                         affected_fields = fields_map[instance.type]

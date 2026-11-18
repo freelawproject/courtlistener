@@ -1,3 +1,5 @@
+"""REST API serializers for SCOTUS network visualizations."""
+
 from rest_framework import serializers
 
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
@@ -8,6 +10,8 @@ from cl.visualizations.models import JSONVersion, SCOTUSMap
 class JSONVersionSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for a visualization's JSON versions."""
+
     class Meta:
         model = JSONVersion
         fields = "__all__"
@@ -16,6 +20,11 @@ class JSONVersionSerializer(
 class VisualizationSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for visualizations owned by the requesting user.
+
+    The start and end clusters must be Supreme Court clusters.
+    """
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     title = serializers.CharField(max_length=200)
     cluster_start = serializers.HyperlinkedRelatedField(

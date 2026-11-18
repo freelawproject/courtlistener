@@ -1,3 +1,5 @@
+"""Re-index RECAP documents whose links were broken."""
+
 import time
 from datetime import datetime
 
@@ -123,9 +125,12 @@ def compose_redis_key() -> str:
 
 
 class Command(VerboseCommand):
+    """Re-index the RECAP documents of dockets with broken links, in batches."""
+
     help = "Re-index RECAP documents affected by broken links."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with default batching settings."""
         super().__init__(*args, **kwargs)
         self.options = {}
         self.pk_offset = 0
@@ -138,6 +143,7 @@ class Command(VerboseCommand):
         self.docket_batch_size: int = 2_000
 
     def add_arguments(self, parser):
+        """Add the queue, batching, resume, testing, start date, interval, and docket ID options."""
         parser.add_argument(
             "--queue",
             type=str,
@@ -296,6 +302,7 @@ class Command(VerboseCommand):
         return all_affected_rds
 
     def handle(self, *args, docket_batch_size: int, **options):
+        """Re-index the documents of affected dockets from the start date on."""
         super().handle(*args, **options)
         self.options = options
         self.queue = self.options["queue"]
