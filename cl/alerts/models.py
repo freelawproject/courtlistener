@@ -1,7 +1,7 @@
 """Models for search alerts, docket alerts, and scheduled alert hits."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import pghistory
 from django.contrib.auth.models import User
@@ -64,19 +64,19 @@ def validate_recap_alert_type(value: str) -> None:
 class Alert(AbstractDateTimeModel):
     """A user's saved search query, sent to them at a chosen rate."""
 
-    REAL_TIME = "rt"
-    DAILY = "dly"
-    WEEKLY = "wly"
-    MONTHLY = "mly"
-    OFF = "off"
-    FREQUENCY = (
+    REAL_TIME: Final = "rt"
+    DAILY: Final = "dly"
+    WEEKLY: Final = "wly"
+    MONTHLY: Final = "mly"
+    OFF: Final = "off"
+    FREQUENCY: Final = (
         (REAL_TIME, "Real Time"),
         (DAILY, "Daily"),
         (WEEKLY, "Weekly"),
         (MONTHLY, "Monthly"),
         (OFF, "Off"),
     )
-    ALL_FREQUENCIES = [REAL_TIME, DAILY, WEEKLY, MONTHLY, OFF]
+    ALL_FREQUENCIES: Final = [REAL_TIME, DAILY, WEEKLY, MONTHLY, OFF]
     user = models.ForeignKey(
         User,
         help_text="The user that created the item",

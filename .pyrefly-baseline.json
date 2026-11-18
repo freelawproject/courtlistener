@@ -64,59 +64,10 @@
       "severity": "error"
     },
     {
-      "column": 52,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `task_id` with type `str` in function `get_task_status`",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `task_id` with type `str` in function `get_task_status`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `elasticsearch.dsl._sync.search.Search[ESRECAPSweepDocument]` is not assignable to parameter `child_search_query` with type `django_elasticsearch_dsl.search.Search` in function `cl.lib.elasticsearch_utils.do_es_sweep_alert_query`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `alerts`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `rate` with type `Literal['dly', 'rt']` in function `query_and_send_alerts`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `rate` with type `Literal['dly', 'rt']` in function `query_and_send_alerts`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `rate` with type `Literal['mly', 'wly']` in function `query_and_schedule_alerts`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `rate` with type `Literal['mly', 'wly']` in function `query_and_schedule_alerts`",
       "severity": "error"
     },
     {

@@ -3741,9 +3741,9 @@ def do_es_alert_estimation_query(
     return estimation_query.count(), total_recap_case_only_estimation
 
 
-def do_es_sweep_alert_query(
+def do_es_sweep_alert_query[ChildSQ: SearchDSL[Any]](
     search_query: Search,
-    child_search_query: Search,
+    child_search_query: ChildSQ,
     cd: CleanData,
 ) -> tuple[Response | None, Response | None, Response | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
@@ -3981,7 +3981,7 @@ def get_court_opinions_counts(
     )
     try:
         response = search_query.execute()
-    except (TransportError, ConnectionError, RequestError):
+    except TransportError, ConnectionError, RequestError:
         return None
 
     buckets = response.aggregations.court_id.buckets
