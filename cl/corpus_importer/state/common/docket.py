@@ -28,7 +28,7 @@ from cl.search.models import Docket
 
 
 def add_scraper_source(db: int | None) -> int:
-    """Add the scraper to a docket's stored source, ignoring the scraped value.
+    """Add the scraper to a docket's stored source.
 
     A missing source is treated as 0. Sources that already include the
     scraper are kept as they are.

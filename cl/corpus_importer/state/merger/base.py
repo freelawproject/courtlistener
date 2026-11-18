@@ -570,7 +570,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         self.populate_from_db(state)
 
         updated: list[str] = []
-        for name, spec in self.config.registry.attr.items():
+        for name in self.config.registry.attr:
             obj_v = getattr(self, name)
             db_v = getattr(state.instance, name)
             if obj_v != db_v:
