@@ -2,9 +2,9 @@
 
 import asyncio
 
-from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
+from cl.lib.command_utils import logger
 from cl.scrapers.management.commands import cl_scrape_oral_arguments
 from cl.scrapers.management.commands.cl_back_scrape_opinions import (
     add_backscraper_arguments,

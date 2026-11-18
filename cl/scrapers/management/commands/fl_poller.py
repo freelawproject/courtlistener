@@ -257,6 +257,7 @@ class Command(FLScrapeCommand, StatePollCommand):
                         update.case_uuid,
                         court_id,
                         maybe_case,
+                        exc_info=maybe_case,
                     )
                     continue
                 case, errors = maybe_case
@@ -348,7 +349,10 @@ class Command(FLScrapeCommand, StatePollCommand):
                 match page:
                     case PaginationFailed() as e:
                         logger.error(
-                            "Failed to get page in court %r: %r", court_id, e
+                            "Failed to get page in court %r: %r",
+                            court_id,
+                            e,
+                            exc_info=e.exc,
                         )
                     case FloridaPaginatedResults(results=results):
                         known = await sync_to_async(set)(
@@ -396,7 +400,10 @@ class Command(FLScrapeCommand, StatePollCommand):
             ):
                 match page:
                     case PaginationFailed() as e:
-                        logger.error("Failed to get page: %r", e)
+                        # the real error and its traceback are on `exc`
+                        logger.error(
+                            "Failed to get page: %r", e, exc_info=e.exc
+                        )
                     case FloridaPaginatedResults(results=results):
                         known = await sync_to_async(set)(
                             FloridaDocument.objects.filter(

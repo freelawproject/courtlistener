@@ -63,6 +63,7 @@ async def _get_full_case(  # type: ignore[return]
                 "Failed to fetch full case data for %s: %s",
                 case_uuid,
                 e,
+                exc_info=e,
             )
             return None
         case (_, errors) if errors:

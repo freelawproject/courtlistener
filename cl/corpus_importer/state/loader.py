@@ -102,7 +102,7 @@ def fingerprint(loader: str, phase: LoadPhase) -> dict[str, list[str]]:
 
     Returns:
         The `extra` to log the error with. See
-        `cl.settings.third_party.sentry.fingerprint_sentry_error`.
+        `cl.lib.sentry.fingerprint_sentry_error`.
     """
     return {"fingerprint": [loader, phase.value]}
 

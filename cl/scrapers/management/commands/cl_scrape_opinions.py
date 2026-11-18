@@ -328,9 +328,10 @@ class Command(ScraperCommand):
                 break
             except SingleDuplicateError:
                 pass
-            except (BadContentError, InvalidDocumentError):
+            except (BadContentError, InvalidDocumentError) as e:
                 # do not update site hash to ensure a retry on the next scrape
                 update_site_hash = False
+                capture_exception(e)
 
         # Update the hash if everything finishes properly.
         logger.debug(
@@ -560,9 +561,7 @@ class Command(ScraperCommand):
                 try:
                     enabled = self.scrape_module(module_string, options)
                 except Exception as e:
-                    capture_exception(
-                        e, fingerprint=[module_string, "{{ default }}"]
-                    )
+                    capture_exception(e)
                     logger.debug(traceback.format_exc())
                     enabled = True
             if not enabled:

@@ -616,7 +616,7 @@ class IngestionTest(TestCase):
 
     def test_duplicate_ingestion_warnings(self) -> None:
         """Can we detect duplicate ingestion."""
-        with mock.patch.object(logger, "error") as error_mock:
+        with mock.patch("cl.scrapers.utils.logger.error") as error_mock:
             check_duplicate_ingestion("pdf/2025/06/05/state_v._walsh_1.pdf")
             error_mock.assert_not_called()
             check_duplicate_ingestion(

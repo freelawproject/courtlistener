@@ -3,9 +3,9 @@
 import asyncio
 from types import ModuleType
 
-from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
+from cl.lib.command_utils import logger
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.utils import save_response
 
