@@ -3,6 +3,7 @@
 import re
 import uuid
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.conf import settings
@@ -19,6 +20,16 @@ from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    UserGroupsEvent: type[Event]
+    UserPermissionsEvent: type[Event]
+    UserProfileBarMembershipEvent: type[Event]
+    UserProfileEvent: type[Event]
+    UserProxyEvent: type[Event]
 
 donation_exclusion_codes = [
     1,  # Unknown error

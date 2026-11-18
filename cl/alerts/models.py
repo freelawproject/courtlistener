@@ -1,6 +1,7 @@
 """Models for search alerts, docket alerts, and scheduled alert hits."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.contrib.auth.models import User
@@ -14,6 +15,13 @@ from model_utils import FieldTracker
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    AlertEvent: type[Event]
+    DocketAlertEvent: type[Event]
 
 
 def check_valid_alert_type_or_raise_error(
