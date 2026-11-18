@@ -79,8 +79,8 @@ AUDIO_REENQUEUE_MAX_PER_SWEEP = env.int(
 )
 
 # RECAP Fetch scheduler. The daemon is the only thing that hands scheduled
-# Fetch API requests to Celery, so it must be running before the
-# "recap-fetch-scheduler" waffle switch is turned on.
+# Fetch API requests to Celery. Until it is running, the
+# "recap_fetch_scheduler" waffle flag has no effect.
 RECAP_FETCH_SCHEDULER_DAEMON_ENABLED = env.bool(
     "RECAP_FETCH_SCHEDULER_DAEMON_ENABLED", default=False
 )

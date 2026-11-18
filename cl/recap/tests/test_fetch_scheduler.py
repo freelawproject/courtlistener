@@ -6,6 +6,7 @@ from io import StringIO
 from unittest import mock
 
 import time_machine
+from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -276,7 +277,9 @@ class SchedulerDatabaseTestCase(SchedulerRedisTestCase, TestCase):
         cls.jane = UserFactory()
 
     @staticmethod
-    def _make_fq(user, status: int = PROCESSING_STATUS.ENQUEUED):
+    def _make_fq(
+        user: User, status: int = PROCESSING_STATUS.ENQUEUED
+    ) -> PacerFetchQueue:
         """Create a docket fetch request for COURT."""
         return PacerFetchQueueFactory(
             user=user,
