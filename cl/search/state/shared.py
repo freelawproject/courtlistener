@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
-from typing import IO, TYPE_CHECKING, Any, Self
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Self
 
 import requests
 from asgiref.sync import async_to_sync
@@ -64,30 +64,37 @@ class ProcessingError:
     BAD_URL = 1
     EXTRACTION_FAILURE = 2
     SEALED = 3
+    HTTP_FORBIDDEN = 4
+    """The court answered the last download attempt with 403. Unlike the
+    other errors this one is transient, so the document is still downloaded
+    again on the next ingest."""
     CHOICES = (
         (BAD_URL, "Bad URL"),
         (EXTRACTION_FAILURE, "Extraction Failure"),
         (SEALED, "Sealed"),
+        (HTTP_FORBIDDEN, "HTTP Forbidden"),
     )
 
 
-class CourtRefused(Exception):
-    """A court answered a document download with 403.
+class CourtAnswered(Exception):
+    """A court's answer to a document download that is a verdict on the document.
 
-    Courts block our requests in bursts, so a refusal is transient: the same
-    URL usually downloads once the block lifts. Download tasks retry on this
-    exception with a long backoff instead of giving up on the document.
+    Rather than a failure of ours, so `download` records the matching
+    `ProcessingError` on the document.
 
     Attributes:
+        processing_error: The `ProcessingError` member this answer records.
         model_name: The document model that was being downloaded.
         pk: The primary key of the document.
-        url: The URL that was refused. This is the endpoint that turned us
-            away, which for gated courts may be the challenge endpoint rather
-            than the document itself.
+        url: The URL that was answered. This is the endpoint that answered,
+            which for gated courts may be the challenge endpoint rather than
+            the document itself.
     """
 
+    processing_error: ClassVar[int]
+
     def __init__(self, model_name: str, pk: int, url: str) -> None:
-        """Record which document was refused, and at which URL."""
+        """Record which document was answered, and at which URL."""
         # All constructor arguments go to the base class so the exception
         # pickles, which Celery needs to report a failed task.
         super().__init__(model_name, pk, url)
@@ -95,8 +102,33 @@ class CourtRefused(Exception):
         self.pk = pk
         self.url = url
 
+
+class CourtRefused(CourtAnswered):
+    """A court answered a document download with 403.
+
+    Courts block our requests in bursts, so a refusal is transient: the same
+    URL usually downloads once the block lifts. Download tasks retry on this
+    exception with a long backoff instead of giving up on the document.
+    """
+
+    processing_error = ProcessingError.HTTP_FORBIDDEN
+
     def __str__(self) -> str:
         return f"Court refused {self.model_name} {self.pk} at {self.url} (403)"
+
+
+class DocumentNotFound(CourtAnswered):
+    """A court answered a document download with 404.
+
+    The stored URL does not resolve, so retrying it is pointless. Recording it
+    keeps the document out of later download passes until a rescrape changes
+    its URL.
+    """
+
+    processing_error = ProcessingError.BAD_URL
+
+    def __str__(self) -> str:
+        return f"{self.model_name} {self.pk} not found at {self.url} (404)"
 
 
 @document_model
@@ -125,8 +157,8 @@ class AbstractStateDocument(AbstractPDF):
 
         The default implementation returns the `url` column unchanged, but it can be overridden for states like Florida that
         require a proof-of-work token to fetch documents. Returns `None`, after logging why, if we failed to construct a URL
-        and therefore shouldn't attempt downloading anything. Overrides may also raise; `download` logs the error itself in
-        that case and skips the document either way.
+        and therefore shouldn't attempt downloading anything. Overrides raise `CourtAnswered` when the court's answer while
+        building the URL is a verdict on the document; `download` records it. Any other failure is the override's to log.
         """
         return self.url
 
@@ -314,7 +346,8 @@ class AbstractStateDocument(AbstractPDF):
         Raises:
             CourtRefused: When the court answers with 403, since that is a
                 transient block the calling task should retry later rather
-                than a failure of this document.
+                than a failure of this document. The refusal is recorded on
+                the document as `ProcessingError.HTTP_FORBIDDEN` first.
         """
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
@@ -342,46 +375,56 @@ class AbstractStateDocument(AbstractPDF):
             )
             return None
 
-        # A URL that can't be built is a per-document problem, so it must
-        # not take down the task that's working through a batch. A refusal
-        # while building it is the court's doing, though, and is retried.
+        # The URL build raises the court's answer itself; the fetch surfaces
+        # it as an HTTP error that is mapped to the same exceptions, so both
+        # steps end in the one recording path.
         try:
-            url = document.build_url()
-        except CourtRefused:
-            raise
-        except Exception:
-            logger.exception("Failed to build URL for %s %s", cls.__name__, pk)
-            return None
-        if url is None:
-            return None
-
-        logger.info(
-            "Document download: Fetching document for %s %s from %s",
-            cls.__name__,
-            pk,
-            url,
-        )
-
-        try:
+            if (url := document.build_url()) is None:
+                return None
+            logger.info(
+                "Document download: Fetching document for %s %s from %s",
+                cls.__name__,
+                pk,
+                url,
+            )
             with download_document_in_stream(
                 url, pk, cls.tmp_prefix(), require_pdf=False
             ) as result:
                 return cls._store_download(
                     document, url, result, extract, queue
                 )
+        except CourtAnswered as exc:
+            answer = exc
         except requests.HTTPError as exc:
             # A 5xx is the court having a bad day and is logged here; a 403
-            # is the court turning us away, and is raised for the task to
-            # retry once the block lifts.
-            if exc.response.status_code == HTTPStatus.FORBIDDEN:
-                raise CourtRefused(cls.__name__, pk, str(exc.request.url))
-            logger.exception(
-                "Failed to fetch %s %s from %s",
-                cls.__name__,
-                pk,
-                exc.request.url,
-            )
-            return None
+            # is the court turning us away, and a 404 is a dead URL.
+            match exc.response.status_code:
+                case HTTPStatus.FORBIDDEN:
+                    answer = CourtRefused(
+                        cls.__name__, pk, str(exc.request.url)
+                    )
+                case HTTPStatus.NOT_FOUND:
+                    answer = DocumentNotFound(
+                        cls.__name__, pk, str(exc.request.url)
+                    )
+                case _:
+                    logger.exception(
+                        "Failed to fetch %s %s from %s",
+                        cls.__name__,
+                        pk,
+                        exc.request.url,
+                    )
+                    return None
+
+        document.processing_error = answer.processing_error
+        document.save(update_fields=["processing_error", "date_modified"])
+        if isinstance(answer, CourtRefused):
+            # Raised for the task to retry once the block lifts. Recording it
+            # first means a refusal that outlives the retries is still
+            # distinguishable from a download that never ran.
+            raise answer
+        logger.warning("Document download: %s. Skipping.", answer)
+        return None
 
     @classmethod
     def _store_download(
@@ -445,6 +488,9 @@ class AbstractStateDocument(AbstractPDF):
         document.filepath_local.save(filename, downloaded_file, save=False)
         document.file_size = downloaded_file.size
         document.sha1 = sha1_hash
+        # A stored file supersedes a refusal recorded by an earlier attempt.
+        if document.processing_error == ProcessingError.HTTP_FORBIDDEN:
+            document.processing_error = None
 
         if extension == ".pdf":
             if pages := async_to_sync(document.fetch_page_count)():

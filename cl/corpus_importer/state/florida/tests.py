@@ -1250,6 +1250,23 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertIn(merged.pk, result.updates["FloridaDocument"])
 
     @merger_test(expected_query_count=29)
+    def test_remerge_refused_document_is_update(self):
+        """Is an unchanged document whose download the court refused reported as updated, so a re-ingest retries it? A refusal is transient, unlike the other processing errors."""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merged = FloridaDocument.objects.get()
+        merged.processing_error = ProcessingError.HTTP_FORBIDDEN
+        merged.save()
+
+        result = FloridaDocketMerger(
+            docket_data, params=docket_data.entries
+        ).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocument"])
+
+    @merger_test(expected_query_count=29)
     def test_remerge_unchanged_document_keeps_download_state(self):
         """Is download state (bad-URL flag, stored file, OCR status) left alone when the rescraped document is unchanged?"""
         _document, docket_data, merged = (

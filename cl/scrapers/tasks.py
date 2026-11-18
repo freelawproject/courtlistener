@@ -682,6 +682,9 @@ async def extract_formatted_text_document_base(
             if not has_content:
                 rd.processing_error = ProcessingError.EXTRACTION_FAILURE
                 update_fields.append("processing_error")
+            elif rd.processing_error == ProcessingError.EXTRACTION_FAILURE:
+                rd.processing_error = None
+                update_fields.append("processing_error")
             await rd.asave(update_fields=update_fields)
         else:
             await rd.asave(update_fields=["ocr_status", "plain_text"])
