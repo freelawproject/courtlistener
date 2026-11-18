@@ -15,6 +15,7 @@ import time
 from typing import Any
 
 from django.conf import settings
+from django.db import close_old_connections
 from sentry_sdk import capture_exception
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -103,13 +104,19 @@ class Command(VerboseCommand):
             and settings.RECAP_FETCH_SCHEDULER_DAEMON_ENABLED
         ):
             try:
-                # The API only queues requests while this heartbeat is fresh.
-                touch_daemon_heartbeat()
+                # Treat each cycle like a web request: drop the database
+                # connection if it broke or is older than CONN_MAX_AGE.
+                # Outside a request Django never does this on its own, so one
+                # dropped connection would fail every later cycle.
+                close_old_connections()
                 run_dispatch_cycle()
                 if time.monotonic() >= next_sweep:
                     next_sweep = time.monotonic() + SWEEP_WAIT
                     if failed := fail_stale_fetches():
                         logger.info("Failed %s stale fetch requests.", failed)
+                # The API only queues requests while this heartbeat is fresh,
+                # so only a cycle that worked renews it.
+                touch_daemon_heartbeat()
                 failures_in_a_row = 0
             except Exception as e:
                 # One bad cycle (e.g. a Redis or DB blip) shouldn't crash the

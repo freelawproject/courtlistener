@@ -19,12 +19,13 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.recap import fetch_queue
 from cl.recap.factories import PacerFetchQueueFactory
 from cl.recap.fetch_queue import (
+    daemon_is_alive,
     enqueue_fetch,
     estimate_delay,
     get_court_interval_ms,
     get_court_rates,
     get_courts_with_waiting_fetches,
-    get_pending_fetch,
+    get_pending_fetches,
     get_queued_fetches,
     mark_fetch_started,
     pop_next_fetch,
@@ -33,10 +34,13 @@ from cl.recap.fetch_queue import (
     touch_daemon_heartbeat,
 )
 from cl.recap.fetch_scheduler import (
+    HANDED_OFF_MESSAGE_PREFIX,
     LOST_MESSAGE,
     SCHEDULER_FLAG,
     SESSION_EXPIRED_MESSAGE,
+    STALLED_MESSAGE,
     fail_stale_fetches,
+    hand_off_fetch,
     run_dispatch_cycle,
     schedule_fetch,
 )
@@ -190,7 +194,7 @@ class FetchSchedulerRateTest(SchedulerRedisTestCase):
 
         self.assertFalse(mark_fetch_started(COURT, 99, T0))
 
-        self.assertEqual(get_pending_fetch(COURT), 1)
+        self.assertEqual(get_pending_fetches([COURT]), {COURT: 1})
         self.assertIsNone(pop_next_fetch(COURT, T0 + 5000))
         self.assertTrue(mark_fetch_started(COURT, 1, T0 + 5000))
         self.assertIsNone(pop_next_fetch(COURT, T0 + 5999))
@@ -294,7 +298,7 @@ class SchedulerDatabaseTestCase(SchedulerRedisTestCase, TestCase):
         """Change a request's status, as a fetch task would."""
         PacerFetchQueue.objects.filter(pk=fq.pk).update(status=status)
 
-    def _schedule(self, fq: PacerFetchQueue) -> float:
+    def _schedule(self, fq: PacerFetchQueue) -> float | None:
         """Queue a request, running the callbacks its commit would run."""
         with self.captureOnCommitCallbacks(execute=True):
             return schedule_fetch(fq)
@@ -379,6 +383,35 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
         self.assertEqual(delay, 0.0)
         self.assertEqual(get_courts_with_waiting_fetches(), [COURT])
 
+    def test_handed_off_request_says_so(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """The row records the hand-off before Celery can pick it up."""
+        fq = self._make_fq(self.bob)
+        self._schedule(fq)
+
+        self.assertEqual(run_dispatch_cycle(), 1)
+
+        fq.refresh_from_db()
+        self.assertTrue(fq.message.startswith(HANDED_OFF_MESSAGE_PREFIX))
+
+    def test_checks_every_handed_off_request_in_one_query(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """The fallback costs one query per cycle, however many courts wait."""
+        for fq_pk, court_id in enumerate((COURT, OTHER_COURT, "cand"), 1):
+            enqueue_fetch(court_id, BOB, fq_pk)
+            self.assertEqual(pop_next_fetch(court_id), fq_pk)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(run_dispatch_cycle(), 0)
+
 
 @mock.patch("cl.recap.fetch_scheduler.send_recap_fetch_webhooks")
 @mock.patch("cl.recap.fetch_scheduler._has_pacer_session")
@@ -440,6 +473,100 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
         self.assertNotIn(expired.pk, get_queued_fetches(COURT, self.jane.pk))
         self.assertIn(still_in_line.pk, get_queued_fetches(COURT, self.bob.pk))
 
+    @mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
+    def test_gives_handed_off_requests_time_to_finish(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """A task that rolled back to retry keeps its request; a lost one not.
+
+        PDF and attachment tasks run in a transaction, so a retry rolls the
+        row back to ENQUEUED with no trace of the task in Redis.
+        """
+        mock_has_session.return_value = True
+        with time_machine.travel(NOON - timedelta(hours=3), tick=False):
+            lost, retrying = self._make_fq(self.bob), self._make_fq(self.jane)
+            self._schedule(lost)
+            self._schedule(retrying)
+        with time_machine.travel(NOON - timedelta(hours=2), tick=False):
+            self.assertTrue(hand_off_fetch(COURT, lost.pk))
+        with time_machine.travel(NOON - timedelta(minutes=10), tick=False):
+            self.assertTrue(hand_off_fetch(COURT, retrying.pk))
+
+        with time_machine.travel(NOON, tick=False):
+            self.assertEqual(fail_stale_fetches(), 1)
+
+        lost.refresh_from_db()
+        retrying.refresh_from_db()
+        self.assertEqual(lost.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(lost.message, STALLED_MESSAGE)
+        self.assertEqual(retrying.status, PROCESSING_STATUS.ENQUEUED)
+
+    def test_request_that_starts_during_the_sweep_is_left_alone(
+        self, mock_has_session: mock.MagicMock, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """The sweeper never fails a request on what it read before a change."""
+        mock_has_session.return_value = True
+        with time_machine.travel(NOON - timedelta(hours=2), tick=False):
+            fq = self._make_fq(self.bob)
+            self._schedule(fq)
+
+        read_queue = get_queued_fetches
+
+        def start_then_read(court_id: str, user_id: int) -> set[int]:
+            """The daemon hands the request off and its task starts."""
+            with mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch"):
+                self.assertEqual(pop_next_fetch(COURT), fq.pk)
+                self.assertTrue(hand_off_fetch(COURT, fq.pk))
+            self.assertTrue(mark_fetch_started(COURT, fq.pk))
+            return read_queue(court_id, user_id)
+
+        with (
+            time_machine.travel(NOON, tick=False),
+            mock.patch(
+                "cl.recap.fetch_scheduler.get_queued_fetches",
+                side_effect=start_then_read,
+            ),
+        ):
+            self.assertEqual(fail_stale_fetches(), 0)
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.ENQUEUED)
+        mock_webhooks.assert_not_called()
+
+    def test_sweeps_each_request_under_its_court_in_one_query(
+        self, mock_has_session: mock.MagicMock, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """A PDF request belongs to its docket's court, whatever fq.court is."""
+        mock_has_session.return_value = True
+        other_court = CourtFactory(
+            id=OTHER_COURT, jurisdiction=Court.FEDERAL_BANKRUPTCY
+        )
+        rd = RECAPDocumentFactory(
+            docket_entry__docket__court=Court.objects.get(pk=COURT)
+        )
+        with time_machine.travel(NOON - timedelta(hours=2), tick=False):
+            for _ in range(3):
+                self._schedule(self._make_fq(self.bob))
+            pdf = PacerFetchQueueFactory(
+                user=self.jane,
+                request_type=REQUEST_TYPE.PDF,
+                recap_document=rd,
+                court=other_court,
+            )
+            self._schedule(pdf)
+        self.assertEqual(get_queued_fetches(COURT, self.jane.pk), {pdf.pk})
+
+        with time_machine.travel(NOON, tick=False), self.assertNumQueries(1):
+            self.assertEqual(fail_stale_fetches(), 0)
+
+        mock_has_session.side_effect = lambda user_id: user_id != self.jane.pk
+        with time_machine.travel(NOON, tick=False):
+            self.assertEqual(fail_stale_fetches(), 1)
+        self.assertEqual(get_queued_fetches(COURT, self.jane.pk), set())
+
 
 class FetchTaskGuardTest(SchedulerDatabaseTestCase):
     """A fetch task never runs a request that is already finished."""
@@ -483,7 +610,7 @@ class FetchTaskStartTest(SchedulerDatabaseTestCase):
 
         fetch_docket.apply(args=(fq.pk,))
 
-        self.assertIsNone(get_pending_fetch(COURT))
+        self.assertEqual(get_pending_fetches([COURT]), {})
 
     def test_pdf_task_frees_its_court_inside_its_transaction(
         self, mock_court_accessible: mock.MagicMock
@@ -502,7 +629,7 @@ class FetchTaskStartTest(SchedulerDatabaseTestCase):
 
         fetch_pacer_doc_by_rd.apply(args=(rd.pk, fq.pk))
 
-        self.assertIsNone(get_pending_fetch(COURT))
+        self.assertEqual(get_pending_fetches([COURT]), {})
 
 
 @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
@@ -587,6 +714,29 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
         self.assertIsNone(response.json()["estimated_execution_delay"])
         mock_do_pacer_fetch.assert_called_once()
         self.assertEqual(get_courts_with_waiting_fetches(), [])
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_redis_down")
+    @override_flag(SCHEDULER_FLAG, active=True)
+    def test_requests_skip_the_queue_when_redis_fails(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_cookies: mock.MagicMock,
+    ) -> None:
+        """A Redis error never leaves a saved request with nothing to run it."""
+        for target in ("daemon_is_alive", "estimate_delay"):
+            mock_do_pacer_fetch.reset_mock()
+            with (
+                self.subTest(target),
+                mock.patch(
+                    f"cl.recap.fetch_scheduler.{target}",
+                    side_effect=RedisError("Redis is down"),
+                ),
+            ):
+                response = self.client.post(self.url, self.body, format="json")
+
+                self.assertEqual(response.status_code, HTTPStatus.CREATED)
+                self.assertIsNone(response.json()["estimated_execution_delay"])
+                mock_do_pacer_fetch.assert_called_once()
 
     @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_per_user")
     def test_flag_can_target_a_single_user(
@@ -694,6 +844,8 @@ class FetchSchedulerDaemonTest(SchedulerRedisTestCase):
 
         self.assertEqual(mock_dispatch.call_count, 6)
         mock_capture.assert_called_once()
+        # The API must not queue requests for a daemon that can't send them.
+        self.assertFalse(daemon_is_alive())
         self.assertEqual(
             [sleep.args[0] for sleep in mock_sleep.call_args_list],
             [1, 2, 4, 8, 16],
@@ -715,3 +867,22 @@ class FetchSchedulerDaemonTest(SchedulerRedisTestCase):
         self.assertEqual(
             [sleep.args[0] for sleep in mock_sleep.call_args_list], [1, 0.5]
         )
+        self.assertTrue(daemon_is_alive())
+
+    @mock.patch(
+        "cl.recap.management.commands.recap_fetch_scheduler_daemon.close_old_connections"
+    )
+    def test_drops_broken_database_connections_every_cycle(
+        self,
+        mock_close: mock.MagicMock,
+        mock_dispatch: mock.MagicMock,
+        mock_capture: mock.MagicMock,
+        mock_sleep: mock.MagicMock,
+        mock_sweep: mock.MagicMock,
+    ) -> None:
+        """A database restart can't leave every later cycle failing."""
+        mock_dispatch.side_effect = None
+
+        call_command("recap_fetch_scheduler_daemon", testing_iterations=3)
+
+        self.assertEqual(mock_close.call_count, 3)

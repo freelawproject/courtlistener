@@ -199,12 +199,15 @@ class PacerFetchRequestViewSet(
     def perform_create(self, serializer):
         """Save the fetch request for the requesting user and start the fetch."""
         fq = serializer.save(user=self.request.user)
-        if not should_schedule(self.request._request):
-            do_pacer_fetch(fq)
+        if (
+            should_schedule(self.request._request)
+            and (delay := schedule_fetch(fq)) is not None
+        ):
+            # Not a model field: the serializer reads it off the instance so
+            # the estimate appears in the response to this POST.
+            fq.estimated_execution_delay = delay
             return
-        # Not a model field: the serializer reads it off the instance so the
-        # estimate appears in the response to this POST.
-        fq.estimated_execution_delay = schedule_fetch(fq)
+        do_pacer_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):

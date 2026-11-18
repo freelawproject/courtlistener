@@ -354,17 +354,26 @@ def pop_next_fetch(court_id: str, now_ms: int | None = None) -> int | None:
     return int(str(fq_pk)) if fq_pk else None
 
 
-def get_pending_fetch(court_id: str) -> int | None:
-    """Get the request a court has handed to Celery that has not started.
+def get_pending_fetches(court_ids: list[str]) -> dict[str, int]:
+    """Get the requests that courts have handed to Celery and not started.
 
     Args:
-        court_id: The court to look up.
+        court_ids: The courts to look up.
 
     Returns:
-        The PK of the PacerFetchQueue row, or None if there is none.
+        A dict of court ID to the PK of its handed-off PacerFetchQueue row.
+        Courts with no such request are left out.
     """
-    fq_pk = get_redis_interface("CACHE").get(_pending_key(court_id))
-    return int(str(fq_pk)) if fq_pk else None
+    if not court_ids:
+        return {}
+    pipe = get_redis_interface("CACHE").pipeline(transaction=False)
+    for court_id in court_ids:
+        pipe.get(_pending_key(court_id))
+    return {
+        court_id: int(str(fq_pk))
+        for court_id, fq_pk in zip(court_ids, pipe.execute())
+        if fq_pk
+    }
 
 
 def mark_fetch_started(
