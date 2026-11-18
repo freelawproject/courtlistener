@@ -20,14 +20,17 @@ from cl.recap.fetch_queue import (
     get_court_interval_ms,
     get_courts_with_waiting_fetches,
     get_pending_fetch,
+    get_queued_fetches,
     mark_fetch_started,
     pop_next_fetch,
+    remove_fetch,
     set_court_rate,
     touch_daemon_heartbeat,
 )
 from cl.recap.fetch_scheduler import (
+    LOST_MESSAGE,
     SCHEDULER_FLAG,
-    STALE_MESSAGE,
+    SESSION_EXPIRED_MESSAGE,
     fail_stale_fetches,
     run_dispatch_cycle,
     schedule_fetch,
@@ -237,6 +240,17 @@ class FetchSchedulerEstimateTest(SchedulerRedisTestCase):
         self.assertEqual(estimate, 6.0)
         self.assertLessEqual(actual_wait, estimate)
 
+    def test_estimate_before_queueing_matches_the_one_after(self) -> None:
+        """A request waiting on its commit gets the same estimate."""
+        for fq_pk in (101, 102):
+            enqueue_fetch(COURT, BOB, fq_pk, T0)
+        enqueue_fetch(COURT, JANE, 201, T0)
+
+        before = estimate_delay(COURT, JANE, T0, not_yet_queued=1)
+        enqueue_fetch(COURT, JANE, 202, T0)
+
+        self.assertEqual(before, estimate_delay(COURT, JANE, T0))
+
 
 class SchedulerDatabaseTestCase(SchedulerRedisTestCase, TestCase):
     """Scheduler tests that also need PostgreSQL rows."""
@@ -266,20 +280,30 @@ class SchedulerDatabaseTestCase(SchedulerRedisTestCase, TestCase):
         """Change a request's status, as a fetch task would."""
         PacerFetchQueue.objects.filter(pk=fq.pk).update(status=status)
 
+    def _schedule(self, fq: PacerFetchQueue) -> float:
+        """Queue a request, running the callbacks its commit would run."""
+        with self.captureOnCommitCallbacks(execute=True):
+            return schedule_fetch(fq)
+
 
 @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
+@mock.patch("cl.recap.fetch_scheduler.send_recap_fetch_webhooks")
+@mock.patch("cl.recap.fetch_scheduler._has_pacer_session", return_value=True)
 @mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
 class FetchDispatchTest(SchedulerDatabaseTestCase):
     """The daemon's cycle hands requests to Celery at each court's rate."""
 
     def test_court_waits_for_a_worker_to_start_its_request(
-        self, mock_do_pacer_fetch: mock.MagicMock
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
     ) -> None:
         """The interval counts from the real start, read from PostgreSQL."""
         first, second = self._make_fq(self.bob), self._make_fq(self.bob)
         with time_machine.travel(NOON, tick=False) as traveller:
-            schedule_fetch(first)
-            schedule_fetch(second)
+            self._schedule(first)
+            self._schedule(second)
 
             self.assertEqual(run_dispatch_cycle(), 1)
             mock_do_pacer_fetch.assert_called_once_with(first)
@@ -298,44 +322,109 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
             self.assertEqual(run_dispatch_cycle(), 1)
             mock_do_pacer_fetch.assert_called_with(second)
 
+    def test_expired_session_fails_without_using_the_turn(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """Bob's dead request fails, and Jane's goes right after it."""
+        bobs, janes = self._make_fq(self.bob), self._make_fq(self.jane)
+        mock_has_session.side_effect = lambda user_id: user_id == self.jane.pk
+        with time_machine.travel(NOON, tick=False) as traveller:
+            # Users who join at the same instant are ordered by user ID, so
+            # make sure Bob is first in line.
+            self._schedule(bobs)
+            traveller.shift(timedelta(milliseconds=1))
+            self._schedule(janes)
+
+            self.assertEqual(run_dispatch_cycle(), 0)
+            self.assertEqual(run_dispatch_cycle(), 1)
+
+        mock_do_pacer_fetch.assert_called_once_with(janes)
+        bobs.refresh_from_db()
+        self.assertEqual(bobs.status, PROCESSING_STATUS.FAILED)
+        self.assertEqual(bobs.message, SESSION_EXPIRED_MESSAGE)
+        mock_webhooks.assert_called_once()
+
+    def test_request_joins_the_line_only_after_its_commit(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """The daemon can't take a PK whose row isn't committed yet."""
+        fq = self._make_fq(self.bob)
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            delay = schedule_fetch(fq)
+            self.assertEqual(get_courts_with_waiting_fetches(), [])
+        for callback in callbacks:
+            callback()
+
+        self.assertEqual(delay, 0.0)
+        self.assertEqual(get_courts_with_waiting_fetches(), [COURT])
+
 
 @mock.patch("cl.recap.fetch_scheduler.send_recap_fetch_webhooks")
+@mock.patch("cl.recap.fetch_scheduler._has_pacer_session")
 class FetchSweeperTest(SchedulerDatabaseTestCase):
-    """No request stays ENQUEUED forever."""
+    """No request stays ENQUEUED forever, and none that can still run fails."""
 
-    def test_fails_only_requests_stuck_in_enqueued(
-        self, mock_webhooks: mock.MagicMock
+    def test_fails_only_queued_requests_that_cannot_succeed(
+        self, mock_has_session: mock.MagicMock, mock_webhooks: mock.MagicMock
     ) -> None:
-        """Old ENQUEUED rows fail; recent, started or ancient rows don't."""
-        with time_machine.travel(NOON - timedelta(days=30), tick=False):
-            ancient = self._make_fq(self.bob)
+        """Expired sessions and lost requests fail; nothing else does."""
+        # Bob keeps his PACER session alive; Jane's has expired.
+        mock_has_session.side_effect = lambda user_id: user_id == self.bob.pk
+        with time_machine.travel(NOON - timedelta(days=8), tick=False):
+            ancient = self._make_fq(self.jane)
+            self._schedule(ancient)
         with time_machine.travel(NOON - timedelta(hours=2), tick=False):
-            stale = self._make_fq(self.bob)
-            schedule_fetch(stale)
+            still_in_line = self._make_fq(self.bob)
+            self._schedule(still_in_line)
+            lost = self._make_fq(self.bob)
+            self._schedule(lost)
+            expired = self._make_fq(self.jane)
+            self._schedule(expired)
+            # Rows from recap.email or pacer_bulk_fetch never went through
+            # the queue.
+            other_flow = self._make_fq(self.jane)
             started = self._make_fq(
                 self.jane, status=PROCESSING_STATUS.IN_PROGRESS
             )
         with time_machine.travel(NOON - timedelta(minutes=10), tick=False):
             recent = self._make_fq(self.jane)
+            self._schedule(recent)
+        remove_fetch(COURT, self.bob.pk, lost.pk)
 
         with time_machine.travel(NOON, tick=False):
-            self.assertEqual(fail_stale_fetches(), 1)
+            self.assertEqual(fail_stale_fetches(), 2)
 
         expected = [
-            ("stuck for two hours", stale, PROCESSING_STATUS.FAILED),
-            ("queued ten minutes ago", recent, PROCESSING_STATUS.ENQUEUED),
+            (
+                "old but still in line",
+                still_in_line,
+                PROCESSING_STATUS.ENQUEUED,
+            ),
+            ("lost from Redis", lost, PROCESSING_STATUS.FAILED),
+            ("session expired", expired, PROCESSING_STATUS.FAILED),
+            ("not from the queue", other_flow, PROCESSING_STATUS.ENQUEUED),
             ("already started", started, PROCESSING_STATUS.IN_PROGRESS),
-            ("older than a day", ancient, PROCESSING_STATUS.ENQUEUED),
+            ("queued ten minutes ago", recent, PROCESSING_STATUS.ENQUEUED),
+            ("older than the lookback", ancient, PROCESSING_STATUS.ENQUEUED),
         ]
         for label, fq, status in expected:
             with self.subTest(label):
                 fq.refresh_from_db()
                 self.assertEqual(fq.status, status)
 
-        self.assertEqual(stale.message, STALE_MESSAGE)
-        mock_webhooks.assert_called_once()
-        # The failed request is also gone from Redis, so it can't use a turn.
-        self.assertIsNone(pop_next_fetch(COURT))
+        self.assertEqual(lost.message, LOST_MESSAGE)
+        self.assertEqual(expired.message, SESSION_EXPIRED_MESSAGE)
+        self.assertEqual(mock_webhooks.call_count, 2)
+        # The expired request is gone from Redis, so it can't use a turn.
+        self.assertNotIn(expired.pk, get_queued_fetches(COURT, self.jane.pk))
+        self.assertIn(still_in_line.pk, get_queued_fetches(COURT, self.bob.pk))
 
 
 class FetchTaskGuardTest(SchedulerDatabaseTestCase):
@@ -411,10 +500,15 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
     def setUp(self) -> None:
         """Log Jane in to the API and start the daemon's heartbeat."""
         super().setUp()
-        # Keep the dispatch cycle away from the real fetch tasks.
-        patcher = mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # Keep the dispatch cycle away from the real fetch tasks and cookies.
+        fetch_patcher = mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
+        fetch_patcher.start()
+        self.addCleanup(fetch_patcher.stop)
+        session_patcher = mock.patch(
+            "cl.recap.fetch_scheduler._has_pacer_session", return_value=True
+        )
+        session_patcher.start()
+        self.addCleanup(session_patcher.stop)
         touch_daemon_heartbeat()
         self.client = APIClient()
         self.client.force_authenticate(self.jane)
@@ -436,9 +530,10 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
     ) -> None:
         """With the flag on, the request waits and the wait is reported."""
         for _ in range(3):
-            schedule_fetch(self._make_fq(self.bob))
+            self._schedule(self._make_fq(self.bob))
 
-        response = self.client.post(self.url, self.body, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url, self.body, format="json")
 
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         data = response.json()
@@ -492,8 +587,11 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
         bob_client = APIClient()
         bob_client.force_authenticate(self.bob)
 
-        jane_response = self.client.post(self.url, self.body, format="json")
-        bob_response = bob_client.post(self.url, self.body, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            jane_response = self.client.post(
+                self.url, self.body, format="json"
+            )
+            bob_response = bob_client.post(self.url, self.body, format="json")
 
         self.assertIsNotNone(jane_response.json()["estimated_execution_delay"])
         self.assertIsNone(bob_response.json()["estimated_execution_delay"])

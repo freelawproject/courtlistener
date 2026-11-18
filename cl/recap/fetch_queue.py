@@ -384,6 +384,31 @@ def remove_fetch(court_id: str, user_id: int, fq_pk: int) -> bool:
     return bool(r.lrem(_user_list_key(court_id, user_id), 0, str(fq_pk)))
 
 
+def get_queued_fetches(court_id: str, user_id: int) -> set[int]:
+    """List a user's requests the queue still knows about in a court.
+
+    That is the requests waiting in the user's line, plus the court's
+    handed-off request if it belongs to them and has not started yet.
+
+    Args:
+        court_id: The court to look in.
+        user_id: The user whose requests to list.
+
+    Returns:
+        The PKs of the PacerFetchQueue rows.
+    """
+    r = get_redis_interface("CACHE")
+    pipe = r.pipeline()
+    pipe.lrange(_user_list_key(court_id, user_id), 0, -1)
+    pipe.get(_pending_key(court_id))
+    waiting, pending = pipe.execute()
+    # The pending PK may belong to another user. That's harmless here, since
+    # callers only look up their own user's PKs in the result.
+    return {int(fq_pk) for fq_pk in waiting} | (
+        {int(pending)} if pending else set()
+    )
+
+
 def get_courts_with_waiting_fetches() -> list[str]:
     """List the courts that may have requests waiting.
 
@@ -398,11 +423,15 @@ def get_courts_with_waiting_fetches() -> list[str]:
 
 
 def estimate_delay(
-    court_id: str, user_id: int, now_ms: int | None = None
+    court_id: str,
+    user_id: int,
+    now_ms: int | None = None,
+    not_yet_queued: int = 0,
 ) -> float:
     """Estimate how long a user's newest request will wait before it starts.
 
-    Call it right after enqueue_fetch for the same court and user.
+    Call it right after enqueue_fetch for the same court and user, or right
+    before it with not_yet_queued=1.
 
     This is an estimate of when we begin the request to PACER, not of when it
     completes, and it is not a promise. It assumes every other waiting user
@@ -415,6 +444,8 @@ def estimate_delay(
         court_id: The court the request will be sent to.
         user_id: The user who made the request.
         now_ms: The current time in milliseconds. Only tests should set it.
+        not_yet_queued: How many of the user's requests are about to join
+            the line but are not in Redis yet.
 
     Returns:
         The estimated wait in seconds.
@@ -432,6 +463,7 @@ def estimate_delay(
     for user in other_users:
         pipe.llen(_user_list_key(court_id, user))
     own_depth, next_ms, *other_depths = pipe.execute()
+    own_depth += not_yet_queued
 
     # Users take turns, so before this user's Nth request starts, each other
     # user gets at most N turns, and fewer if they have fewer requests waiting.
