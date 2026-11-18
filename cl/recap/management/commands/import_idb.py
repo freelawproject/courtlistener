@@ -64,7 +64,7 @@ def create_or_update_row(
         # Didn't hit a break b/c too many matches.
         logger.warning(
             "Got %s results when looking up row by filters: %s",
-            existing_row_count,
+            existing_rows.count(),
             fjc_filter,
         )
         fjc_row = None

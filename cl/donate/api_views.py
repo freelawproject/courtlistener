@@ -160,6 +160,7 @@ class MembershipWebhookViewSet(
         except User.DoesNotExist:
             client = NeonClient()
             neon_account = client.get_account_by_id(account_id)
+            contact_data = neon_account["primaryContact"]
             if (
                 "accountCustomFields" in neon_account
                 and "cl_user_id" in neon_account["accountCustomFields"]
@@ -167,7 +168,6 @@ class MembershipWebhookViewSet(
                 user_id = neon_account["accountCustomFields"]["cl_user_id"]
                 users = User.objects.filter(id=user_id)
             else:
-                contact_data = neon_account["primaryContact"]
                 users = filter_by_email(
                     User.objects.all(), contact_data["email1"]
                 ).order_by(F("last_login").desc(nulls_last=True))
@@ -255,6 +255,9 @@ class MembershipWebhookViewSet(
         Returns:
             int: The integer value of the trigger event type according to
             the NeonWebhookEvent model
+
+        Raises:
+            NotImplementedError: If `trigger_event` is unrecognized.
         """
         match trigger_event:
             case "createMembership":
@@ -265,10 +268,14 @@ class MembershipWebhookViewSet(
                 trigger = NeonWebhookEvent.MEMBERSHIP_EDIT
             case "deleteMembership":
                 trigger = NeonWebhookEvent.MEMBERSHIP_DELETE
+            case _:
+                raise NotImplementedError(
+                    f"Unknown event trigger-{trigger_event}"
+                )
 
         return trigger
 
-    def _store_webhook_payload(self, webhook_data) -> None:
+    def _store_webhook_payload(self, webhook_data: dict[str, Any]) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
         if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
             membership_data = self._get_membership_data(webhook_data)

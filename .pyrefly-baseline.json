@@ -1,5 +1,4 @@
 {
-  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -618,20 +617,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
-      "name": "unbound-name",
-      "concise_description": "`qs` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 39,
-      "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
-      "name": "unbound-name",
-      "concise_description": "`update_fn` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 33,
       "path": "cl/citations/management/commands/reindex_es_cite_fields.py",
       "name": "bad-argument-type",
@@ -1038,13 +1023,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/donate/api_views.py",
-      "name": "unbound-name",
-      "concise_description": "`contact_data` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
@@ -1056,13 +1034,6 @@
       "path": "cl/donate/api_views.py",
       "name": "bad-return",
       "concise_description": "Returned type `User | None` is not assignable to declared return type `User`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/donate/api_views.py",
-      "name": "unbound-name",
-      "concise_description": "`trigger` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1210,13 +1181,6 @@
       "path": "cl/lasc/models.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `CaseIDQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/lasc/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`di` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1479,45 +1443,10 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unbound-name",
-      "concise_description": "`courtid` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unbound-name",
-      "concise_description": "`politics` is uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unbound-name",
-      "concise_description": "`gender` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unbound-name",
-      "concise_description": "`gender` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "unbound-name",
-      "concise_description": "`court` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1654,13 +1583,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "unbound-name",
-      "concise_description": "`existing_row_count` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "missing-attribute",
@@ -1707,13 +1629,6 @@
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/mergers.py",
-      "name": "unbound-name",
-      "concise_description": "`a` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1794,24 +1709,10 @@
       "severity": "error"
     },
     {
-      "column": 29,
-      "path": "cl/recap/mergers.py",
-      "name": "unbound-name",
-      "concise_description": "`p` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `ClaimHistory` has no attribute `pacer_seq_no`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/recap/mergers.py",
-      "name": "unbound-name",
-      "concise_description": "`main_rd` may be uninitialized",
       "severity": "error"
     },
     {
@@ -2165,13 +2066,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/recap/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`r_msg` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -2190,13 +2084,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `download_pacer_pdf_and_save_to_pq`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`pacer_seq_no` may be uninitialized",
       "severity": "error"
     },
     {
@@ -2713,13 +2600,6 @@
     {
       "column": 24,
       "path": "cl/search/api_utils.py",
-      "name": "unbound-name",
-      "concise_description": "`results` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/api_utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `took`",
       "severity": "error"
@@ -3152,13 +3032,6 @@
       "severity": "error"
     },
     {
-      "column": 18,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "unbound-name",
-      "concise_description": "`opinions_to_process` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/search/management/commands/llm_clean_docket_number_daemon.py",
       "name": "missing-attribute",
@@ -3502,27 +3375,6 @@
       "severity": "error"
     },
     {
-      "column": 53,
-      "path": "cl/search/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`parent_instance` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/search/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`parent_instance` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 51,
-      "path": "cl/search/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`count_query` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -3548,20 +3400,6 @@
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `meta` in function `cl.search.documents.DocketDocument.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`child_es_document` may be uninitialized",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/search/tasks.py",
-      "name": "unbound-name",
-      "concise_description": "`child_id_property` may be uninitialized",
       "severity": "error"
     },
     {
