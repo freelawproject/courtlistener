@@ -7,7 +7,7 @@ from functools import reduce
 from typing import Any
 
 import boto3
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 

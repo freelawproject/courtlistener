@@ -331,7 +331,7 @@ def generate_ia_json(
         *[
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
-            attorney_prefetch,  # type: ignore
+            attorney_prefetch,
         ],
     )
 
@@ -353,7 +353,7 @@ def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
         output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join(output_directory, f"{d_pk}.json"), "w") as f:
+    with (Path(output_directory) / f"{d_pk}.json").open("w") as f:
         f.write(j)
 
 
@@ -407,9 +407,9 @@ async def download_recap_item(
     and an existing file are logged rather than raised.
     """
     logger.info("  Getting item at: %s", url)
-    location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
+    location = Path(settings.MEDIA_ROOT) / "recap" / filename
     try:
-        if os.path.isfile(location) and not clobber:
+        if location.is_file() and not clobber:
             raise OSError(f"    IOError: File already exists at {location}")
         async with httpx.AsyncClient(
             follow_redirects=True, http2=True
@@ -3117,6 +3117,22 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
+def list_of_creditors_report_path(court_id: str, file_name: str) -> Path:
+    """Get the path of a list of creditors report file for a court.
+
+    :param court_id: The court the report belongs to.
+    :param file_name: The name of the report file.
+    :return: The file's path inside the court's reports directory.
+    """
+    return (
+        Path(settings.MEDIA_ROOT)
+        / "list_of_creditors"
+        / "reports"
+        / court_id
+        / file_name
+    )
+
+
 def make_csv_file(
     pipe_limited_file: str, court_id: str, d_number_file_name: str
 ) -> None:
@@ -3127,12 +3143,8 @@ def make_csv_file(
     """
     import pandas as pd  # Only import pandas if function is called.
 
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "list_of_creditors",
-        "reports",
-        court_id,
-        f"{court_id}-{d_number_file_name}.csv",
+    csv_file = list_of_creditors_report_path(
+        court_id, f"{court_id}-{d_number_file_name}.csv"
     )
     docket_number = d_number_file_name.replace("-", ":")
     # Read the pipe-delimited text into a pandas DataFrame
@@ -3321,12 +3333,10 @@ async def query_and_save_list_of_creditors_base(
             "utf-8"
         )
         report._parse_text(text)
-        pipe_limited_file = os.path.join(
-            settings.MEDIA_ROOT,
-            "list_of_creditors",
-            "reports",
-            court_id,
-            f"{court_id}-{d_number_file_name}-raw.txt",
+        pipe_limited_file = str(
+            list_of_creditors_report_path(
+                court_id, f"{court_id}-{d_number_file_name}-raw.txt"
+            )
         )
 
         raw_data = report.data

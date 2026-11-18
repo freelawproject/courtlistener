@@ -18,6 +18,7 @@ Once located, we update items:
 import csv
 import string
 from datetime import datetime
+from pathlib import Path
 
 from django.core.management import CommandError
 from django.db import IntegrityError
@@ -365,7 +366,7 @@ class Command(VerboseCommand):
 
         If action_zero or action_many return None, no action is taken.
         """
-        f = open(self.file)
+        f = Path(self.file).open()
         dialect = csv.Sniffer().sniff(f.read(1024))
         f.seek(0)
         reader = csv.DictReader(f, dialect=dialect)

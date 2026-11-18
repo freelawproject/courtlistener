@@ -1,10 +1,10 @@
 # !/usr/bin/python
 """Query bankruptcy claims activity reports and export them to CSV."""
 
-import glob
 import json
 import os
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 from asgiref.sync import async_to_sync
@@ -15,6 +15,7 @@ from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.utils import glob_files
 from cl.search.models import Court
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -48,6 +49,7 @@ async def query_and_parse_claims_activity(
         "firmenich": "Firmenich",
     }
 
+    reports_path = Path(settings.MEDIA_ROOT) / "claims_activity" / "reports"
     async with ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     ) as session:
@@ -57,20 +59,8 @@ async def query_and_parse_claims_activity(
             for alias, creditor_name in creditor_names.items():
                 logger.info(f"Doing {court} and creditor {alias}")
 
-                # Check if the reports directory already exists
-                html_path = os.path.join(
-                    settings.MEDIA_ROOT, "claims_activity", "reports"
-                )
-                if not os.path.exists(html_path):
-                    # Create the directory if it doesn't exist
-                    os.makedirs(html_path)
-
-                html_file = os.path.join(
-                    settings.MEDIA_ROOT,
-                    "claims_activity",
-                    "reports",
-                    f"{court}-{alias}.html",
-                )
+                reports_path.mkdir(parents=True, exist_ok=True)
+                html_file = reports_path / f"{court}-{alias}.html"
                 try:
                     report = ClaimsActivity(court, session)
                 except AssertionError:
@@ -78,7 +68,7 @@ async def query_and_parse_claims_activity(
                     logger.warning(f"Court {court} is not a bankruptcy court.")
                     continue
 
-                if not os.path.exists(html_file):
+                if not html_file.exists():
                     # If the HTML report for this creditor and court doesn't exist
                     # query it from PACER.
                     logger.info(f"File {html_file} doesn't exist.")
@@ -101,7 +91,7 @@ async def query_and_parse_claims_activity(
                         )
 
                     # Save report HTML in disk.
-                    with open(html_file, "w", encoding="utf-8") as file:
+                    with html_file.open("w", encoding="utf-8") as file:
                         file.write(report.response.text)
 
                 else:
@@ -110,18 +100,13 @@ async def query_and_parse_claims_activity(
                         f"creditor_name: {alias}, skipping report query."
                     )
 
-                json_file = os.path.join(
-                    settings.MEDIA_ROOT,
-                    "claims_activity",
-                    "reports",
-                    f"{court}-{alias}.json",
-                )
-                if not os.path.exists(json_file):
+                json_file = reports_path / f"{court}-{alias}.json"
+                if not json_file.exists():
                     # If not json_file for court and creditor, parse it from HTML.
-                    with open(html_file, "rb") as file:
+                    with html_file.open("rb") as file:
                         text = file.read().decode("utf-8")
                     report._parse_text(text)
-                    with open(json_file, "w", encoding="utf-8") as file:
+                    with json_file.open("w", encoding="utf-8") as file:
                         json.dump(
                             report.data,
                             file,
@@ -151,26 +136,16 @@ def make_csv_file() -> None:
     Returns:
         None, The function saves a CSV file in disk.
     """
-    # Check if the csv directory already exists
-    csv_path = os.path.join(settings.MEDIA_ROOT, "claims_activity", "csv")
-    if not os.path.exists(csv_path):
-        # Create the directory if it doesn't exist
-        os.makedirs(csv_path)
+    claims_activity_path = Path(settings.MEDIA_ROOT) / "claims_activity"
+    csv_path = claims_activity_path / "csv"
+    csv_path.mkdir(parents=True, exist_ok=True)
 
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "claims_activity",
-        "csv",
-        "global_report.csv",
-    )
-    files_path = os.path.join(
-        settings.MEDIA_ROOT, "claims_activity", "reports"
-    )
+    csv_file = csv_path / "global_report.csv"
     logger.info(f"Generating CSV {csv_file}")
-    json_files = glob.glob(f"{files_path}/*json")
+    json_files = glob_files(claims_activity_path / "reports", "*json")
     data_frames = []
     for file_path in json_files:
-        with open(file_path, encoding="utf-8") as f:
+        with file_path.open(encoding="utf-8") as f:
             data = json.load(f)
 
         if not data == {} and not data == []:

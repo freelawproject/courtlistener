@@ -58,7 +58,7 @@ from cl.favorites.utils import NOTEABLE_MODELS
 from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
-    ratelimiter_all_2_per_m,
+    ratelimiter_all_5_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
@@ -729,7 +729,7 @@ def register_success(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimiter_all_2_per_m
+@ratelimiter_all_5_per_m
 @sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
@@ -738,8 +738,14 @@ def confirm_email(request, activation_key):
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
 
+    Confirmation only happens on POST. A GET renders a page with a button, so
+    that mail scanners and link prefetchers that follow links in emails can't
+    consume the single-use key before the human clicks it.
+
     Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
-    protection against brute-forcing activation_key.
+    protection against brute-forcing activation_key. The limit allows several
+    requests a minute because one confirmation takes a GET and a POST, and
+    users reload and scanners prefetch.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -772,6 +778,15 @@ def confirm_email(request, activation_key):
             request,
             "register/confirm.html",
             {"expired": True, "private": True},
+        )
+
+    if request.method != "POST":
+        # Valid key, but don't change anything on a GET. Ask the human to
+        # confirm.
+        return TemplateResponse(
+            request,
+            "register/confirm.html",
+            {"needs_confirmation": True, "private": True},
         )
 
     # Tests pass; Save the profile
