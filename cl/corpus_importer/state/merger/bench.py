@@ -231,7 +231,7 @@ class SpecificationBench:
     def bench_attr_transform_custom(self, benchmark: BenchmarkFixture):
         spec = cast(AttributeMerger, Constant("abcdefg"))
 
-        benchmark(spec.transform, None, None)
+        benchmark(spec.transform, None, None, None)
 
     def bench_attr_transform_default_no_params(
         self, benchmark: BenchmarkFixture
@@ -239,7 +239,7 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Constant("abcdefg"))
         spec._name = "docket_number"
 
-        benchmark(spec.transform, None, None)
+        benchmark(spec.transform, None, None, None)
 
     def bench_attr_transform_default_dict_params(
         self, benchmark: BenchmarkFixture
@@ -247,7 +247,7 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Constant("abcdefg"))
         spec._name = "docket_number"
 
-        benchmark(spec.transform, None, {"docket_number": "hijklmn"})
+        benchmark(spec.transform, None, {"docket_number": "hijklmn"}, None)
 
     def bench_attr_transform_default_object_params(
         self, benchmark: BenchmarkFixture
@@ -255,7 +255,9 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Params(DocketParams).court_id)
         spec._name = "court_id"
 
-        benchmark(spec.transform, None, DocketParams(court_id=STUB_COURT.pk))
+        benchmark(
+            spec.transform, None, DocketParams(court_id=STUB_COURT.pk), None
+        )
 
     def bench_attr_validation(self, benchmark: BenchmarkFixture):
         spec = cast(AttributeMerger, Constant("abcdefg"))
