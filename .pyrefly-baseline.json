@@ -3817,24 +3817,10 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/search/views.py",
-      "name": "invalid-argument",
-      "concise_description": "Expected a mapping, got object | Unknown",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/search/views.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `QueryDict`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/search/views.py",
-      "name": "no-matching-overload",
-      "concise_description": "No matching overload found for function `typing.MutableMapping.update` called with arguments: (object | Unknown)",
       "severity": "error"
     },
     {
