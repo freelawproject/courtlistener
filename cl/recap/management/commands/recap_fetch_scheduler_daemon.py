@@ -28,6 +28,11 @@ DISPATCH_WAIT = 0.5
 # database query, so it runs far less often than dispatching.
 SWEEP_WAIT = 60
 
+# Longest wait between cycles after repeated failures. Backing off keeps a
+# Redis or database outage from flooding the logs, and the API stops queueing
+# on its own once the heartbeat goes stale.
+MAX_FAILURE_WAIT = 30
+
 shutdown_requested = False
 
 
@@ -38,6 +43,19 @@ def _request_shutdown(signum: int, _frame: Any) -> None:
         "Signal %s received. Shutting down after current cycle.", signum
     )
     shutdown_requested = True
+
+
+def _wait_after(failures_in_a_row: int) -> float:
+    """Get how long to wait before the next cycle.
+
+    Args:
+        failures_in_a_row: How many cycles in a row have failed.
+
+    Returns:
+        DISPATCH_WAIT after a good cycle, then twice as long after each
+        failure, up to MAX_FAILURE_WAIT.
+    """
+    return min(DISPATCH_WAIT * 2**failures_in_a_row, MAX_FAILURE_WAIT)
 
 
 class Command(VerboseCommand):
@@ -73,6 +91,7 @@ class Command(VerboseCommand):
         iterations_completed = 0
         # Sweep on the first cycle, so a restart doesn't delay it.
         next_sweep = time.monotonic()
+        failures_in_a_row = 0
 
         logger.info(
             "RECAP Fetch scheduler daemon starting. enabled=%s.",
@@ -91,12 +110,22 @@ class Command(VerboseCommand):
                     next_sweep = time.monotonic() + SWEEP_WAIT
                     if failed := fail_stale_fetches():
                         logger.info("Failed %s stale fetch requests.", failed)
+                failures_in_a_row = 0
             except Exception as e:
                 # One bad cycle (e.g. a Redis or DB blip) shouldn't crash the
                 # pod and cause a restart loop. Waiting requests stay in Redis
-                # and the next cycle picks them up.
-                logger.exception("Scheduler cycle failed; continuing.")
-                capture_exception(e)
+                # and the next cycle picks them up. Only the first failure of
+                # a streak goes to Sentry.
+                failures_in_a_row += 1
+                if failures_in_a_row == 1:
+                    logger.exception("Scheduler cycle failed; continuing.")
+                    capture_exception(e)
+                else:
+                    logger.warning(
+                        "Scheduler cycle failed %s times in a row: %s",
+                        failures_in_a_row,
+                        e,
+                    )
 
             iterations_completed += 1
             if (
@@ -105,7 +134,7 @@ class Command(VerboseCommand):
             ):
                 break
 
-            time.sleep(DISPATCH_WAIT)
+            time.sleep(_wait_after(failures_in_a_row))
 
         logger.info(
             "RECAP Fetch scheduler daemon stopped after %s iteration(s).",

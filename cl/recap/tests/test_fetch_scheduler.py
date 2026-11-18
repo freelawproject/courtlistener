@@ -2,11 +2,14 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from io import StringIO
 from unittest import mock
 
 import time_machine
+from django.core.management import CommandError, call_command
 from django.test import override_settings
 from django.urls import reverse
+from redis.exceptions import RedisError
 from rest_framework.test import APIClient
 from waffle.models import Flag
 from waffle.testutils import override_flag
@@ -18,6 +21,7 @@ from cl.recap.fetch_queue import (
     enqueue_fetch,
     estimate_delay,
     get_court_interval_ms,
+    get_court_rates,
     get_courts_with_waiting_fetches,
     get_pending_fetch,
     get_queued_fetches,
@@ -156,6 +160,13 @@ class FetchSchedulerRateTest(SchedulerRedisTestCase):
 
         set_court_rate(COURT, None)
         self.assertEqual(get_court_interval_ms(COURT), 1000)
+
+    def test_rate_that_allows_no_requests_is_rejected(self) -> None:
+        """A zero rate would stop the court and break its interval."""
+        for rate in ("0/s", "-1/s", "1/0s"):
+            with self.subTest(rate=rate), self.assertRaises(ValueError):
+                set_court_rate(COURT, rate)
+        self.assertEqual(get_court_rates(), {})
 
     def test_rate_holds_across_concurrent_processes(self) -> None:
         """Many processes asking at the same instant get one request."""
@@ -598,4 +609,106 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
         mock_do_pacer_fetch.assert_called_once()
         self.assertEqual(
             mock_do_pacer_fetch.call_args.args[0].pk, bob_response.json()["id"]
+        )
+
+
+@override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
+class FetchQueueCommandTest(SchedulerDatabaseTestCase):
+    """People can see the queue and change rates without redis-cli."""
+
+    @staticmethod
+    def _run(*args: str) -> str:
+        """Run recap_fetch_queue and return what it printed."""
+        out = StringIO()
+        call_command("recap_fetch_queue", *args, stdout=out)
+        return out.getvalue()
+
+    def test_status_shows_each_users_waiting_requests(self) -> None:
+        """The status lists the depth per court and per user."""
+        for fq_pk in (1, 2, 3):
+            enqueue_fetch(COURT, self.bob.pk, fq_pk)
+        enqueue_fetch(COURT, self.jane.pk, 4)
+        self.assertEqual(pop_next_fetch(COURT), 1)
+
+        output = self._run("--status")
+
+        self.assertIn("Scheduler daemon: NOT running", output)
+        self.assertIn(f"{COURT}: 3 waiting", output)
+        self.assertIn("handed off and not started: 1", output)
+        self.assertIn(f"user {self.bob.pk}: 2", output)
+        self.assertIn(f"user {self.jane.pk}: 1", output)
+
+    def test_set_and_clear_a_courts_rate(self) -> None:
+        """A court's own rate applies until it is cleared."""
+        self._run("--set-rate", COURT, "1/2s")
+        self.assertEqual(get_court_interval_ms(COURT), 2000)
+        self.assertIn(f"{COURT}: 1/2s", self._run("--status"))
+
+        self._run("--clear-rate", COURT)
+        self.assertEqual(get_court_interval_ms(COURT), 1000)
+
+    def test_bad_input_is_rejected(self) -> None:
+        """Typos in the court or the rate never reach Redis."""
+        cases = [
+            ("unknown court", ("--set-rate", "nope", "1/s")),
+            ("unparsable rate", ("--set-rate", COURT, "fast")),
+            ("zero rate", ("--set-rate", COURT, "0/s")),
+            ("unknown court to clear", ("--clear-rate", "nope")),
+        ]
+        for label, args in cases:
+            with self.subTest(label), self.assertRaises(CommandError):
+                self._run(*args)
+        self.assertEqual(get_court_rates(), {})
+
+
+@override_settings(RECAP_FETCH_SCHEDULER_DAEMON_ENABLED=True)
+@mock.patch(
+    "cl.recap.management.commands.recap_fetch_scheduler_daemon.fail_stale_fetches",
+    return_value=0,
+)
+@mock.patch(
+    "cl.recap.management.commands.recap_fetch_scheduler_daemon.time.sleep"
+)
+@mock.patch(
+    "cl.recap.management.commands.recap_fetch_scheduler_daemon.capture_exception"
+)
+@mock.patch(
+    "cl.recap.management.commands.recap_fetch_scheduler_daemon.run_dispatch_cycle",
+    side_effect=RedisError("Redis is down"),
+)
+class FetchSchedulerDaemonTest(SchedulerRedisTestCase):
+    """The daemon survives outages without flooding Sentry."""
+
+    def test_backs_off_and_reports_a_failure_streak_once(
+        self,
+        mock_dispatch: mock.MagicMock,
+        mock_capture: mock.MagicMock,
+        mock_sleep: mock.MagicMock,
+        mock_sweep: mock.MagicMock,
+    ) -> None:
+        """Waits double after each failure and Sentry hears about it once."""
+        call_command("recap_fetch_scheduler_daemon", testing_iterations=6)
+
+        self.assertEqual(mock_dispatch.call_count, 6)
+        mock_capture.assert_called_once()
+        self.assertEqual(
+            [sleep.args[0] for sleep in mock_sleep.call_args_list],
+            [1, 2, 4, 8, 16],
+        )
+
+    def test_recovers_its_pace_after_a_good_cycle(
+        self,
+        mock_dispatch: mock.MagicMock,
+        mock_capture: mock.MagicMock,
+        mock_sleep: mock.MagicMock,
+        mock_sweep: mock.MagicMock,
+    ) -> None:
+        """One good cycle resets the wait and the next failure is reported."""
+        mock_dispatch.side_effect = [RedisError(), 0, RedisError()]
+
+        call_command("recap_fetch_scheduler_daemon", testing_iterations=3)
+
+        self.assertEqual(mock_capture.call_count, 2)
+        self.assertEqual(
+            [sleep.args[0] for sleep in mock_sleep.call_args_list], [1, 0.5]
         )

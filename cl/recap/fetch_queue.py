@@ -31,6 +31,7 @@ turn, so one user's large batch cannot hold up another user's single request.
 
 import logging
 import time
+from dataclasses import dataclass
 
 from django.conf import settings
 from redis.exceptions import RedisError
@@ -211,15 +212,81 @@ def set_court_rate(court_id: str, rate: str | None) -> None:
             None removes the court's own rate, returning it to the default.
 
     Raises:
-        ValueError, KeyError: If the rate cannot be parsed.
+        ValueError, KeyError: If the rate cannot be parsed or allows no
+            requests at all.
     """
     r = get_redis_interface("CACHE")
     if rate is None:
         r.hdel(_rates_key(), court_id)
         return
     # Reject a bad rate here, rather than every time the court is scheduled.
-    parse_rate(rate)
+    # A rate of zero would make get_court_interval_ms divide by zero.
+    num_requests, duration = parse_rate(rate)
+    if num_requests <= 0 or duration <= 0:
+        raise ValueError(f"The rate must allow some requests: {rate}")
     r.hset(_rates_key(), court_id, rate)
+
+
+def get_court_rates() -> dict[str, str]:
+    """List the courts that have their own rate.
+
+    Returns:
+        A dict of court ID to rate. Courts not in it use
+        settings.RECAP_FETCH_DEFAULT_COURT_RATE.
+    """
+    r = get_redis_interface("CACHE")
+    return {
+        str(court): str(rate)
+        for court, rate in r.hgetall(_rates_key()).items()
+    }
+
+
+@dataclass
+class CourtQueueStatus:
+    """A snapshot of one court's queue, for people operating it."""
+
+    court_id: str
+    # User ID to the number of requests they have waiting.
+    depth_by_user: dict[int, int]
+    pending_pk: int | None
+    # Milliseconds until the court may be sent its next request.
+    next_in_ms: int
+    interval_ms: int
+
+
+def get_court_queue_status(
+    court_id: str, now_ms: int | None = None
+) -> CourtQueueStatus:
+    """Read how many requests wait in a court, and when the next one goes.
+
+    The numbers are read with separate commands, so they can be a moment out
+    of step with each other while the daemon runs.
+
+    Args:
+        court_id: The court to look at.
+        now_ms: The current time in milliseconds. Only tests should set it.
+
+    Returns:
+        The court's queue status.
+    """
+    now_ms = _now_ms() if now_ms is None else now_ms
+    r = get_redis_interface("CACHE")
+    users = [str(user) for user in r.zrange(_users_key(court_id), 0, -1)]
+    pipe = r.pipeline()
+    pipe.get(_pending_key(court_id))
+    pipe.get(_next_key(court_id))
+    for user in users:
+        pipe.llen(_user_list_key(court_id, user))
+    pending, next_ms, *depths = pipe.execute()
+    return CourtQueueStatus(
+        court_id=court_id,
+        depth_by_user={
+            int(user): depth for user, depth in zip(users, depths) if depth
+        },
+        pending_pk=int(pending) if pending else None,
+        next_in_ms=max(int(next_ms or 0) - now_ms, 0),
+        interval_ms=get_court_interval_ms(court_id),
+    )
 
 
 def enqueue_fetch(
