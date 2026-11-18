@@ -159,7 +159,7 @@ class VersionBasedPagination(PageNumberPagination):
 
         try:
             page_number = int(page_number)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             msg = "Invalid page: That page number is not an integer"
             raise NotFound(msg)
 
@@ -306,12 +306,12 @@ class ESCursorPagination(BasePagination):
         return self.request_date
 
     def paginate_queryset(
-        self, es_list_instance: CursorESList, request: Request, view=None
+        self, queryset: CursorESList, request: Request, view=None
     ) -> tuple[list[defaultdict], bool]:
         """Paginate the Elasticsearch query and retrieve the results.
 
         Args:
-            es_list_instance: Instance of CursorESList used to execute
+            queryset: Instance of CursorESList used to execute
                 and paginate the Elasticsearch query.
             request: The current DRF request object.
             view: The DRF view instance.
@@ -321,7 +321,7 @@ class ESCursorPagination(BasePagination):
             - A list of result items.
             - A boolean indicating whether the results came from cache.
         """
-        self.es_list_instance = es_list_instance
+        self.es_list_instance = queryset
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
@@ -416,7 +416,7 @@ class ESCursorPagination(BasePagination):
             search_type = tokens.get("t", [None])[0]
             request_date = tokens.get("d", [None])[0]
             page_int = int(tokens.get("p", [0])[0])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise NotFound(self.invalid_cursor_message)
 
         if search_type != self.search_type:
