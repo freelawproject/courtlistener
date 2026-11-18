@@ -727,7 +727,7 @@ def query_and_send_alerts(
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, sent_time, True, custom_date)
             qd = override_alert_query(alert, cut_off_date)
-            alert.query_run = qd.urlencode()  # type: ignore
+            alert.query_run = qd.urlencode()
             hits.append(
                 [
                     alert,

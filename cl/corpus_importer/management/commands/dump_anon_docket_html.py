@@ -1,6 +1,5 @@
 """Write anonymized copies of uploaded PACER docket HTML to disk."""
 
-import os
 from pathlib import Path
 
 from juriscraper.pacer import DocketReport
@@ -15,7 +14,7 @@ report = DocketReport("cand")
 
 def _write_anon_item_to_disk(pacer_file: PacerHtmlFiles) -> None:
     # Get the text and anonymize it
-    with open(pacer_file.filepath.path) as f:
+    with Path(pacer_file.filepath.path).open() as f:
         text = f.read()
     report._parse_text(text)
     try:
@@ -25,7 +24,7 @@ def _write_anon_item_to_disk(pacer_file: PacerHtmlFiles) -> None:
         return
 
     # Save anonymized text to disk
-    basename = os.path.basename(pacer_file.filepath.name)
+    basename = Path(pacer_file.filepath.name).name
     out = Path(f"/storage/sample-data/dockets/{basename[0:2]}/{basename[2:]}")
     out.parent.mkdir(exist_ok=True, parents=True)
     out.write_text(anon_text)

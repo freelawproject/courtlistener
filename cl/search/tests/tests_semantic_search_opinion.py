@@ -95,9 +95,8 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
         test_dir = (
             Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
         )
-        with open(
-            test_dir / "opinion_1_embeddings.json",
-            encoding="utf-8",
+        with (test_dir / "opinion_1_embeddings.json").open(
+            encoding="utf-8"
         ) as embeddings_file:
             opinion_1_embeddings = json.load(embeddings_file)
             Document.update(
@@ -370,16 +369,15 @@ class SemanticSearchTests(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
             Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
         )
         # Load embeddings for query
-        with open(
-            cls.test_dir / "situational_query_embeddings.json",
-            encoding="utf-8",
+        with (cls.test_dir / "situational_query_embeddings.json").open(
+            encoding="utf-8"
         ) as f:
             cls.situational_query_vectors = json.load(f)
 
         # Update documents with precomputed embeddings
         for key, opinion in es_opinions.items():
             filename = f"{key}_embeddings.json"
-            with open(cls.test_dir / filename, encoding="utf-8") as f:
+            with (cls.test_dir / filename).open(encoding="utf-8") as f:
                 embeddings = json.load(f)
                 Document.update(
                     opinion,

@@ -197,7 +197,7 @@ class Audio(AbstractDateTimeModel):
 @pghistory.track(
     pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
 )
-class AudioPanel(Audio.panel.through):  # type: ignore
+class AudioPanel(Audio.panel.through):
     """A model class to track audio panel m2m relation."""
 
     class Meta:
