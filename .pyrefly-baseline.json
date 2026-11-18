@@ -1,5 +1,4 @@
 {
-  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -1399,13 +1398,6 @@
       "path": "cl/people_db/import_judges/populate_fjc_judges.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/management/commands/cl_export_recap_judge_info.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `to_pickle` from `pandas`",
       "severity": "error"
     },
     {
@@ -2858,27 +2850,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketEntryEvent` from `cl.search.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketEvent` from `cl.search.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `RECAPDocumentEvent` from `cl.search.models`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",
@@ -2911,13 +2882,6 @@
       "path": "cl/search/management/commands/export_doc_coverage.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketEvent` from `cl.search.models`",
       "severity": "error"
     },
     {
@@ -3660,97 +3624,6 @@
       "path": "cl/users/tasks.py",
       "name": "unsupported-operation",
       "concise_description": "`None` is not subscriptable",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `AlertEvent` from `cl.alerts.models`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketAlertEvent` from `cl.alerts.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `APIThrottleEvent` from `cl.api.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `WebhookHistoryEvent` from `cl.api.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `DocketTagEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `NoteEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `PrayerEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserTagEvent` from `cl.favorites.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserGroupsEvent` from `cl.users.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserPermissionsEvent` from `cl.users.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserProfileBarMembershipEvent` from `cl.users.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserProfileEvent` from `cl.users.models`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/utils.py",
-      "name": "missing-module-attribute",
-      "concise_description": "Could not import `UserProxyEvent` from `cl.users.models`",
       "severity": "error"
     },
     {

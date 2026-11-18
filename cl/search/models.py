@@ -103,9 +103,15 @@ from cl.users.models import User
 
 if TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
+    from pghistory.models import Event
 
     from cl.alerts.docket_alert_sources import DocketAlertSource
     from cl.opinion_page.docket_entry_sources import DocketEntrySource
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    DocketEvent: type[Event]
+    DocketEntryEvent: type[Event]
+    RECAPDocumentEvent: type[Event]
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
