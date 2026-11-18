@@ -112,7 +112,7 @@ class Command(VerboseCommand, CommandUtils):
         self.bool_fields = []
         self.date_fields = []
         self.court_fields = []
-        self.nullable_fields = None
+        self.nullable_fields = []
 
     @staticmethod
     def ensure_filetype_ok(filetype: int) -> None:

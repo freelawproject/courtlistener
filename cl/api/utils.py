@@ -363,7 +363,9 @@ class FilterManyToManyMixin(FilterSet):
         for related_name, related_filterset in self.related_filtersets.items():
             prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
             # Check if the related filterset has data to apply
-            if not any(value.startswith(prefix) for value in self.data):
+            if self.data is None or not any(
+                value.startswith(prefix) for value in self.data
+            ):
                 # Skip processing if no parameter starts with the prefix
                 continue
 
