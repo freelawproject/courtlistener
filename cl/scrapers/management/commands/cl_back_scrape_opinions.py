@@ -45,6 +45,8 @@ def add_backscraper_arguments(parser) -> None:
 class Command(cl_scrape_opinions.Command):
     """Scrape opinions by walking each site's back-scrape iterable."""
 
+    scrape_kind = "backscrape"
+
     def add_arguments(self, parser):
         """Add the opinion scraper options plus the back-scrape range options."""
         super().add_arguments(parser)

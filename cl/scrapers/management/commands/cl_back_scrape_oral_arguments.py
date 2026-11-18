@@ -15,6 +15,8 @@ from cl.scrapers.utils import save_response
 class Command(cl_scrape_oral_arguments.Command):
     """Scrape oral arguments by walking each site's back-scrape iterable."""
 
+    scrape_kind = "backscrape"
+
     def add_arguments(self, parser):
         """Add the oral argument scraper options plus the back-scrape range options."""
         super().add_arguments(parser)

@@ -21,6 +21,7 @@ from cl.corpus_importer.state.florida.utils import FLORIDA_COURT_IDS
 from cl.corpus_importer.tasks import fl_ingest_docket_task
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
+from cl.lib.sentry import set_scraper_tags
 from cl.scrapers.management.commands.back_scrape_fl_dockets import (
     S3_BASE,
     save_case_to_s3,
@@ -237,6 +238,7 @@ class Command(FLScrapeCommand, StatePollCommand):
             ):
                 logger.info("Got update: %s", update)
                 court_id = external_id_map[update.court_external_id]
+                set_scraper_tags(court_id.value, "state-docket")
                 try:
                     maybe_case = await scraper.fetch_case_data(
                         str(update.case_uuid),
@@ -328,6 +330,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         """
         logger.info("Checking for cases since %s", start)
         for court_id in courts:
+            set_scraper_tags(court_id.value, "state-docket")
             parser = FloridaCasePollParser(court_id=court_id.value)
             async for page in scraper._enumerate_pages(
                 DOCKET_ENDPOINT,
@@ -377,6 +380,7 @@ class Command(FLScrapeCommand, StatePollCommand):
             start,
         )
         for court_id in courts:
+            set_scraper_tags(court_id.value, "state-docket")
             async for page in scraper._enumerate_pages(
                 DE_DOC_ENDPOINT,
                 parser,

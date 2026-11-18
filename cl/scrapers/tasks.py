@@ -45,6 +45,7 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
+from cl.lib.sentry import set_scraper_tags
 from cl.lib.storage import (
     S3GlacierInstantRetrievalStorage,
     clobbering_get_name,
@@ -88,6 +89,7 @@ def update_document_from_text(
         the extracted data dictionary
     """
     court_id = opinion.cluster.docket.court.pk
+    set_scraper_tags(court_id, "extract-from-text")
     site = get_scraper_object_by_name(court_id, juriscraper_module)
     if site is None:
         logger.debug("No site found %s", juriscraper_module)
@@ -180,6 +182,7 @@ def extract_opinion_content(
             larger scrape.
     """
     opinion = Opinion.objects.get(pk=pk)
+    set_scraper_tags(opinion.cluster.docket.court_id, "extract-from-text")
 
     with opinion.local_path.open(mode="rb") as document_file:
         # Try to extract opinion content without using OCR.
@@ -318,6 +321,7 @@ def extract_doc_content(
             larger scrape.
     """
     opinion = Opinion.objects.get(pk=pk)
+    set_scraper_tags(opinion.cluster.docket.court_id, "extract-from-text")
 
     with opinion.local_path.open(mode="rb") as document_file:
         # Try to extract opinion content without using OCR.
