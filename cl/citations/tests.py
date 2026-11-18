@@ -84,6 +84,7 @@ from cl.search.factories import (
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithMultipleOpinionsFactory,
     OpinionFactory,
+    OpinionsCitedWithParentsFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -1045,7 +1046,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         cls.same_citation_3_clusters = [cls.cluster_5, cls.cluster_6]
 
         for cluster in cls.same_citation_1_clusters:
-            Citation.objects.create(
+            CitationWithParentsFactory.create(
                 cluster=cluster,
                 volume="307",
                 reporter="Ill. Dec.",
@@ -1054,7 +1055,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             )
 
         for cluster in cls.same_citation_2_clusters:
-            Citation.objects.create(
+            CitationWithParentsFactory.create(
                 cluster=cluster,
                 volume="203",
                 reporter="N.J.",
@@ -1063,7 +1064,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             )
 
         for cluster in cls.same_citation_3_clusters:
-            Citation.objects.create(
+            CitationWithParentsFactory.create(
                 cluster=cluster,
                 volume="172",
                 reporter="A.3d",
@@ -3241,7 +3242,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
         # Test signal on matching Citation created
         unmatched_citation = UnmatchedCitation.objects.first()
-        Citation.objects.create(
+        CitationWithParentsFactory.create(
             cluster=self.cluster,
             reporter=unmatched_citation.reporter,
             volume=unmatched_citation.volume,
@@ -3485,12 +3486,12 @@ class CountCitationsTest(TestCase):
         cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
         cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
 
-        OpinionsCited.objects.create(
+        OpinionsCitedWithParentsFactory.create(
             citing_opinion=cluster1_opinion,
             cited_opinion=cluster2_opinion1,
             depth=1,
         )
-        OpinionsCited.objects.create(
+        OpinionsCitedWithParentsFactory.create(
             citing_opinion=cluster1_opinion,
             cited_opinion=cluster2_opinion2,
             depth=1,
@@ -3502,17 +3503,17 @@ class CountCitationsTest(TestCase):
         )
         cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
 
-        OpinionsCited.objects.create(
+        OpinionsCitedWithParentsFactory.create(
             citing_opinion=cluster1_opinion,
             cited_opinion=cluster3_opinion,
             depth=1,
         )
-        OpinionsCited.objects.create(
+        OpinionsCitedWithParentsFactory.create(
             citing_opinion=cluster2_opinion1,
             cited_opinion=cluster3_opinion,
             depth=1,
         )
-        OpinionsCited.objects.create(
+        OpinionsCitedWithParentsFactory.create(
             citing_opinion=cluster2_opinion2,
             cited_opinion=cluster3_opinion,
             depth=1,
@@ -3578,7 +3579,7 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
         another_opinion = another_cluster.sub_opinions.first()
 
-        created = OpinionsCited.objects.create(
+        created = OpinionsCitedWithParentsFactory.create(
             citing_opinion=another_opinion, cited_opinion=another_opinion
         )
         # prevent triggering the signal using .update
