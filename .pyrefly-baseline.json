@@ -1,4 +1,5 @@
 {
+  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -365,20 +366,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/api/utils.py",
-      "name": "invalid-annotation",
-      "concise_description": "`_get_filter_label` method self type `FilterSet` is not a superclass of class `FilterManyToManyMixin`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/api/utils.py",
-      "name": "invalid-annotation",
-      "concise_description": "`get_filters_for_join_table` method self type `FilterSet` is not a superclass of class `FilterManyToManyMixin`",
-      "severity": "error"
-    },
-    {
       "column": 62,
       "path": "cl/api/utils.py",
       "name": "not-iterable",
@@ -386,10 +373,10 @@
       "severity": "error"
     },
     {
-      "column": 32,
+      "column": 17,
       "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FilterSet` has no attribute `_clean_join_table_key`",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `key` with type `str` in function `FilterManyToManyMixin._clean_join_table_key`",
       "severity": "error"
     },
     {
@@ -3141,20 +3128,6 @@
       "path": "cl/search/forms.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `OrderedDict[str, Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/search/llm_models.py",
-      "name": "invalid-annotation",
-      "concise_description": "Function call cannot be used in annotations",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/search/llm_models.py",
-      "name": "invalid-annotation",
-      "concise_description": "Function call cannot be used in annotations",
       "severity": "error"
     },
     {
