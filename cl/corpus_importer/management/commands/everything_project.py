@@ -1,3 +1,5 @@
+"""Purchase PACER dockets for the cases in the FJC Integrated Database."""
+
 import os
 
 from asgiref.sync import async_to_sync
@@ -5,6 +7,7 @@ from celery.canvas import chain
 from django.conf import settings
 
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     filter_docket_by_tags,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -12,7 +15,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import (
     CIVIL_RIGHTS_ACCOMMODATIONS,
     CIVIL_RIGHTS_ADA_EMPLOYMENT,
@@ -58,21 +61,23 @@ NOS_EXCLUSIONS = [
 
 
 def get_fjc_rows():
-    items = FjcIntegratedDatabase.objects.exclude(
+    """Get the FJC IDB rows from the 2017 and 2020 civil datasets filed since 2014, excluding some natures of suit."""
+    return FjcIntegratedDatabase.objects.exclude(
         nature_of_suit__in=NOS_EXCLUSIONS,
     ).filter(
         date_filed__gte="2014-01-01", dataset_source__in=[CV_2017, CV_2020]
     )
-    return items
 
 
 def get_everything_sample(options, sample_size):
+    """Get the dockets of a random sample of the FJC rows, tagged as a sample."""
     items = get_fjc_rows()
     tags = [TAG, TAG_SAMPLE]
     get_dockets(options, items, tags, sample_size)
 
 
 def price_sample(options, de_upper_bound):
+    """Queue docket downloads for 50 random FJC rows, only up to docket entry ``de_upper_bound``."""
     items = get_fjc_rows()
     tags = [TAG, TAG_SAMPLE]
     get_dockets(
@@ -81,6 +86,7 @@ def price_sample(options, de_upper_bound):
 
 
 def get_content_by_year(options, year):
+    """Queue docket downloads for the FJC rows filed in a year."""
     items = get_fjc_rows()
     start = f"{year}-01-01"
     end = f"{year}-12-31"
@@ -90,24 +96,27 @@ def get_content_by_year(options, year):
 
 
 def get_everything_full(options):
+    """Get the dockets of all the FJC rows."""
     items = get_fjc_rows()
     tags = [TAG]
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
+def get_dockets(
+    options, items, tags: list[str], sample_size=0, doc_num_end=""
+):
     """Download dockets from PACER.
 
-    :param options: Options provided by argparse
-    :param items: Items from our FJC IDB database
-    :param tags: A list of tag names to associate with the purchased content.
-    :param sample_size: The number of items to get. If 0, get them all. Else,
-    get only this many and do it randomly.
-    :param doc_num_end: Only get docket numbers up to this value to constrain
-    costs. If set to an empty string, no constraints are applied. Note that
-    applying this value means no unnumbered entries will be retrieved by PACER.
+    Args:
+        options: Options provided by argparse
+        items: Items from our FJC IDB database
+        tags: A list of tag names to associate with the purchased content.
+        sample_size: The number of items to get. If 0, get them all. Else,
+            get only this many and do it randomly.
+        doc_num_end: Only get docket numbers up to this value to constrain
+            costs. If set to an empty string, no constraints are applied. Note that
+            applying this value means no unnumbered entries will be retrieved by PACER.
     """
-
     if sample_size > 0:
         items = items.order_by("?")[:sample_size]
 
@@ -134,34 +143,36 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
 
         throttle.maybe_wait()
         params = make_fjc_idb_lookup_params(row)
-        session_data = SessionData(session.cookies, session.proxy_address)
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
-                session_data=session_data,
+                session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": False,
-                    "doc_num_end": doc_num_end,
-                },
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
+                    doc_num_end=doc_num_end,
+                ),
             ).set(queue=q),
         ).apply_async()
 
 
 class Command(VerboseCommand):
+    """Run one of the everything project's docket purchasing tasks."""
+
     help = "Purchase dockets from PACER"
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, and task options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -189,6 +200,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task, printing a message for unknown tasks."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "everything":
             get_everything_full(options)

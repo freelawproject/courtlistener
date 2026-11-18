@@ -1,3 +1,5 @@
+"""Celery tasks for finding and storing citations and parentheticals."""
+
 import logging
 from http.client import ResponseNotReady
 
@@ -56,8 +58,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 def identify_parallel_citations(
     citations: list[SupportedCitationType],
 ) -> set[tuple[SupportedCitationType, ...]]:
-    """Work through a list of citations and identify ones that are physically
-    near each other in the document.
+    """Work through a list of citations and identify ones that are physically near each other in the document.
 
     Return a set of tuples. Each tuple represents a series of parallel
     citations. These will usually be length two, but not necessarily.
@@ -96,17 +97,17 @@ def find_citations_and_parantheticals_for_recap_documents(
 ):
     """Find citations and authored parentheticals for search.RECAPDocument objects.
 
-    :param doc_ids: An iterable of search.RECAPDocument PKs
-
-    :return: None
+    Args:
+        self: The bound Celery task.
+        doc_ids: An iterable of search.RECAPDocument PKs
     """
-    documents: QuerySet[RECAPDocument, RECAPDocument] = (
-        RECAPDocument.objects.filter(pk__in=doc_ids).filter(
-            ocr_status__in=[
-                RECAPDocument.OCR_UNNECESSARY,
-                RECAPDocument.OCR_COMPLETE,
-            ]
-        )
+    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
+        pk__in=doc_ids
+    ).filter(
+        ocr_status__in=[
+            RECAPDocument.OCR_UNNECESSARY,
+            RECAPDocument.OCR_COMPLETE,
+        ]
     )
 
     for d in documents:
@@ -127,18 +128,19 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
-    :param opinion_pks: An iterable of search.Opinion PKs
-    :param disable_parenthetical_groups: True if not ParentheticalGroup should
-        be created; and their  post_save and post_delete signals should be
-        disconnected; useful in batch jobs from the `find_citations` command
-    :param disable_citation_count_update: if True,
-        OpinionCluster.citation_count and related ElasticSearch fields will not
-        be updated. Useful to prevent database overloading during bulk work
-    :param percolate_opinion: Whether to percolate the related opinion document in
-    order to trigger search alerts.
-    :return: None
+    Args:
+        self: The bound Celery task.
+        opinion_pks: An iterable of search.Opinion PKs
+        disable_parenthetical_groups: True if not ParentheticalGroup should
+            be created; and their  post_save and post_delete signals should be
+            disconnected; useful in batch jobs from the `find_citations` command
+        disable_citation_count_update: if True,
+            OpinionCluster.citation_count and related ElasticSearch fields will not
+            be updated. Useful to prevent database overloading during bulk work
+        percolate_opinion: Whether to percolate the related opinion document in
+            order to trigger search alerts.
     """
-    opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
+    opinions: QuerySet[Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
     ).select_related("cluster")
 
@@ -175,11 +177,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 failed_ids.append(opinion.id)
             except Exception as e:
                 # Send this opinion failure to sentry and continue onward
-                logger.error(
+                logger.exception(
                     "Opinion failed: '%s' with %s",
                     opinion.id,
                     str(e),
-                    exc_info=True,
                 )
 
                 # do not retry the whole loop on an unknown exception
@@ -224,20 +225,18 @@ def store_opinion_citations_and_update_parentheticals(
     disable_parenthetical_groups: bool = False,
     percolate_opinion: bool = False,
 ) -> None:
-    """
-    Updates counts of citations to other opinions within a given court opinion,
-    parenthetical info for the cited opinions, and stores unmatched citations
+    """Updates counts of citations to other opinions within a given court opinion, parenthetical info for the cited opinions, and stores unmatched citations.
 
-    :param opinion: A search.Opinion object
-    :param update_citation_count: if False, do NOT update the DB or Elastic:
-        - OpinionCluster.citation_count
-        - `index_related_cites_fields` that updates OpinionDocument and
-            OpinionClusterDocument
-        this is useful to prevent database overloading during bulk work
-    :param disable_parenthetical_groups: Skip creating ParentheticalGroups
-    :param percolate_opinion: Whether to percolate the related opinion document in
-    order to trigger search alerts.
-    :return: None
+    Args:
+        opinion: A search.Opinion object
+        update_citation_count: if False, do NOT update the DB or Elastic:
+            - OpinionCluster.citation_count
+            - `index_related_cites_fields` that updates OpinionDocument and
+                OpinionClusterDocument
+            this is useful to prevent database overloading during bulk work
+        disable_parenthetical_groups: Skip creating ParentheticalGroups
+        percolate_opinion: Whether to percolate the related opinion document in
+            order to trigger search alerts.
     """
     segments = make_get_citations_kwargs(opinion)
     if not segments:

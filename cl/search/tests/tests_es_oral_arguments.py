@@ -33,6 +33,7 @@ from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
+    AuthenticatedClientMixin,
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
@@ -48,7 +49,7 @@ class OASearchAPICommonTests(AudioESTestCase):
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
-        """Get the result count in a API query response"""
+        """Get the result count in a API query response."""
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v3"}), params
         )
@@ -136,17 +137,17 @@ class OASearchAPICommonTests(AudioESTestCase):
 
     @skip_if_common_tests_skipped
     async def test_oa_case_name_filtering(self) -> None:
-        """Filter by case_name"""
+        """Filter by case_name."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "case_name": "jose",
         }
         # API
-        r = await self._test_api_results_count(search_params, 1, "case_name")
+        await self._test_api_results_count(search_params, 1, "case_name")
 
     @skip_if_common_tests_skipped
     async def test_oa_docket_number_filtering(self) -> None:
-        """Filter by docket number"""
+        """Filter by docket number."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "docket_number": f"{self.docket_1.docket_number}",
@@ -159,17 +160,17 @@ class OASearchAPICommonTests(AudioESTestCase):
 
     @skip_if_common_tests_skipped
     async def test_oa_jurisdiction_filtering(self) -> None:
-        """Filter by court"""
+        """Filter by court."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "court": f"{self.docket_3.court_id}",
         }
         # API
-        r = await self._test_api_results_count(search_params, 2, "court")
+        await self._test_api_results_count(search_params, 2, "court")
 
     @skip_if_common_tests_skipped
     async def test_oa_date_argued_filtering(self) -> None:
-        """Filter by date_argued"""
+        """Filter by date_argued."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "argued_after": "2015-08-16",
@@ -186,7 +187,7 @@ class OASearchAPICommonTests(AudioESTestCase):
 
     @skip_if_common_tests_skipped
     async def test_oa_combine_search_and_filtering(self) -> None:
-        """Test combine text query and filtering"""
+        """Test combine text query and filtering."""
         # Text query filtered by case_name
         search_params = {
             "q": "Loretta",
@@ -195,7 +196,7 @@ class OASearchAPICommonTests(AudioESTestCase):
         }
 
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 2, "case_name + query"
         )
 
@@ -207,7 +208,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 1, "case_name + judge + query"
         )
 
@@ -222,7 +223,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = await self._test_api_results_count(
+        await self._test_api_results_count(
             search_params, 1, "case_name + judge + query"
         )
 
@@ -305,7 +306,6 @@ class OAV3SearchAPITests(
 
     async def test_search_transcript(self) -> None:
         """Test search transcript."""
-
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "q": "This is the best transcript",
@@ -326,7 +326,7 @@ class OAV3SearchAPITests(
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(audios_to_create):
                 audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,
@@ -370,9 +370,7 @@ class OAV3SearchAPITests(
             "order_by": "random_123 desc",
         }
         # API
-        r = await self._test_api_results_count(
-            search_params, 2, "random sorting"
-        )
+        await self._test_api_results_count(search_params, 2, "random sorting")
 
     async def test_oa_results_highlights(self) -> None:
         """Confirm snippet is properly highlighted."""
@@ -494,7 +492,11 @@ class OAV3SearchAPITests(
 
 
 class OAV4SearchAPITests(
-    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+    AuthenticatedClientMixin,
+    OASearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     version_api = "v4"
     skip_common_tests = False
@@ -511,7 +513,7 @@ class OAV4SearchAPITests(
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
-        """Get the result count in a API query response"""
+        """Get the result count in a API query response."""
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v4"}), params
         )
@@ -557,7 +559,6 @@ class OAV4SearchAPITests(
 
     def test_results_api_empty_fields(self) -> None:
         """Confirm  empty fields values in V4 OA Search API results."""
-
         mock_date = now().replace(day=15, hour=0)
         with (
             time_machine.travel(mock_date, tick=False),
@@ -658,7 +659,6 @@ class OAV4SearchAPITests(
     @override_settings(SEARCH_API_PAGE_SIZE=3)
     def test_opinion_results_cursor_api_pagination(self) -> None:
         """Test cursor pagination for V4 OA Search API."""
-
         created_audios = []
         audios_to_create = 4
 
@@ -820,9 +820,7 @@ class OAV4SearchAPITests(
             created_audio.delete()
 
     def test_audio_specific_sorting_keys(self) -> None:
-        """Test if the dateArgued sorting keys work properly in
-        the V4 OA Search API."""
-
+        """Test if the dateArgued sorting keys work properly in the V4 OA Search API."""
         docket_date_argued_none = DocketFactory.create(
             docket_number="12-43562",
             court_id=self.court_1.pk,
@@ -904,7 +902,6 @@ class OAV4SearchAPITests(
 
     def test_audio_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 OA Search API."""
-
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "order_by": "score desc",
@@ -941,7 +938,7 @@ class OAV4SearchAPITests(
 
 
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
-    """Oral argument search tests for Elasticsearch"""
+    """Oral argument search tests for Elasticsearch."""
 
     @classmethod
     def setUpTestData(cls):
@@ -963,18 +960,17 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     @staticmethod
     def get_article_count(r):
-        """Get the article count in a query response"""
+        """Get the article count in a query response."""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     @staticmethod
     def get_results_count(r):
-        """Get the result count in a API query response"""
+        """Get the result count in a API query response."""
         return len(r.data["results"])
 
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
         """Confirm if a percolator query matched."""
-
         matched = False
         for hit in response:
             if hit.meta.id == query_id:
@@ -1219,7 +1215,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_oa_case_name_filtering(self) -> None:
-        """Filter by case_name"""
+        """Filter by case_name."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "case_name": "jose",
@@ -1239,7 +1235,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_oa_docket_number_filtering(self) -> None:
-        """Filter by docket number"""
+        """Filter by docket number."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "docket_number": f"{self.audio_1.docket.docket_number}",
@@ -1302,8 +1298,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         docket.delete()
 
     def test_timestamp_filtering(self) -> None:
-        """Confirm the timestamp fielded filter works properly"""
-
+        """Confirm the timestamp fielded filter works properly."""
         mock_date = now().replace(
             day=28, hour=0, minute=0, second=0, microsecond=0
         )
@@ -1365,7 +1360,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         audio.delete()
 
     def test_oa_jurisdiction_filtering(self) -> None:
-        """Filter by court"""
+        """Filter by court."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "court": f"{self.audio_3.docket.court.pk}",
@@ -1385,7 +1380,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_oa_date_argued_filtering(self) -> None:
-        """Filter by date_argued"""
+        """Filter by date_argued."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "argued_after": "2015-08-16",
@@ -1415,7 +1410,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_oa_combine_search_and_filtering(self) -> None:
-        """Test combine text query and filtering"""
+        """Test combine text query and filtering."""
         # Text query
         search_params = {
             "q": "Loretta",
@@ -1497,7 +1492,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_oa_advanced_search_not_query(self) -> None:
-        """Test advanced search queries"""
+        """Test advanced search queries."""
         # NOT query
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -1674,7 +1669,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertNotIn("an error", r.content.decode())
 
     def test_last_oral_arguments_home_page(self) -> None:
-        """Test last oral arguments in home page"""
+        """Test last oral arguments in home page."""
         cache.delete("homepage-data-oa-es")
         r = self.client.get(
             reverse("show_results"),
@@ -1807,7 +1802,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        with self.captureOnCommitCallbacks(execute=True):
             for _ in range(audios_to_create):
                 audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,
@@ -2108,10 +2103,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(r.content.decode().count("<mark>⚖️</mark>"), 1)
 
     def test_docket_number_proximity_query(self) -> None:
-        """Test docket_number proximity query, so that docket numbers like
-        1:21-cv-1234-ABC can be matched by queries like: 21-1234
-        """
-
+        """Test docket_number proximity query, so that docket numbers like 1:21-cv-1234-ABC can be matched by queries like: 21-1234."""
         # Query 1234-21, no results should be returned due to phrased search.
         # Frontend
         search_params = {
@@ -2198,7 +2190,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     def test_docket_number_suffixes_query(self) -> None:
         """Test docket_number with suffixes can be found."""
-
         # Indexed: 1:21-bk-1234 -> Search: 1:21-bk-1234-ABC
         # Frontend
         search_params = {
@@ -2230,7 +2221,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     def test_stemming_disable_search(self) -> None:
         """Test docket_number with suffixes can be found."""
-
         # Normal search with stemming 'Information', results for:
         # Hong Liu Yang (Joseph Information Deposition)
         # SEC v. Frank J. Information... (Mary Deposit)
@@ -2304,7 +2294,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     def test_exact_and_synonyms_query(self) -> None:
         """Test exact and synonyms in the same query."""
-
         # Search for 'learn road' should return results for 'learn of rd' and
         # 'learning rd'.
         search_params = {
@@ -2505,8 +2494,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_frontend_oa_count(self) -> None:
-        """Assert OA search results counts in the fronted. Below and
-        above the estimation threshold.
+        """Assert OA search results counts in the fronted.
+
+        Below and above the estimation threshold.
         """
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2534,7 +2524,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     def test_search_transcript(self) -> None:
         """Test search transcript."""
-
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "q": "This is the best transcript",
@@ -2552,10 +2541,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
-        """Confirm that stemming is disabled on the case_name
-        filter and text query.
-        """
-
+        """Confirm that stemming is disabled on the case_name filter and text query."""
         # case_name filter: Howell
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2606,9 +2592,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
 
 class OralArgumentsSearchDecayRelevancyTest(
-    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+    AuthenticatedClientMixin, ESIndexTestCase, V4SearchAPIAssertions, TestCase
 ):
-    """Oral Arguments Search Decay Relevancy Tests"""
+    """Oral Arguments Search Decay Relevancy Tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2861,7 +2847,7 @@ class OralArgumentsSearchDecayRelevancyTest(
         ]
 
     def test_relevancy_decay_scoring_frontend(self) -> None:
-        """Test relevancy decay scoring for Oral Arguments search Frontend"""
+        """Test relevancy decay scoring for Oral Arguments search Frontend."""
         for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
@@ -2874,12 +2860,12 @@ class OralArgumentsSearchDecayRelevancyTest(
                 )
 
     def test_relevancy_decay_scoring_v4_api(self) -> None:
-        """Test relevancy decay scoring for Oral Arguments search V4 API"""
+        """Test relevancy decay scoring for Oral Arguments search V4 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "id", version="v4")
 
     def test_relevancy_decay_scoring_v3_api(self) -> None:
-        """Test relevancy decay scoring for Oral Arguments search V3 API"""
+        """Test relevancy decay scoring for Oral Arguments search V3 API."""
         for test in self.test_cases:
             self._test_results_ordering(test, "id", version="v3")
 
@@ -2909,7 +2895,6 @@ class OralArgumentIndexingTest(
     )
     def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
         """Test Audio documents are updated when related objects change."""
-
         docket_5 = DocketFactory.create(
             docket_number="1:22-bk-12345",
             court_id=self.court_1.pk,
@@ -2988,10 +2973,7 @@ class OralArgumentIndexingTest(
         self.assertEqual(s.count(), 0)
 
     def test_oa_indexing_and_tasks_count(self) -> None:
-        """Confirm an Audio is properly indexed in ES with the right number of
-        indexing tasks.
-        """
-
+        """Confirm an Audio is properly indexed in ES with the right number of indexing tasks."""
         # When the Audio is created the file processing is not complete.
         # The Audio indexing is avoided.
         with mock.patch(

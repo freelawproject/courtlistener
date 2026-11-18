@@ -1,3 +1,5 @@
+"""The contact form."""
+
 import re
 from typing import Any
 
@@ -16,6 +18,8 @@ SEALING_KEYWORDS_REGEX = re.compile(
 
 
 class ContactForm(forms.Form):
+    """Contact form whose required fields depend on the issue type."""
+
     SUPPORT_REQUEST = "support"
     PARTNERSHIPS = "partnerships"
     API_HELP = "api"
@@ -243,6 +247,7 @@ class ContactForm(forms.Form):
         account_email: str = "",
         **kwargs: Any,
     ) -> None:
+        """Build the form for a user, linking the documentation checkbox to the help pages."""
         super().__init__(*args, **kwargs)
         self.is_authenticated = is_authenticated
         self.account_email = account_email
@@ -259,6 +264,11 @@ class ContactForm(forms.Form):
         )
 
     def clean(self) -> dict[str, Any] | None:
+        """Require the fields for the chosen issue type.
+
+        Also requires an email from anonymous users, the documentation
+        checkbox for support issues, and a link in removal requests.
+        """
         cleaned_data: dict[str, Any] | None = super().clean()
         if cleaned_data is None:
             return cleaned_data
@@ -344,6 +354,7 @@ class ContactForm(forms.Form):
         return cleaned_data
 
     def get_issue_type_display(self) -> str:
+        """Get the label of the chosen issue type, or "Unidentified Type"."""
         value = self.cleaned_data.get("issue_type", "")
         return dict(self.ISSUE_TYPE_CHOICES).get(value, "Unidentified Type")
 
@@ -370,11 +381,14 @@ class ContactForm(forms.Form):
         user input (e.g. the Message textarea) has its newlines converted
         to ``<br>`` so they render in Zoho Desk's HTML description.
 
-        :param user_agent: The submitter's browser User-Agent string.
-        :param logged_in_info: If the submitter was authenticated, a dict
-            with their ``username``, ``email``, and ``email_confirmed``
-            status. ``None`` for anonymous submissions.
-        :return: HTML string suitable for the Zoho Desk ``description``
+        Args:
+            user_agent: The submitter's browser User-Agent string.
+            logged_in_info: If the submitter was authenticated, a dict
+                with their ``username``, ``email``, and ``email_confirmed``
+                status. ``None`` for anonymous submissions.
+
+        Returns:
+            HTML string suitable for the Zoho Desk ``description``
             field.
         """
         cd = self.cleaned_data
@@ -457,7 +471,7 @@ class ContactForm(forms.Form):
         return "<br><br>".join(lines)
 
     def _get_email(self) -> str:
-        """Return the email for the form"""
+        """Return the email for the form."""
         if self.is_authenticated:
             return self.account_email
         return self.cleaned_data.get("email", "")

@@ -1,3 +1,5 @@
+"""Views for corpus importer cleanup tools."""
+
 from asgiref.sync import async_to_sync
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -23,8 +25,7 @@ from cl.search.models import Court
 
 @staff_member_required
 def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Show paginated judges from CA that can be updated by a researcher"""
-
+    """Show paginated judges from CA that can be updated by a researcher."""
     get_string = make_get_string(request)
 
     # Gather the judges and load the page

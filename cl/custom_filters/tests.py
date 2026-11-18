@@ -136,7 +136,7 @@ class DummyObject:
 
 
 class SimpleForm(forms.Form):
-    """Helper form for testing get_item and render_field_with_id"""
+    """Helper form for testing get_item and render_field_with_id."""
 
     name = forms.CharField()
     email = forms.EmailField()
@@ -146,7 +146,7 @@ class TestExtras(SimpleTestCase):
     factory = RequestFactory()
 
     def test_get_full_host(self) -> None:
-        """Does get_full_host return the right values"""
+        """Does get_full_host return the right values."""
         c = Context({"request": self.factory.request()})
         self.assertEqual(get_full_host(c), "http://testserver")
 
@@ -157,7 +157,6 @@ class TestExtras(SimpleTestCase):
 
     def test_get_canonical_element(self) -> None:
         """Do we get a simple canonical element?"""
-
         c = Context({"request": self.factory.get("/some-path/")})
         self.assertEqual(
             get_canonical_element(c),
@@ -224,7 +223,7 @@ class TestExtras(SimpleTestCase):
         self.assertEqual(granular_date(obj, "date_start"), "Unknown")
 
     def test_humanize_number(self):
-        """Test multiple values for the humanize_number function
+        """Test multiple values for the humanize_number function.
 
         Test cases includes multiple examples to see when the function rounds up or down a number, validate when a
         invalid value is passed and some edge cases.
@@ -261,7 +260,7 @@ class TestExtras(SimpleTestCase):
                 )
 
     def test_get_item_with_various_types(self):
-        """Test get_item retrieves values from different object types
+        """Test get_item retrieves values from different object types.
 
         Validates:
         - Dict key access (string keys, returns value or empty string)
@@ -291,7 +290,7 @@ class TestExtras(SimpleTestCase):
         self.assertEqual(get_item(test_dict, None), "")
 
     def test_render_field_with_custom_id(self):
-        """Test render_field_with_id renders form fields with custom IDs
+        """Test render_field_with_id renders form fields with custom IDs.
 
         Validates:
         - Custom ID attribute is applied to rendered HTML
@@ -322,8 +321,25 @@ class TestExtras(SimpleTestCase):
         rendered = render_field_with_id(form["name"], "custom_id")
         self.assertNotIn('id="id_name"', rendered)
 
+    def test_render_field_with_id_points_invalid_field_at_error(self) -> None:
+        """Does render_field_with_id point an invalid field at its error?
+
+        Django adds ``aria-invalid`` itself; the filter only overrides
+        ``aria-describedby``.
+        """
+        form = SimpleForm({"name": "Jane", "email": "not-an-email"})
+        form.is_valid()
+
+        rendered = render_field_with_id(form["email"], "custom_email")
+        self.assertIn('aria-invalid="true"', rendered)
+        self.assertIn('aria-describedby="custom_email-error"', rendered)
+
+        rendered = render_field_with_id(form["name"], "custom_name")
+        self.assertNotIn("aria-invalid", rendered)
+        self.assertNotIn("aria-describedby", rendered)
+
     def test_render_field_with_corpus_search_form(self) -> None:
-        """Test render_field_with_id works with actual CorpusSearchForm
+        """Test render_field_with_id works with actual CorpusSearchForm.
 
         Validates all field types used in corpus search:
         - TextInput fields (case_name, docket_number, etc.)
@@ -417,7 +433,7 @@ class TestExtras(SimpleTestCase):
         self.assertIn('type="checkbox"', rendered)
 
     def test_get_item_with_corpus_search_form(self):
-        """Test get_item filter works with actual CorpusSearchForm
+        """Test get_item filter works with actual CorpusSearchForm.
 
         Validates field access for all field types in corpus search:
         - Text fields return BoundField with correct name
@@ -459,8 +475,7 @@ class TestHighlightQuery(SimpleTestCase):
         self.assertIn("<mark>fair use</mark>", result)
 
     def test_unquoted_words_not_highlighted(self) -> None:
-        """Unquoted words are NOT highlighted (they drive semantic
-        ranking, not keyword matching)."""
+        """Unquoted words are NOT highlighted (they drive semantic ranking, not keyword matching)."""
         result = highlight_query(
             "The copyright holder filed suit.",
             "copyright holder",

@@ -1,7 +1,10 @@
+"""General-purpose helpers shared across apps."""
+
 import datetime
 import re
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Iterator
 from itertools import chain, islice, tee
+from pathlib import Path, PurePath
 from re import Match
 from typing import Any, TypeIs
 
@@ -63,28 +66,27 @@ def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
         if "." in name:
             attr, subname = name.split(".", 1)
             return deepgetattr(getattr(obj, attr), subname, default)
-        else:
-            return getattr(obj, name)
+        return getattr(obj, name)
     except AttributeError:
         if default is _UNSPECIFIED:
             raise
-        else:
-            return default
+        return default
 
 
 def chunks[T](
     iterable: Iterable[T], chunk_size: int
 ) -> Generator[Iterable[T]]:
-    """Warning: If you're considering using this method, you might want to
-    consider using itertools.batched instead.
-    Like the chunks function, but the iterable can be a generator.
+    """Warning: If you're considering using this method, you might want to consider using itertools.batched instead. Like the chunks function, but the iterable can be a generator.
 
     Note that the chunks must be *consumed* for it to work properly. Usually
     that means converting them to a list in your loop.
 
-    :param iterable: Any iterable
-    :param chunk_size: The number of items to put in each chunk
-    :return: Yields iterators of chunksize number of items from iterable
+    Args:
+        iterable: Any iterable
+        chunk_size: The number of items to put in each chunk
+
+    Returns:
+        Yields iterators of chunksize number of items from iterable
     """
     iterator = iter(iterable)
     for first in iterator:
@@ -112,6 +114,7 @@ def previous_and_next[T](
 
 
 def is_iter(item: Any) -> TypeIs[Iterable]:
+    """Check if an item is iterable."""
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
@@ -124,36 +127,108 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
+def glob_files(
+    root: Path, pattern: str, recursive: bool = False
+) -> Iterator[Path]:
+    """Yield paths under `root` matching `pattern`, as `glob.glob` would.
+
+    `Path.glob` differs from `glob.glob` in two ways that this smooths over:
+    wildcards match names starting with a dot, and `**` always recurses.
+
+    Args:
+        root: Directory the pattern is relative to. Never matched against
+            the hidden-name rule, so it may itself live under a dot directory.
+        pattern: Relative glob pattern. Hidden files and directories are
+            only matched when the pattern is itself explicit about them.
+        recursive: Whether `**` matches any number of directories. When
+            False, `**` is treated like `*`.
+
+    Returns:
+        The matching paths, in arbitrary order.
+    """
+    pattern_parts = PurePath(pattern).parts
+    if not recursive:
+        pattern_parts = tuple("*" if p == "**" else p for p in pattern_parts)
+    for path in root.glob("/".join(pattern_parts)):
+        relative_parts = path.relative_to(root).parts
+        if any(
+            part.startswith(".") and not pattern_part.startswith(".")
+            for part, pattern_part in zip(
+                relative_parts,
+                _align_pattern_parts(pattern_parts, len(relative_parts)),
+                strict=True,
+            )
+        ):
+            continue
+        yield path
+
+
+def _align_pattern_parts(
+    pattern_parts: tuple[str, ...], length: int
+) -> list[str]:
+    """Pair each matched path component with its glob pattern component.
+
+    `**` is expanded to cover however many components it consumed.
+
+    Args:
+        pattern_parts: Components of a glob pattern.
+        length: Number of components in the matched path.
+
+    Returns:
+        A list of `length` pattern components.
+    """
+    expansion = length - (len(pattern_parts) - pattern_parts.count("**"))
+    aligned: list[str] = []
+    for part in pattern_parts:
+        if part == "**":
+            aligned.extend(["**"] * max(expansion, 0))
+            expansion = 0
+        else:
+            aligned.append(part)
+    return aligned
+
+
 def human_sort[T: str | tuple[str, Any]](
     unordered_list: Iterable[T],
     key: str | None = None,
 ) -> list[T]:
-    """Human sort Lists of strings or list of dictionaries
-
-    :param unordered_list: The list we want to sort
-    :param key: A key (if any) to sort the dictionary with.
-    :return: An ordered list
+    """Human sort Lists of strings or list of dictionaries.
 
     TODO: The `tuple[str, Any]` is almost certainly wrong and should be a
-        `dict[str, Any]`, but this requires verification.
+    `dict[str, Any]`, but this requires verification.
+
+    Args:
+        unordered_list: The list we want to sort
+        key: A key (if any) to sort the dictionary with.
+
+    Returns:
+        An ordered list
     """
-    convert = lambda text: int(text) if text.isdigit() else text
+
+    def convert(text):
+        return int(text) if text.isdigit() else text
+
     if key:
-        sorter = lambda item: [
-            convert(c) for c in re.split("([0-9]+)", item[key])
-        ]
+
+        def sorter(item):
+            return [convert(c) for c in re.split("([0-9]+)", item[key])]
     else:
-        sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
+
+        def sorter(item):
+            return [convert(c) for c in re.split("([0-9]+)", item)]
 
     return sorted(unordered_list, key=sorter)
 
 
 def wrap_text(length: int, text: str) -> str:
-    """Wrap text to specified length without cutting words
+    """Wrap text to specified length without cutting words.
 
-    :param length: max length to wrap
-    :param text: text to wrap
-    :return: text wrapped
+    Args:
+        length: max length to wrap
+        text: text to wrap
+
+    Returns:
+        text wrapped
     """
     words = text.split(" ")
     if words:
@@ -169,10 +244,7 @@ def wrap_text(length: int, text: str) -> str:
 
 
 def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
-    """Gets the selected checkboxes from the form data, and puts it into
-    an array. Uses a prefix to know which items to pull out of the cleaned
-    data.Check forms.py to see how the prefixes are set up.
-    """
+    """Gets the selected checkboxes from the form data, and puts it into an array. Uses a prefix to know which items to pull out of the cleaned data.Check forms.py to see how the prefixes are set up."""
     return [
         k.replace(prefix, "")
         for k, v in cd.items()
@@ -181,12 +253,13 @@ def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
 
 
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
-    """
-    Retrieves and combines court IDs from both the given parents and their
-    child courts and removing duplicates.
+    """Retrieves and combines court IDs from both the given parents and their child courts and removing duplicates.
 
-    :param selected_courts_string: The courts from the original user query.
-    :return: A string containing the unique combination of parent and child courts.
+    Args:
+        selected_courts_string: The courts from the original user query.
+
+    Returns:
+        A string containing the unique combination of parent and child courts.
     """
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
     unique_courts.update(lookup_child_courts_cache(list(unique_courts)))
@@ -197,10 +270,12 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
 def extend_child_courts(match: Match[str]) -> str:
     """Extends court_id: queries with their child courts.
 
-    :param match: A regex match object containing the matched court_id: query.
-    :return: A string with the court_id query extended with child courts.
-    """
+    Args:
+        match: A regex match object containing the matched court_id: query.
 
+    Returns:
+        A string with the court_id query extended with child courts.
+    """
     # Remove parentheses
     cleaned_str = re.sub(r"[()]", "", match.group(1))
     # Split the string by spaces to handle each court
@@ -227,19 +302,21 @@ def modify_court_id_queries(query_str: str) -> str:
     with their child courts, then reinserts them back into the original
     query string.
 
-    :param query_str: The query string to be parsed.
-    :return: The modified query string after extending with child courts, or
-    the original query string if no valid 'court_id:' queries are found.
-    """
+    Args:
+        query_str: The query string to be parsed.
 
+    Returns:
+        The modified query string after extending with child courts, or
+        the original query string if no valid 'court_id:' queries are found.
+    """
     pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
-    modified_query = re.sub(pattern, extend_child_courts, query_str)
-    return modified_query
+    return re.sub(pattern, extend_child_courts, query_str)
 
 
 def check_query_for_disallowed_wildcards(query_string: str) -> bool:
-    """Check if the query_string contains not allowed wildcards that can be
-    really expensive.
+    """Check if the query_string contains not allowed wildcards.
+
+    Not allowed wildcards can be really expensive. See:
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-wildcard
 
     * at the beginning of a term
@@ -250,10 +327,12 @@ def check_query_for_disallowed_wildcards(query_string: str) -> bool:
     *ing
     a* or !a
 
-    :param query_string: The query string to be checked.
-    :return: A boolean indicating if the query string contains not allowed wildcards.
-    """
+    Args:
+        query_string: The query string to be checked.
 
+    Returns:
+        A boolean indicating if the query string contains not allowed wildcards.
+    """
     # Match any term that starts with *
     wildcard_start = r"(?:^|\s)\*\w+"
 
@@ -272,13 +351,14 @@ def check_query_for_disallowed_wildcards(query_string: str) -> bool:
 
 
 def perform_special_character_replacements(query_string: str) -> str:
-    """Perform a series of special character replacements in the given query
-    string to clean it up and support the % &, !, and * search connectors.
+    """Perform a series of special character replacements in the given query string to clean it up and support the % &, !, and * search connectors.
 
-    :param query_string: The user query string.
-    :return: The transformed query string with the specified replacements applied.
+    Args:
+        query_string: The user query string.
+
+    Returns:
+        The transformed query string with the specified replacements applied.
     """
-
     # Replace smart quotes with standard double quotes for consistency.
     query_string = re.sub(r"[“”]", '"', query_string)
 
@@ -298,15 +378,13 @@ def perform_special_character_replacements(query_string: str) -> str:
     # Replace * (universal character) that is not at the end of a word with ?.
     universal_char_pattern = r"\*(?=\w)"
     universal_char_replacement = "?"
-    query_string = re.sub(
+    return re.sub(
         universal_char_pattern, universal_char_replacement, query_string
     )
 
-    return query_string
-
 
 def cleanup_main_query(query_string: str) -> str:
-    """Enhance the query string with some simple fixes
+    """Enhance the query string with some simple fixes.
 
      - Check for expensive wildcards and thrown an error if found.
      - Perform special character replacements for search connectors.
@@ -319,8 +397,11 @@ def cleanup_main_query(query_string: str) -> str:
      court in the query, append them, and then add them back to the original
      query.
 
-    :param query_string: The query string from the form
-    :return The enhanced query string
+    Args:
+        query_string: The query string from the form
+
+    Returns:
+        The enhanced query string
     """
     inside_a_phrase = False
     cleaned_items = []
@@ -404,29 +485,31 @@ def cleanup_main_query(query_string: str) -> str:
     cleaned_query = re.sub(r'(")\s*(?=~\d+)', r"\1", cleaned_query)
     # If it's a court_id query, parse it, append the child courts, and then
     # reintegrate them into the original query.
-    final_query = modify_court_id_queries(cleaned_query)
-    return final_query
+    return modify_court_id_queries(cleaned_query)
 
 
 def check_for_proximity_tokens(query: str) -> bool:
-    """Check whether the query contains an unrecognized proximity token from
-    other common search providers.
+    """Check whether the query contains an unrecognized proximity token from other common search providers.
 
-    :param query: The input query string
-    :return: True if the query contains an unrecognized proximity token.
-    Otherwise False
+    Args:
+        query: The input query string
+
+    Returns:
+        True if the query contains an unrecognized proximity token.
+        Otherwise False
     """
-
     pattern = r"/s(?!\w)|/p(?!\w)"
     return bool(re.search(pattern, query))
 
 
 def check_unbalanced_parenthesis(query: str) -> bool:
-    """Check whether the query string has unbalanced opening or closing
-    parentheses.
+    """Check whether the query string has unbalanced opening or closing parentheses.
 
-    :param query: The input query string
-    :return: True if the query contains unbalanced parenthesis. Otherwise False
+    Args:
+        query: The input query string
+
+    Returns:
+        True if the query contains unbalanced parenthesis. Otherwise False
     """
     opening_count = query.count("(")
     closing_count = query.count(")")
@@ -437,8 +520,11 @@ def check_unbalanced_parenthesis(query: str) -> bool:
 def check_unbalanced_quotes(query: str) -> bool:
     """Check whether the query string has unbalanced quotes.
 
-    :param query: The input query string
-    :return: True if the query contains unbalanced quotes. Otherwise False
+    Args:
+        query: The input query string
+
+    Returns:
+        True if the query contains unbalanced quotes. Otherwise False
     """
     all_quotes = re.findall(r"[“”\"]", query)
     return len(all_quotes) % 2 != 0
@@ -447,14 +533,16 @@ def check_unbalanced_quotes(query: str) -> bool:
 def remove_last_symbol_occurrence(
     query: str, symbol_count: int, symbol: str
 ) -> tuple[str, int]:
-    """Remove the last occurrence of a specified symbol from a query string and
-     update the symbol count.
+    """Remove the last occurrence of a specified symbol from a query string and update the symbol count.
 
-    :param query: The query string.
-    :param symbol_count: The current count of the symbol in the query.
-    :param symbol: The symbol to be removed from the query.
-    :return: A tuple containing the updated query string and the updated symbol
-     count.
+    Args:
+        query: The query string.
+        symbol_count: The current count of the symbol in the query.
+        symbol: The symbol to be removed from the query.
+
+    Returns:
+        A tuple containing the updated query string and the updated symbol
+        count.
     """
     # Find last unclosed symbol position.
     last_symbol_pos = query.rfind(symbol)
@@ -468,8 +556,11 @@ def remove_last_symbol_occurrence(
 def sanitize_unbalanced_parenthesis(query: str) -> str:
     """Sanitize a query by removing unbalanced opening or closing parentheses.
 
-    :param query: The input query string
-    :return: The sanitized query string, after removing unbalanced parentheses.
+    Args:
+        query: The input query string
+
+    Returns:
+        The sanitized query string, after removing unbalanced parentheses.
     """
     opening_count = query.count("(")
     closing_count = query.count(")")
@@ -489,8 +580,11 @@ def sanitize_unbalanced_parenthesis(query: str) -> str:
 def sanitize_unbalanced_quotes(query: str) -> str:
     """Sanitize a query by removing unbalanced quotes.
 
-    :param query: The input query string
-    :return: The sanitized query string, after removing unbalanced quotes.
+    Args:
+        query: The input query string
+
+    Returns:
+        The sanitized query string, after removing unbalanced quotes.
     """
     # Replace smart quotes with standard double quotes for consistency.
     query = re.sub(r"[“”]", '"', query)
@@ -506,21 +600,20 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
     if sort_string == "dateFiled asc":
         return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
+    if sort_string == "dateFiled desc":
         return "entry_date_filed desc"
-    else:
-        return sort_string
+    return sort_string
 
 
 def append_value_in_cache(key: str, value: object) -> None:
     """Append a value to a cached list associated with the given key.
+
     If the key does not exist, a new list is created and the value is added.
 
-    :param key: The cache key to retrieve or store the list.
-    :param value: The value to be appended to the cached list.
-    :return: None.
+    Args:
+        key: The cache key to retrieve or store the list.
+        value: The value to be appended to the cached list.
     """
-
     cached_docs = cache.get(key)
     if cached_docs is None:
         cached_docs = []
@@ -530,8 +623,7 @@ def append_value_in_cache(key: str, value: object) -> None:
 
 
 def convert_to_es_date_match(date_string: str) -> str:
-    """Parse and convert a provided relative-date string into an ES date-math
-    expression.
+    """Parse and convert a provided relative-date string into an ES date-math expression.
 
     Raises ValueError for anything that isn’t explicitly:
       - negative (e.g: '-10d', '-5 months ago')
@@ -542,10 +634,13 @@ def convert_to_es_date_match(date_string: str) -> str:
       5d
       10m
       1y
-    :param date_string: The provided relative date string to parse.
-    :return: the ES compatible date-math expression as a string.
-    """
 
+    Args:
+        date_string: The provided relative date string to parse.
+
+    Returns:
+        the ES compatible date-math expression as a string.
+    """
     date_string_clean = date_string.strip().lower()
     rd_matched = RELATIVE_DATES_SYNTAX.match(date_string_clean)
     if not rd_matched:
@@ -576,13 +671,15 @@ def convert_to_es_date_match(date_string: str) -> str:
 
 
 def parse_string_date(date_value: datetime.date | str) -> str | None:
-    """Parse a provided relative string date or ignore incompatible relative
-    date syntax.
-    :param date_value: The relative date to parse.
-    :return: The ES-compatible date math expression as a string, or None if
-    the date syntax is incompatible.
-    """
+    """Parse a provided relative string date or ignore incompatible relative date syntax.
 
+    Args:
+        date_value: The relative date to parse.
+
+    Returns:
+        The ES-compatible date math expression as a string, or None if
+        the date syntax is incompatible.
+    """
     if not date_value:
         return None
 
@@ -598,6 +695,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
 
 
 def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
+    """Create a Chrome driver, remote if ``DOCKER_SELENIUM_HOST`` is set and headless if configured."""
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")

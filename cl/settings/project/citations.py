@@ -1,3 +1,5 @@
+"""Settings for the citation lookup API."""
+
 import environ
 
 env = environ.FileAwareEnv()

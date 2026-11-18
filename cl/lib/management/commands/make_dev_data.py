@@ -1,3 +1,5 @@
+"""Create dummy data for development."""
+
 from typing import Any
 
 from django.core.management.base import CommandParser
@@ -70,9 +72,12 @@ factories_str: str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 
 
 class Command(VerboseCommand):
+    """Create dummy objects with factories, a bit of everything by default."""
+
     help = "Create dummy data in your system for development purposes"
 
     def add_arguments(self, parser: CommandParser) -> None:
+        """Add the count, object type, list, and parent ID options."""
         parser.add_argument(
             "--count",
             type=int,
@@ -102,6 +107,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        """Make the chosen objects, or a bit of everything if none are chosen.
+
+        With ``--list-objects``, print the object types and exit instead.
+        """
         super().handle(*args, **options)
 
         if options["list_objects"]:

@@ -1,3 +1,5 @@
+"""Helpers for PACER court IDs, docket data, and connectivity."""
+
 import logging
 import pickle
 import re
@@ -5,6 +7,7 @@ import socket
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import TypedDict, cast
 
 import requests
@@ -53,10 +56,12 @@ cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
 def map_pacer_to_cl_id(pacer_id: str) -> str:
+    """Map a PACER court ID to its CourtListener ID, if they differ."""
     return pacer_to_cl_ids.get(pacer_id, pacer_id)
 
 
 def map_cl_to_pacer_id(cl_id: str) -> str:
+    """Map a CourtListener court ID to its PACER ID, if they differ."""
     return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
@@ -71,10 +76,11 @@ def lookup_and_save(
 
     Returns None if an error occurs, else, return the new or updated Docket.
 
-    :param new: The row to merge. Its `court_id` holds a PACER court ID, so
-        callers must remove it before calling.
-    :param court: The CourtListener court the row belongs to.
-    :param debug: If True, don't save the Docket.
+    Args:
+        new: The row to merge. Its `court_id` holds a PACER court ID, so
+            callers must remove it before calling.
+        court: The CourtListener court the row belongs to.
+        debug: If True, don't save the Docket.
     """
     try:
         d = Docket.objects.get(pacer_case_id=new.pacer_case_id, court=court)
@@ -136,18 +142,18 @@ def lookup_and_save(
 
 
 async def get_first_missing_de_date(d: Docket) -> date | None:
-    """When buying dockets use this function to figure out which docket entries
-    we already have, starting at the first item. Since PACER only allows you to
-    do a range of docket entries, this allows us to figure out a later starting
-    point for our query.
+    """When buying dockets use this function to figure out which docket entries we already have, starting at the first item. Since PACER only allows you to do a range of docket entries, this allows us to figure out a later starting point for our query.
 
     For example, if we have documents 1-32 already in the DB, we can save some
     money by only getting items 33 and on.
 
-    :param d: The Docket object to check.
-    :returns date: The starting date that should be used in your query. If the
-    docket has no entries, returns 1960/1/1. If the docket has entries, returns
-    the date of the highest available item.
+    Args:
+        d: The Docket object to check.
+
+    Returns:
+        date: The starting date that should be used in your query. If the
+        docket has no entries, returns 1960/1/1. If the docket has entries, returns
+        the date of the highest available item.
     """
     # Get docket entry numbers for items that *have* docket entry descriptions.
     # This ensures that we don't count RSS items towards the docket being
@@ -199,13 +205,16 @@ async def get_blocked_status(
             Docket  | <= 500 items  |         |    X   |
                     +---------------+---------+--------+
 
-    :param docket: A Docket or Docket-like object that contains a `court`
-    attribute that can be checked to see if it is a bankruptcy court.
-    :param count_override: Allows a calling function to provide the count, if
-    it is known in advance.
-    :returns A tuple containing two entries. The first is a boolean stating
-    whether the item should be private. The second is the date of the privacy
-    decision (today) or None if the item should not be private.
+    Args:
+        docket: A Docket or Docket-like object that contains a `court`
+            attribute that can be checked to see if it is a bankruptcy court.
+        count_override: Allows a calling function to provide the count, if
+            it is known in advance.
+
+    Returns:
+        A tuple containing two entries. The first is a boolean stating
+        whether the item should be private. The second is the date of the privacy
+        decision (today) or None if the item should not be private.
     """
     if getattr(docket, "blocked", False):
         # Short circuit. This function can only make things blocked that were
@@ -235,10 +244,11 @@ def process_docket_data(
 ) -> int | None:
     """Process docket data file.
 
-    :param d: A docket object to work on.
-    :param report_type: Whether it's a docket or a docket history report.
-    :param filepath: A local path where the item can be found. If not provided,
-    the filepath_local field of the docket object will be attempted.
+    Args:
+        d: A docket object to work on.
+        report_type: Whether it's a docket or a docket history report.
+        filepath: A local path where the item can be found. If not provided,
+            the filepath_local field of the docket object will be attempted.
     """
     from cl.recap.mergers import (
         add_bankruptcy_data_to_docket,
@@ -269,8 +279,7 @@ def process_docket_data(
         )
 
     if filepath:
-        with open(filepath) as f:
-            text = f.read()
+        text = Path(filepath).read_text()
     else:
         # This is an S3 path, so get it remotely.
         text = d.filepath_local.read().decode()
@@ -305,7 +314,7 @@ def process_docket_data(
 
 
 def normalize_attorney_role(r: str) -> RoleType:
-    """Normalize attorney roles into the valid set"""
+    """Normalize attorney roles into the valid set."""
     role: RoleType = {"role": None, "date_action": None, "role_raw": r}
 
     r = r.lower()
@@ -350,7 +359,7 @@ def normalize_us_phone_number(phone: str) -> str:
 
 
 def normalize_us_state(state: str) -> str:
-    """Convert state values to valid state postal abbreviations
+    """Convert state values to valid state postal abbreviations.
 
     va --> VA
     Virginia --> VA
@@ -369,7 +378,7 @@ def normalize_us_state(state: str) -> str:
 
 
 def make_address_lookup_key(address_info: dict) -> str:
-    """Make a key for looking up normalized addresses in the DB
+    """Make a key for looking up normalized addresses in the DB.
 
     - Sort the fields alphabetically
     - Strip anything that's not a character or number
@@ -399,8 +408,7 @@ def make_address_lookup_key(address_info: dict) -> str:
 
 
 def normalize_address_info(address_info: dict) -> dict:
-    """Normalize various address components"""
-
+    """Normalize various address components."""
     # Titlecase where appropriate
     for k, v in address_info.items():
         if k == "state":
@@ -482,11 +490,10 @@ def normalize_attorney_contact(
             if m:
                 atty_info["fax"] = normalize_us_phone_number(clean_line)
             continue
-        else:
-            m = phone_digits_re.search(clean_line)
-            if m:
-                atty_info["phone"] = normalize_us_phone_number(clean_line)
-                continue
+        m = phone_digits_re.search(clean_line)
+        if m:
+            atty_info["phone"] = normalize_us_phone_number(clean_line)
+            continue
 
         # First line containing an ampersand? These are usually law firm names.
         if "&" in line and i == 0:
@@ -571,6 +578,8 @@ def normalize_attorney_contact(
 
 
 class ConnectionType(TypedDict):
+    """The result of checking a PACER court's connectivity."""
+
     connection_ok: bool
     status_code: int | None
     date_time: datetime
@@ -579,10 +588,12 @@ class ConnectionType(TypedDict):
 def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
     """Check PACER connection status for the given court.
 
-    :param court_id: The court ID to check.
-    :returns: A dict with the court connection status.
-    """
+    Args:
+        court_id: The court ID to check.
 
+    Returns:
+        A dict with the court connection status.
+    """
     url = f"https://ecf.{court_id}.uscourts.gov/"
 
     connection_ok = False
@@ -606,17 +617,18 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
 def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     """Get the court status from Redis or cache it if it's not there.
 
-    :param court_id: The court ID to check.
-    :param server_ip: The server IP address.
-    :return: True if connection was successful, False otherwise.
-    """
+    Args:
+        court_id: The court ID to check.
+        server_ip: The server IP address.
 
+    Returns:
+        True if connection was successful, False otherwise.
+    """
     court_status_key = f"status:pacer:court.{court_id}:ip.{server_ip}"
     r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
-        court_status = pickle.loads(pickle_status)
-        return court_status
+        return pickle.loads(pickle_status)
 
     # Unable to find court_status in cache, getting it from request.
     connection_info = check_pacer_court_connectivity(court_id)
@@ -641,11 +653,11 @@ def log_pacer_court_connection(
 ) -> None:
     """Log the problem with the court in Redis.
 
-    :param connection_info: A dict as returned by
-    check_pacer_court_connectivity method.
-    :param court_id: The court ID.
-    :param server_ip: The server IP address.
-    :return: None
+    Args:
+        connection_info: A dict as returned by
+            check_pacer_court_connectivity method.
+        court_id: The court ID.
+        server_ip: The server IP address.
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
@@ -674,14 +686,15 @@ def log_pacer_court_connection(
 def is_pacer_court_accessible(court_id: str) -> bool:
     """Check the connectivity for the given court.
 
-    :param court_id: The court ID to check.
-    :return: True if connection was successful, False otherwise.
-    """
+    Args:
+        court_id: The court ID to check.
 
+    Returns:
+        True if connection was successful, False otherwise.
+    """
     pacer_court_id = map_cl_to_pacer_id(court_id)
     # Get the IP address of the current node.
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
 
-    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
-    return court_status
+    return get_or_cache_pacer_court_status(pacer_court_id, ip_addr)

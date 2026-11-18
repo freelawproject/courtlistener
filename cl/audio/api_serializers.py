@@ -1,3 +1,5 @@
+"""REST API serializers for oral argument audio."""
+
 from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
 from cl.api.utils import (
@@ -15,6 +17,8 @@ class AudioSerializer(
     DynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
+    """Serializer for oral argument audio, linking its docket and panel."""
+
     absolute_url = CharField(source="get_absolute_url", read_only=True)
     panel = HyperlinkedRelatedField(
         many=True,

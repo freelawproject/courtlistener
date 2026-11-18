@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 
 
 import sys
 
-from django.db import migrations, models
+from django.db import migrations
 
 from cl.lib.migration_utils import load_migration_fixture
 

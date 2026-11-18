@@ -1,5 +1,6 @@
-from django.db import migrations
 from django.contrib.postgres.operations import RemoveIndexConcurrently
+from django.db import migrations
+
 
 class Migration(migrations.Migration):
     atomic = False

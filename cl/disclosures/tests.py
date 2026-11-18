@@ -1,5 +1,4 @@
 import json
-import os
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -36,20 +35,9 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class DisclosureIngestionTest(TestCase):
-    test_file = os.path.join(
-        settings.INSTALL_ROOT,
-        "cl",
-        "disclosures",
-        "test_assets",
-        "disclosure_test_asset.json",
-    )
-    jef_pdf = os.path.join(
-        settings.INSTALL_ROOT,
-        "cl",
-        "disclosures",
-        "test_assets",
-        "JEF_format.pdf",
-    )
+    test_assets = settings.INSTALL_ROOT / "cl" / "disclosures" / "test_assets"
+    test_file = test_assets / "disclosure_test_asset.json"
+    jef_pdf = test_assets / "JEF_format.pdf"
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -63,8 +51,7 @@ class DisclosureIngestionTest(TestCase):
 
     def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
-
-        with open(self.test_file) as f:
+        with self.test_file.open() as f:
             extracted_data = json.load(f)
         Investment.objects.all().delete()
 
@@ -90,8 +77,7 @@ class DisclosureIngestionTest(TestCase):
 
     async def test_extraction_and_ingestion_jef(self) -> None:
         """Can we successfully ingest disclosures from jef documents?"""
-        with open(self.jef_pdf, "rb") as f:
-            pdf_bytes = f.read()
+        pdf_bytes = self.jef_pdf.read_bytes()
         await Investment.objects.all().adelete()
 
         extracted_data = await microservice(

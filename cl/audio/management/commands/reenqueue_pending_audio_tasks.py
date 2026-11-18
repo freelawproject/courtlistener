@@ -1,3 +1,5 @@
+"""Re-enqueue recent audio that is missing standardization or transcription."""
+
 import argparse
 from datetime import timedelta
 from typing import cast
@@ -28,16 +30,17 @@ def run_reenqueue_cycle(
     Redis-locked helpers, returns. Safe to run alongside the scraper —
     contended pks are no-ops.
 
-    :param older_than_hours: Only consider audios created at least this
-        many hours ago (avoids fighting with in-flight scraper enqueues).
-    :param newer_than_days: Don't look further back than this many days.
-    :param limit: Cap on rows per stage. 0 means no limit.
-    :param skip_processing: Skip the standardization stage.
-    :param skip_transcription: Skip the transcription stage.
-    :param dry_run: Print what would be dispatched without acquiring locks.
-    :param verbose: When False, per-pk dispatch logs go to DEBUG instead
-        of INFO. Cycle summaries always log at INFO. Set to False from the
-        daemon so steady-state hourly runs don't flood logs.
+    Args:
+        older_than_hours: Only consider audios created at least this
+            many hours ago (avoids fighting with in-flight scraper enqueues).
+        newer_than_days: Don't look further back than this many days.
+        limit: Cap on rows per stage. 0 means no limit.
+        skip_processing: Skip the standardization stage.
+        skip_transcription: Skip the transcription stage.
+        dry_run: Print what would be dispatched without acquiring locks.
+        verbose: When False, per-pk dispatch logs go to DEBUG instead
+            of INFO. Cycle summaries always log at INFO. Set to False from the
+            daemon so steady-state hourly runs don't flood logs.
     """
     per_pk_log = logger.info if verbose else logger.debug
 
@@ -159,6 +162,8 @@ def run_reenqueue_cycle(
 
 
 class Command(VerboseCommand):
+    """Run one re-enqueue cycle for pending audio."""
+
     help = (
         "Re-enqueue audios that are missing standardization (no duration) "
         "or missing transcription (stt_status=STT_NEEDED). The dispatch "
@@ -167,6 +172,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Add the age window, limit, stage-skipping, and dry-run options."""
         parser.add_argument(
             "--older-than-hours",
             type=int,
@@ -213,6 +219,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
+        """Run a re-enqueue cycle with the given options."""
         super().handle(*args, **options)
         # OptionsType is too loose for the function signature, but argparse
         # has already coerced these via type=int / action="store_true".
