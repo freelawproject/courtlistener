@@ -98,7 +98,13 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    RECAPDocument,
+    SearchType,
+)
 from cl.stats.metrics import record_search_duration
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -2897,9 +2903,9 @@ def apply_custom_score_to_main_query(
         else False
     )
 
-    valid_decay_relevance_types: dict[str, dict[str, str | int | float]] = (
-        date_decay_relevance_types
-    )
+    valid_decay_relevance_types: dict[
+        SearchType, dict[str, str | int | float]
+    ] = date_decay_relevance_types
     main_order_by = cd.get("order_by", "")
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on

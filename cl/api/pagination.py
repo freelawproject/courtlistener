@@ -21,7 +21,7 @@ from rest_framework.utils.urls import replace_query_param
 
 from cl.lib.elasticsearch_utils import get_cardinality_count
 from cl.search.api_utils import CursorESList
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SearchType
 from cl.search.types import ESCursor
 
 
@@ -267,32 +267,20 @@ class BigPagination(VersionBasedPagination):
 class ESCursorPagination(BasePagination):
     """Custom pagination class to handle ES cursor pagination, based in the ES search_after param."""
 
-    request = None
-    es_list_instance = None
-    results_count_exact = None
-    results_count_approximate = None
-    child_results_count = None
-    results_in_page = None
-    base_url = None
-    cursor = None
-    search_type = None
-    cursor_query_param = "cursor"
-    invalid_cursor_message = "Invalid cursor"
-    request_date = None
-    page_int = 0
-
-    def initialize_context_from_request(
-        self, request, search_type
+    def __init__(
+        self, request, search_type: SearchType
     ) -> datetime.date | None:
-        """Set up the paginator's state from the request and its cursor.
-
-        Returns:
-            The request date from the cursor, or today on the first page.
-            None if the cursor has no request date.
-        """
+        """Set up the paginator's state from the request and its cursor."""
+        self.es_list_instance = None
+        self.results_count_exact = None
+        self.results_count_approximate = None
+        self.child_results_count = None
+        self.results_in_page = None
+        self.cursor_query_param: str = "cursor"
+        self.invalid_cursor_message: str = "Invalid cursor"
         self.base_url = request.build_absolute_uri()
         self.request = request
-        self.search_type = search_type
+        self.search_type: SearchType = search_type
         self.cursor = self.decode_cursor(request)
 
         # Set the request date from the cursor or provide an initial one if
@@ -359,7 +347,7 @@ class ESCursorPagination(BasePagination):
             "results": data,
         }
 
-        if self.search_type == SEARCH_TYPES.RECAP:
+        if self.search_type == SearchType.RECAP:
             # Include the document_count for the "r" search type.
             base_response["document_count"] = self.get_child_results_count()
         return Response(base_response)

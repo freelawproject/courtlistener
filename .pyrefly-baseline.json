@@ -190,24 +190,10 @@
       "severity": "error"
     },
     {
-      "column": 25,
-      "path": "cl/api/pagination.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `search_type` with type `str` in function `cl.search.types.ESCursor.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/api/pagination.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `get_reverse_search_after_sort_key`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/api/pagination.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `search_type` with type `str` in function `cl.search.types.ESCursor.__init__`",
       "severity": "error"
     },
     {
@@ -222,13 +208,6 @@
       "path": "cl/api/pagination.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `search_type` with type `str` in function `cl.search.types.ESCursor.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `url` with type `str` in function `rest_framework.utils.urls.replace_query_param`",
       "severity": "error"
     },
     {

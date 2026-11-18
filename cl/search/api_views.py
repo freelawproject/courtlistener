@@ -338,7 +338,7 @@ class OpinionClusterViewSet(
                 redirection = ClusterRedirection.objects.get(
                     deleted_cluster_id=int(pk)
                 )
-            except (ValueError, TypeError, ClusterRedirection.DoesNotExist):
+            except ValueError, TypeError, ClusterRedirection.DoesNotExist:
                 raise exc
 
             if redirection.reason == ClusterRedirection.SEALED:
@@ -586,10 +586,8 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
 
         search_query = result_serializer.document.search()
 
-        paginator = ESCursorPagination()
-        cleaned_data["request_date"] = (
-            paginator.initialize_context_from_request(request, search_type)
-        )
+        paginator = ESCursorPagination(request, search_type)
+        cleaned_data["request_date"] = paginator.request_date
         highlighting_fields = {}
         main_query, child_docs_query = do_es_api_query(
             search_query,

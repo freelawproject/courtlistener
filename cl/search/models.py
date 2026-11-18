@@ -4,6 +4,7 @@ import logging
 import re
 from collections.abc import Callable
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
 from urllib.parse import quote
@@ -3986,8 +3987,10 @@ class Tag(AbstractDateTimeModel):
 #
 #     class Meta:
 #         unique_together = ("upper_court", "lower_court")
-class SEARCH_TYPES:
-    """Search type codes, their names, and lists of types for alerts."""
+
+
+class SearchType(StrEnum):
+    """Search type codes."""
 
     OPINION = "o"
     RECAP = "r"
@@ -3996,6 +3999,18 @@ class SEARCH_TYPES:
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     PARENTHETICAL = "pa"
+
+
+class SEARCH_TYPES:
+    """Search type codes, their names, and lists of types for alerts."""
+
+    OPINION = SearchType.OPINION
+    RECAP = SearchType.RECAP
+    DOCKETS = SearchType.DOCKETS
+    RECAP_DOCUMENT = SearchType.RECAP_DOCUMENT
+    ORAL_ARGUMENT = SearchType.ORAL_ARGUMENT
+    PEOPLE = SearchType.PEOPLE
+    PARENTHETICAL = SearchType.PARENTHETICAL
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
