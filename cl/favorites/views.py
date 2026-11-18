@@ -128,14 +128,17 @@ def _note_form_response(
 ) -> TemplateResponse:
     """Render the v2 note form fragment for htmx.
 
-    :param request: The request being answered.
-    :param form: The form to render, with its errors if any.
-    :param event: The event to announce once the fragment is swapped in, set
-        only when the note was saved or deleted. It also updates the note
-        button on the page and, through the dialog's listeners, closes the
-        dialog. A response that carries errors must leave it unset so the
-        dialog stays open.
-    :return: The fragment response.
+    Args:
+        request: The request being answered.
+        form: The form to render, with its errors if any.
+        event: The event to announce once the fragment is swapped in, set
+            only when the note was saved or deleted. It also updates the
+            note button on the page and, through the dialog's listeners,
+            closes the dialog. A response that carries errors must leave it
+            unset so the dialog stays open.
+
+    Returns:
+        The fragment response.
     """
     if event is None:
         return TemplateResponse(

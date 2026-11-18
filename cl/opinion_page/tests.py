@@ -5788,8 +5788,11 @@ class DocketNoteFormV2Test(TestCase):
         )
 
     async def test_tab_without_a_v2_template_keeps_the_v1_form(self) -> None:
-        """Does a tab with no v2 template keep the v1 form when the flag is
-        on? It still renders the legacy modal."""
+        """Does a tab with no v2 template keep the v1 form?
+
+        It must, even with the flag on, since it still renders the legacy
+        modal.
+        """
         r = await self.async_client.get(
             reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
         )
@@ -5798,8 +5801,10 @@ class DocketNoteFormV2Test(TestCase):
         self.assertIs(type(r.context["note_form"]), NoteForm)
 
     async def test_logged_out_user_gets_sign_in_links(self) -> None:
-        """Does a logged-out user see sign-in and register links that return
-        to the docket, instead of the note form?"""
+        """Does a logged-out user see sign-in and register links?
+
+        The links return to the docket, and no note form is shown.
+        """
         url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
 
         r = await self.async_client.get(url)
@@ -5811,9 +5816,12 @@ class DocketNoteFormV2Test(TestCase):
         self.assertNotIn(reverse("save_or_update_note"), content)
 
     async def test_logged_in_user_gets_the_form_for_their_note(self) -> None:
-        """Does a logged-in user see "Add Note", the save form and no Delete
-        button until they have a note, and then "Edit Note", their saved
-        values and a Delete button?"""
+        """Does a logged-in user get the form for their note?
+
+        They see "Add Note", the save form and no Delete button until they
+        have a note, and then "Edit Note", their saved values and a Delete
+        button.
+        """
         user = await sync_to_async(UserWithChildProfileFactory)()
         await self.async_client.aforce_login(user)
         url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])

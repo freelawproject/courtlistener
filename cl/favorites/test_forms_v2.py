@@ -23,8 +23,7 @@ class NoteFormV2Test(TestCase):
         cls.content_type = ContentType.objects.get_for_model(cls.docket)
 
     def build_form(self, **overrides: str | int) -> NoteForm:
-        """Build a bound form for the docket, with fields that can be
-        overridden."""
+        """Build a bound form for the docket, with overridable fields."""
         data = {
             "content_type": self.content_type.pk,
             "object_id": self.docket.pk,
@@ -54,8 +53,10 @@ class NoteFormV2Test(TestCase):
                 self.assertIn(field_name, over_limit.errors)
 
     def test_line_breaks_count_as_one_character(self) -> None:
-        """Does a note the browser counted as 500 characters pass, even though
-        it is submitted with CRLF line breaks?"""
+        """Does a note the browser counted as 500 characters pass?
+
+        It must, even though it is submitted with CRLF line breaks.
+        """
         within_limit = "a" * 250 + "\r\n" + "a" * 249
         over_limit = "a" * 251 + "\r\n" + "a" * 249
 
@@ -65,8 +66,10 @@ class NoteFormV2Test(TestCase):
         self.assertFalse(self.build_form(notes=over_limit).is_valid())
 
     def test_first_invalid_visible_field_takes_focus(self) -> None:
-        """Does a failed save mark the first invalid visible field for
-        autofocus, and nothing else?"""
+        """Does a failed save autofocus the first invalid visible field?
+
+        No other field may be marked.
+        """
         for label, form, focused in (
             ("name", self.build_form(name="", notes="a" * 501), "name"),
             ("notes", self.build_form(notes="a" * 501), "notes"),
@@ -85,8 +88,10 @@ class NoteFormV2Test(TestCase):
                 self.assertEqual(marked, [focused] if focused else [])
 
     def test_has_hidden_field_errors(self) -> None:
-        """Is only a failure of the hidden fields reported, and not a failure
-        of the fields the user fills in?"""
+        """Are only failures of the hidden fields reported?
+
+        A failure in a field the user fills in is not.
+        """
         cases = (
             ("valid", self.build_form(), False),
             ("dangling object_id", self.build_form(object_id=999999999), True),
@@ -116,8 +121,10 @@ class NoteFormComponentTest(TestCase):
         cls.content_type = ContentType.objects.get_for_model(cls.docket)
 
     def render(self, **overrides: str | int) -> str:
-        """Render the component with a validated form, with fields that can
-        be overridden."""
+        """Render the component with a validated form.
+
+        Its fields can be overridden.
+        """
         data = {
             "content_type": self.content_type.pk,
             "object_id": self.docket.pk,
@@ -134,8 +141,10 @@ class NoteFormComponentTest(TestCase):
         )
 
     def test_notice_is_only_for_hidden_field_errors(self) -> None:
-        """Is the user told to reload only when a hidden field fails, and left
-        to the field's own message when a visible one does?"""
+        """Is the user told to reload only when a hidden field fails?
+
+        A visible field's failure is left to that field's own message.
+        """
         for label, overrides, notice, message in (
             ("hidden field", {"object_id": 999999999}, True, None),
             ("visible field", {"name": ""}, False, "This field is required."),
@@ -150,9 +159,11 @@ class NoteFormComponentTest(TestCase):
                     self.assertIn(message, html)
 
     def test_counter_markup(self) -> None:
-        """Does the notes field sit in a counter that reads the textarea's own
-        limit, keeps the visible count from screen readers, and has a status
-        region for the thresholds?"""
+        """Does the notes field sit in an accessible counter?
+
+        The counter reads the textarea's own limit, keeps the visible count
+        from screen readers, and has a status region for the thresholds.
+        """
         html = self.render()
 
         root = html.index('x-data="noteCounter"')
@@ -180,8 +191,7 @@ class NoteDialogComponentTest(TestCase):
         cls.content_type = ContentType.objects.get_for_model(cls.docket)
 
     def render(self, user: AnonymousUser | User, note: bool = False) -> str:
-        """Render the dialog for the docket, for a user who may have a
-        note."""
+        """Render the dialog for the docket, for a user who may have a note."""
         if note:
             instance = NoteFactory(content_object=self.docket, user=user)
             form = NoteForm(instance=instance)
@@ -204,8 +214,10 @@ class NoteDialogComponentTest(TestCase):
         )
 
     def test_button_has_the_id_the_response_updates(self) -> None:
-        """Does the note button carry the id that the htmx response targets,
-        built from the object's content type and id?"""
+        """Does the note button carry the id the htmx response targets?
+
+        The id is built from the object's content type and id.
+        """
         html = self.render(AnonymousUser())
 
         self.assertIn(
@@ -213,16 +225,17 @@ class NoteDialogComponentTest(TestCase):
         )
 
     def test_button_label_follows_the_note(self) -> None:
-        """Does the button offer to add a note, or to edit the existing
-        one?"""
+        """Does the button offer to add a note, or to edit the existing one?"""
         user = UserFactory()
 
         self.assertIn("Add Note", self.render(user))
         self.assertIn("Edit Note", self.render(user, note=True))
 
     def test_dialog_listens_for_the_events_the_views_send(self) -> None:
-        """Does the dialog close on the save and delete events, and announce
-        them from a status region that stays on the page?"""
+        """Does the dialog close on the save and delete events?
+
+        It also announces them from a status region that stays on the page.
+        """
         html = self.render(UserFactory())
 
         for markup in (
@@ -267,8 +280,10 @@ class GetNoteFormForTest(TestCase):
         self.assertEqual(form.initial["default_name"], "Foo v. Bar")
 
     async def test_existing_note_still_gets_the_suggested_name(self) -> None:
-        """Does a v2 form for an existing note carry the page's suggested
-        name, whether it is given as text or as a lazy callable?"""
+        """Does a v2 form for an existing note carry the suggested name?
+
+        The name can be given as text or as a lazy callable.
+        """
         await sync_to_async(NoteFactory)(
             content_object=self.docket, user=self.user, name="Old name"
         )

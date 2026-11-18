@@ -1,3 +1,5 @@
+"""Forms for creating and editing notes on the new-stack (v2) pages."""
+
 from typing import Any
 
 from django import forms
@@ -15,8 +17,11 @@ class LineBreakCharField(forms.CharField):
     """
 
     def to_python(self, value: Any) -> str | None:
-        """Normalize CRLF to LF. Runs before the length validators, which is
-        why this isn't a clean_notes() method."""
+        """Normalize CRLF to LF.
+
+        Runs before the length validators, which is why this isn't a
+        clean_notes() method.
+        """
         cleaned = super().to_python(value)
         if not cleaned:
             return cleaned
