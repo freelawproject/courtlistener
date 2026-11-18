@@ -64,12 +64,6 @@ class FakeNewAppellateCaseDocketReport(FakeDocketReport):
         return data
 
 
-class FakeEmptyAcmsCaseSearch(FakeDocketReport):
-    @property
-    def data(self):
-        return {}
-
-
 class FakeAcmsCaseSearch(FakeDocketReport):
     @property
     def data(self):
@@ -77,6 +71,9 @@ class FakeAcmsCaseSearch(FakeDocketReport):
 
 
 class FakeAcmsDocketReport(FakeDocketReport):
+    async def query_by_docket_number(self, *args, **kwargs):
+        pass
+
     @property
     def data(self):
         return {
@@ -104,6 +101,14 @@ class FakeAcmsDocketReport(FakeDocketReport):
                 }
             ],
         }
+
+
+class FakeEmptyAcmsDocketReport(FakeAcmsDocketReport):
+    """An ACMS court that has no case for the requested docket number."""
+
+    @property
+    def data(self):
+        return {}
 
 
 class FakeAcmsDocketReportToUpdate(FakeAcmsDocketReport):

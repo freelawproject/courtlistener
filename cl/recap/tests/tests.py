@@ -9,6 +9,7 @@ from unittest.mock import ANY, MagicMock
 from unittest.mock import patch as mock_patch
 from zipfile import ZipFile
 
+import httpx
 import requests
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
@@ -2925,7 +2926,7 @@ class RecapDocketFetchApiTest(TestCase):
         "cl.recap.tasks.AppellateDocketReport",
         new=fakes.FakeAppellateDocketReport,
     )
-    @mock.patch("cl.recap.tasks.AcmsCaseSearch")
+    @mock.patch("cl.recap.tasks.ACMSDocketReport")
     @mock.patch(
         "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
     )
@@ -2936,7 +2937,7 @@ class RecapDocketFetchApiTest(TestCase):
         self,
         mock_fetch_appellate_docket,
         mock_should_check_acms_court,
-        mock_acms_case_search,
+        mock_acms_docket_report,
         mock_court_accessible,
         mock_cookies,
     ):
@@ -2965,9 +2966,9 @@ class RecapDocketFetchApiTest(TestCase):
             self.appellate_docket.court_id
         )
 
-        # Verify that the ACMS case search was not triggered since the court
+        # Verify that the ACMS docket report was not used since the court
         # is ca1.
-        mock_acms_case_search.assert_not_called()
+        mock_acms_docket_report.assert_not_called()
 
         # Assert that a RECAPDocument was created.
         rds = RECAPDocument.objects.filter(
@@ -2979,7 +2980,7 @@ class RecapDocketFetchApiTest(TestCase):
         "cl.recap.tasks.AppellateDocketReport",
         new=fakes.FakeNewAppellateCaseDocketReport,
     )
-    @mock.patch("cl.recap.tasks.AcmsCaseSearch")
+    @mock.patch("cl.recap.tasks.ACMSDocketReport")
     @mock.patch(
         "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
     )
@@ -2990,7 +2991,7 @@ class RecapDocketFetchApiTest(TestCase):
         self,
         mock_fetch_appellate_docket,
         mock_should_check_acms_court,
-        mock_acms_case_search,
+        mock_acms_docket_report,
         mock_court_accessible,
         mock_cookies,
     ) -> None:
@@ -3019,9 +3020,9 @@ class RecapDocketFetchApiTest(TestCase):
             self.appellate_docket.court_id
         )
 
-        # Verify that the ACMS case search was not triggered since the court
+        # Verify that the ACMS docket report was not used since the court
         # is ca1.
-        mock_acms_case_search.assert_not_called()
+        mock_acms_docket_report.assert_not_called()
 
         # Verify that the docket was created.
         appellate_docket = Docket.objects.filter(pacer_case_id="49959").first()
@@ -3041,7 +3042,6 @@ class RecapDocketFetchApiTest(TestCase):
     @mock.patch(
         "cl.recap.tasks.ACMSDocketReport", new=fakes.FakeAcmsDocketReport
     )
-    @mock.patch("cl.recap.tasks.AcmsCaseSearch", new=fakes.FakeAcmsCaseSearch)
     @mock.patch("cl.recap.tasks.AppellateDocketReport")
     @mock.patch(
         "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
@@ -3109,9 +3109,143 @@ class RecapDocketFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.ACMSDocketReport",
+        new=fakes.FakeEmptyAcmsDocketReport,
+    )
+    @mock.patch(
+        "cl.recap.tasks.AppellateDocketReport",
+        new=fakes.FakeNewAppellateCaseDocketReport,
+    )
+    @mock.patch.object(
+        fakes.FakeEmptyAcmsDocketReport,
+        "query_by_docket_number",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch(
+        "cl.recap.tasks.fetch_appellate_docket", wraps=fetch_appellate_docket
+    )
+    def test_fetch_acms_court_docket_not_on_acms_uses_appellate_report(
+        self,
+        mock_fetch_appellate_docket,
+        mock_acms_query,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        """A pre-ACMS case in an ACMS court comes from the classic report."""
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.ca9_acms_court.pk,
+            docket_number="10-1081",
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        # ACMS was asked first and had no case for the number...
+        mock_acms_query.assert_awaited_once_with("10-1081")
+        # ...so the docket came from the classic appellate report.
+        self.assertIsNotNone(fq.docket)
+        self.assertEqual(fq.docket.pacer_case_id, "49959")
+        mock_fetch_appellate_docket.si.assert_called_once_with(fq.pk)
+
+    @staticmethod
+    def _acms_http_error(status: int) -> httpx.HTTPStatusError:
+        """Build the error httpx raises for a non-2xx answer from ACMS."""
+        request = httpx.Request(
+            "GET",
+            "https://ca9-showdoc.azurewebsites.us/Home/IndexContent"
+            "?caseIdentifier=26-7519",
+        )
+        return httpx.HTTPStatusError(
+            f"HTTP {status}",
+            request=request,
+            response=httpx.Response(status, request=request),
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.ACMSDocketReport", new=fakes.FakeAcmsDocketReport
+    )
+    @mock.patch("cl.recap.tasks.AppellateDocketReport")
+    @mock.patch.object(
+        fakes.FakeAcmsDocketReport,
+        "query_by_docket_number",
+        new_callable=mock.AsyncMock,
+    )
+    def test_fetch_appellate_docket_rejected_fails_without_retry(
+        self,
+        mock_acms_query,
+        mock_appellate_docket_report,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        """A 401 or 403 from the court fails the fetch on the first attempt."""
+        for status in (401, 403):
+            with self.subTest(status=status):
+                mock_acms_query.reset_mock()
+                mock_acms_query.side_effect = self._acms_http_error(status)
+                fq = PacerFetchQueue.objects.create(
+                    user=self.user,
+                    request_type=REQUEST_TYPE.DOCKET,
+                    court_id=self.ca9_acms_court.pk,
+                    docket_number="26-7519",
+                )
+                # Apply the task on its own: in eager mode a chain runs its
+                # success marker regardless of request.chain being cleared.
+                fetch_appellate_docket.apply(args=[fq.pk])
+
+                fq.refresh_from_db()
+                self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+                self.assertIn(f"HTTP {status}", fq.message)
+                self.assertIn("ca9-showdoc.azurewebsites.us", fq.message)
+                # One attempt, no retries, and no fallback to the classic
+                # report.
+                mock_acms_query.assert_awaited_once()
+                mock_appellate_docket_report.assert_not_called()
+
+    @mock.patch(
+        "cl.recap.tasks.ACMSDocketReport", new=fakes.FakeAcmsDocketReport
+    )
+    @mock.patch("cl.recap.tasks.AppellateDocketReport")
+    @mock.patch.object(
+        fakes.FakeAcmsDocketReport,
+        "query_by_docket_number",
+        new_callable=mock.AsyncMock,
+    )
+    def test_fetch_appellate_docket_server_error_is_retried(
+        self,
+        mock_acms_query,
+        mock_appellate_docket_report,
+        mock_court_accessible,
+        mock_cookies,
+    ):
+        """A 503 from the court keeps the retry behaviour."""
+        mock_acms_query.side_effect = self._acms_http_error(503)
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.ca9_acms_court.pk,
+            docket_number="26-7519",
+        )
+        # Apply the task on its own: in eager mode a chain runs its success
+        # marker regardless of request.chain being cleared.
+        fetch_appellate_docket.apply(args=[fq.pk])
+
+        fq.refresh_from_db()
+        # Eager tasks run their retries inline, so the fetch ends FAILED
+        # after the first attempt plus max_retries further ones.
+        self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("HTTP 503", fq.message)
+        self.assertEqual(
+            mock_acms_query.await_count,
+            fetch_appellate_docket.max_retries + 1,
+        )
+        mock_appellate_docket_report.assert_not_called()
+
+    @mock.patch(
+        "cl.recap.tasks.ACMSDocketReport",
         new=fakes.FakeAcmsDocketReportToUpdate,
     )
-    @mock.patch("cl.recap.tasks.AcmsCaseSearch", new=fakes.FakeAcmsCaseSearch)
     @mock.patch("cl.recap.tasks.AppellateDocketReport")
     @mock.patch(
         "cl.recap.tasks.should_check_acms_court", wraps=should_check_acms_court
