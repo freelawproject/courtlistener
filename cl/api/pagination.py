@@ -283,11 +283,12 @@ class ESCursorPagination(BasePagination):
 
     def initialize_context_from_request(
         self, request, search_type
-    ) -> datetime.date:
+    ) -> datetime.date | None:
         """Set up the paginator's state from the request and its cursor.
 
         Returns:
             The request date from the cursor, or today on the first page.
+            None if the cursor has no request date.
         """
         self.base_url = request.build_absolute_uri()
         self.request = request
@@ -463,7 +464,10 @@ class ESCursorPagination(BasePagination):
         Returns:
             An integer representing the number of results matching the query.
         """
-        if self.results_count_approximate is None:
+        if (
+            self.results_count_approximate is None
+            or self.results_count_exact is None
+        ):
             raise RuntimeError(
                 "paginate_queryset must run before the response is built."
             )

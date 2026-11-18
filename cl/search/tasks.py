@@ -27,6 +27,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from elastic_transport import ObjectApiResponse
 from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
 from elasticsearch.exceptions import (
     ApiError,
@@ -1815,7 +1816,7 @@ def remove_documents_by_query(
     testing_mode: bool = False,
     requests_per_second: int | None = None,
     max_docs: int = 0,
-) -> None | dict[str, str]:
+) -> ObjectApiResponse[Any] | None:
     """Remove documents from ES by query.
 
     This method deletes documents from a specified ES document type based on a

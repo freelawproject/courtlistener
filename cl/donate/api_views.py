@@ -12,7 +12,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
-from django.http import HttpResponse
 from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
@@ -171,7 +170,7 @@ class MembershipWebhookViewSet(
                 users = filter_by_email(
                     User.objects.all(), contact_data["email1"]
                 ).order_by(F("last_login").desc(nulls_last=True))
-            if not users.exists():
+            if (user := users.first()) is None:
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]
                 )
@@ -183,8 +182,6 @@ class MembershipWebhookViewSet(
                     },
                     address,
                 )
-            else:
-                user = users.first()
 
             profile = user.profile
             profile.neon_account_id = neon_account["accountId"]
@@ -458,10 +455,6 @@ class MembershipWebhookViewSet(
             membership_data["membershipId"]
         )
         if neon_membership is None:
-            return HttpResponse(
-                "Error processing webhook, Membership not found",
-                status=HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            return
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
-        return None

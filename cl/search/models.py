@@ -102,6 +102,8 @@ from cl.search.state.texas.models import TexasDocument as TexasDocument
 from cl.users.models import User
 
 if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
+
     from cl.alerts.docket_alert_sources import DocketAlertSource
     from cl.opinion_page.docket_entry_sources import DocketEntrySource
 
@@ -1430,10 +1432,11 @@ class RECAPDocument(
         )
         return str(Path(root) / bucket / filename)
 
-    def get_absolute_url(self) -> str:
+    def get_absolute_url(self) -> str | None:
         """Get the URL of the document's or attachment's page.
 
-        Documents without a document number get an empty string.
+        Documents without a document number get an empty string, and
+        documents with an unknown document type get None.
         """
         if not self.document_number:
             # Numberless entries don't get URLs
@@ -1536,7 +1539,7 @@ class RECAPDocument(
     @property
     def has_valid_pdf(self) -> bool:
         """Whether the document is available and has a local file."""
-        return self.is_available and self.filepath_local
+        return bool(self.is_available and self.filepath_local)
 
     @property
     def needs_extraction(self):
@@ -3472,7 +3475,7 @@ class Opinion(AbstractDateTimeModel):
         ]
 
     @property
-    def siblings(self) -> QuerySet:
+    def siblings(self) -> RelatedManager[Opinion]:
         """All opinions in the opinion's cluster, including this one."""
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
@@ -3892,7 +3895,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> tuple[Tag, bool]:
+    def tag_object(self, thing: TaggableType) -> tuple[models.Model, bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones
@@ -3914,7 +3917,8 @@ class Tag(AbstractDateTimeModel):
                 wish to tag.
 
         Returns:
-            A tuple with the tag and whether a new item was created
+            A tuple with the tag's through-table row for ``thing`` and whether
+            it was created
         """
         match thing:
             case Docket():
