@@ -1151,7 +1151,7 @@ async def get_or_make_docket_entry(
             )
             de_created = True
         elif count == 1:
-            de = await des.afirst()
+            de = await des.aget()
             de_created = False
         else:
             logger.warning(
