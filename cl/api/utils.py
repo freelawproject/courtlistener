@@ -283,7 +283,7 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
         return ""
 
 
-class FilterManyToManyMixin:
+class FilterManyToManyMixin(FilterSet):
     """Mixin for filtering nested many-to-many relationships.
 
     Provides helper methods to efficiently filter nested querysets when using
@@ -300,7 +300,7 @@ class FilterManyToManyMixin:
 
     join_table_cleanup_mapping: dict[str, str] = {}
 
-    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+    def _get_filter_label(self, field_name: str) -> str:
         """Maps a filter field name to its corresponding label.
 
         When defining filters(Declarative or using the `fields` attribute) in a
@@ -343,7 +343,7 @@ class FilterManyToManyMixin:
             join_table_key = join_table_key.replace(url_key, new_key, 1)
         return join_table_key
 
-    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
+    def get_filters_for_join_table(self) -> dict[str, Any]:
         """Processes request filters for use in a join table query.
 
         Iterates through the request filters, cleaning and transforming them to
