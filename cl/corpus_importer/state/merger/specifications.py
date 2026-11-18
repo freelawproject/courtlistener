@@ -134,10 +134,6 @@ class AttributeMerger[Scrape, Params, Transform](
 
     _transform: Transformer[Any, Any, Any, Any]
 
-    def __init__(self):
-        """Create an expression."""
-        super().__init__()
-
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.
 
