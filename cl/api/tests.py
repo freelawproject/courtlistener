@@ -2389,16 +2389,15 @@ class V4DRFPaginationTest(TestCase):
         return list(self.pagination.paginate_queryset(self.queryset, request))
 
     async def _compare_page_results(self, results, sort_key, start, end):
-        page_2_expected = []
-
-        page_2_expected.extend(
+        page_2_expected = [
             pk
             async for pk in (
                 Docket.objects.all()
                 .order_by(sort_key)[start:end]
                 .values_list("pk", flat=True)
             )
-        )
+        ]
+
         self.assertEqual(
             results,
             list(page_2_expected),

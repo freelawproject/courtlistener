@@ -93,18 +93,14 @@ async def send_old_alerts_webhook_event(
         webhook: The Webhook object to send the event to.
         report: A dict containing information about old alerts
     """
-    serialized_very_old_alerts = []
-    serialized_disabled_alerts = []
-
-    serialized_very_old_alerts.extend(
+    serialized_very_old_alerts = [
         DocketAlertSerializer(very_old_alert.da_alert).data
         for very_old_alert in report.very_old_alerts
-    )
-
-    serialized_disabled_alerts.append(
+    ]
+    serialized_disabled_alerts = [
         DocketAlertSerializer(disabled_alert.da_alert).data
         for disabled_alert in report.disabled_alerts
-    )
+    ]
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),
