@@ -47,6 +47,10 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
     """
     af = Audio.objects.get(pk=af_pk)
     d = af.docket
+    if d.docket_number is None:
+        raise TypeError("Docket number must not be None")
+    if d.date_argued is None:
+        raise TypeError("Date argued must not be None")
     file_name = make_af_filename(
         d.court_id,
         d.docket_number,
@@ -216,7 +220,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
                 "transcribe deferred: OpenAI conflict (audio=%s)", audio_pk
             )
             return
-        except (UnprocessableEntityError, BadRequestError):
+        except UnprocessableEntityError, BadRequestError:
             # 400/422. Terminal: the file itself can't be decoded. Mark
             # FAILED so the daemon stops trying. Not retryable.
             audio.stt_status = Audio.STT_FAILED

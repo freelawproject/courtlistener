@@ -386,27 +386,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/audio/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `docket_number` with type `str` in function `cl.audio.utils.make_af_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/audio/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `date | None` is not assignable to parameter `date_argued` with type `date` in function `cl.audio.utils.make_af_filename`",
-      "severity": "error"
-    },
-    {
-      "column": 54,
-      "path": "cl/audio/tasks.py",
-      "name": "bad-specialization",
-      "concise_description": "`str | None` is not assignable to upper bound `_StrPromise | str` of type variable `_StrOrPromiseT`",
-      "severity": "error"
-    },
-    {
       "column": 47,
       "path": "cl/audio/views.py",
       "name": "missing-attribute",
