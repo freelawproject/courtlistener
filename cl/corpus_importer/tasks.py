@@ -22,6 +22,7 @@ from typing import (
     IO,
     Any,
     Literal,
+    Never,
     NotRequired,
     TypedDict,
     TypeIs,
@@ -1998,7 +1999,7 @@ async def get_docket_by_pacer_case_id_base(
         return None
 
     # Attempt a light docket look up, we'll do better after fetching more data
-    pacer_case_id = data.get("pacer_case_id")
+    pacer_case_id = data["pacer_case_id"]
     docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = await Docket.objects.aget(pk=docket_pk)
@@ -5019,7 +5020,7 @@ def is_texas_supreme_docket(
 # TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
 # function should be replaced by a simple `is None` check.
 def is_texas_docket(
-    d: dict[str, None]
+    d: dict[Never, Never]
     | TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
