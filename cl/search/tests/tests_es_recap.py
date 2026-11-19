@@ -11,6 +11,7 @@ import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.core.paginator import Paginator
@@ -4509,6 +4510,19 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
     test_score = CharField(read_only=True)
 
 
+RECAP_API_V4_COURT_LIST_KEY = "recap_search_api_v4:minimal-court-list"
+
+
+# Patch the cached court list access to prevent inconsistent results from
+# parallel test workers editing it.
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    new=lambda: RECAP_API_V4_COURT_LIST_KEY,
+)
+@mock.patch(
+    "cl.search.signals.get_cache_key_for_court_list",
+    new=lambda: RECAP_API_V4_COURT_LIST_KEY,
+)
 class RECAPSearchAPIV4Test(
     AuthenticatedClientMixin,
     RECAPSearchAPICommonTests,
@@ -4523,6 +4537,8 @@ class RECAPSearchAPIV4Test(
 
     @classmethod
     def setUpTestData(cls):
+        # Clear anything from a previous run
+        cache.delete(RECAP_API_V4_COURT_LIST_KEY)
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now().replace(day=15, hour=0)
