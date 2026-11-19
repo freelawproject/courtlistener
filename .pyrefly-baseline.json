@@ -877,13 +877,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
       "column": 58,
       "path": "cl/search/api_utils.py",
       "name": "unexpected-keyword",
@@ -895,20 +888,6 @@
       "path": "cl/search/api_utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[list[defaultdict[str, None]], Unknown, Response | None, Response | None, Literal[False]]` is not assignable to declared return type `tuple[list[defaultdict[Unknown, Unknown]], int, Response, Response | None, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `defaultdict` has no attribute `meta`",
       "severity": "error"
     },
     {
@@ -1031,136 +1010,10 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `FieldTracker` is not assignable to parameter `tracked_set` with type `FieldInstanceTracker` in function `cl.lib.es_signal_processor.check_fields_that_changed`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/management/commands/export_doc_coverage.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/llm_clean_docket_number_daemon.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `needs_extraction`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `filepath_local`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `order_by`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ClusterCitationQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_reporter`",
       "severity": "error"
     },
     {
@@ -1206,45 +1059,10 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `parties`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
       "column": 29,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `NoneType` has no class attribute `count`",
       "severity": "error"
     },
     {
@@ -1280,20 +1098,6 @@
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `params` in function `elasticsearch._sync.client.Elasticsearch.delete_by_query`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
       "severity": "error"
     },
     {

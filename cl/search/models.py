@@ -37,6 +37,7 @@ from django.utils.encoding import force_str
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from eyecite import get_citations
+from eyecite.models import ResourceCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
@@ -1099,6 +1100,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             process_docket_data(self, UPLOAD_TYPE.IA_XML_FILE)
 
         # Then layer the uploads on top of that.
+        # pyrefly:ignore[missing-attribute] GenericRelation's descriptor always returns a manager, even when null=True
         for html in self.html_documents.order_by("date_created"):
             process_docket_data(
                 self, html.upload_type, filepath=html.filepath.path
@@ -2406,29 +2408,26 @@ class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
         Raises:
             ValueError: If the ``citation`` string can't be parsed.
         """
-        clone = self._clone()
         citation_str = kwargs.pop("citation", None)
         if citation_str:
-            try:
-                c = get_citations(
-                    citation_str,
-                    remove_ambiguous=False,
-                    tokenizer=HYPERSCAN_TOKENIZER,
-                )[0]
-            except IndexError:
+            citations = get_citations(
+                citation_str,
+                remove_ambiguous=False,
+                tokenizer=HYPERSCAN_TOKENIZER,
+            )
+            if not citations or not isinstance(
+                c := citations[0], ResourceCitation
+            ):
                 raise ValueError(f"Unable to parse citation '{citation_str}'")
-            else:
-                clone.query.add_q(
-                    Q(
-                        citations__volume=c.groups["volume"],
-                        citations__reporter=c.corrected_reporter(),
-                        citations__page=c.groups["page"],
-                    )
-                )
-
-        # Add the rest of the args & kwargs
-        clone.query.add_q(Q(*args, **kwargs))
-        return clone
+            args = (
+                Q(
+                    citations__volume=c.groups["volume"],
+                    citations__reporter=c.corrected_reporter(),
+                    citations__page=c.groups["page"],
+                ),
+                *args,
+            )
+        return super().filter(*args, **kwargs)
 
 
 @pghistory.track()

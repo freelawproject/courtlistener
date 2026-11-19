@@ -25,7 +25,7 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
-        self.throttle = None
+        self.throttle: CeleryThrottle
 
     def add_arguments(self, parser):
         """Add the testing iterations, queue, and throttle options."""

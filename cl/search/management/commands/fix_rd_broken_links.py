@@ -134,7 +134,7 @@ class Command(VerboseCommand):
         super().__init__(*args, **kwargs)
         self.options = {}
         self.pk_offset = 0
-        self.throttle = None
+        self.throttle: CeleryThrottle
         self.testing_mode = None
         self.queue = None
         self.chunk_size: int = 100
