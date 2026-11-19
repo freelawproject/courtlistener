@@ -59,8 +59,8 @@ class StructuredExtractionStatus(StrEnum):
 # CL has no per-curiam type, so per curiam opinions are stored as
 # lead opinions with the per_curiam flag set. An order, such as a SCOTUS
 # cert denial followed by a dissent from it, is the court's decision, so it
-# is the lead too, but it is not a per curiam opinion. Kinds missing here
-# fall back to lead in map_centralia_opinion_type.
+# is the lead too; see _is_per_curiam for when it is flagged per curiam.
+# Kinds missing here fall back to lead in map_centralia_opinion_type.
 CENTRALIA_OPINION_TYPES: dict[str, str] = {
     "majority": Opinion.LEAD,
     "per-curiam": Opinion.LEAD,
@@ -345,32 +345,38 @@ def _ordering_keys(writings: list[dict[str, Any]]) -> list[int]:
     return list(range(1, len(writings) + 1))
 
 
-def _is_unsigned(writing: dict[str, Any], split: bool) -> bool:
+def _is_per_curiam(writing: dict[str, Any], split: bool) -> bool:
     """Tell whether a writing is the court's own, signed by no judge.
 
-    A per curiam opinion is unsigned by definition. So is an order the read
-    found no signer for in a paper split into several writings, such as a
-    SCOTUS cert denial followed by a dissent from it: the dissent's author
-    did not write the order. A lone order is not treated as unsigned, so
-    single-opinion clusters keep the author they already had.
+    A per curiam writing is one by definition. So is an order with no
+    author in a paper split into several writings, such as a SCOTUS cert
+    denial followed by a dissent from it: the dissent's author did not
+    write the order. A lone order is left as it is, so single-opinion
+    clusters keep the author and flag they already had.
 
     :param writing: One of the `opinions` of Doctor's structured payload.
     :param split: Whether the read found several writings in the paper.
-    :return: True when no judge should be credited with the writing.
+    :return: True when the writing should be flagged per curiam and
+    credited to no judge.
     """
     kind = normalize_centralia_opinion_type(writing.get("type"))
     if kind == "per-curiam":
         return True
-    return split and kind == "order" and not writing.get("author_name")
+    return (
+        split
+        and kind == "order"
+        and not writing.get("author")
+        and not writing.get("author_name")
+    )
 
 
 def _apply_writing(
     opinion: Opinion, writing: dict[str, Any], ordering_key: int, split: bool
-) -> bool:
+) -> None:
     """Copy one writing of a structured read onto an opinion, unsaved.
 
     Sets the opinion's HTML, ordering key, type, per curiam flag and author
-    string. An unsigned writing (see _is_unsigned) has no author, so its
+    string. A per curiam writing (see _is_per_curiam) has no author, so its
     author string and linked `author` are cleared: an author the seed
     carried belongs to the whole combined paper, not to an unsigned order
     within it. Otherwise the read's author replaces the author string, which
@@ -383,29 +389,21 @@ def _apply_writing(
     It must carry HTML.
     :param ordering_key: The writing's ordering key, from _ordering_keys.
     :param split: Whether the read found several writings in the paper.
-    :return: Whether the writing is unsigned, so callers can keep
-    link_judges from crediting it to a judge.
+    :return: None
     """
     opinion.html = _wrap(writing["html"])
     opinion.ordering_key = ordering_key
-    centralia_type = writing.get("type")
-    opinion.type = map_centralia_opinion_type(centralia_type)
-    opinion.per_curiam = (
-        normalize_centralia_opinion_type(centralia_type) == "per-curiam"
-    )
-    unsigned = _is_unsigned(writing, split)
-    if unsigned:
+    opinion.type = map_centralia_opinion_type(writing.get("type"))
+    opinion.per_curiam = _is_per_curiam(writing, split)
+    if opinion.per_curiam:
         author_str = ""
     elif author_name := writing.get("author_name"):
         author_str = titlecase(author_name)
     else:
         author_str = opinion.author_str
-
-    if unsigned or author_str != opinion.author_str:
+    if opinion.per_curiam or author_str != opinion.author_str:
         opinion.author = None
     opinion.author_str = author_str
-
-    return unsigned
 
 
 def merge_structured_opinion_into_cl_opinion(
@@ -472,17 +470,14 @@ def merge_structured_opinion_into_cl_opinion(
     # The first writing, normally the majority, goes on the existing opinion
     # so citations to it and its URL keep pointing at the decision.
     split = len(ordered) > 1
-    unsigned: list[Opinion] = []
-    if _apply_writing(opinion, ordered[0][1], ordered[0][0], split):
-        unsigned.append(opinion)
+    _apply_writing(opinion, ordered[0][1], ordered[0][0], split)
     siblings = []
     for ordering_key, writing in ordered[1:]:
         sibling = Opinion(
             cluster=opinion.cluster,
             plain_text=writing.get("text") or "",
         )
-        if _apply_writing(sibling, writing, ordering_key, split):
-            unsigned.append(sibling)
+        _apply_writing(sibling, writing, ordering_key, split)
         siblings.append(sibling)
 
     cluster = opinion.cluster
@@ -498,9 +493,10 @@ def merge_structured_opinion_into_cl_opinion(
     with transaction.atomic():
         link_judges(cluster, [opinion, *siblings])
         # link_judges credits a lone opinion with no author string to the
-        # judge named in the cluster's `judges`, even when it is unsigned
-        for merged in unsigned:
-            merged.author = None
+        # judge named in the cluster's `judges`, even when it is per curiam
+        for merged in (opinion, *siblings):
+            if merged.per_curiam:
+                merged.author = None
         opinion.save(
             update_fields=[
                 "date_modified",
