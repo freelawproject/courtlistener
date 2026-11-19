@@ -2337,17 +2337,6 @@ class TexasDocketEntrySourceTest(TestCase):
                     docket_entry_sources.TEXAS,
                 )
 
-    def test_only_sources_that_send_alerts_opt_in(self) -> None:
-        """Do RECAP and SCOTUS, whose mergers send docket alerts, opt in, while Texas keeps the default of no alerts menu?"""
-        cases = {
-            "RECAP": (docket_entry_sources.RECAP, True),
-            "SCOTUS": (docket_entry_sources.SCOTUS, True),
-            "TEXAS": (docket_entry_sources.TEXAS, False),
-        }
-        for name, (source, expected) in cases.items():
-            with self.subTest(source=name):
-                self.assertEqual(source.supports_docket_alerts, expected)
-
     def test_download_label_follows_the_stored_format(self) -> None:
         """Is a Texas file's download button named after its stored format, since TAMES also serves HTML, WordPerfect and MP3 files, while RECAP keeps "Download PDF"?"""
         cases = [
@@ -2371,17 +2360,6 @@ class TexasDocketEntrySourceTest(TestCase):
             ),
             "Download PDF",
         )
-
-    def test_only_indexed_sources_opt_into_entry_search(self) -> None:
-        """Do RECAP and SCOTUS, whose entries are in the search index, opt into "Search this docket", while Texas keeps the default of no search box?"""
-        cases = {
-            "RECAP": (docket_entry_sources.RECAP, True),
-            "SCOTUS": (docket_entry_sources.SCOTUS, True),
-            "TEXAS": (docket_entry_sources.TEXAS, False),
-        }
-        for name, (source, expected) in cases.items():
-            with self.subTest(source=name):
-                self.assertEqual(source.supports_entry_search, expected)
 
     def test_entries_and_documents_load_in_two_queries(self) -> None:
         """Do the docket page's entries and their documents take two queries, however many entries there are?"""
@@ -2603,28 +2581,18 @@ class TexasDocketPageTest(TestCase):
                 self.assertNotIn('name="entry_gte"', content)
                 self.assertNotIn("Buy on PACER", content)
 
-    def test_alerts_menu_follows_supports_docket_alerts(self) -> None:
-        """Is the alerts menu hidden for Texas, whose alerts aren't sent yet, and shown again as soon as its source supports docket alerts, in both stacks?"""
-        with_alerts = replace(
-            docket_entry_sources.TEXAS, supports_docket_alerts=True
-        )
-        cases = (
-            ("texas", docket_entry_sources.TEXAS, False),
-            ("texas with alerts", with_alerts, True),
-        )
-        for name, source, shows_menu in cases:
-            for new_design in (False, True):
-                with (
-                    self.subTest(source=name, new_design=new_design),
-                    mock.patch.dict(
-                        docket_entry_sources.BY_COURT_ID, {"tex": source}
-                    ),
-                    override_flag("texas_docket_page", active=True),
-                    override_flag("use_new_design", active=new_design),
-                ):
-                    content = self.client.get(self.url).content.decode()
-                    self.assertEqual("Get Alerts" in content, shows_menu)
-                    self.assertEqual("Share Alert Link" in content, shows_menu)
+    def test_alerts_menu_and_search_box_show_in_both_stacks(self) -> None:
+        """Does each stack show the alerts menu and "Search this docket" on a Texas docket, as for RECAP and SCOTUS? The page stays behind texas_docket_page until both work."""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Get Alerts", content)
+                self.assertIn("Share Alert Link", content)
+                self.assertIn('placeholder="Search this docket"', content)
 
     def test_download_button_names_the_stored_format(self) -> None:
         """Does each stack label a stored MP3 "Download MP3" rather than promise a PDF?"""
@@ -2640,31 +2608,6 @@ class TexasDocketPageTest(TestCase):
                 content = self.client.get(self.url).content.decode()
                 self.assertIn("Download MP3", content)
                 self.assertNotIn("Download PDF", content)
-
-    def test_search_box_follows_supports_entry_search(self) -> None:
-        """Is "Search this docket" hidden for Texas, whose entries aren't in the search index, and shown again once its source supports entry search, in both stacks?"""
-        searchable = replace(
-            docket_entry_sources.TEXAS, supports_entry_search=True
-        )
-        cases = (
-            ("texas", docket_entry_sources.TEXAS, False),
-            ("texas indexed", searchable, True),
-        )
-        for name, source, shows_search in cases:
-            for new_design in (False, True):
-                with (
-                    self.subTest(source=name, new_design=new_design),
-                    mock.patch.dict(
-                        docket_entry_sources.BY_COURT_ID, {"tex": source}
-                    ),
-                    override_flag("texas_docket_page", active=True),
-                    override_flag("use_new_design", active=new_design),
-                ):
-                    content = self.client.get(self.url).content.decode()
-                    self.assertEqual(
-                        'placeholder="Search this docket"' in content,
-                        shows_search,
-                    )
 
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
         """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""
@@ -3127,10 +3070,10 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
                 self.assertEqual(r.status_code, status)
 
     @override_settings(
-        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag_and_offers_no_alerts"
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag"
     )
-    def test_texas_docket_needs_its_flag_and_offers_no_alerts(self) -> None:
-        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown without the alerts button, since Texas doesn't send docket alerts yet?"""
+    def test_texas_docket_needs_its_flag(self) -> None:
+        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown with the alerts button?"""
         # Sync, since override_flag queries the DB when it's entered.
         self.client.login(username="pandora", password="password")
         url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
@@ -3140,7 +3083,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         with override_flag("texas_docket_page", active=True):
             r = self.client.get(url)
             self.assertEqual(r.status_code, HTTPStatus.OK)
-            self.assertNotIn(
+            self.assertIn(
                 'data-enable-message="Get Alerts"', r.content.decode()
             )
 

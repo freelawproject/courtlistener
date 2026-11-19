@@ -421,14 +421,10 @@ async def render_new_docket_alert(
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
     # docket_alerts_button.html gates the alerts button on the docket
-    # having a page at its source, mirroring the docket page toolbar, which
-    # also hides it for sources that don't send docket alerts.
-    source = docket.get_entry_source()
-    docket_source_url = (
-        await sync_to_async(source.docket_url)(docket)
-        if source.supports_docket_alerts
-        else None
-    )
+    # having a page at its source, mirroring the docket page toolbar.
+    docket_source_url = await sync_to_async(
+        docket.get_entry_source().docket_url
+    )(docket)
     return TemplateResponse(
         request,
         "docket_alert_new.html",

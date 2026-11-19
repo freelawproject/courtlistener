@@ -265,23 +265,11 @@ class DocketEntrySource:
     ``entry_number``. When False, the docket page drops its "Documents"
     range filter, since there is nothing to filter on.
 
-    ``supports_docket_alerts`` says whether subscribers of the source's
-    dockets get docket alerts. When False, both stacks hide the docket's
-    alerts menu, so nobody subscribes to alerts that would never be sent.
-    It defaults to False so a new source only shows the menu once its
-    mergers send alerts and it opts in.
-
     ``entry_display_text`` returns the text the docket page shows for an
     entry, which the view puts on ``entry.display_text``. The legacy stack
     renders it unescaped, as it always did for RECAP descriptions, so a
     source that builds it from scraped fields MUST escape them, e.g. with
     ``format_html``, as ``_texas_entry_display_text`` does.
-
-    ``supports_entry_search`` says whether the source's entries are in the
-    search index that "Search this docket" queries. When False, both stacks
-    hide that box, since it could never find anything. Like
-    ``supports_docket_alerts``, it defaults to False so a new source only
-    shows the box once it's indexed.
 
     ``document_download_label`` returns the label of the button that
     downloads a document's stored file, which ``attach_display_fields`` puts
@@ -345,8 +333,6 @@ class DocketEntrySource:
     )
     launch_flag: str | None = None
     has_entry_numbers: bool = True
-    supports_docket_alerts: bool = False
-    supports_entry_search: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
     document_download_label: Callable[[Any], str] = _download_pdf_label
@@ -575,8 +561,6 @@ RECAP: DocketEntrySource = DocketEntrySource(
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
     initial_document_buttons=_recap_initial_document_buttons,
-    supports_docket_alerts=True,
-    supports_entry_search=True,
 )
 
 
@@ -767,8 +751,6 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     ),
     admin_document_label="SCOTUS Document",
     launch_flag="scotus_docket_page",
-    supports_docket_alerts=True,
-    supports_entry_search=True,
 )
 
 

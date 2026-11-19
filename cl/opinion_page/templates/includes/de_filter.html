@@ -2,8 +2,7 @@
   <div class="row filter-box">
     <!-- Search -->
     <div class="col-xs-12 col-md-2">
-      {# Hidden for sources whose entries aren't in the search index. #}
-      {% if docket_entries and docket_source.supports_entry_search %}
+      {% if docket_entries %}
         <div class="row" id="main-query-box">
           <div id="search-container" class="col-xs-12 text-center">
             <label class="sr-only" for="de-filter-search">Search</label>
