@@ -92,9 +92,11 @@ class DocketFeed(Feed):
             anchor = f"minute-entry-{item.pk}"
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
-    def item_pubdate(self, item: SourceDocketEntry) -> datetime:
-        """Use midnight Pacific time on the entry's filing date."""
-        return midnight_pt(item.date_filed)
+    def item_pubdate(self, item: SourceDocketEntry) -> datetime | None:
+        """Use midnight Pacific time on the entry's filing date, if it has one."""
+        if not (date_filed := item.date_filed):
+            return None
+        return midnight_pt(date_filed)
 
     def item_enclosure_url(self, item: SourceDocketEntry) -> str | None:
         """Link to the entry's main document.
