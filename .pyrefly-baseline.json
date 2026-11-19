@@ -303,13 +303,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/lasc/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CaseIDQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
