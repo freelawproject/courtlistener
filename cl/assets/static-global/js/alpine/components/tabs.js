@@ -55,7 +55,7 @@ document.addEventListener('alpine:init', () => {
     },
     handleSendError(event) {
       if (!this.isTabRequest(event)) return;
-      this.errorMessage = "Couldn't load this tab. Please check your connection and try again.";
+      this.errorMessage = this.$root.dataset.errorMessageConnection;
       this.restoreSelectedTab();
     },
     handleResponseError(event) {
@@ -63,7 +63,7 @@ document.addEventListener('alpine:init', () => {
       const { xhr, pathInfo } = event.detail;
 
       if (xhr.status >= 500) {
-        this.errorMessage = 'An error occurred on our end. Please try again.';
+        this.errorMessage = this.$root.dataset.errorMessageServer;
         this.restoreSelectedTab();
         return;
       }

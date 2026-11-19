@@ -11,6 +11,8 @@
       class="w-full {{ class }}"
       x-data="tabsComponent"
       data-active-tab="{{ active_tab }}"
+      data-error-message-connection="Couldn't load this tab. Please check your connection and try again."
+      data-error-message-server="An error occurred on our end. Please try again."
       x-on:htmx:before-request="startRequest"
       x-on:htmx:after-request="endRequest"
       x-on:htmx:send-error="handleSendError"
@@ -37,7 +39,9 @@
       </nav>
       <div role="status">
         <template x-if="errorMessage">
-          <p class="py-[10px] px-4 mt-4 border rounded-lg-10 bg-red-100/75 border-red-400 text-red-800" x-text="errorMessage"></p>
+          <div class="mt-4">
+            <c-banner variant="warning"><span x-text="errorMessage"></span></c-banner>
+          </div>
         </template>
       </div>
       <div x-bind:aria-busy="isBusy">
