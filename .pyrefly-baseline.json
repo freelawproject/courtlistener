@@ -219,13 +219,6 @@
       "severity": "error"
     },
     {
-      "column": 12,
-      "path": "cl/custom_filters/templatetags/component_tags.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `HttpRequest` has no attribute `_extensionless_scripts`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/disclosures/tasks.py",
       "name": "missing-attribute",
