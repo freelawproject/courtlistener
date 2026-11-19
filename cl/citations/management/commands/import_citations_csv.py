@@ -20,9 +20,9 @@ Note: If --limit is greater than --end-row, end row will be ignored
 """
 
 import argparse
-import os.path
 import time
 from collections.abc import Hashable
+from pathlib import Path
 from typing import cast
 
 import pandas as pd
@@ -116,7 +116,7 @@ class Command(BaseCommand):
         Returns:
             valid path
         """
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise argparse.ArgumentTypeError(
                 f"Csv file: {path} doesn't exist."
             )

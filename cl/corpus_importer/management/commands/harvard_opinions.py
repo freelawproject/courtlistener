@@ -4,10 +4,9 @@ import difflib
 import itertools
 import json
 import logging
-import os
 import re
 from datetime import date, datetime, timedelta
-from glob import glob
+from pathlib import Path
 from typing import Any, TypedDict, cast
 
 import requests
@@ -30,7 +29,7 @@ from cl.corpus_importer.utils import (
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import trunc
-from cl.lib.utils import human_sort
+from cl.lib.utils import glob_files, human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.cluster_sources import ClusterSources
@@ -83,7 +82,7 @@ def _make_glob_from_args(
     volumes: range | None,
     page: str | None,
 ) -> list[str]:
-    """Make list of glob paths.
+    """Make list of glob patterns relative to the Harvard corpus directory.
 
     Args:
         reporter: The reporter to filter if any
@@ -91,39 +90,18 @@ def _make_glob_from_args(
         page: The page to filter to, if any
 
     Returns:
-        A list of glob paths
+        A list of glob patterns
     """
     if reporter and volumes and page:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"law.free.cap.{reporter}.{volumes[0]}",
-            f"{page}.*.json",
-        )
-        return [glob_path]
+        return [f"law.free.cap.{reporter}.{volumes[0]}/{page}.*.json"]
     if reporter and volumes:
-        glob_paths = []
-        for volume in volumes:
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"law.free.cap.{reporter}.{volume}",
-                "*.json",
-            )
-            glob_paths.append(glob_path)
-        return glob_paths
+        return [
+            f"law.free.cap.{reporter}.{volume}/*.json" for volume in volumes
+        ]
     if reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"{reporter_key}.*/*.json",
-        )
-    else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-        )
-    return [glob_path]
+        return [f"{reporter_key}.*/*.json"]
+    return ["law.free.cap.*/*.json"]
 
 
 def filepath_list(
@@ -150,10 +128,12 @@ def filepath_list(
         A sorted list of file paths
     """
     files = []
-    glob_paths = _make_glob_from_args(reporter, volumes, page)
-    for glob_path in glob_paths:
-        files.extend(glob(glob_path))
-    return human_sort(files, key=None)  # type: ignore
+    corpus_dir = Path(settings.MEDIA_ROOT) / "harvard_corpus"
+    for glob_pattern in _make_glob_from_args(reporter, volumes, page):
+        files.extend(
+            str(path) for path in glob_files(corpus_dir, glob_pattern)
+        )
+    return human_sort(files, key=None)
 
 
 def check_for_match(new_case: str, possibilities: list[str]) -> bool:
@@ -296,7 +276,7 @@ def read_json(file_path: str, ia_download_url: str) -> Any | None:
         JSON object if available
     """
     try:
-        with open(file_path) as f:
+        with Path(file_path).open() as f:
             data = json.load(f)
     except ValueError:
         logger.warning("Empty json: missing case at: %s", ia_download_url)
@@ -730,7 +710,7 @@ def find_previously_imported_cases(
             harvard_characters,
             docket_number,
             case_name_full,
-            possible_cases,  # type: ignore
+            possible_cases,
             data["name_abbreviation"],
             citation,
         )

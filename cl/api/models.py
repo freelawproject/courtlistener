@@ -156,7 +156,7 @@ class WebhookVersions(models.IntegerChoices):
     v2 = 2, "v2"
 
 
-HttpStatusCodes = models.IntegerChoices(  # type: ignore
+HttpStatusCodes = models.IntegerChoices(
     "HttpStatusCodes",
     [(s.name, s.value) for s in HTTPStatus],  # type: ignore[arg-type]
 )

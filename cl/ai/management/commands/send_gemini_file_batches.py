@@ -124,11 +124,11 @@ NEXT STEPS AFTER RUNNING:
 """
 
 import logging
-import os
 import tempfile
 import uuid
 from collections.abc import Generator, Iterator
 from itertools import islice
+from pathlib import Path
 
 import boto3
 import environ
@@ -364,7 +364,7 @@ def create_tasks_from_files(
             logger.info("  - Referenced S3 file: %s", s3_key)
 
         with tempfile.NamedTemporaryFile(
-            delete=False, suffix=os.path.splitext(filename)[1]
+            delete=False, suffix=Path(filename).suffix
         ) as temp_file:
             temp_files.append(temp_file.name)
             temp_file.write(file_content)
@@ -440,7 +440,7 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
     logger.info("Cleaning up temporary files...")
     for temp_file_path in temp_files:
         try:
-            os.remove(temp_file_path)
+            Path(temp_file_path).unlink()
         except OSError as e:
             if e.errno != 2:  # errno.ENOENT
                 logger.warning(
