@@ -44,6 +44,7 @@ from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
+    SCOTUSDocketEntryEmailHandlingResult,
     SCOTUSEmailType,
     SCOTUSNotificationEmail,
 )
@@ -4156,7 +4157,7 @@ def fetch_and_archive_scotus_docket_followup(
     notification: SCOTUSNotificationEmail,
     followup_url: str,
     timeout: float = 10.0,
-) -> dict[str, str | dict[str, str]]:
+) -> SCOTUSDocketEntryEmailHandlingResult:
     """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3, and parse it.
 
     Args:
@@ -4297,7 +4298,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             rd_id=doc_pks,
             model_name="search.SCOTUSDocument",
         )
-        msg = f"SCOTUS docket {data['docket_number']} updated successfully."
+        msg = f"SCOTUS docket {d.docket_number} updated successfully."
         status = PROCESSING_STATUS.SUCCESSFUL
         async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
