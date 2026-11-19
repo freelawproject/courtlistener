@@ -1144,26 +1144,28 @@ async def get_or_make_docket_entry(
             date_filed=docket_entry["date_filed"],
             entry_number=docket_entry["document_number"],
         )
-        count = await des.acount()
-        if count == 0:
-            de = DocketEntry(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
-            de_created = True
-        elif count == 1:
-            de = await des.aget()
-            de_created = False
-        else:
-            logger.warning(
-                "Multiple docket entries returned for unnumbered docket "
-                "entry on date: %s while processing %s. Attempting merge",
-                docket_entry["date_filed"],
-                d,
-            )
-            # There's so little metadata with unnumbered des that if there's
-            # more than one match, we can just select the oldest as canonical.
-            de = await merge_unnumbered_docket_entries(des, docket_entry)
-            de_created = False
+        # Fetch at most two rows in a single read so concurrent imports can't
+        # change the match count between checking it and loading the entry.
+        match [de async for de in des[:2]]:
+            case []:
+                de = DocketEntry(
+                    docket=d, entry_number=docket_entry["document_number"]
+                )
+                de_created = True
+            case [de]:
+                de_created = False
+            case _:
+                logger.warning(
+                    "Multiple docket entries returned for unnumbered docket "
+                    "entry on date: %s while processing %s. Attempting merge",
+                    docket_entry["date_filed"],
+                    d,
+                )
+                # There's so little metadata with unnumbered des that if
+                # there's more than one match, we can just select the oldest
+                # as canonical.
+                de = await merge_unnumbered_docket_entries(des, docket_entry)
+                de_created = False
     return de, de_created
 
 

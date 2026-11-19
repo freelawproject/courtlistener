@@ -31,6 +31,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--reindex-target",
             choices=["citeCount", "cites"],
+            required=True,
             help="What ElasticSearch Document field to update",
         )
         parser.add_argument(
