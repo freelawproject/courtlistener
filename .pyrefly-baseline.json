@@ -618,27 +618,6 @@
       "severity": "error"
     },
     {
-      "column": 15,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `content`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `raise_for_status`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `status_code`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/scrapers/DupChecker.py",
       "name": "missing-attribute",

@@ -17,7 +17,7 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
-from httpx import HTTPError
+from httpx import HTTPError, Response
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 from redis import Redis
@@ -224,7 +224,9 @@ async def check_if_feed_changed_base(
         await feed_status.asave()
         return None
 
-    content = rss_feed.response.content
+    # query() always sets the response.
+    response = cast(Response, rss_feed.response)
+    content = response.content
     if not content:
         try:
             raise Exception(
@@ -237,12 +239,12 @@ async def check_if_feed_changed_base(
             return None
 
     try:
-        rss_feed.response.raise_for_status()
+        response.raise_for_status()
     except HTTPError as exc:
         logger.warning(
             "RSS feed down at '%s' (%s). %s",
             court_pk,
-            rss_feed.response.status_code,
+            response.status_code,
             exc,
         )
         feed_status.status = RssFeedStatus.PROCESSING_FAILED
