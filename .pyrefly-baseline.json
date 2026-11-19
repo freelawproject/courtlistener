@@ -2305,13 +2305,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/settings/third_party/sentry.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `(event: dict[Unknown, Unknown], hint: dict[Unknown, Unknown]) -> dict[Unknown, Unknown]` is not assignable to parameter `before_send` with type `((Event, dict[str, Any]) -> Event | None) | None` in function `sentry_sdk.consts.ClientConstructor.__init__`",
-      "severity": "error"
-    },
-    {
       "column": 44,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-specialization",
