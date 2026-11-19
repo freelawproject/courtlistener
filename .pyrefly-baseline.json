@@ -1185,27 +1185,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/users/api_views.py",
       "name": "bad-override",
@@ -1220,59 +1199,10 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CleanEmailMixin` has no attribute `cleaned_data`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/users/forms.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `webhooks`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/users/management/commands/cl_get_zoho_tokens.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `token`",
       "severity": "error"
     },
     {
@@ -1301,20 +1231,6 @@
       "path": "cl/users/models.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `dict[str, dict[str, int]]`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {
