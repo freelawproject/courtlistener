@@ -2265,7 +2265,7 @@ class DynamicFieldsMixin:
         source: str,
         default: Default = None,
         include_parent: bool = True,
-    ) -> set[str] | Default:
+    ) -> Iterable[str] | Default:
         """Split a comma-separated fields parameter, or return ``default`` if it is missing."""
         try:
             return params.split(",")
