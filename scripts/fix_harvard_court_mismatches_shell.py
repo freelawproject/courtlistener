@@ -1,23 +1,27 @@
 # Issue #8085. Paste this whole file into `python manage.py shell`.
-# First copy the CSV of changes from the issue to CHANGES_PATH. Each row is a
-# docket to move: docket_id, docket_number, cluster_ids, from_court_id and
-# to_court_id.
+# It downloads the CSV of changes attached to the issue from CHANGES_URL. Each
+# row is a docket to move: docket_id, docket_number, cluster_ids,
+# from_court_id and to_court_id.
 # The paste only runs a dry run, which changes nothing.
 # If the dry run output matches the expected line, type: apply()
 # apply() moves the dockets and queues Elasticsearch updates on the Celery ETL
 # queue. It writes REPORT_PATH, which records every change it made.
 # Keep that file: rollback() needs it to undo apply().
 import csv
+import io
 import os
 from collections import Counter
 
+import requests
 from django.conf import settings
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, index_parent_and_child_docs
 
-CHANGES_PATH = "/tmp/8085-court-changes.csv"
+CHANGES_URL = (
+    "https://github.com/user-attachments/files/35108858/8085-court-changes.csv"
+)
 DRY_RUN_REPORT_PATH = "/tmp/8085-dry-run.csv"
 REPORT_PATH = "/tmp/8085-run.csv"
 ROLLBACK_REPORT_PATH = "/tmp/8085-rollback.csv"
@@ -86,6 +90,13 @@ def read_rows(path: str) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def download_changes() -> list[dict[str, str]]:
+    """Download the CSV of changes from the issue and read its rows."""
+    response = requests.get(CHANGES_URL, timeout=60)
+    response.raise_for_status()
+    return list(csv.DictReader(io.StringIO(response.text)))
+
+
 def run_rows(
     rows: list[dict[str, str]], dry_run: bool, report_path: str
 ) -> Counter:
@@ -119,7 +130,7 @@ def apply() -> Counter | None:
     if os.path.exists(REPORT_PATH):
         print(f"STOP. {REPORT_PATH} exists, so apply() already ran.")
         return None
-    return run_rows(read_rows(CHANGES_PATH), False, REPORT_PATH)
+    return run_rows(download_changes(), False, REPORT_PATH)
 
 
 def rollback(dry_run: bool = False) -> Counter:
@@ -136,5 +147,5 @@ def rollback(dry_run: bool = False) -> Counter:
     return run_rows(rows, dry_run, ROLLBACK_REPORT_PATH)
 
 
-stats = run_rows(read_rows(CHANGES_PATH), True, DRY_RUN_REPORT_PATH)
+stats = run_rows(download_changes(), True, DRY_RUN_REPORT_PATH)
 print("Expected: 3187 'would move', nothing skipped. If so, type: apply()")
