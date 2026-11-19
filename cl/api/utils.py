@@ -7,7 +7,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import eyecite
 from asgiref.sync import async_to_sync, sync_to_async
@@ -31,7 +31,6 @@ from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
 from rest_framework.exceptions import Throttled, ValidationError
-from rest_framework.generics import GenericAPIView
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
@@ -41,7 +40,6 @@ from rest_framework.throttling import (
     BaseThrottle,
     UserRateThrottle,
 )
-from rest_framework.views import APIView
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
@@ -76,6 +74,19 @@ from cl.users.tasks import (
     notify_failing_webhook,
     tag_zoho_record,
 )
+
+# DRF's view classes read DEFAULT_THROTTLE_CLASSES, which point back into
+# this module, when they're defined. Importing them here at runtime would be
+# circular, so the view mixins only inherit from them for type checking.
+if TYPE_CHECKING:
+    from rest_framework.generics import GenericAPIView
+    from rest_framework.views import APIView
+
+    _APIViewBase = APIView
+    _GenericAPIViewBase = GenericAPIView
+else:
+    _APIViewBase = object
+    _GenericAPIViewBase = object
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -515,7 +526,7 @@ def get_logging_prefix(api_version: str) -> str:
     return f"api:{api_version}"
 
 
-class LoggingMixin(APIView):
+class LoggingMixin(_APIViewBase):
     """Log requests to Redis.
 
     This draws inspiration from the code that can be found at:
@@ -659,7 +670,7 @@ def make_cache_key_for_no_filter_mixin(
     )
 
 
-class NoFilterCacheListMixin(GenericAPIView):
+class NoFilterCacheListMixin(_GenericAPIViewBase):
     """A mixin that caches list of results when there's no pagination and either a count is requested or no filters are applied to the queryset.
 
     It leverages Django's caching mechanism to store responses when no filters
