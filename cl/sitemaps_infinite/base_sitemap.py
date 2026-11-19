@@ -31,16 +31,14 @@ class CacheableList[T](list[T]):
     """
 
     expiration_time: datetime
-    current_cursor: str
+    current_cursor: str | None
     next_cursor: str | None
 
 
 class CustomCursorPaginator(CursorPaginator):
     """A custom CursorPaginator that uses the number of pages from the cache."""
 
-    section: str | None = None
-
-    def __init__(self, queryset, ordering: dict[str], section: str):
+    def __init__(self, queryset, ordering: tuple[str, ...], section: str):
         """Build the paginator for a sitemap section."""
         super().__init__(queryset, ordering)
         self.section = section
@@ -50,10 +48,6 @@ class CustomCursorPaginator(CursorPaginator):
         """Returns the total number of pages in the paginator, reads it from the cache. Overloaded version to be compatible with the standard Django Paginator API."""
         redis_db: Redis = get_redis_interface(REDIS_DB)
         num_pages_cached: SitemapsPagesNumber = redis_db.hgetall(HASH_NAME)
-
-        if self.section is None:
-            raise Exception("The section is not set in the paginator.")
-
         return int(num_pages_cached.get(self.section, 1))
 
     def save_num_pages(self, num: int) -> None:
@@ -166,7 +160,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         return urls
 
     def _urls(
-        self, cursor: str, protocol: str, domain: str
+        self, cursor: str | None, protocol: str, domain: str
     ) -> tuple[CacheableList[dict[str, Any]], str | None, bool]:
         urls: CacheableList[dict[str, Any]] = CacheableList()
         # keep the `current_cursor` with the list as cached metadata, can be used later to re-fetch the list
