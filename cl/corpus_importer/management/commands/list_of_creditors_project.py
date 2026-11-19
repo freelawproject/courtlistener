@@ -6,7 +6,7 @@ import itertools
 import os
 import re
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict, Unpack, cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -184,7 +184,7 @@ class Command(VerboseCommand):
             required=True,
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options: Unpack[OptionsType]):
         """Query and save the list of creditors reports."""
         super().handle(*args, **options)
         query_and_save_creditors_data(options)

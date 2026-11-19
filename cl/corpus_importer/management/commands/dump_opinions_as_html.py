@@ -48,5 +48,5 @@ class Command(VerboseCommand):
             )
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"{op.pk}.html"
-            with output_path.open("w") as f:
+            with output_path.open("wb") as f:
                 f.write(content.encode())

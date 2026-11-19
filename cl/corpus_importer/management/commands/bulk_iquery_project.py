@@ -2,7 +2,7 @@
 
 import itertools
 import time
-from typing import TypedDict
+from typing import Literal, TypedDict, Unpack
 
 from django.conf import settings
 from django.core.management import CommandParser
@@ -26,6 +26,7 @@ class OptionsType(TypedDict):
     courts: list[str]
     iterations: int
     iteration_delay: float
+    task: Literal["everything", "byu-project"]
 
 
 def add_all_cases_to_cl(options: OptionsType) -> None:
@@ -200,7 +201,7 @@ class Command(VerboseCommand):
             help="How many rows to skip before doing work?",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options: Unpack[OptionsType]):
         """Run the chosen task."""
         if options["task"] == "everything":
             add_all_cases_to_cl(options)

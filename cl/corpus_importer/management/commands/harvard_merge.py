@@ -8,6 +8,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup, Tag
 from django.db import transaction
+from django.db.models import QuerySet
 from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -474,7 +475,7 @@ def merge_opinion_clusters(
         )
 
 
-def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
+def fetch_cl_opinion_content(sub_opinions: QuerySet[Opinion]) -> list[str]:
     """Fetch CL opinion Content.
 
     This is a simple helper function to grab an opinion content to compare
@@ -585,7 +586,9 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def update_matching_opinions(
-    matches: dict, cluster_sub_opinions: list, harvard_opinions: list
+    matches: dict,
+    cluster_sub_opinions: QuerySet[Opinion],
+    harvard_opinions: list,
 ) -> None:
     """Update matching opinions.
 

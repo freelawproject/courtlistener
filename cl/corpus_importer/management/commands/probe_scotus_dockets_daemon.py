@@ -49,7 +49,7 @@ def process_scotus_hit(docket_number: str, content: str) -> None:
     )
     parser = SCOTUSDocketReport()
     parser._parse_text(content)
-    if not parser.data.get("docket_number"):
+    if not parser.data or not parser.data.get("docket_number"):
         logger.error(
             "SCOTUS parser produced no docket_number for %s", docket_number
         )
