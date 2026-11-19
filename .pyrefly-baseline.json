@@ -1185,20 +1185,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/stats/metrics.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CollectorRegistry` has no attribute `_cl_stat_metrics_collector_registered`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/stats/metrics.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CollectorRegistry` has no attribute `_cl_celery_queue_collector_registered`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/users/admin.py",
       "name": "missing-attribute",
