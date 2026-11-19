@@ -794,11 +794,12 @@ def merge_versions_by_download_url(
         if limit and len(seen_urls) > limit:
             break
 
-        versions_queryset = get_same_url_opinions(group, seen_urls).exclude(
-            main_version__isnull=False
-        )
+        versions_queryset = get_same_url_opinions(group, seen_urls)
         if versions_queryset is None:
             continue
+        versions_queryset = versions_queryset.exclude(
+            main_version__isnull=False
+        )
 
         # keep the latest opinion as the main version
         # exclude opinions that already have a main_version. If that main

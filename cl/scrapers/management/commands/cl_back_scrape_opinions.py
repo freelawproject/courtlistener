@@ -90,7 +90,3 @@ class Command(cl_scrape_opinions.Command):
                     wait,
                 )
                 await asyncio.sleep(wait)
-
-    def save_everything(self, items, backscrape=True):
-        """Save the scraped items, marking them as back-scraped by default."""
-        super().save_everything(items, backscrape)

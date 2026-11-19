@@ -21,6 +21,7 @@ from django.core.files.base import ContentFile
 from django.utils.html import strip_tags
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
+from juriscraper.OpinionSite import OpinionSite
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
@@ -89,8 +90,8 @@ def update_document_from_text(
     """
     court_id = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court_id, juriscraper_module)
-    if site is None:
-        logger.debug("No site found %s", juriscraper_module)
+    if not isinstance(site, OpinionSite):
+        logger.debug("No opinion site found %s", juriscraper_module)
         return {}
 
     citation_created = False
@@ -127,9 +128,7 @@ def update_document_from_text(
             )
 
     # if the candidate citation was saved successfully, it will have an id
-    metadata_dict["citation_created"] = citation_created
-
-    return metadata_dict
+    return {**metadata_dict, "citation_created": citation_created}
 
 
 @app.task(

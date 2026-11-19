@@ -1348,6 +1348,10 @@ class RECAPDocument(
 ):
     """The model for Docket Documents and Attachments."""
 
+    # Not a model field - batch jobs set this transiently so the post_save
+    # signal enqueues citation extraction on the given Celery queue.
+    citation_queue: str | None
+
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
     DOCUMENT_TYPES = (

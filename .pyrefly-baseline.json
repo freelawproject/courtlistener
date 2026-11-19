@@ -618,31 +618,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/scrapers/DupChecker.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `sha1`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/scrapers/DupChecker.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/scrapers/management/commands/cl_back_scrape_citations.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_back_scrape_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Command` has no attribute `save_everything`",
       "severity": "error"
     },
     {
@@ -653,38 +632,10 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `replace`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `*args` with type `PathLike[str] | str` in function `pathlib.PurePath.__new__`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/scrapers/management/commands/delete_duplicates.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `ClusterSources` has no class attribute `parts_to_source_mapper`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Opinion` has no attribute `unmatched_citations`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `exclude`",
       "severity": "error"
     },
     {
@@ -699,27 +650,6 @@
       "path": "cl/scrapers/management/commands/scrape_harvard_ia.py",
       "name": "bad-specialization",
       "concise_description": "`dict[str, Any]` is not assignable to upper bound `str | tuple[str, Any]` of type variable `T`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/scrapers/management/commands/update_from_text.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `AbstractSite` has no attribute `extract_from_text`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/scrapers/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `RECAPDocument` has no attribute `citation_queue`",
       "severity": "error"
     },
     {
@@ -874,27 +804,6 @@
       "path": "cl/scrapers/test_assets/test_oral_arg_scraper.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `xpath`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `all_editions`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_reporter`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_page`",
       "severity": "error"
     },
     {

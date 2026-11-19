@@ -10,6 +10,7 @@ from courts_db import find_court_by_id, find_court_ids_by_name
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
+from eyecite.models import ResourceCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.AbstractSite import AbstractSite, logger
 from reporters_db import REPORTERS
@@ -38,7 +39,7 @@ def make_citation(
 ) -> Citation | None:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
-    if not citation_objs:
+    if not citation_objs or not isinstance(citation_objs[0], ResourceCitation):
         logger.error(
             "Could not parse citation from court '%s'",
             court_id,
@@ -488,7 +489,7 @@ def save_response(site: AbstractSite) -> None:
         # both tests for and parses JSON content
         content = json.dumps(json.loads(response.content), indent=4)
         extension = "json"
-    except (UnicodeDecodeError, json.decoder.JSONDecodeError):
+    except UnicodeDecodeError, json.decoder.JSONDecodeError:
         content = response.content
         extension = "html"
 
