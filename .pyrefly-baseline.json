@@ -1,4 +1,5 @@
 {
+  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -491,13 +492,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/corpus_importer/signals.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/corpus_importer/state/florida/mergers.py",
       "name": "missing-attribute",
@@ -533,45 +527,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
+      "column": 32,
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
+      "concise_description": "Argument `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket | dict[str, None]` is not assignable to parameter `d` with type `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket | dict[Never, Never]` in function `is_texas_docket`",
       "severity": "error"
     },
     {
@@ -823,7 +782,7 @@
       "column": 23,
       "path": "cl/opinion_page/forms.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `str | None` has no attribute `field`",
+      "concise_description": "Object of class `NoneType` has no attribute `help_text`",
       "severity": "error"
     },
     {
@@ -1278,7 +1237,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1292,7 +1251,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1327,7 +1286,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`Any | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`Any | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1349,13 +1308,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int`",
       "severity": "error"
     },
     {
@@ -1429,13 +1381,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `attachment_number` with type `int` in function `cl.corpus_importer.tasks.update_rd_metadata`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -1503,6 +1448,13 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[str | None]` is not assignable to parameter `unique_case_ids` with type `list[str]` in function `replicate_recap_email_to_subdockets`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket | dict[str, None]` is not assignable to parameter `docket_data` with type `TexasCourtOfAppealsDocket | TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket` in function `cl.corpus_importer.tasks.merge_texas_docket`",
       "severity": "error"
     },
     {
