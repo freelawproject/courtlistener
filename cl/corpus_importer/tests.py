@@ -6406,6 +6406,93 @@ class CentraliaIngestTest(TestCase):
         self.assertIsNone(dissent.download_url)
         self.assertEqual(self.cluster.sub_opinions.count(), 2)
 
+    def test_an_unsigned_order_is_per_curiam(self) -> None:
+        """Is an unsigned order in a split paper a per curiam lead?
+
+        The scraper credits a SCOTUS cert denial with a dissent from it to
+        the dissent's author, since that is the only name on the paper. The
+        seed takes the order when the paper is split, so the seed's author
+        must be dropped, not kept for the order.
+        """
+        self.seed.author = PersonFactory()
+        self.seed.author_str = ""
+        self.seed.save()
+        payload = copy.deepcopy(self.multi_payload)
+        payload["opinions"][0].update(
+            type="order", author=None, author_name=None, author_title=None
+        )
+
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, payload
+        )
+
+        self.assertEqual(len(opinion_pks), 2, msg=reason)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertTrue(self.seed.per_curiam)
+        self.assertEqual(self.seed.author_str, "")
+        self.assertIsNone(self.seed.author_id)
+        dissent = Opinion.objects.get(pk=opinion_pks[1])
+        self.assertEqual(dissent.type, Opinion.DISSENT)
+        self.assertFalse(dissent.per_curiam)
+        self.assertEqual(dissent.author_str, "Lee")
+
+    def test_a_signed_order_is_not_per_curiam(self) -> None:
+        """Does an order with an author keep it, unflagged, in a split paper?
+
+        Only an order with neither an author nor an author name is the
+        court's own. One the read found a signer for is that judge's.
+        """
+        author = PersonFactory()
+        for author_fields, author_str, author_id in (
+            ({"author": None, "author_name": "WALKER"}, "Walker", None),
+            ({"author": "WALKER", "author_name": None}, "", author.pk),
+        ):
+            with self.subTest(author_fields=author_fields):
+                self.cluster.sub_opinions.exclude(pk=self.seed.pk).delete()
+                self.seed.author = author
+                self.seed.author_str = ""
+                self.seed.save()
+                payload = copy.deepcopy(self.multi_payload)
+                payload["opinions"][0].update(type="order", **author_fields)
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    self.seed, payload
+                )
+
+                self.assertEqual(len(opinion_pks), 2, msg=reason)
+                self.seed.refresh_from_db()
+                self.assertFalse(self.seed.per_curiam)
+                self.assertEqual(self.seed.author_str, author_str)
+                self.assertEqual(self.seed.author_id, author_id)
+
+    def test_a_lone_unsigned_order_keeps_its_author(self) -> None:
+        """Does a single-writing order keep the author it already had?
+
+        Only a split paper drops the seed's author for an unsigned order.
+        A lone order is imported as before, so single-opinion clusters
+        keep the author the scraper gave them.
+        """
+        author = PersonFactory()
+        self.seed.author = author
+        self.seed.author_str = ""
+        self.seed.save()
+        payload = copy.deepcopy(self.single_payload)
+        payload["opinions"][0].update(
+            type="order", author=None, author_name=None, author_title=None
+        )
+
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, payload
+        )
+
+        self.assertEqual(opinion_pks, [self.seed.pk], msg=reason)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertFalse(self.seed.per_curiam)
+        self.assertEqual(self.seed.author_str, "")
+        self.assertEqual(self.seed.author_id, author.pk)
+
     def test_orders_fall_back_to_position(self) -> None:
         """Are unusable Centralia orders replaced by 1 to N?
 
