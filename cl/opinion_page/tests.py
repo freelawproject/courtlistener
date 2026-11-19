@@ -2452,7 +2452,11 @@ class TexasDocketPageTest(TestCase):
             county="Travis",
         )
         cls.coa_docket = DocketFactory(
-            court=CourtFactory(short_name="Tex. App. - Austin"),
+            court=CourtFactory(
+                id="txctapp3",
+                jurisdiction="SA",
+                short_name="Tex. App. - Austin",
+            ),
             docket_number="03-25-00042-CV",
         )
         CaseTransferFactory(
@@ -2499,6 +2503,38 @@ class TexasDocketPageTest(TestCase):
                 self.assertIn("Court of Appeals Justice", content)
                 self.assertIn("Darlene Byrne", content)
                 self.assertNotIn("Trial Judge", content)
+
+    def test_appeal_from_a_trial_court_keeps_the_trial_judge(self) -> None:
+        """When the appeal comes straight from a trial court, as death penalty cases do, does each stack keep the common section, with the judge as the trial judge?"""
+        trial_court = CourtFactory(
+            id="texdistct262", jurisdiction="ST", short_name="Tex. Dist. Ct."
+        )
+        CaseTransferFactory(
+            origin_court=trial_court,
+            origin_docket=None,
+            origin_docket_number="D-1-DC-25-000042",
+            destination_court=self.docket.court,
+            destination_docket=self.docket,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        self.docket.appeal_from = trial_court
+        self.docket.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="D-1-DC-25-000042",
+                assigned_to_str="Karen Sage",
+            )
+        )
+        self.docket.save()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Trial Judge", content)
+                self.assertIn("Karen Sage", content)
+                self.assertNotIn("Court of Appeals Justice", content)
 
     def test_trial_court_section_in_both_stacks(self) -> None:
         """Does each stack show the Trial Court Information section with the docket's trial court data?"""

@@ -805,6 +805,14 @@ def _texas_document_download_label(document: TexasDocument) -> str:
     return f"Download {extension.lstrip('.').upper()}"
 
 
+# The fifteen Texas Courts of Appeals: every TAMES court but the two courts
+# of last resort.
+_TEXAS_COURTS_OF_APPEALS: frozenset[str] = TAMES_COURT_IDS - {
+    "tex",
+    "texcrimapp",
+}
+
+
 def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a Texas docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
@@ -868,11 +876,15 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "title": "Case Transfers",
         },
     ]
-    # On a Supreme Court docket, the merger keeps the court of appeals' case
-    # in the originating court information. Case Transfers already lists
-    # that appeal, with a link to the docket, so drop the "Appealed From"
-    # row, and name the judge for what they are: that court's justice.
-    appealed_from_court_of_appeals = docket.appeal_from_id and any(
+    # On a Supreme Court or Court of Criminal Appeals docket, the merger
+    # keeps the court of appeals' case in the originating court information.
+    # Case Transfers already lists that appeal, with a link to the docket, so
+    # drop the "Appealed From" row, and name the judge for what they are:
+    # that court's justice. Appeals that come straight from a trial court,
+    # like death penalty cases, keep the common section and its Trial Judge.
+    appealed_from_court_of_appeals = docket.appeal_from_id in (
+        _TEXAS_COURTS_OF_APPEALS
+    ) and any(
         transfer.destination_docket_id == docket.pk
         and transfer.origin_court_id == docket.appeal_from_id
         for transfer in transfers
