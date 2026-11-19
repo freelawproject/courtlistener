@@ -219,13 +219,6 @@
       "severity": "error"
     },
     {
-      "column": 5,
-      "path": "cl/disclosures/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/donate/api_views.py",
       "name": "bad-index",
