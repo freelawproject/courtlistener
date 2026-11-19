@@ -2478,6 +2478,28 @@ class TexasDocketPageTest(TestCase):
                 self.assertIn(self.coa_docket.get_absolute_url(), content)
                 self.assertIn("03-25-00042-CV", content)
 
+    def test_appeal_from_a_court_of_appeals_shows_once(self) -> None:
+        """On a Supreme Court docket appealed from a court of appeals, does each stack list the appeal once, under Case Transfers, and show that court's justice under their own label rather than as the trial judge?"""
+        self.docket.appeal_from = self.coa_docket.court
+        self.docket.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="03-25-00042-CV",
+                assigned_to_str="Darlene Byrne",
+            )
+        )
+        self.docket.save()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertEqual(content.count("Appealed From"), 1)
+                self.assertIn("Court of Appeals Justice", content)
+                self.assertIn("Darlene Byrne", content)
+                self.assertNotIn("Trial Judge", content)
+
     def test_trial_court_section_in_both_stacks(self) -> None:
         """Does each stack show the Trial Court Information section with the docket's trial court data?"""
         for new_design in (False, True):

@@ -234,7 +234,8 @@ class DocketEntrySource:
     block, so they render as part of that block with no heading or visual
     division (e.g. the SCOTUS docket metadata). ``metadata_sections``
     returns standalone titled sections rendered before the common ones
-    (e.g. RECAP's Bankruptcy Information).
+    (e.g. RECAP's Bankruptcy Information). A section titled like a common
+    one replaces it, as Texas does with Originating Court Information.
 
     ``docket_url`` returns the docket's page on the source's own site, or
     None when the source has no page for it. core_docket_data() resolves
@@ -810,6 +811,7 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     # imports from this module.
     from cl.opinion_page.utils import (
         build_case_transfer_metadata,
+        build_originating_court_metadata,
         build_trial_court_metadata,
     )
 
@@ -856,7 +858,7 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "destination_docket__slug",
         )
     )
-    return [
+    sections: list[MetadataSection] = [
         {
             "items": build_trial_court_metadata(trial_court),
             "title": "Trial Court Information",
@@ -866,6 +868,29 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "title": "Case Transfers",
         },
     ]
+    # On a Supreme Court docket, the merger keeps the court of appeals' case
+    # in the originating court information. Case Transfers already lists
+    # that appeal, with a link to the docket, so drop the "Appealed From"
+    # row, and name the judge for what they are: that court's justice.
+    appealed_from_court_of_appeals = docket.appeal_from_id and any(
+        transfer.destination_docket_id == docket.pk
+        and transfer.origin_court_id == docket.appeal_from_id
+        for transfer in transfers
+    )
+    if appealed_from_court_of_appeals:
+        items: list[MetadataItem] = []
+        for item in build_originating_court_metadata(
+            docket, docket.originating_court_information
+        ):
+            if item["label"] == "Appealed From":
+                continue
+            if item["label"] == "Trial Judge":
+                item["label"] = "Court of Appeals Justice"
+            items.append(item)
+        sections.append(
+            {"items": items, "title": "Originating Court Information"}
+        )
+    return sections
 
 
 def _texas_main_docs_prefetch() -> Prefetch:

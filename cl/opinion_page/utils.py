@@ -1019,14 +1019,23 @@ async def core_docket_data(
     # undivided block; each stack styles that section itself.
     # Source sections come before the common ones to preserve the
     # long-standing order: Bankruptcy Information, then Originating
-    # Court Information.
+    # Court Information. A source section replaces the common section
+    # with the same title.
+    source_sections = await sync_to_async(docket_source.metadata_sections)(
+        docket
+    )
+    source_titles = {section.get("title") for section in source_sections}
     metadata_sections: list[MetadataSection] = [
         {
             "items": docket_metadata
             + await sync_to_async(docket_source.metadata_items)(docket)
         },
-        *await sync_to_async(docket_source.metadata_sections)(docket),
-        *await _common_metadata_sections(docket, og_info),
+        *source_sections,
+        *[
+            section
+            for section in await _common_metadata_sections(docket, og_info)
+            if section.get("title") not in source_titles
+        ],
     ]
 
     parties = await docket.parties.aexists()
