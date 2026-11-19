@@ -32,7 +32,7 @@
     class="-mb-px flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self aria-selected:border-primary-600 aria-selected:font-medium aria-selected:text-greyscale-900"
   >
     {{ tab.label }}
-    {% if tab.count %}
+    {% if tab.count is not None %}
       <span class="size-6 rounded-full bg-greyscale-100 py-1 text-xs font-normal text-center text-greyscale-600">{{ tab.count }}</span>
     {% endif %}
   </button>
