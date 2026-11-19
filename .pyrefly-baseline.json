@@ -2,34 +2,6 @@
   "min_severity": "error",
   "errors": [
     {
-      "column": 5,
-      "path": "cl/ai/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/ai/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/ai/llm_providers/google.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/ai/llm_providers/google.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_name`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/ai/llm_providers/google.py",
       "name": "bad-assignment",
