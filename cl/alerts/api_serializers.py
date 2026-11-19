@@ -191,13 +191,11 @@ class SearchAlertSerializer(
         alert_type = attrs.get("alert_type") or getattr(
             self.instance, "alert_type", None
         )
-        alert_being_edited = bool(self.instance and self.instance.pk)
-
         result = check_alert_limits(
             user,
             rate,
             alert_type,
-            exclude_alert_pk=self.instance.pk if alert_being_edited else None,
+            exclude_alert_pk=self.instance.pk if self.instance else None,
         )
         match result.violation:
             case AlertLimitViolation.REAL_TIME_NOT_ALLOWED:
@@ -301,8 +299,8 @@ class SearchAlertSerializer(
         if alert_type:
             try:
                 # Update the instance's alert_type to compare it with its old value
-                self.instance.alert_type = alert_type
-                self.instance.validate_alert_type_change()
+                instance.alert_type = alert_type
+                instance.validate_alert_type_change()
             except ValidationError as e:
                 raise serializers.ValidationError(e.message_dict)
 

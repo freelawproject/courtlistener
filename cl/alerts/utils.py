@@ -15,6 +15,7 @@ from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
 from elasticsearch.dsl.query import Query
 from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
@@ -350,10 +351,10 @@ def fetch_all_search_alerts_results(
         percolator results (if applicable).
     """
 
+    # Response.hits is annotated upstream as a plain list, but at runtime it
+    # is an AttrList that also exposes the raw `hits` payload and `total`.
     def get_search_after(response: Response | None) -> Any:
-        # TODO: Response.hits is annotated upstream as a plain list, but at runtime
-        # it is an AttrList that also exposes the raw `hits` payload.
-        if response and cast(Any, response.hits).hits:
+        if response and cast(AttrList[Hit], response.hits).hits:
             return response.hits[-1].meta.sort
         return None
 
@@ -362,9 +363,10 @@ def fetch_all_search_alerts_results(
     all_d_alert_hits = []
 
     main_response = initial_responses.main_response
-    all_main_alert_hits.extend(main_response.hits)
-    main_total_hits = main_response.hits.total.value
-    main_alerts_returned = len(main_response.hits.hits)
+    main_hits = cast(AttrList[Hit], main_response.hits)
+    all_main_alert_hits.extend(main_hits)
+    main_total_hits = main_hits.total.value
+    main_alerts_returned = len(main_hits.hits)
     rd_response = d_response = None
     if initial_responses.rd_response:
         rd_response = initial_responses.rd_response
@@ -390,8 +392,9 @@ def fetch_all_search_alerts_results(
         if not responses.main_response:
             break
 
-        all_main_alert_hits.extend(responses.main_response.hits)
-        main_alerts_returned = len(responses.main_response.hits.hits)
+        main_hits = cast(AttrList[Hit], responses.main_response.hits)
+        all_main_alert_hits.extend(main_hits)
+        main_alerts_returned = len(main_hits.hits)
         alerts_retrieved += main_alerts_returned
 
         if responses.rd_response:
@@ -1133,7 +1136,7 @@ def get_alert_estimation_count(
         InputTooLongError,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
-    except (TransportError, ConnectionError, RequestError):
+    except TransportError, ConnectionError, RequestError:
         raise ElasticServerError()
     except ApiError as e:
         if "Failed to parse query" in str(e):

@@ -24,7 +24,9 @@ from cl.search.tasks import remove_document_from_es_index
     sender=Alert,
     dispatch_uid="create_or_update_alert_in_es_index",
 )
-def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
+def create_or_update_alert_in_es_index(
+    sender, instance: Alert, **kwargs
+) -> None:
     """Receiver function that gets called after an Alert instance is saved.
 
     This method creates or updates an Alert object in the Percolator index.
@@ -71,7 +73,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
     sender=Alert,
     dispatch_uid="remove_alert_from_es_index",
 )
-def remove_alert_from_es_index(sender, instance=None, **kwargs):
+def remove_alert_from_es_index(sender, instance: Alert, **kwargs) -> None:
     """Receiver function that gets called after an Alert instance is deleted.
 
     This function removes Alert from the Percolator index and cleans up the
