@@ -450,213 +450,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ClaimHistory` has no attribute `pacer_seq_no`",
-      "severity": "error"
-    },
-    {
-      "column": 10,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_doc_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_type`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `acms_document_guid`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `RECAPDocument | None` is not assignable to parameter `object` with type `RECAPDocument` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_type`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_doc_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `page_count`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `page_count`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `RECAPDocument` has no attribute `document_url`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-typed-dict-key",
-      "concise_description": "TypedDict `_MergeAttachmentDict` does not have key `document_url`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_iquery_sweep`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_iquery_sweep`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `objects`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `encode`",
       "severity": "error"
     },
     {
@@ -727,13 +524,6 @@
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `data`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -825,13 +615,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, str] | dict[str, Any] | str` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `court_id`",
       "severity": "error"
     },
     {

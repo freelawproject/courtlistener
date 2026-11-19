@@ -79,7 +79,7 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
             .only("court_id")
             .first()
         )
-        court_id = docket.court_id
+        court_id = docket.court_id if docket else None
     elif attrs.get("docket"):
         court_id = (
             fq.docket.court_id

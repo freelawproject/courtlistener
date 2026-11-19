@@ -389,7 +389,11 @@ class EmailProcessingQueue(AbstractDateTimeModel):
                 "Call to EmailProcessingQueue.get_related_objects() with null related_model."
             )
             return None
-        model_class = self.related_model.model_class()
+        if (model_class := self.related_model.model_class()) is None:
+            raise ValueError(
+                f"EmailProcessingQueue {self.pk} relates to "
+                f"{self.related_model}, which is no longer an installed model."
+            )
         return model_class.objects.filter(pk__in=self.object_ids)
 
     def __str__(self) -> str:

@@ -310,6 +310,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
     # SCOTUS) so the ES signal processor doesn't percolate a save that will be
     # percolated later, e.g. after the docket's parties are indexed.
     skip_percolator_request: bool
+    # Not a model field - set transiently by mergers so the save signal
+    # doesn't trigger an iquery sweep for the docket.
+    skip_iquery_sweep: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
