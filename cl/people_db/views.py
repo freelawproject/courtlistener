@@ -22,12 +22,9 @@ async def view_person(
     )
     person = await aget_object_or_404(queryset, pk=pk)
     # Redirect the user if they're trying to check out an alias.
-    if person.is_alias:
+    if alias_of := person.is_alias_of:
         return HttpResponseRedirect(
-            reverse(
-                "view_person",
-                args=[person.is_alias_of.pk, person.is_alias_of.slug],
-            )
+            reverse("view_person", args=[alias_of.pk, alias_of.slug])
         )
 
     title = await make_title_str(person)

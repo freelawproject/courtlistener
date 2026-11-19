@@ -415,20 +415,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/people_db/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name_full`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_dod`",
-      "severity": "error"
-    },
-    {
       "column": 77,
       "path": "cl/people_db/models.py",
       "name": "missing-attribute",
@@ -447,20 +433,6 @@
       "path": "cl/people_db/models.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `AttorneyOrganizationAssociation` has no attribute `docket_id`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/people_db/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/people_db/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `slug`",
       "severity": "error"
     },
     {
