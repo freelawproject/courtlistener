@@ -905,6 +905,27 @@ class TabsComponentTest(SimpleTestCase):
                 self.assertEqual(link.tag, "a")
                 self.assertEqual(link.get("href"), tab["url"])
 
+    def test_link_tabs_stay_out_of_the_history_cache(self) -> None:
+        """Link tabs opt out of htmx's history cache, so private pages aren't stored."""
+        root = self.render(
+            self.LINK_SOURCE, tabs=self.link_tabs(), active_tab="first"
+        )
+
+        self.assertEqual(root.get("hx-history"), "false")
+
+    def test_link_tabs_declare_their_error_messages(self) -> None:
+        """The error messages come from the template, not from the JS."""
+        root = self.render(
+            self.LINK_SOURCE, tabs=self.link_tabs(), active_tab="first"
+        )
+
+        for attribute in (
+            "data-error-message-connection",
+            "data-error-message-server",
+        ):
+            with self.subTest(attribute=attribute):
+                self.assertTrue(root.get(attribute))
+
     def test_only_the_active_link_is_current(self) -> None:
         """Only the active tab's link has aria-current="page"."""
         for active in ("first", "second"):
