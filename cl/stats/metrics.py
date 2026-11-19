@@ -9,6 +9,7 @@ from prometheus_client.core import (
     CounterMetricFamily,
     GaugeMetricFamily,
 )
+from prometheus_client.registry import Collector
 from sentry_sdk import capture_exception
 
 from cl.lib.celery_utils import get_queue_length
@@ -53,7 +54,7 @@ Usage:
 
 
 # Celery queue metrics (custom collector for multi-worker compatibility)
-class CeleryQueueCollector:
+class CeleryQueueCollector(Collector):
     """Custom Prometheus collector for Celery queue lengths.
 
     This collector computes queue lengths at scrape time by querying Redis
@@ -78,7 +79,7 @@ class CeleryQueueCollector:
         yield gauge
 
 
-class StatMetricsCollector:
+class StatMetricsCollector(Collector):
     """Collects tally_stat metrics from Redis for Prometheus."""
 
     def describe(self):
