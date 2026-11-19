@@ -4189,56 +4189,51 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
         )
     else:
         handling_result = async_to_sync(scotus_email.handle_email)()
-    email_type = handling_result["email_type"]
-    data = handling_result["data"]
 
-    if email_type == SCOTUSEmailType.INVALID.value:
-        async_to_sync(mark_pq_status)(
-            epq,
-            "SCOTUS email format is invalid or not recognized.",
-            PROCESSING_STATUS.INVALID_CONTENT,
-            "status_message",
-        )
-        self.request.chain = None
-        return
+    match handling_result["email_type"]:
+        case SCOTUSEmailType.CONFIRMATION.value:
+            data = handling_result["data"]
+            if data == SCOTUSConfirmationResult.Success.value:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    "Successfully confirmed SCOTUS subscription.",
+                    PROCESSING_STATUS.SUCCESSFUL,
+                    "status_message",
+                )
+                self.request.chain = None
+                return
 
-    if email_type == SCOTUSEmailType.CONFIRMATION.value:
-        if data == SCOTUSConfirmationResult.Success.value:
             async_to_sync(mark_pq_status)(
                 epq,
-                "Successfully confirmed SCOTUS subscription.",
-                PROCESSING_STATUS.SUCCESSFUL,
+                "Failed to confirm SCOTUS subscription.",
+                PROCESSING_STATUS.FAILED,
                 "status_message",
             )
             self.request.chain = None
             return
-
-        async_to_sync(mark_pq_status)(
-            epq,
-            "Failed to confirm SCOTUS subscription.",
-            PROCESSING_STATUS.FAILED,
-            "status_message",
-        )
-        self.request.chain = None
-        return
-    try:
-        d, _, doc_pks = merge_scotus_docket(data)
-    except Exception as e:
-        async_to_sync(mark_pq_status)(
-            epq,
-            f"SCOTUS docket update error: {e}",
-            PROCESSING_STATUS.FAILED,
-            "status_message",
-        )
-    else:
-        async_to_sync(associate_related_instances)(
-            epq,
-            rd_id=doc_pks,
-            model_name="search.SCOTUSDocument",
-        )
-        msg = f"SCOTUS docket {d.docket_number} updated successfully."
-        status = PROCESSING_STATUS.SUCCESSFUL
-        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
+        case SCOTUSEmailType.DOCKET_ENTRY.value:
+            data = handling_result["data"]
+            try:
+                d, _, doc_pks = merge_scotus_docket(data)
+            except Exception as e:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    f"SCOTUS docket update error: {e}",
+                    PROCESSING_STATUS.FAILED,
+                    "status_message",
+                )
+            else:
+                async_to_sync(associate_related_instances)(
+                    epq,
+                    rd_id=doc_pks,
+                    model_name="search.SCOTUSDocument",
+                )
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    f"SCOTUS docket {d.docket_number} updated successfully.",
+                    PROCESSING_STATUS.SUCCESSFUL,
+                    "status_message",
+                )
 
     return
 
