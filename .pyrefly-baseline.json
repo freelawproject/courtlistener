@@ -1535,38 +1535,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | str | Any` is not assignable to parameter `source` with type `int` in function `cl.scrapers.utils.update_or_create_docket`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Any` is not assignable to parameter `blocked` with type `bool` in function `cl.scrapers.utils.update_or_create_docket`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/scrapers/management/commands/cl_scrape_opinions.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `date | None` is not assignable to parameter `d` with type `date` in function `cl.lib.import_lib.get_scotus_judges`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/scrapers/management/commands/cl_scrape_oral_arguments.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bytes | str` is not assignable to parameter `content` with type `bytes`",
       "severity": "error"
     },
     {
@@ -1619,13 +1591,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/scrapers/management/commands/scrape_harvard_ia.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, Unknown]` is not assignable to parameter `options` with type `OptionsType` in function `get_from_ia`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/scrapers/management/commands/update_from_text.py",
       "name": "missing-attribute",
@@ -1651,13 +1616,6 @@
       "path": "cl/scrapers/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/scrapers/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AttributeValueList | str` is not assignable to parameter `anti_forgery_token` with type `str` in function `get_scotus_captcha_solution`",
       "severity": "error"
     },
     {
@@ -1840,20 +1798,6 @@
       "path": "cl/scrapers/utils.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `tuple[Pattern[Unknown], Unknown, Unknown, Unknown, Unknown, Unknown]`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/scrapers/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | date | str` is not assignable to parameter `first` with type `str` in function `case_names_are_too_different`",
-      "severity": "error"
-    },
-    {
-      "column": 62,
-      "path": "cl/scrapers/utils.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | date | str` is not assignable to parameter `obj` with type `Sized` in function `len`",
       "severity": "error"
     },
     {

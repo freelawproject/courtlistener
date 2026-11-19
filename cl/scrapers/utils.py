@@ -409,10 +409,10 @@ def update_or_create_docket(
         ):
             # Safeguard to catch possible docket mismatches, check that they
             # have at least 50% of words in common
-            if case_names_are_too_different(value, docket.case_name, 0.5):
+            if case_names_are_too_different(case_name, docket.case_name, 0.5):
                 logger.error(
                     "New case_name '%s' looks too different from old '%s'. Court %s. Docket %s",
-                    value,
+                    case_name,
                     docket.case_name,
                     court_id,
                     docket.pk,
@@ -422,10 +422,10 @@ def update_or_create_docket(
             # Most times, we find updated values for case_name that may
             # be a longer form than what we currently have, which we can
             # take advantage of to populate case_name_full
-            if not getattr(docket, "case_name_full") and len(value) > len(
+            if not getattr(docket, "case_name_full") and len(case_name) > len(
                 getattr(docket, field)
             ):
-                setattr(docket, "case_name_full", value)
+                setattr(docket, "case_name_full", case_name)
         else:
             setattr(docket, field, value)
 
