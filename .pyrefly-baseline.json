@@ -1122,13 +1122,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/settings/third_party/pghistory.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `tracks`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/sitemaps_infinite/base_sitemap.py",
       "name": "bad-override",
