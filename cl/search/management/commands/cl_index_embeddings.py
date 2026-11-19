@@ -185,7 +185,7 @@ class Command(VerboseCommand):
 
         chunk: list[int] = []
         processed_count = 0
-        if inventory_file:
+        if inventory_file and inventory_rows:
             count = (
                 inventory_rows - start_id if auto_resume else inventory_rows
             )

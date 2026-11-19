@@ -3,7 +3,7 @@
 import time
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import Literal, cast
+from typing import Literal
 
 from django.apps import apps
 from django.conf import settings
@@ -45,7 +45,7 @@ def compose_indexer_redis_key() -> str:
 
 def log_indexer_last_status(
     model_name: str, document_pk: int, chunk_size: int
-) -> Mapping[str, int | str]:
+) -> Mapping[str | bytes, int | str]:
     """Log the sweep indexer last status to Redis.
 
     Args:
@@ -66,13 +66,12 @@ def log_indexer_last_status(
             current_total = chunk_size + current_total
         documents_dict[model] = current_total
 
-    data_to_log = {
+    log_info: dict[str | bytes, int | str] = {
         "model_name": model_name,
         "last_document_id": document_pk,
         "date_time": datetime.now().isoformat(),
     }
-    data_to_log.update(documents_dict)
-    log_info = cast(Mapping[str, int | str], data_to_log)
+    log_info.update(documents_dict)
     r.hset(log_key, mapping=log_info)
     return log_info
 
@@ -126,9 +125,7 @@ def find_starting_model(target_model: str) -> int | None:
         return None
 
 
-def get_es_doc_id(
-    es_document: type[ESDocumentType], instance_id: int
-) -> int | str:
+def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> str:
     """Retrieve the Elasticsearch document ID according to their es_document.
 
     Args:
@@ -143,7 +140,7 @@ def get_es_doc_id(
     elif es_document is OpinionDocument:
         doc_id = ES_CHILD_ID(instance_id).OPINION
     else:
-        doc_id = instance_id
+        doc_id = str(instance_id)
     return doc_id
 
 

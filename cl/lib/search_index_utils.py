@@ -3,7 +3,7 @@
 import re
 from collections.abc import Iterable
 from datetime import date
-from typing import Any, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from django.db.models import Model
 from elastic_transport import ApiResponseMeta
@@ -13,7 +13,6 @@ from elasticsearch.helpers import BulkIndexError, bulk
 
 from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
-from cl.search.tasks import CiteCountUpdateDict
 
 
 def extract_field_values[M: Model](
@@ -160,6 +159,16 @@ def check_bulk_indexing_exceptions(
             case _:
                 raise_error = True
     return conflict_found, raise_error
+
+
+class CiteCountUpdateDict(TypedDict):
+    """TypedDict for the output from `build_cite_count_update`."""
+
+    _id: int | str
+    _op_type: Literal["update"]
+    _index: str
+    _routing: NotRequired[int]
+    doc: dict
 
 
 def index_documents_in_bulk(

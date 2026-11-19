@@ -133,8 +133,8 @@ class Command(VerboseCommand):
         )
         self.throttle = None
         self.queue_name: str = "batch0"
-        self.interval = None
-        self.initial_backoff_time = None
+        self.interval: int
+        self.initial_backoff_time: float
         self.max_fq_wait: float = 3600  # 1 hour. Maximum wait time for an FQ to be completed to prevent a deadlock
         self.fetches_in_progress = {}  # {court_id: (fq_pk, retry_count)}
 

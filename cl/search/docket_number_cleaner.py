@@ -273,7 +273,7 @@ def clean_docket_number_raw(
 def create_llm_court_batches(
     llm_batch: list[int],
     r: Redis,
-) -> defaultdict[str | None, list[dict[int, str]]]:
+) -> defaultdict[str, list[dict[int, str]]]:
     """Groups docket numbers by their associated court type for a given batch of docket_ids. Remove docket_ids that no longer exist, if any, from the Redis set.
 
     Args:
@@ -288,11 +288,11 @@ def create_llm_court_batches(
     dockets = Docket.objects.filter(pk__in=llm_batch).values_list(
         "id", "court_id", "docket_number_raw"
     )
-    court_batches = defaultdict(list)
+    court_batches: defaultdict[str, list[dict[int, str]]] = defaultdict(list)
     for docket_id, court_id, raw in dockets.iterator(chunk_size=2000):
         existing_docket_ids.add(docket_id)
-        if court_map.get(court_id) is not None:
-            court_batches[court_map.get(court_id)].append({docket_id: raw})
+        if (court_mapping := court_map.get(court_id)) is not None:
+            court_batches[court_mapping].append({docket_id: raw})
 
     # Remove docket_ids that no longer exist, in case the docket was deleted since the daemon job started
     deleted_docket_ids = set(llm_batch) - existing_docket_ids

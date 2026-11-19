@@ -8,10 +8,10 @@ from django.db.models import QuerySet
 
 from cl import settings
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.search_index_utils import CiteCountUpdateDict
 from cl.search.documents import OpinionClusterDocument, OpinionDocument
 from cl.search.models import Opinion, OpinionCluster
 from cl.search.tasks import (
-    CiteCountUpdateDict,
     build_bulk_cites_doc,
     build_cite_count_update,
     index_documents_in_bulk,

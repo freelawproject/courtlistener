@@ -3,6 +3,7 @@
 from django.shortcuts import get_object_or_404
 from django.templatetags.static import static
 from django.utils.timezone import is_naive
+from elasticsearch.dsl.response import Response
 
 from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
@@ -42,7 +43,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         """Get the request and the court, or raise 404 if the court doesn't exist."""
         return request, get_object_or_404(Court, pk=court)
 
-    def items(self, obj):
+    def items(self, obj) -> Response | list:
         """Returns a list of items to publish in this feed."""
         request, court = obj
         cd = {

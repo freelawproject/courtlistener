@@ -1,5 +1,6 @@
 """Estimate token counts for the RECAP and case law archives from a sample."""
 
+from collections.abc import Sequence
 from math import ceil
 from typing import cast
 
@@ -106,11 +107,11 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
     return nh3.clean(text, tags=set())
 
 
-def compute_avg_from_list(array: list[float]) -> float:
+def compute_avg_from_list(array: Sequence[float]) -> float:
     """Computes the average of a list of numbers.
 
     Args:
-        array (list[float]): A list containing numeric values.
+        array: A sequence containing numeric values.
 
     Returns:
         float: The average of the numbers in the list as a floating-point

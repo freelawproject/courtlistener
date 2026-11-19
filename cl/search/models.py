@@ -1242,7 +1242,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
         Courts without a known timezone default to US/Eastern.
         """
-        if self.time_filed:
+        if self.time_filed and self.date_filed:
             from cl.recap.constants import COURT_TIMEZONES
 
             local_timezone = pytz.timezone(
@@ -1572,7 +1572,7 @@ class RECAPDocument(
 
         The returned queryset is sorted by the depth field.
         """
-        return build_authorities_query(self.cited_opinions)
+        return build_authorities_query(self.cited_opinions.all())
 
     def save(
         self,
@@ -3253,7 +3253,7 @@ class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
         source_fields = OPINION_TEXT_SOURCE_FIELDS
         # To populate best_text we get the first non-empty value
         # from the list of possible text sources:
-        coalesce_args = [
+        coalesce_args: list[NullIf | F] = [
             NullIf(F(field), Value("")) for field in source_fields
         ]
         # And we fall back to plain_text if all of the above are empty:

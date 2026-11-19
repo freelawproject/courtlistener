@@ -4,6 +4,7 @@ import logging
 import pickle
 import time
 from collections import defaultdict
+from collections.abc import Sequence
 
 from django.conf import settings
 from django.core.cache import cache
@@ -104,7 +105,7 @@ def get_object_list(request, cd, paginator):
     )
 
 
-class ESList:
+class ESList(Sequence):
     """This class implements a yielding list object that fetches items from ES as they are queried."""
 
     def __init__(
@@ -311,7 +312,7 @@ class CursorESList:
                 child_count_query, child_unique_field
             )
 
-        error_to_raise = None
+        error_to_raise: type[APIException] = ElasticServerError
         duration = None
         try:
             multi_search = MultiSearch()
@@ -334,13 +335,13 @@ class CursorESList:
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
         except TransportError, ConnectionError, RequestError:
-            error_to_raise = ElasticServerError
+            # Raised below as the default ElasticServerError.
+            pass
         except ApiError as e:
             if "Failed to parse query" in str(e):
                 error_to_raise = ElasticBadRequestError
             else:
                 logger.error("Multi-search API Error: %s", e)
-                error_to_raise = ElasticServerError
 
         # Record search duration metric
         if duration is not None:
@@ -356,11 +357,11 @@ class CursorESList:
         # Store search query.
         store_search_api_query(
             request=self.request,
-            failed=bool(error_to_raise),
-            query_time=main_results.took if not error_to_raise else None,
+            failed=main_results is None,
+            query_time=main_results.took if main_results is not None else None,
             engine=SearchQuery.ELASTICSEARCH,
         )
-        if error_to_raise:
+        if main_results is None:
             raise error_to_raise()
 
         return (
@@ -431,7 +432,7 @@ class CursorESList:
                 settings.SEARCH_RESULTS_MICRO_CACHE,
             )
 
-        self.process_results(self.results)
+        self.process_results(main_results)
 
         es_results_items = (
             [

@@ -215,7 +215,7 @@ class JurisdictionFeed(Feed):
         """Get the court, or raise 404 if it doesn't exist."""
         return get_object_or_404(Court, pk=court)
 
-    def items(self, obj):
+    def items(self, obj) -> Response | list:
         """Do a search query here.
 
         Return the first 20 results JurisdictionFeed return Opinions instead of

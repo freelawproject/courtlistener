@@ -267,9 +267,7 @@ class BigPagination(VersionBasedPagination):
 class ESCursorPagination(BasePagination):
     """Custom pagination class to handle ES cursor pagination, based in the ES search_after param."""
 
-    def __init__(
-        self, request, search_type: SearchType
-    ) -> datetime.date | None:
+    def __init__(self, request, search_type: SearchType) -> None:
         """Set up the paginator's state from the request and its cursor."""
         self.es_list_instance = None
         self.results_count_exact = None
@@ -291,8 +289,6 @@ class ESCursorPagination(BasePagination):
             else datetime.datetime.now().date()
         )
         self.page_int = self.cursor.page_int if self.cursor else 1
-
-        return self.request_date
 
     def paginate_es_list(
         self, queryset: CursorESList, request: Request, view=None

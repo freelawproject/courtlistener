@@ -58,7 +58,7 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         court_ids = options.get("court_ids")
         auto_resume = options["auto_resume"]
-        delay = options.get("delay")
+        delay = options["delay"]
         test_mode = options.get("test_mode")
 
         r = get_redis_interface("CACHE")

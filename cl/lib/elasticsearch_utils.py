@@ -2779,7 +2779,7 @@ def do_es_feed_query(
     rows: int = 20,
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
-) -> Response | list:
+) -> Response:
     """Execute an Elasticsearch query for feeds with optional micro-caching.
 
     Args:
