@@ -928,14 +928,23 @@ class ToastComponentTest(SimpleTestCase):
         )
         self.assertIn("shrink-0 items-center gap-2", with_action)
 
-    def test_message_renders_in_a_template_outside_the_empty_message_column(
-        self,
-    ) -> None:
-        """The message column renders empty; the title and description wait in a template."""
+    def test_live_region_renders_empty_and_polite(self) -> None:
+        """The message column is an empty polite live region at render time."""
+        html = self.render('<c-toast title="Docket blocked" />')
+        region = re.search(r'<div[^>]*x-ref="live"[^>]*></div>', html)
+        self.assertIsNotNone(region)
+        for attribute in (
+            'role="status"',
+            'aria-live="polite"',
+            'aria-atomic="true"',
+        ):
+            self.assertIn(attribute, region[0])
+
+    def test_message_waits_in_a_template(self) -> None:
+        """The title and description render inside a template, not in the live region."""
         html = self.render(
             '<c-toast title="Docket blocked" description="No longer indexed" />'
         )
-        self.assertRegex(html, r'x-ref="live"[^>]*></div>')
         template = re.search(r"<template[^>]*>(.*?)</template>", html, re.S)
         self.assertIsNotNone(template)
         self.assertIn("Docket blocked", template[1])
