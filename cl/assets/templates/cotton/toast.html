@@ -4,13 +4,12 @@
 <c-vars title variant="" description="" icon="" />
 
 {# The root is box-less so a closed toast takes no space wherever the page puts it. The panel stays in the DOM, with its chrome and controls hidden until open, so htmx binds any hx-* control in the slot at page load. #}
-<div x-data="toast" class="contents" x-on:toast-opened.window="onToastOpened" {{ attrs }}>
+<div x-data="toast" class="contents" x-on:toast-opened.window="onToastOpened" x-on:keydown.escape.window="close" {{ attrs }}>
   {{ trigger }}
   <div x-ref="region" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
     <div
       x-bind:class="panelClass"
       class="flex w-full max-w-2xl items-center gap-4 rounded-lg text-sm"
-      x-on:keydown.escape.stop="close"
     >
       {% if icon or variant == "warning" or variant == "success" or variant == "info" %}
         <span x-show="isOpen" x-cloak class="shrink-0 text-greyscale-100">
