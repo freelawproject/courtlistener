@@ -12,11 +12,9 @@ from eyecite.models import (
     FullCaseCitation,
     FullJournalCitation,
     FullLawCitation,
-    Resource,
     ShortCaseCitation,
     SupraCitation,
 )
-from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
 
 from cl.citations.match_citations_queries import es_search_db_for_full_citation
@@ -24,6 +22,7 @@ from cl.citations.types import (
     MatchedResourceType,
     ResolvedFullCites,
     SupportedCitationType,
+    UnmatchedResource,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, RECAPDocument
@@ -32,12 +31,6 @@ from cl.search.selectors import get_clusters_from_citation_str
 DEBUG = True
 
 
-NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
-MULTIPLE_MATCHES_RESOURCE = Resource(
-    case_citation(
-        source_text="MULTIPLE_MATCHES", page="999999", volume="999999"
-    )
-)
 # to be used when storing unmatched citations
 MULTIPLE_MATCHES_FLAG = "is_ambiguous"
 
@@ -76,8 +69,8 @@ def resolve_fullcase_citation(
     flagged as ambiguous.
 
     Returns:
-        The cited opinion, ``MULTIPLE_MATCHES_RESOURCE`` if several
-        opinions match, or ``NO_MATCH_RESOURCE`` if none do.
+        The cited opinion, ``UnmatchedResource.MULTIPLE_MATCHES`` if
+        several opinions match, or ``UnmatchedResource.NO_MATCH`` if none do.
     """
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
@@ -101,7 +94,7 @@ def resolve_fullcase_citation(
                 )(volume=volume, reporter=reporter, page=page)
 
                 if _count == 0 or clusters is None:
-                    return NO_MATCH_RESOURCE
+                    return UnmatchedResource.NO_MATCH
 
                 # exclude self links
                 if getattr(full_citation, "citing_opinion", False):
@@ -122,18 +115,18 @@ def resolve_fullcase_citation(
                     # more-than-one-match citations
                     setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
                     # if two or more remain return multiple matches
-                    return MULTIPLE_MATCHES_RESOURCE
+                    return UnmatchedResource.MULTIPLE_MATCHES
 
         if len(db_search_results) > 1:
             setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
-            return MULTIPLE_MATCHES_RESOURCE
+            return UnmatchedResource.MULTIPLE_MATCHES
 
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
             try:
                 return Opinion.objects.get(pk=result_id)
-            except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
+            except Opinion.DoesNotExist, Opinion.MultipleObjectsReturned:
                 pass
 
     # Case 2: FullLawCitation (TODO: implement support)
@@ -145,7 +138,7 @@ def resolve_fullcase_citation(
         pass
 
     # If no Opinion can be matched, just return a placeholder object
-    return NO_MATCH_RESOURCE
+    return UnmatchedResource.NO_MATCH
 
 
 def resolve_shortcase_citation(
@@ -227,3 +220,35 @@ def do_resolve_citations(
         resolve_shortcase_citation=resolve_shortcase_citation,
         resolve_supra_citation=resolve_supra_citation,
     )
+
+
+def split_resolutions(
+    citation_resolutions: dict[
+        MatchedResourceType, list[SupportedCitationType]
+    ],
+) -> tuple[
+    dict[Opinion, list[SupportedCitationType]],
+    list[SupportedCitationType],
+    list[SupportedCitationType],
+]:
+    """Separate citations that resolved to an opinion from those that did not.
+
+    Args:
+        citation_resolutions: Citations grouped by the resource they
+            resolved to, as returned by ``do_resolve_citations``.
+
+    Returns:
+        A three-tuple of the citations grouped by the opinion they cite, the
+        citations that matched no opinion, and the citations that matched
+        several opinions.
+    """
+    matched = {
+        resource: citations
+        for resource, citations in citation_resolutions.items()
+        if isinstance(resource, Opinion)
+    }
+    unmatched = citation_resolutions.get(UnmatchedResource.NO_MATCH, [])
+    ambiguous = citation_resolutions.get(
+        UnmatchedResource.MULTIPLE_MATCHES, []
+    )
+    return matched, unmatched, ambiguous

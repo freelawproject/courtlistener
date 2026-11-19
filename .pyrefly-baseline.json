@@ -121,66 +121,10 @@
       "severity": "error"
     },
     {
-      "column": 43,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 50,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/citations/api_views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `QuerySet[OpinionCluster, OpinionCluster] | None` is not assignable to parameter `clusters` with type `QuerySet[OpinionCluster, OpinionCluster]` in function `CitationLookupViewSet._format_cluster_response`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/citations/recap_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 55,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster_id`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster_id`",
       "severity": "error"
     },
     {

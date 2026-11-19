@@ -18,9 +18,8 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.match_citations import (
-    MULTIPLE_MATCHES_RESOURCE,
-    NO_MATCH_RESOURCE,
     do_resolve_citations,
+    split_resolutions,
 )
 from cl.citations.parenthetical_utils import (
     create_parenthetical_groups,
@@ -300,13 +299,14 @@ def store_opinion_citations_and_update_parentheticals(
         return
 
     # Put apart the unmatched citations and ambiguous citations
-    unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
-    ambiguous_matches = citation_resolutions.pop(MULTIPLE_MATCHES_RESOURCE, [])
+    matched_resolutions, unmatched_citations, ambiguous_matches = (
+        split_resolutions(citation_resolutions)
+    )
 
     clusters_to_update_par_groups_for = set()
     parentheticals: list[Parenthetical] = []
 
-    for _opinion, _citations in citation_resolutions.items():
+    for _opinion, _citations in matched_resolutions.items():
         # Currently, eyecite has a bug where parallel citations are
         # detected individually. We avoid creating duplicate parentheticals
         # because of that by keeping track of what we've seen so far.
@@ -343,7 +343,7 @@ def store_opinion_citations_and_update_parentheticals(
                 opinion.pk,
             )
             cluster_ids_to_update = get_cited_clusters_ids_to_update(
-                citation_resolutions.keys(), opinion.pk
+                matched_resolutions.keys(), opinion.pk
             )
             OpinionCluster.objects.filter(id__in=cluster_ids_to_update).update(
                 citation_count=F("citation_count") + 1
@@ -352,7 +352,7 @@ def store_opinion_citations_and_update_parentheticals(
         handle_unmatched_citations(
             opinion,
             unmatched_citations + ambiguous_matches,
-            citation_resolutions,
+            matched_resolutions,
         )
         logger.debug("Recreate OpCited and Parens: %s", opinion.pk)
 
@@ -368,7 +368,7 @@ def store_opinion_citations_and_update_parentheticals(
                     cited_opinion_id=_opinion.pk,
                     depth=len(_citations),
                 )
-                for _opinion, _citations in citation_resolutions.items()
+                for _opinion, _citations in matched_resolutions.items()
                 if opinion.cluster_id != _opinion.cluster_id
             ]
         )
