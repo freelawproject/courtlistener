@@ -15,11 +15,11 @@ from waffle.testutils import override_flag
 
 from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.types import TabItem
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
-from cl.users.utils import TabItem
 
 
 class ChangePasswordWellKnownTests(SimpleTestCase):

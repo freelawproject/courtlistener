@@ -24,13 +24,14 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.lib.types import TabItem
+from cl.lib.utils import resolve_active_tab
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
 from cl.opinion_page.forms_v2 import DocketEntryFilterForm
 from cl.search.models import Court, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
-from cl.users.utils import TabItem, resolve_active_tab
 
 logger = logging.getLogger(__name__)
 
