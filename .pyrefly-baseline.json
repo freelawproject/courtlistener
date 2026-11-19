@@ -541,13 +541,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/custom_filters/templatetags/extras.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `datetime | None` is not assignable to parameter `value` with type `datetime` in function `django.utils.timezone.make_aware`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/disclosures/tasks.py",
       "name": "missing-attribute",
