@@ -1,18 +1,16 @@
 function hasUnloadedScripts(page) {
   const loaded = new Set([...document.scripts].map((script) => script.getAttribute('src')));
-  return [...page.querySelectorAll('script[src]')].some(
-    (script) => !loaded.has(script.getAttribute('src')),
-  );
+  return [...page.querySelectorAll('script[src]')].some((script) => !loaded.has(script.getAttribute('src')));
 }
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('tabsComponent', () => ({
     isBusy: false,
-    errorMessage: "",
-    activeTab: "",
+    errorMessage: '',
+    activeTab: '',
 
     init() {
-      this.activeTab = this.$el.dataset.activeTab ?? "";
+      this.activeTab = this.$el.dataset.activeTab ?? '';
     },
     get isSelected() {
       return this.$el.dataset.tabKey === this.activeTab;
@@ -31,11 +29,19 @@ document.addEventListener('alpine:init', () => {
       url.searchParams.set('tab', key);
       history.replaceState(history.state, '', url);
     },
-    startRequest() {
-      this.isBusy = true;
-      this.errorMessage = "";
+    isTabRequest(event) {
+      // These listeners sit on the root, which also wraps the page's content, so htmx
+      // requests made by that content reach them too. requestConfig.elt is the element
+      // that made the request in every event; detail.elt is the swap target in before-swap.
+      return this.$refs.tabsNav.contains(event.detail.requestConfig.elt);
     },
-    endRequest() {
+    startRequest(event) {
+      if (!this.isTabRequest(event)) return;
+      this.isBusy = true;
+      this.errorMessage = '';
+    },
+    endRequest(event) {
+      if (!this.isTabRequest(event)) return;
       this.isBusy = false;
     },
     navigateToTab(event) {
@@ -47,15 +53,17 @@ document.addEventListener('alpine:init', () => {
       const select = document.getElementById(`${this.$root.id}-select`);
       for (const option of select.options) option.selected = option.defaultSelected;
     },
-    handleSendError() {
+    handleSendError(event) {
+      if (!this.isTabRequest(event)) return;
       this.errorMessage = "Couldn't load this tab. Please check your connection and try again.";
       this.restoreSelectedTab();
     },
     handleResponseError(event) {
+      if (!this.isTabRequest(event)) return;
       const { xhr, pathInfo } = event.detail;
 
       if (xhr.status >= 500) {
-        this.errorMessage = "An error occurred on our end. Please try again.";
+        this.errorMessage = 'An error occurred on our end. Please try again.';
         this.restoreSelectedTab();
         return;
       }
@@ -63,7 +71,7 @@ document.addEventListener('alpine:init', () => {
       window.location.assign(pathInfo.requestPath);
     },
     handleBeforeSwap(event) {
-      if (!event.detail.shouldSwap) return;
+      if (!this.isTabRequest(event) || !event.detail.shouldSwap) return;
       // An expired session answers with the login page, which lacks this component, and a
       // tab's page may need scripts this page never loaded, which a swap can't run. Load
       // either in full instead.
