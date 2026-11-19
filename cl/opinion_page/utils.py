@@ -1101,7 +1101,9 @@ def generate_docket_entries_csv_data(
 
     for docket_entry in docket_entries:
         documents = list(source.documents_for_entry(docket_entry))
-        if not documents and source.exports_entries_without_documents:
+        # An entry without documents still gets a row, with empty document
+        # columns, so the export lists every entry the docket page shows.
+        if not documents:
             csvwriter.writerow(
                 docket_entry.to_csv_row() + [""] * len(document_columns)
             )

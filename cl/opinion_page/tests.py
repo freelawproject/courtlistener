@@ -4324,20 +4324,59 @@ class DocketEntryFileDownload(TestCase):
         self.client.get(download_path)
         mock_is_ratelimited.assert_called_once()
 
-    def test_csv_export_when_first_entry_has_no_documents(self) -> None:
-        """The CSV header doesn't depend on the first entry having a document."""
-        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
-        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
-        empty_entry = SCOTUSDocketEntryFactory(docket=docket)
-        entry = SCOTUSDocketEntryFactory(docket=docket)
-        SCOTUSDocumentFactory(docket_entry=entry)
+    def test_csv_export_keeps_entries_without_documents(self) -> None:
+        """Does an entry without documents get its own row, with empty document columns, for RECAP and SCOTUS too, with the header taken from the first entry that has a document?"""
+        cases = {
+            "RECAP": (
+                "cand",
+                Docket.RECAP,
+                DocketEntryFactory,
+                RECAPDocumentFactory,
+                "recapdocument_id",
+            ),
+            "SCOTUS": (
+                "scotus",
+                Docket.SCRAPER,
+                SCOTUSDocketEntryFactory,
+                SCOTUSDocumentFactory,
+                "scotusdocument_id",
+            ),
+        }
+        for name, (
+            court_id,
+            source,
+            entry_factory,
+            document_factory,
+            document_id_column,
+        ) in cases.items():
+            with self.subTest(source=name):
+                docket = DocketFactory(
+                    court=CourtFactory(id=court_id, jurisdiction="F"),
+                    source=source,
+                )
+                empty_entry = entry_factory(docket=docket)
+                entry = entry_factory(docket=docket)
+                document = document_factory(docket_entry=entry)
 
-        header, *rows = csv.reader(
-            io.StringIO(generate_docket_entries_csv_data([empty_entry, entry]))
-        )
+                header, *rows = csv.reader(
+                    io.StringIO(
+                        generate_docket_entries_csv_data([empty_entry, entry])
+                    )
+                )
 
-        self.assertIn("scotusdocument_id", header)
-        self.assertEqual([row[0] for row in rows], [str(entry.pk)])
+                self.assertEqual(
+                    [row[0] for row in rows],
+                    [str(empty_entry.pk), str(entry.pk)],
+                )
+                empty_row, entry_row = rows
+                self.assertEqual(len(empty_row), len(header))
+                self.assertEqual(
+                    empty_row[header.index(document_id_column)], ""
+                )
+                self.assertEqual(
+                    entry_row[header.index(document_id_column)],
+                    str(document.pk),
+                )
 
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
