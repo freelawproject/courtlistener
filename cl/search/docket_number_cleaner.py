@@ -163,13 +163,12 @@ def prelim_clean_F(s: str) -> str:
     s = re.sub(r"_\d+$", "", s)  # Remove trailing numbers after underscores
     s = re.sub(r"^-+|-+$", "", s)  # Remove leading/trailing dashes
     s = re.sub(r"\.+$", "", s)  # Remove trailing periods
-    s = re.sub(
+    return re.sub(
         r"^(?:No\.?|Case No\.?|Docket No\.?|Docket|Case)\s+",
         "",
         s,
         flags=re.IGNORECASE,
     )  # Remove common prefixes
-    return s
 
 
 def regex_clean_F(s: str) -> str:
@@ -379,14 +378,14 @@ def process_llm_batches(
 
     while remaining:
         logger.info(
-            f"---Processing {len(remaining)} records with {model_id}---"
+            "---Processing %d records with %s---", len(remaining), model_id
         )
         batches = [
             remaining[i : i + current_batch_size]
             for i in range(0, len(remaining), current_batch_size)
         ]
         with ThreadPoolExecutor(
-            max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS  # type: ignore
+            max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS
         ) as executor:
             future_to_batch = {
                 executor.submit(
@@ -410,7 +409,10 @@ def process_llm_batches(
         if current_retry >= max_retries:
             unprocessed_ids = [next(iter(batch)) for batch in remaining]
             logger.info(
-                f"---{max_retries} max retries reached. {len(remaining)} unprocessed records assigned raw values: {unprocessed_ids}.---"
+                "---%d max retries reached. %d unprocessed records assigned raw values: %s.---",
+                max_retries,
+                len(remaining),
+                unprocessed_ids,
             )
             for batch in remaining:
                 docket_id = next(iter(batch))
@@ -418,7 +420,10 @@ def process_llm_batches(
             break
 
         logger.info(
-            f"---Retry {current_retry + 1}/{max_retries} for {len(remaining)} remaining records---"
+            "---Retry %d/%d for %d remaining records---",
+            current_retry + 1,
+            max_retries,
+            len(remaining),
         )
         current_retry += 1
         current_batch_size = max(1, int(current_batch_size / 2))
@@ -453,8 +458,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_one,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
         all_cleaned=dict(),
     )
     model_two_results = process_llm_batches(
@@ -462,8 +467,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_two,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
         all_cleaned=dict(),
     )
 

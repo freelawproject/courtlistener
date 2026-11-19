@@ -83,11 +83,10 @@ class ScraperCheckpointTracker:
             return None
         if isinstance(stored_checkpoint, bytes):
             stored_checkpoint = stored_checkpoint.decode()
-        latest_checkpoint = datetime.strptime(
+        return datetime.strptime(
             stored_checkpoint,
             "%Y-%m-%d",
         ).date()
-        return latest_checkpoint
 
     def set(self, checkpoint: date) -> None:
         """Save the checkpoint date and the time it was saved, expiring after four weeks."""

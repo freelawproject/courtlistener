@@ -227,13 +227,12 @@ def get_group_from_component(
     representative = get_representative_parenthetical(
         pars_in_group, similarity_graph
     )
-    parenthetical_group = ComputedParentheticalGroup(
+    return ComputedParentheticalGroup(
         parentheticals=pars_in_group,
         representative=representative,
         size=len(pars_in_group),
         score=group_score,
     )
-    return parenthetical_group
 
 
 BEST_PARENTHETICAL_SEARCH_THRESHOLD = 0.2
@@ -284,5 +283,4 @@ def get_parenthetical_tokens(text: str) -> list[str]:
     # Treat "holding", "recognizing" etc. at first position as a stop word
     if len(tokens) > 0 and GERUND_WORD.match(tokens[0]):
         del tokens[0]
-    tokens = stemmer.stemWords(tokens)
-    return tokens
+    return stemmer.stemWords(tokens)

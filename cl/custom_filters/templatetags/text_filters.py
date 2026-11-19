@@ -162,14 +162,13 @@ def naturalduration(
             "m": trunc_m,
             "s": trunc_s,
         }
-    else:
-        duration = f"{trunc_d:02d}:{trunc_h:02d}:{trunc_m:02d}:{trunc_s:02d}"
-        trimmed_duration = duration.lstrip("0:")
-        if len(trimmed_duration) == 0:
-            # It was ALL trimmed away.
-            trimmed_duration = "0"
+    duration = f"{trunc_d:02d}:{trunc_h:02d}:{trunc_m:02d}:{trunc_s:02d}"
+    trimmed_duration = duration.lstrip("0:")
+    if len(trimmed_duration) == 0:
+        # It was ALL trimmed away.
+        trimmed_duration = "0"
 
-        return mark_safe(trimmed_duration)
+    return mark_safe(trimmed_duration)
 
 
 @register.filter(is_safe=True)
@@ -195,10 +194,9 @@ def best_case_name(obj):
     """
     if obj.case_name:
         return obj.case_name
-    elif obj.case_name_full:
+    if obj.case_name_full:
         return obj.case_name_full
-    else:
-        return obj.case_name_short
+    return obj.case_name_short
 
 
 @register.filter(is_safe=True)

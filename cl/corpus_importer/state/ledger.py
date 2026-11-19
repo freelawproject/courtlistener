@@ -224,24 +224,30 @@ class LoadLedger:
         except Exception:
             logger.exception("Could not dispatch row %s to %s", row, self.key)
 
-    def merged(self, row: int, result: MergeResult) -> None:
+    def merged(
+        self, row: int, result: MergeResult, files: FileTally = NO_FILES
+    ) -> None:
         """Record that `row` merged cleanly, and what its merge wrote.
 
         Args:
             row: The row's position in the run database's query.
             result: The merge's result, counted into the run's totals.
+            files: What became of the files the merge had to publish.
         """
-        self._settle(row, "merged", result)
+        self._settle(row, "merged", result, files)
 
-    def rejected(self, row: int, result: MergeResult) -> None:
+    def rejected(
+        self, row: int, result: MergeResult, files: FileTally = NO_FILES
+    ) -> None:
         """Record that `row`'s merge failed.
 
         Args:
             row: The row's position in the run database's query.
             result: The merge's result. A merge that failed partway still
                 created and updated objects worth counting.
+            files: What became of the files the merge had to publish.
         """
-        self._settle(row, "rejected", result)
+        self._settle(row, "rejected", result, files)
 
     def errored(self, row: int) -> None:
         """Record that `row`'s merge never reached a verdict.
@@ -253,7 +259,7 @@ class LoadLedger:
         Args:
             row: The row's position in the run database's query.
         """
-        self._settle(row, "errored", None)
+        self._settle(row, "errored", None, NO_FILES)
         self._hold_for_retry(self._name("merge_retry"), (str(row),))
 
     def extracting(self, documents: int) -> None:
@@ -384,17 +390,18 @@ class LoadLedger:
         )
 
     def _settle(
-        self, row: int, outcome: str, result: MergeResult | None
+        self,
+        row: int,
+        outcome: str,
+        result: MergeResult | None,
+        files: FileTally,
     ) -> None:
         """Take `row` off the pending hash and count what its merge did."""
         try:
             self._redis.hdel(self._name("pending"), str(row))
         except Exception:
             logger.exception("Could not settle row %s of %s", row, self.key)
-        counts = {outcome: 1}
-        if result is not None:
-            counts |= _file_counts(result.files)
-        self._count(**counts)
+        self._count(**{outcome: 1} | _file_counts(files))
         if result is None:
             return
         for part, models in (

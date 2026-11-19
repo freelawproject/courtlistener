@@ -216,13 +216,11 @@ def query_possible_matches(
             cluster__date_filed=date_filed,
         )
         citation_queries |= citation_query
-    possible_matches = (
+    return (
         Citation.objects.filter(citation_queries)
         .select_related("cluster")
         .distinct("cluster__id")
     )
-
-    return possible_matches
 
 
 def update_matched_case_name(
@@ -355,7 +353,7 @@ def process_csv(
                 index,
             )
             continue
-        elif len(matches) > 1:
+        if len(matches) > 1:
             # More than one match, log and go to next row
             matches_found = ", ".join([str(cluster.id) for cluster in matches])
             logger.warning(
@@ -397,7 +395,7 @@ def process_csv(
                 if Citation.objects.filter(**citation).exists():
                     # We already have the citation
                     continue
-                elif Citation.objects.filter(
+                if Citation.objects.filter(
                     cluster_id=citation["cluster_id"],
                     reporter=citation.get("reporter"),
                 ).exists():
@@ -409,14 +407,13 @@ def process_csv(
                     )
                     transaction.set_rollback(True)
                     break
-                else:
-                    new_citation = Citation.objects.create(**citation)
-                    logger.info(
-                        "New citation added: %s to cluster id: %s",
-                        new_citation,
-                        matched_cluster.id,
-                    )
-                    total_citations_added += 1
+                new_citation = Citation.objects.create(**citation)
+                logger.info(
+                    "New citation added: %s to cluster id: %s",
+                    new_citation,
+                    matched_cluster.id,
+                )
+                total_citations_added += 1
 
             # Wait between each processed row to avoid sending to many
             # indexing tasks

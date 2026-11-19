@@ -70,8 +70,7 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
             disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             disclosure.save()
             return
-        else:
-            raise self.retry(exc=response.status_code)
+        raise self.retry(exc=response.status_code)
 
     disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     disclosure.thumbnail.save(None, ContentFile(response.content))
@@ -126,11 +125,11 @@ def get_report_type(extracted_data: dict) -> int:
     """
     if extracted_data.get("initial"):
         return REPORT_TYPES.INITIAL
-    elif extracted_data.get("nomination"):
+    if extracted_data.get("nomination"):
         return REPORT_TYPES.NOMINATION
-    elif extracted_data.get("annual"):
+    if extracted_data.get("annual"):
         return REPORT_TYPES.ANNUAL
-    elif extracted_data.get("final"):
+    if extracted_data.get("final"):
         return REPORT_TYPES.FINAL
     return REPORT_TYPES.UNKNOWN
 

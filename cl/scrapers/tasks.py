@@ -800,12 +800,12 @@ def update_docket_info_iquery(
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
     except IQuerySaveError as exc:
         if self.request.retries == self.max_retries:
             logger.warning("%s", exc)
-            return
+            return None
         logger.info("%s Retrying.", exc)
         raise self.retry(exc=exc.__cause__)
 
@@ -955,8 +955,9 @@ def get_scotus_captcha_solution(
         else:
             if attempt > 0:
                 logger.warning(
-                    f"Generated valid CAPTCHA solution in %d attempts.\nErrors: {error_messages}",
+                    "Generated valid CAPTCHA solution in %d attempts.\nErrors: %s",
                     attempt + 1,
+                    error_messages,
                 )
             return solution, captcha_id
         time.sleep(wait)

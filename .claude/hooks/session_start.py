@@ -77,7 +77,7 @@ COMPOSE_FILES = [
 # and the tag its rebuilt, bundle-trusting version gets. The override
 # hard-codes the images, so build_proxy_ca_images checks that the stack
 # still agrees; a mismatch would silently fall back to the originals.
-HOST_CA_BUNDLE = os.environ.get("SSL_CERT_FILE", "")
+HOST_CA_BUNDLE = Path(os.environ.get("SSL_CERT_FILE", ""))
 PROXY_CA_DIR = Path(__file__).resolve().parent / "proxy-ca"
 PROXY_CA_IMAGES = [
     (
@@ -93,7 +93,7 @@ PROXY_CA_IMAGES = [
         "cl-proxy-ca/node:16",
     ),
 ]
-if os.path.isfile(HOST_CA_BUNDLE):
+if HOST_CA_BUNDLE.is_file():
     COMPOSE_FILES.append(PROXY_CA_DIR / "docker-compose.yml")
 # The image bakes in the Python and Node dependencies; when any of these
 # change, an image cached from an earlier session is stale.
@@ -342,7 +342,7 @@ def configure_environment(persist: bool) -> None:
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if not persist or not env_file:
         return
-    with open(env_file, "a", encoding="utf-8") as f:
+    with Path(env_file).open("a", encoding="utf-8") as f:
         for name, value in variables.items():
             f.write(f"export {name}={shlex.quote(value)}\n")
 
@@ -352,7 +352,7 @@ def build_proxy_ca_images() -> None:
 
     Does nothing when the host has no such bundle.
     """
-    if not os.path.isfile(HOST_CA_BUNDLE):
+    if not HOST_CA_BUNDLE.is_file():
         return
     for path, pattern, base, tag in PROXY_CA_IMAGES:
         match = re.search(pattern, path.read_text(encoding="utf-8"), re.M)

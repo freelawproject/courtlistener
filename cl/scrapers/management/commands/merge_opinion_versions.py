@@ -346,7 +346,7 @@ def group_opinions_by_url(query: Q) -> QuerySet:
     Returns:
         the opinion groups queryset
     """
-    qs = (
+    return (
         Opinion.objects.filter(query)
         .exclude(Q(download_url="") | Q(download_url__isnull=True))
         .values("download_url")
@@ -359,7 +359,6 @@ def group_opinions_by_url(query: Q) -> QuerySet:
         # actual duplicates, which will be handled in another command
         .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
     )
-    return qs
 
 
 def get_same_url_opinions(
@@ -377,7 +376,7 @@ def get_same_url_opinions(
     """
     standard_url = opinion_group["download_url"].replace("https", "http")
     if standard_url in seen_urls:
-        return
+        return None
 
     seen_urls.add(standard_url)
     download_url_query = get_query_from_url(

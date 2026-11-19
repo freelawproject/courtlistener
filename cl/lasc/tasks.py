@@ -5,6 +5,7 @@ import logging
 import os
 import pickle
 from datetime import date
+from pathlib import Path
 
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
@@ -121,7 +122,7 @@ def download_pdf(self: Task, pdf_pk: int) -> None:
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
 
 
@@ -236,7 +237,7 @@ def add_or_update_case_db(self: Task, case_id: str) -> None:
         retries_remaining = self.max_retries - self.request.retries
         if retries_remaining == 0:
             logger.error("%s", exc)
-            return
+            return None
         logger.info("%s %s retries remaining.", exc, retries_remaining)
         r = get_redis_interface("CACHE")
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
@@ -372,8 +373,7 @@ def add_case_from_filepath(filepath):
         filepath: Filepath string to where the item is stored
     """
     query = LASCSearch(None)
-    with open(filepath) as f:
-        original_data = f.read()
+    original_data = Path(filepath).read_text()
 
     case_data = query._parse_case_data(json.loads(original_data))
     case_id = make_case_id(case_data)
@@ -399,7 +399,7 @@ def fetch_date_range(self: Task, start: date, end: date) -> None:
     except CourtQueryError as exc:
         logger.warning("%s", exc)
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc.__cause__)
 
 
@@ -429,11 +429,9 @@ async def fetch_date_range_base(start: date, end: date) -> None:
         )
         if not await case_object.aexists():
             await QueuedCase.objects.acreate(
-                **{
-                    "internal_case_id": internal_case_id,
-                    "judge_code": case["judge_code"],
-                    "case_type_code": case["case_type_code"],
-                }
+                internal_case_id=internal_case_id,
+                judge_code=case["judge_code"],
+                case_type_code=case["case_type_code"],
             )
             cases_added_cnt += 1
             logger.info(

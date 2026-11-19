@@ -41,7 +41,7 @@ class DocketFeed(Feed):
         """Title the feed as updates for the docket."""
         return f"Docket updates for {make_docket_title(obj)}"
 
-    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:  # type: ignore
+    def get_object(self, request: HttpRequest, docket_id: int) -> Docket:
         """Return the docket this feed covers, or raise Http404."""
         try:
             return Docket.objects.only(

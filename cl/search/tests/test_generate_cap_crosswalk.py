@@ -1,11 +1,14 @@
 import json
-import os
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytz
 from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
+
+CROSSWALK_OUTPUT_DIR = Path("/opt/courtlistener/cl/search/crosswalks")
+US_CROSSWALK_PATH = CROSSWALK_OUTPUT_DIR / "U_S_.json"
 
 
 @override_settings(
@@ -61,20 +64,17 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         # Call the command
         call_command(
             "generate_cap_crosswalk",
-            output_dir="/opt/courtlistener/cl/search/crosswalks",
+            output_dir=str(CROSSWALK_OUTPUT_DIR),
         )
 
         # Check if crosswalk file was created
-        expected_file_path = (
-            "/opt/courtlistener/cl/search/crosswalks/U_S_.json"
-        )
         self.assertTrue(
-            os.path.exists(expected_file_path),
-            f"Crosswalk file not found at {expected_file_path}",
+            US_CROSSWALK_PATH.exists(),
+            f"Crosswalk file not found at {US_CROSSWALK_PATH}",
         )
 
         # Check the content of the file
-        with open(expected_file_path) as f:
+        with US_CROSSWALK_PATH.open() as f:
             crosswalk_data = json.load(f)
             self.assertEqual(len(crosswalk_data), 1)
             self.assertEqual(crosswalk_data[0]["cap_case_id"], 1)
@@ -84,7 +84,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
             )
 
         # Clean up the created file
-        os.remove(expected_file_path)
+        US_CROSSWALK_PATH.unlink()
 
         # Verify that our mocked methods were called
         mock_fetch_reporters.assert_called_once()
@@ -152,18 +152,16 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         mock_find_matching_case.return_value = mock_opinion_cluster
 
         # Call the command with updated_after param set return only newer case
-        output_dir = "/opt/courtlistener/cl/search/crosswalks"
         call_command(
             "generate_cap_crosswalk",
-            output_dir=output_dir,
+            output_dir=str(CROSSWALK_OUTPUT_DIR),
             updated_after="2024-03-19T00:00:00+00:00",
         )
 
         # Check if crosswalk file was created
-        expected_file_path = f"{output_dir}/U_S_.json"
-        self.assertTrue(os.path.exists(expected_file_path))
+        self.assertTrue(US_CROSSWALK_PATH.exists())
 
-        with open(expected_file_path) as f:
+        with US_CROSSWALK_PATH.open() as f:
             crosswalk_data = json.load(f)
             # Verify only one case is present
             self.assertEqual(len(crosswalk_data), 1)
@@ -187,7 +185,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
                 "Found old case in crosswalk when it should have been filtered out",
             )
 
-        os.remove(expected_file_path)
+        US_CROSSWALK_PATH.unlink()
 
         mock_fetch_reporters.assert_called_once()
         mock_fetch_volumes.assert_called_once_with("U.S.")
@@ -254,18 +252,16 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         mock_find_matching_case.return_value = mock_opinion_cluster
 
         # Call the command with short date format
-        output_dir = "/opt/courtlistener/cl/search/crosswalks"
         call_command(
             "generate_cap_crosswalk",
-            output_dir=output_dir,
+            output_dir=str(CROSSWALK_OUTPUT_DIR),
             updated_after="2024-03-19",  # Using YYYY-MM-DD format
         )
 
         # Check if crosswalk file was created
-        expected_file_path = f"{output_dir}/U_S_.json"
-        self.assertTrue(os.path.exists(expected_file_path))
+        self.assertTrue(US_CROSSWALK_PATH.exists())
 
-        with open(expected_file_path) as f:
+        with US_CROSSWALK_PATH.open() as f:
             crosswalk_data = json.load(f)
             self.assertEqual(len(crosswalk_data), 1)
 
@@ -288,7 +284,7 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
                 "Found old case in crosswalk when it should have been filtered out",
             )
 
-        os.remove(expected_file_path)
+        US_CROSSWALK_PATH.unlink()
 
         mock_fetch_reporters.assert_called_once()
         mock_fetch_volumes.assert_called_once_with("U.S.")

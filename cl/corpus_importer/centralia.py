@@ -2,14 +2,17 @@
 
 import logging
 from enum import StrEnum
-from typing import Any
+from html import unescape
+from typing import Any, cast
 
 from django.db import transaction
+from django.utils.html import strip_tags
 from eyecite import get_citations
 from juriscraper.lib.string_utils import titlecase
 
 from cl.citations.tasks import HYPERSCAN_TOKENIZER
 from cl.citations.utils import make_get_citations_kwargs
+from cl.scrapers.utils import link_judges
 from cl.search.models import Opinion
 
 logger = logging.getLogger(__name__)
@@ -123,15 +126,33 @@ def _syllabus_html(payload: dict) -> str:
     )
 
 
+def _text_length(text: str | None) -> int:
+    """Count the characters of a text, leaving out whitespace.
+
+    pdftotext pads `plain_text` with layout spaces and blank lines that a
+    structured read drops, so whitespace would skew any comparison of the
+    two.
+
+    :param text: The text to measure.
+    :return: The number of non-whitespace characters.
+    """
+    return sum(not char.isspace() for char in text or "")
+
+
 def _payload_text_length(payload: dict) -> int:
-    """Total plain text the structured read recovered.
+    """Total text the structured read recovered, leaving out whitespace.
+
+    Covers everything the read takes from the PDF, so it can be compared
+    with the opinion's `plain_text`, which holds the whole PDF.
 
     :param payload: Doctor's structured payload.
-    :return: Combined length of the headmatter and every writing's text.
+    :return: Combined length of the headmatter, the syllabus and every
+    writing's text, counted with _text_length.
     """
-    total = len((payload.get("headmatter") or {}).get("text") or "")
+    total = _text_length((payload.get("headmatter") or {}).get("text"))
+    total += _text_length(unescape(strip_tags(_syllabus_html(payload))))
     for writing in payload.get("opinions") or []:
-        total += len(writing.get("text") or "")
+        total += _text_length(writing.get("text"))
     return total
 
 
@@ -162,7 +183,7 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
         ("cid_pages", "CID-encoded pages"),
     ):
         if pages := diagnostics.get(field):
-            return False, f"{why} {list(pages)[:5]}, needs OCR"  # type: ignore
+            return False, f"{why} {list(pages)[:5]}, needs OCR"
 
     writings = payload.get("opinions") or []
     if not writings:
@@ -176,7 +197,7 @@ def should_ingest(opinion: Opinion, payload: dict) -> tuple[bool, str]:
 
     # Guard against a silently partial read by comparing against whatever
     # the existing extraction already managed.
-    existing = len(opinion.plain_text or "")
+    existing = _text_length(opinion.plain_text)
     recovered = _payload_text_length(payload)
     if existing and recovered < existing * MIN_TEXT_COVERAGE:
         return False, (
@@ -192,16 +213,18 @@ def check_structured_extraction(
 ) -> tuple[bool, str]:
     """Decide whether a structured extraction can be merged into an opinion.
 
-    Runs should_ingest and, while only single-opinion documents are
-    supported, requires Centralia to have found exactly one writing. Nothing
-    is changed or logged, so dry runs can use it too.
+    Runs should_ingest and requires every writing Centralia found to carry
+    HTML. A read with several writings is only accepted when the opinion is
+    its cluster's only one, since merging splits it into sibling opinions;
+    this also stops a cluster that was already split from being split again.
+    Nothing is changed or logged, so dry runs can use it too.
 
     :param opinion: The opinion the extraction was read from.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
     :param skip_validation: Whether to skip should_ingest's quality checks.
-    Only the single writing with HTML that merging needs is still required,
-    so a partial or garbled read passes. Opinions with text in a field that
+    Only the writings with HTML that merging needs are still required, so a
+    partial or garbled read passes. Opinions with text in a field that
     outranks `html` are still refused, since the merged HTML would be
     neither shown nor cited. Meant for previews and one-off fixes.
     :return: A 2-tuple of whether the extraction can be merged and the
@@ -225,13 +248,23 @@ def check_structured_extraction(
         if not ingestible:
             return False, reason
     writings = data.get("opinions") or []
-    if (count := len(writings)) != 1:
-        return False, (
-            f"found {count} opinions; only single-opinion documents are "
-            "supported"
+    if not writings:
+        return False, "no writings found"
+    # A sibling without HTML would be a blank opinion on the case page
+    if not all((w.get("html") or "").strip() for w in writings):
+        return False, "a writing carries no html"
+    if len(writings) > 1 and (
+        others := opinion.cluster.sub_opinions.filter(
+            main_version__isnull=True
         )
-    if not (writings[0].get("html") or "").strip():
-        return False, "writing carries no html"
+        .exclude(pk=opinion.pk)
+        .count()
+    ):
+        return False, (
+            f"found {len(writings)} writings, but the cluster already has "
+            f"{others + 1} opinions; only a cluster's only opinion can be "
+            "split"
+        )
     return True, reason
 
 
@@ -261,53 +294,130 @@ def compare_structured_extraction(
     the opinion's current content. Citation counting runs eyecite on both
     versions, so this is too slow to run on every ingest.
 
+    Both sides cover the whole PDF: the current content was extracted from
+    all of it, so the extraction's headmatter and syllabus are counted along
+    with its writings.
+
     :param opinion: The opinion as currently stored.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
-    :return: The character counts of the current `plain_text` and of the
-    extracted text, and the number of citations eyecite finds in the
-    opinion's current content and in the extracted HTML.
+    :return: The character counts, without whitespace, of the current
+    `plain_text` and of the extracted text, and the number of citations
+    eyecite finds in the opinion's current content and in the extracted
+    HTML.
     """
     extracted = Opinion(
         html="".join(
-            _wrap(writing.get("html") or "")
-            for writing in data.get("opinions") or []
+            _wrap(fragment)
+            for fragment in (
+                (data.get("headmatter") or {}).get("html") or "",
+                _syllabus_html(data),
+                *(
+                    writing.get("html") or ""
+                    for writing in data.get("opinions") or []
+                ),
+            )
         )
     )
     return {
-        "old_chars": len(opinion.plain_text or ""),
+        "old_chars": _text_length(opinion.plain_text),
         "new_chars": _payload_text_length(data),
         "old_citations": count_citations(opinion),
         "new_citations": count_citations(extracted),
     }
 
 
+def _ordering_keys(writings: list[dict[str, Any]]) -> list[int]:
+    """Pick an ordering key for each writing of a structured read.
+
+    :param writings: The `opinions` of Doctor's structured payload.
+    :return: Centralia's `order` for each writing when they are distinct
+    positive integers. Otherwise, 1 to N by position, since the keys must be
+    unique within a cluster.
+    """
+    orders = [writing.get("order") for writing in writings]
+    if len(set(orders)) == len(orders) and all(
+        type(order) is int and order > 0 for order in orders
+    ):
+        return cast(list[int], orders)
+    return list(range(1, len(writings) + 1))
+
+
+def _apply_writing(
+    opinion: Opinion, writing: dict[str, Any], ordering_key: int
+) -> None:
+    """Copy one writing of a structured read onto an opinion, unsaved.
+
+    Sets the opinion's HTML, ordering key, type, per curiam flag and author
+    string. A per curiam writing has no author, so its author string is
+    cleared. Otherwise the read's author replaces the author string, which
+    is kept when the read names no one. The linked `author` is cleared
+    whenever it may no longer match the author string, so callers must run
+    link_judges afterward to link it again.
+
+    :param opinion: The opinion to update. It may be new.
+    :param writing: One of the `opinions` of Doctor's structured payload.
+    It must carry HTML.
+    :param ordering_key: The writing's ordering key, from _ordering_keys.
+    :return: None
+    """
+    opinion.html = _wrap(writing["html"])
+    opinion.ordering_key = ordering_key
+    centralia_type = writing.get("type")
+    opinion.type = map_centralia_opinion_type(centralia_type)
+    opinion.per_curiam = (
+        normalize_centralia_opinion_type(centralia_type) == "per-curiam"
+    )
+    if opinion.per_curiam:
+        author_str = ""
+    elif author_name := writing.get("author_name"):
+        author_str = titlecase(author_name)
+    else:
+        author_str = opinion.author_str
+    if opinion.per_curiam or author_str != opinion.author_str:
+        opinion.author = None
+    opinion.author_str = author_str
+
+
 def merge_structured_opinion_into_cl_opinion(
     opinion: Opinion, data: dict[str, Any], skip_validation: bool = False
-) -> tuple[bool, str]:
+) -> tuple[list[int], str]:
     """Merge a Centralia structured extraction into a CL opinion and save it.
 
-    Stores the extracted HTML in `Opinion.html` along with the opinion's
-    ordering key, type, per curiam flag and author string, and the syllabus
-    and headmatter in `OpinionCluster.syllabus` and `.headmatter`. A cluster
-    field is only replaced when the read found that section, so existing
-    content is never blanked.
+    Stores the first writing's HTML in `Opinion.html` along with the
+    opinion's ordering key, type, per curiam flag and author string, and the
+    syllabus and headmatter in `OpinionCluster.syllabus` and `.headmatter`.
+    A cluster field is only replaced when the read found that section, so
+    existing content is never blanked.
+
+    Each opinion's `author` is then linked to the judges database from its
+    author string with link_judges, which may also add the judges named in
+    the cluster's `judges` to its panel.
+
+    When the read found several writings, such as a majority and a dissent,
+    each writing after the first becomes a new opinion in the cluster, with
+    its text in `plain_text`. The source document stays on the original
+    opinion only: new opinions get no `local_path`, `download_url` or
+    `sha1`, so the PDF is offered once on the case page, and duplicate and
+    version detection don't mistake them for copies of it.
+
     Extractions that fail check_structured_extraction are logged and
     skipped, leaving the opinion and cluster untouched. Errors while saving
-    are raised.
+    are raised, and nothing is saved.
 
     Callers must run find_citations_and_parentheticals_for_opinion_by_pks
-    afterward to find and store citations in the new HTML.
+    on every returned opinion afterward to find and store citations in the
+    new HTML.
 
-    :param opinion: The opinion to update. It should be its cluster's only
-    opinion.
+    :param opinion: The opinion to update. It must be its cluster's only
+    opinion when the read found several writings.
     :param data: A successful response payload from Doctor's structured
     opinion endpoint.
     :param skip_validation: Whether to skip the quality checks. See
     check_structured_extraction. A partial or garbled read can then replace
     the opinion's existing content.
-    :return: A 2-tuple of whether the opinion was updated and saved, and
-    the reason, for logging.
+    :return: A 2-tuple of the ids of the saved opinions, the updated one
+    first and empty when skipped, and the reason, for logging.
     """
     log_extra = {
         "opinion_id": opinion.pk,
@@ -323,20 +433,24 @@ def merge_structured_opinion_into_cl_opinion(
             reason,
             extra=log_extra,
         )
-        return False, reason
+        return [], reason
 
-    extracted = data["opinions"][0]
     # check_structured_extraction has already rejected writings without HTML
-    opinion.html = _wrap(extracted["html"])
-    opinion.ordering_key = extracted["order"]
-    centralia_type = extracted.get("type")
-    opinion.type = map_centralia_opinion_type(centralia_type)
-    opinion.per_curiam = (
-        normalize_centralia_opinion_type(centralia_type) == "per-curiam"
+    writings = data["opinions"]
+    ordered = sorted(
+        zip(_ordering_keys(writings), writings), key=lambda pair: pair[0]
     )
-    if not opinion.per_curiam:
-        if author_name := extracted.get("author_name"):
-            opinion.author_str = titlecase(author_name)
+    # The first writing, normally the majority, goes on the existing opinion
+    # so citations to it and its URL keep pointing at the decision.
+    _apply_writing(opinion, ordered[0][1], ordered[0][0])
+    siblings = []
+    for ordering_key, writing in ordered[1:]:
+        sibling = Opinion(
+            cluster=opinion.cluster,
+            plain_text=writing.get("text") or "",
+        )
+        _apply_writing(sibling, writing, ordering_key)
+        siblings.append(sibling)
 
     cluster = opinion.cluster
     cluster_fields = []
@@ -349,6 +463,12 @@ def merge_structured_opinion_into_cl_opinion(
         cluster_fields.append("headmatter")
 
     with transaction.atomic():
+        link_judges(cluster, [opinion, *siblings])
+        # link_judges credits a lone opinion with no author string to the
+        # judge named in the cluster's `judges`, even when it is per curiam
+        for merged in (opinion, *siblings):
+            if merged.per_curiam:
+                merged.author = None
         opinion.save(
             update_fields=[
                 "date_modified",
@@ -357,8 +477,13 @@ def merge_structured_opinion_into_cl_opinion(
                 "type",
                 "per_curiam",
                 "author_str",
+                "author",
             ]
         )
+        # Saved one at a time, unlike bulk_create, so the signals that
+        # index opinions in search run for each one.
+        for sibling in siblings:
+            sibling.save()
         if cluster_fields:
             cluster.save(update_fields=["date_modified", *cluster_fields])
-    return True, reason
+    return [opinion.pk, *(sibling.pk for sibling in siblings)], reason

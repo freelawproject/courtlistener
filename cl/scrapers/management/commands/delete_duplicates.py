@@ -239,7 +239,7 @@ def delete_cleaned_up_content_duplicates(
         # iteration is ordered by descending date; the first element in each
         # hash group is the most recent opinion and duplicates should be
         # collapsed into it
-        hash_groups = defaultdict(lambda: [])
+        hash_groups = defaultdict(list)
         file_errors = 0
         for opinion in duplicate_candidates:
             try:
@@ -304,7 +304,7 @@ def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
             return
         logger.info("Processing group %s", group)
 
-        hash_groups = defaultdict(lambda: [])
+        hash_groups = defaultdict(list)
         for candidate in duplicate_candidates:
             if candidate.plain_text:
                 extracted_content = candidate.plain_text

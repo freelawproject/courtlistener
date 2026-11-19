@@ -908,7 +908,7 @@ def make_docket_title(docket: Docket) -> str:
 
     Blank parts are left out.
     """
-    title = ", ".join(
+    return ", ".join(
         [
             s
             for s in [
@@ -918,7 +918,6 @@ def make_docket_title(docket: Docket) -> str:
             if s and s.strip()
         ]
     )
-    return title
 
 
 async def _common_metadata_sections(
@@ -1134,11 +1133,11 @@ async def build_cites_clusters_query(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
-    search_query = (
+    return (
         cluster_cites_query.sort({"citeCount": {"order": "desc"}})
         .source(
             includes=[
@@ -1155,7 +1154,6 @@ async def build_cites_clusters_query(
         .extra(size=20, track_total_hits=True)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 async def build_related_clusters_query(
@@ -1186,7 +1184,7 @@ async def build_related_clusters_query(
     )
 
     cluster_related_query = cluster_search.query(main_query)
-    search_query = (
+    return (
         cluster_related_query.sort({"_score": {"order": "desc"}})
         .source(
             includes=[
@@ -1203,7 +1201,6 @@ async def build_related_clusters_query(
         .extra(size=20)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 @dataclass
@@ -1462,7 +1459,7 @@ async def es_cited_case_count(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)

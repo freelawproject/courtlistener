@@ -95,14 +95,13 @@ def get_object_list(request, cd, paginator):
             request.version,
         )
 
-    sl = ESList(
+    return ESList(
         request=request,
         main_query=main_query,
         offset=offset,
         page_size=page_size,
         type=cd["type"],
     )
-    return sl
 
 
 class ESList:
@@ -140,7 +139,7 @@ class ESList:
         # Iterate over the results returned by the query, up to the specified
         # page_size.
         total_items = min(len(self), self.page_size)
-        for item in range(0, total_items):
+        for item in range(total_items):
             try:
                 yield self._item_cache[item]
             except IndexError:
@@ -202,13 +201,12 @@ class ESList:
                 item.step,
             )
             return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
+        # Not slicing.
+        try:
+            return self._item_cache[item]
+        except IndexError:
+            # No results!
+            return []
 
     def append(self, p_object):
         """Lightly override the append method so we get items duplicated in our cache."""
