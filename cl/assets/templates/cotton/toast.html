@@ -4,7 +4,7 @@
 <c-vars title variant="" description="" icon="" />
 
 {# The root is box-less so a closed toast takes no space wherever the page puts it. The panel stays in the DOM, with its chrome and controls hidden until open, so htmx binds any hx-* control in the slot at page load. #}
-<div x-data="toast" class="contents" x-on:toast-opened.window="replace" {{ attrs }}>
+<div x-data="toast" class="contents" x-on:toast-opened.window="onToastOpened" {{ attrs }}>
   {{ trigger }}
   <div x-ref="region" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
     <div
@@ -25,8 +25,8 @@
           {% endif %}
         </span>
       {% endif %}
-      {# Holds the live region the script creates on each open. Only the message lives here, so the buttons are not read as part of it. #}
-      <div x-ref="live" class="flex-1 min-w-0"></div>
+      {# Always rendered and empty while closed: screen readers only announce content added to a live region that already exists. Only the message lives here, so the buttons are not read as part of it. #}
+      <div x-ref="live" role="status" aria-live="polite" aria-atomic="true" class="flex-1 min-w-0"></div>
       {% if slot.strip %}<div x-show="isOpen" x-cloak class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
       <c-button
         x-show="isOpen"
