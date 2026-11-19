@@ -1178,13 +1178,6 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `next_cursor`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/sitemaps_infinite/sitemap_generator.py",
       "name": "bad-argument-type",
