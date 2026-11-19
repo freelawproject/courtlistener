@@ -28,7 +28,7 @@
         hx-sync="this:replace"
         class="flex flex-wrap items-center"
       >
-        <ul role="list" class="hidden md:flex items-center list-none pl-0 border-greyscale-200">
+        <ul role="list" class="tabs-list hidden md:flex">
           {% for tab in tabs %}
             <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
           {% endfor %}
@@ -58,7 +58,7 @@
       <div
         role="tablist"
         aria-label="{{ label }}"
-        class="hidden md:flex items-center border-b border-greyscale-200"
+        class="tabs-list hidden md:flex"
         x-data="focus"
         x-on:keydown.left="focusPrevious"
         x-on:keydown.right="focusNext"

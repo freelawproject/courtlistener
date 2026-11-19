@@ -3,11 +3,11 @@
 <c-vars tab tabs_id="" active_tab="" />
 
 {% if tab.url %}
-<li class="-mb-px">
+<li>
   <a
     href="{{ tab.url }}"
     id="{{ tabs_id }}-tab-{{ tab.key }}"
-    class="flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self aria-[current=page]:border-primary-600 aria-[current=page]:font-medium aria-[current=page]:text-greyscale-900"
+    class="tabs-item"
     {% if tab.key == active_tab %} aria-current="page"{% endif %}
   >
     {% if tab.icon %}
@@ -29,11 +29,11 @@
     x-bind:tabindex="tabIndex"
     x-on:click="selectTab"
     x-on:focus="selectTab"
-    class="-mb-px flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self aria-selected:border-primary-600 aria-selected:font-medium aria-selected:text-greyscale-900"
+    class="tabs-item"
   >
     {{ tab.label }}
     {% if tab.count is not None %}
-      <span class="size-6 rounded-full bg-greyscale-100 py-1 text-xs font-normal text-center text-greyscale-600">{{ tab.count }}</span>
+      <span class="tabs-count">{{ tab.count }}</span>
     {% endif %}
   </button>
 {% endif %}
