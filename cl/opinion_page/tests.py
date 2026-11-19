@@ -2580,7 +2580,7 @@ class TexasDocketPageTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     def test_docket_renders_entries_and_tames_links(self) -> None:
-        """With the flag on, does each stack list the entry, link the docket and the document to TAMES, and leave out the PACER-only controls?"""
+        """With the flag on, does each stack list the entry, link the docket and the document to TAMES and the attribution to our Texas coverage page, and leave out the PACER-only controls?"""
         for new_design in (False, True):
             with (
                 self.subTest(new_design=new_design),
@@ -2600,6 +2600,7 @@ class TexasDocketPageTest(TestCase):
                     "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
                     content,
                 )
+                self.assertIn(settings.WIKI_COVERAGE_TEXAS_URL, content)
                 self.assertNotIn('name="entry_gte"', content)
                 self.assertNotIn("Buy on PACER", content)
 
