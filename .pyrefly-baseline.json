@@ -639,31 +639,10 @@
       "severity": "error"
     },
     {
-      "column": 56,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `AnonymousUser | User` in function `cl.favorites.utils.get_note_for_target`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/favorites/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `association_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `AbstractBaseUser | AnonymousUser` is not assignable to parameter `user` with type `User` in function `cl.favorites.utils.get_existing_prayers_in_bulk`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `_SupportsPagination[Unknown]` is not assignable to parameter `recap_documents` with type `list[RECAPDocument]` in function `cl.favorites.utils.get_existing_prayers_in_bulk`",
       "severity": "error"
     },
     {
@@ -678,20 +657,6 @@
       "path": "cl/favorites/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `status` with type `str | None` in function `cl.favorites.utils.get_user_prayers`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/favorites/views.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `status` with type `str | None` in function `cl.favorites.utils.get_user_prayers`",
       "severity": "error"
     },
     {
