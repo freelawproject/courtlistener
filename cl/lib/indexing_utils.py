@@ -3,8 +3,9 @@
 from collections.abc import Mapping
 from datetime import datetime
 
+from django.db.models import Model
+
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.types import ESModelType
 
 
 def log_last_document_indexed(
@@ -44,7 +45,7 @@ def get_last_parent_document_id_processed(log_key: str) -> int:
     return int(stored_values.get("last_document_id", 0))
 
 
-def compose_app_label(instance: ESModelType) -> str:
+def compose_app_label[M: Model](instance: M) -> str:
     """Compose the app label and model class name for an ES model instance.
 
     Args:

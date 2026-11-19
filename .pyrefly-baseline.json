@@ -667,34 +667,6 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/lib/es_signal_processor.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `M` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.search.tasks.get_es_doc_id_and_parent_id`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",

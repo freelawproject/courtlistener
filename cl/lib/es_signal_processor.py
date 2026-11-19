@@ -937,7 +937,7 @@ class ESSignalProcessor:
         )
 
     @elasticsearch_enabled
-    def handle_delete[M: Model](
+    def handle_delete[M: ESModelType](
         self, sender: type[M], instance: M | None = None, **kwargs
     ) -> None:
         """Receiver function that gets called after an object instance is deleted."""
