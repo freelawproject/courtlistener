@@ -548,20 +548,6 @@
       "severity": "error"
     },
     {
-      "column": 42,
-      "path": "cl/disclosures/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | list[Unknown] | str` is not assignable to parameter `data_id` with type `str` in function `make_disclosure_key`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/disclosures/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | list[Unknown] | str` is not assignable to parameter `url` with type `bytes | str` in function `requests.api.get`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/donate/api_views.py",
       "name": "bad-index",
