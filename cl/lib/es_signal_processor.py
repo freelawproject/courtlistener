@@ -259,7 +259,7 @@ def update_es_documents(
                 if should_compute_embeddings:
                     c = compute_single_opinion_embeddings.si(instance.pk) | c
                 transaction.on_commit(partial(c.apply_async))
-            case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
+            case OpinionCluster() if es_document is OpinionDocument:
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -269,7 +269,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case Docket() if es_document is OpinionDocument:  # type: ignore
+            case Docket() if es_document is OpinionDocument:
                 related_record = OpinionCluster.objects.filter(
                     **{query: instance}
                 )
@@ -285,7 +285,7 @@ def update_es_documents(
                     )
             case Person() if (
                 es_document is PositionDocument and query == "person"
-            ):  # type: ignore
+            ):
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
@@ -303,7 +303,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case School() if es_document is PositionDocument:  # type: ignore
+            case School() if es_document is PositionDocument:
                 """
                 This code handles the update of fields that belongs to records associated with
                 the parent document using ForeignKeys.
@@ -326,7 +326,7 @@ def update_es_documents(
                             fields_map,
                         )
                     )
-            case Docket() if es_document is ESRECAPDocument:  # type: ignore
+            case Docket() if es_document is ESRECAPDocument:
                 # The related name must come from this source's own
                 # config -- a hardcoded RECAP name would silently miss
                 # every other source.
@@ -346,7 +346,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case Person() if es_document is ESRECAPDocument:  # type: ignore
+            case Person() if es_document is ESRECAPDocument:
                 if main_model not in SOURCE_BY_MODEL:
                     continue
                 source = SOURCE_BY_MODEL[main_model]
@@ -537,7 +537,7 @@ def update_reverse_related_documents(
     match instance:
         case ABARating() | PoliticalAffiliation() | Education() if (
             es_document is PersonDocument
-        ):  # type: ignore
+        ):
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
@@ -554,7 +554,7 @@ def update_reverse_related_documents(
                         affected_fields,
                     )
                 )
-        case Citation() | Opinion() if es_document is OpinionClusterDocument:  # type: ignore
+        case Citation() | Opinion() if es_document is OpinionClusterDocument:
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -566,7 +566,7 @@ def update_reverse_related_documents(
             )
         case _ if (
             type(instance) in SOURCE_BY_MODEL and es_document is DocketDocument
-        ):  # type: ignore
+        ):
             # Always a metadata-model instance here.
             source = SOURCE_BY_MODEL[type(instance)]
             # docket is a real FK on every metadata model.
@@ -604,7 +604,7 @@ def delete_reverse_related_documents(
             the instance.
     """
     match instance:
-        case Person() if es_document is PersonDocument:  # type: ignore
+        case Person() if es_document is PersonDocument:
             # Update the Person document after the reverse instanced is deleted
             # Update parent document in ES.
             transaction.on_commit(
@@ -630,7 +630,7 @@ def delete_reverse_related_documents(
                     affected_fields,
                 )
             )
-        case Docket() if es_document is DocketDocument:  # type: ignore
+        case Docket() if es_document is DocketDocument:
             # Update the Docket document after the reverse instanced is deleted
 
             # Update parent document in ES.
@@ -661,7 +661,7 @@ def delete_reverse_related_documents(
                     affected_fields,
                 )
             )
-        case OpinionCluster() if es_document is OpinionClusterDocument:  # type: ignore
+        case OpinionCluster() if es_document is OpinionClusterDocument:
             # Update parent document in ES.
             transaction.on_commit(
                 partial(
@@ -993,7 +993,7 @@ class ESSignalProcessor:
                 case _ if (
                     type(instance) in SOURCE_BY_MODEL
                     and self.es_document is DocketDocument
-                ):  # type: ignore
+                ):
                     # Sender is always a registered metadata model here.
                     # Every registered metadata model (BankruptcyInformation,
                     # ScotusDocketMetadata, ...) is a one-to-one relation
@@ -1006,7 +1006,7 @@ class ESSignalProcessor:
                     )
                     if not affected_fields:
                         return
-                case Opinion() if self.es_document is OpinionClusterDocument:  # type: ignore
+                case Opinion() if self.es_document is OpinionClusterDocument:
                     changed_fields = updated_fields(instance, self.es_document)
                     affected_fields = get_fields_to_update(
                         changed_fields, fields_map

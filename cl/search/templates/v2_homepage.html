@@ -147,16 +147,27 @@
         About<br>RECAP
       </c-icon-link>
 
-      <c-icon-link
-        x-on:focus="scrollIntoView"
-        href="https://free.law/membership/"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Become a member and donate to Free Law Project (opens in new tab)"
-        icon="money_hand"
-      >
-        Become a Member
-      </c-icon-link>
+      {% if request.user.is_authenticated and request.user.profile.is_member %}
+        <c-icon-link
+          x-on:focus="scrollIntoView"
+          href="{% url 'profile_your_support' %}"
+          aria-label="View your membership"
+          icon="money_hand"
+        >
+          Your Membership
+        </c-icon-link>
+      {% else %}
+        <c-icon-link
+          x-on:focus="scrollIntoView"
+          href="https://free.law/membership/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Become a member and donate to Free Law Project (opens in new tab)"
+          icon="money_hand"
+        >
+          Become a Member
+        </c-icon-link>
+      {% endif %}
 
       <c-icon-link
         x-on:focus="scrollIntoView"

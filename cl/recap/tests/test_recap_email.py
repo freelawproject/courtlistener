@@ -1,7 +1,6 @@
 import json
 from datetime import timedelta
 from http import HTTPStatus
-from pathlib import Path
 from unittest import mock
 
 import httpx
@@ -42,7 +41,7 @@ from cl.recap.tasks import (
     mark_pq_successful,
     set_rd_sealed_status,
 )
-from cl.recap.tests.tests import mock_bucket_open
+from cl.recap.tests.tests import TEST_ASSETS_DIR, mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -65,9 +64,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="txwd", jurisdiction="FB")
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
-        with open(
-            test_dir / "recap_mail_custom_receipt.json",
+        with (TEST_ASSETS_DIR / "recap_mail_custom_receipt.json").open(
             encoding="utf-8",
         ) as file:
             recap_mail_receipt = json.load(file)
@@ -205,34 +202,31 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
             enabled=True,
             version=2,
         )
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt.json").open(
                 encoding="utf-8",
             ) as file,
-            open(
-                test_dir / "recap_mail_custom_receipt_2.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_2.json").open(
                 encoding="utf-8",
             ) as file_2,
-            open(
-                test_dir / "recap_mail_custom_receipt_3.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_3.json").open(
                 encoding="utf-8",
             ) as file_3,
-            open(
-                test_dir / "recap_mail_custom_receipt_4.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_4.json").open(
                 encoding="utf-8",
             ) as file_4,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda.json").open(
                 encoding="utf-8",
             ) as file_5,
-            open(
-                test_dir / "recap_mail_custom_receipt_no_re_user.json",
+            (
+                TEST_ASSETS_DIR / "recap_mail_custom_receipt_no_re_user.json"
+            ).open(
                 encoding="utf-8",
             ) as file_6,
-            open(
-                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+            (
+                TEST_ASSETS_DIR
+                / "recap_mail_custom_receipt_multi_nef_jpml.json"
+            ).open(
                 encoding="utf-8",
             ) as file_jpml,
         ):
@@ -3202,22 +3196,17 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         cls.court_ca11 = CourtFactory(id="ca11", jurisdiction="F")
         cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
         cls.court_ca8 = CourtFactory(id="ca8", jurisdiction="F")
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt_nda.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda.json").open(
                 encoding="utf-8",
             ) as nda_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca11.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca11.json").open(
                 encoding="utf-8",
             ) as ca11_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca2.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca2.json").open(
                 encoding="utf-8",
             ) as ca2_file,
-            open(
-                test_dir / "recap_mail_custom_receipt_nda_ca8.json",
+            (TEST_ASSETS_DIR / "recap_mail_custom_receipt_nda_ca8.json").open(
                 encoding="utf-8",
             ) as ca8_file,
         ):
@@ -3652,10 +3641,11 @@ class RecapEmailContentReplication(TestCase):
         cls.user_profile = UserProfileWithParentsFactory()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
 
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
-            open(
-                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+            (
+                TEST_ASSETS_DIR
+                / "recap_mail_custom_receipt_multi_nef_jpml.json"
+            ).open(
                 encoding="utf-8",
             ) as file_jpml,
         ):

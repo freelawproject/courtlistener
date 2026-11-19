@@ -3,6 +3,7 @@
 import re
 import sys
 from datetime import date
+from pathlib import Path
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -216,8 +217,8 @@ class Command(VerboseCommand, CommandUtils):
         self.build_field_data()
 
         logger.info(f"Importing IDB file at: {options['input_file']}")
-        with open(
-            options["input_file"], encoding="cp1252", newline="\r\n"
+        with Path(options["input_file"]).open(
+            encoding="cp1252", newline="\r\n"
         ) as f:
             col_headers = f.readline().strip().split("\t")
             for i, line in enumerate(f):

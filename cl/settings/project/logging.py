@@ -1,4 +1,3 @@
-# type: ignore
 """Logging settings."""
 
 import environ
