@@ -117,6 +117,26 @@ def should_schedule(request: HttpRequest) -> bool:
     return alive
 
 
+def get_fetch_court_id(fq: PacerFetchQueue) -> str:
+    """Get the court whose PACER server a fetch request's task will query.
+
+    The queue must count each request against that court. PDF and attachment
+    tasks query the court of the document's docket. Docket tasks prefer the
+    request's own court over its docket's court, the reverse of
+    get_court_id_from_fetch_queue, so a request that names a docket and a
+    different court must be queued under the court it names.
+
+    Args:
+        fq: The PacerFetchQueue row.
+
+    Returns:
+        The court ID.
+    """
+    if not fq.recap_document_id and (court_id := fq.court_id):
+        return court_id
+    return get_court_id_from_fetch_queue(fq)
+
+
 def schedule_fetch(fq: PacerFetchQueue) -> float | None:
     """Put a new request in line and tell its user how long the wait may be.
 
@@ -129,18 +149,24 @@ def schedule_fetch(fq: PacerFetchQueue) -> float | None:
         fq: The PacerFetchQueue row, already saved with status ENQUEUED.
 
     Returns:
-        The estimated wait in seconds, or None if Redis could not be reached
-        before anything was queued. The caller must then send the request to
-        Celery itself. See estimate_delay for what the number does and does
-        not promise.
+        The estimated wait in seconds, or None if the request could not be
+        queued, e.g. because Redis is unreachable. Nothing was queued in that
+        case, and the caller must send the request to Celery itself. See
+        estimate_delay for what the number does and does not promise.
     """
-    court_id = get_court_id_from_fetch_queue(fq)
+    court_id = get_fetch_court_id(fq)
+    # Nothing is queued until the estimate succeeds, so on any error the
+    # request can safely go straight to Celery instead of being left in
+    # ENQUEUED with nothing to run it.
     try:
         delay = estimate_delay(court_id, fq.user_id, not_yet_queued=1)
     except RedisError:
         logger.warning(
             "Unable to reach Redis to queue fetch request %s.", fq.pk
         )
+        return None
+    except Exception:
+        logger.exception("Unable to queue fetch request %s.", fq.pk)
         return None
     fq.message = (
         f"{QUEUED_MESSAGE_PREFIX} {court_id}. Estimated wait before we "
@@ -341,7 +367,8 @@ def fail_stale_fetches() -> int:
 
     Only requests that went through the queue are touched. Requests from
     other flows (recap.email, pacer_bulk_fetch) and requests whose task has
-    started are not.
+    started are not. In particular, a docket task killed mid-run leaves its
+    request IN_PROGRESS, and this does not finish it.
 
     Returns:
         The number of requests that were failed.
@@ -356,12 +383,12 @@ def fail_stale_fetches() -> int:
             date_created__gt=now() - SWEEP_LOOKBACK,
         )
         # The same court the request was queued under: see
-        # get_court_id_from_fetch_queue. Annotating it avoids a query per row.
+        # get_fetch_court_id. Annotating it avoids a query per row.
         .annotate(
             queue_court_id=Coalesce(
                 "recap_document__docket_entry__docket__court_id",
-                "docket__court_id",
                 "court_id",
+                "docket__court_id",
             )
         )
         .values_list(

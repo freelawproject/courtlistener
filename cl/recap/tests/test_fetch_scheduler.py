@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -32,6 +33,7 @@ from cl.recap.fetch_queue import (
     mark_fetch_started,
     pop_next_fetch,
     remove_fetch,
+    report_fetch_started,
     set_court_rate,
     touch_daemon_heartbeat,
 )
@@ -48,11 +50,17 @@ from cl.recap.fetch_scheduler import (
 )
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import (
+    fetch_appellate_docket,
+    fetch_attachment_page,
     fetch_docket,
     fetch_pacer_doc_by_rd,
     send_fq_webhooks,
 )
-from cl.search.factories import CourtFactory, RECAPDocumentFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    RECAPDocumentFactory,
+)
 from cl.search.models import Court
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
@@ -178,6 +186,31 @@ class FetchSchedulerRateTest(SchedulerRedisTestCase):
             with self.subTest(rate=rate), self.assertRaises(ValueError):
                 set_court_rate(COURT, rate)
         self.assertEqual(get_court_rates(), {})
+
+    def test_unparsable_rate_is_rejected(self) -> None:
+        """A typo in a rate never reaches Redis."""
+        for rate in ("fast", "1/", "1/x", "1 per s"):
+            with self.subTest(rate=rate), self.assertRaises(ValueError):
+                set_court_rate(COURT, rate)
+        self.assertEqual(get_court_rates(), {})
+
+    def test_start_report_never_breaks_a_fetch(self) -> None:
+        """Every fetch task reports its start, so the report must not fail.
+
+        Fetches that never went through the queue don't even read the rate.
+        """
+        enqueue_fetch(COURT, BOB, 1, T0)
+        self.assertEqual(pop_next_fetch(COURT, T0), 1)
+
+        with (
+            override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="0/s"),
+            mock.patch("cl.recap.fetch_queue.logger") as mock_logger,
+        ):
+            report_fetch_started(COURT, 99)
+            mock_logger.exception.assert_not_called()
+
+            report_fetch_started(COURT, 1)
+            mock_logger.exception.assert_called_once()
 
     def test_rate_holds_across_concurrent_processes(self) -> None:
         """Many processes asking at the same instant get one request."""
@@ -419,6 +452,44 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
         with self.assertNumQueries(1):
             self.assertEqual(run_dispatch_cycle(), 0)
 
+    def test_request_that_cannot_reach_celery_fails_and_frees_its_court(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """A broker error fails the request rather than risk running it twice."""
+        mock_do_pacer_fetch.side_effect = ConnectionError("Broker is down")
+        fq = self._make_fq(self.bob)
+        self._schedule(fq)
+
+        with mock.patch(
+            "cl.recap.tasks.send_recap_fetch_webhooks",
+            new_callable=mock.AsyncMock,
+        ):
+            self.assertEqual(run_dispatch_cycle(), 0)
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("unable to schedule", fq.message)
+        self.assertEqual(get_pending_fetches([COURT]), {})
+
+    def test_request_deleted_while_waiting_frees_its_court(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """Nothing is sent for a deleted request, and the court moves on."""
+        fq = self._make_fq(self.bob)
+        self._schedule(fq)
+        fq.delete()
+
+        self.assertEqual(run_dispatch_cycle(), 0)
+
+        mock_do_pacer_fetch.assert_not_called()
+        self.assertEqual(get_pending_fetches([COURT]), {})
+
 
 @mock.patch("cl.recap.fetch_scheduler.send_fq_webhooks")
 @mock.patch("cl.recap.fetch_scheduler._has_pacer_session")
@@ -581,6 +652,35 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
             self.assertEqual(fail_stale_fetches(), 1)
         self.assertEqual(get_queued_fetches(COURT, self.jane.pk), set())
 
+    def test_docket_request_waits_under_the_court_it_names(
+        self, mock_has_session: mock.MagicMock, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """Its task queries the court it names, not its docket's court.
+
+        So that court's rate applies, and the sweeper looks for the request
+        in that court's line.
+        """
+        mock_has_session.return_value = False
+        other_court = CourtFactory(
+            id=OTHER_COURT, jurisdiction=Court.FEDERAL_BANKRUPTCY
+        )
+        with time_machine.travel(NOON - timedelta(hours=2), tick=False):
+            fq = PacerFetchQueueFactory(
+                user=self.bob,
+                request_type=REQUEST_TYPE.DOCKET,
+                docket=DocketFactory(court=Court.objects.get(pk=COURT)),
+                court=other_court,
+            )
+            self._schedule(fq)
+        self.assertEqual(get_courts_with_waiting_fetches(), [OTHER_COURT])
+
+        with time_machine.travel(NOON, tick=False):
+            self.assertEqual(fail_stale_fetches(), 1)
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.message, SESSION_EXPIRED_MESSAGE)
+        self.assertEqual(get_queued_fetches(OTHER_COURT, self.bob.pk), set())
+
 
 @mock.patch("cl.recap.fetch_scheduler.send_fq_webhooks")
 class FetchSweeperLockTest(SchedulerDatabaseTestCase):
@@ -655,17 +755,54 @@ class FetchTaskGuardTest(SchedulerDatabaseTestCase):
     """A fetch task never runs a request that is already finished."""
 
     @mock.patch("cl.recap.tasks.is_pacer_court_accessible")
-    def test_task_skips_a_request_failed_by_the_sweeper(
+    def test_tasks_skip_a_request_failed_by_the_sweeper(
         self, mock_court_accessible: mock.MagicMock
     ) -> None:
         """The sweeper and a late Celery task can't both act on a request."""
-        fq = self._make_fq(self.bob, status=PROCESSING_STATUS.FAILED)
+        rd = RECAPDocumentFactory(
+            docket_entry__docket__court=Court.objects.get(pk=COURT)
+        )
+        cases: list[tuple[str, int, Callable[[PacerFetchQueue], object]]] = [
+            (
+                "docket",
+                REQUEST_TYPE.DOCKET,
+                lambda fq: fetch_docket.apply(args=(fq.pk,)),
+            ),
+            (
+                "appellate docket",
+                REQUEST_TYPE.DOCKET,
+                lambda fq: fetch_appellate_docket.apply(args=(fq.pk,)),
+            ),
+            (
+                "PDF",
+                REQUEST_TYPE.PDF,
+                lambda fq: fetch_pacer_doc_by_rd.apply(args=(rd.pk, fq.pk)),
+            ),
+            (
+                "attachment page",
+                REQUEST_TYPE.ATTACHMENT_PAGE,
+                lambda fq: fetch_attachment_page.apply(args=(fq.pk,)),
+            ),
+        ]
+        for label, request_type, run_task in cases:
+            with self.subTest(label):
+                fq = PacerFetchQueueFactory(
+                    user=self.bob,
+                    request_type=request_type,
+                    court_id=COURT,
+                    recap_document=(
+                        None if request_type == REQUEST_TYPE.DOCKET else rd
+                    ),
+                    status=PROCESSING_STATUS.FAILED,
+                    message=STALLED_MESSAGE,
+                )
 
-        fetch_docket.apply(args=(fq.pk,))
+                run_task(fq)
 
-        mock_court_accessible.assert_not_called()
-        fq.refresh_from_db()
-        self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+                mock_court_accessible.assert_not_called()
+                fq.refresh_from_db()
+                self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+                self.assertEqual(fq.message, STALLED_MESSAGE)
 
 
 @mock.patch("cl.recap.tasks.is_pacer_court_accessible", return_value=True)
@@ -711,6 +848,43 @@ class FetchTaskStartTest(SchedulerDatabaseTestCase):
         self._hand_off(fq)
 
         fetch_pacer_doc_by_rd.apply(args=(rd.pk, fq.pk))
+
+        self.assertEqual(get_pending_fetches([COURT]), {})
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_appellate_docket_task_frees_its_court(
+        self,
+        mock_cookies: mock.AsyncMock,
+        mock_court_accessible: mock.MagicMock,
+    ) -> None:
+        """Appellate docket tasks report their start like the others."""
+        fq = self._make_fq(self.bob)
+        self._hand_off(fq)
+
+        fetch_appellate_docket.apply(args=(fq.pk,))
+
+        self.assertEqual(get_pending_fetches([COURT]), {})
+
+    def test_attachment_task_frees_its_court_inside_its_transaction(
+        self, mock_court_accessible: mock.MagicMock
+    ) -> None:
+        """Attachment tasks run in a transaction too."""
+        rd = RECAPDocumentFactory(
+            docket_entry__docket__court=Court.objects.get(pk=COURT),
+            pacer_doc_id="",
+        )
+        fq = PacerFetchQueueFactory(
+            user=self.bob,
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document=rd,
+        )
+        self._hand_off(fq)
+
+        fetch_attachment_page.apply(args=(fq.pk,))
 
         self.assertEqual(get_pending_fetches([COURT]), {})
 
@@ -821,6 +995,26 @@ class FetchApiSchedulingTest(SchedulerDatabaseTestCase):
                 self.assertIsNone(response.json()["estimated_execution_delay"])
                 mock_do_pacer_fetch.assert_called_once()
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_fetch_scheduler_bad_rate",
+        RECAP_FETCH_DEFAULT_COURT_RATE="1/x",
+    )
+    @override_flag(SCHEDULER_FLAG, active=True)
+    def test_requests_skip_the_queue_when_they_cannot_be_queued(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_cookies: mock.MagicMock,
+    ) -> None:
+        """Any error before queueing sends the request to Celery, not limbo."""
+        with mock.patch("cl.recap.fetch_scheduler.logger") as mock_logger:
+            response = self.client.post(self.url, self.body, format="json")
+
+        mock_logger.exception.assert_called_once()
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertIsNone(response.json()["estimated_execution_delay"])
+        mock_do_pacer_fetch.assert_called_once()
+        self.assertEqual(get_courts_with_waiting_fetches(), [])
+
     @override_settings(WAFFLE_CACHE_PREFIX="test_fetch_scheduler_per_user")
     def test_flag_can_target_a_single_user(
         self,
@@ -885,8 +1079,12 @@ class FetchQueueCommandTest(SchedulerDatabaseTestCase):
 
     def test_bad_input_is_rejected(self) -> None:
         """Typos in the court or the rate never reach Redis."""
+        CourtFactory(
+            id="nopacer", jurisdiction=Court.FEDERAL_DISTRICT, in_use=False
+        )
         cases = [
             ("unknown court", ("--set-rate", "nope", "1/s")),
+            ("court not on PACER", ("--set-rate", "nopacer", "1/s")),
             ("unparsable rate", ("--set-rate", COURT, "fast")),
             ("zero rate", ("--set-rate", COURT, "0/s")),
             ("unknown court to clear", ("--clear-rate", "nope")),
@@ -969,3 +1167,18 @@ class FetchSchedulerDaemonTest(SchedulerRedisTestCase):
         call_command("recap_fetch_scheduler_daemon", testing_iterations=3)
 
         self.assertEqual(mock_close.call_count, 3)
+
+    @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/x")
+    def test_refuses_to_start_with_an_invalid_default_rate(
+        self,
+        mock_dispatch: mock.MagicMock,
+        mock_capture: mock.MagicMock,
+        mock_sleep: mock.MagicMock,
+        mock_sweep: mock.MagicMock,
+    ) -> None:
+        """A typo in the default rate stops the daemon instead of hiding."""
+        with self.assertRaises(CommandError):
+            call_command("recap_fetch_scheduler_daemon", testing_iterations=1)
+
+        mock_dispatch.assert_not_called()
+        self.assertFalse(daemon_is_alive())

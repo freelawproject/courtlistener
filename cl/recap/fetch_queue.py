@@ -9,9 +9,15 @@ so the fetch tasks can import it without a circular import.
 Each court has its own clock, because each court has its own PACER server, so
 that we never send it requests faster than its rate allows. The clock counts
 from when a request starts running, not from when it is handed to Celery, and
-a court never has more than one request handed off but not yet started.
+a court normally has at most one request handed off but not yet started.
 Otherwise requests that pile up in Celery while workers are busy would all
 start together once the workers free up.
+
+The exception is a handed-off request that doesn't start within
+PENDING_TTL_SECONDS: the court stops waiting for it, since it may have been
+lost. If the workers are down for longer than that, each court hands off one
+more request per PENDING_TTL_SECONDS, and those can start close together once
+the workers come back.
 
 Within a court, each user has their own line and users take turns. The next
 request always belongs to the user who has waited longest since their last
@@ -66,6 +72,9 @@ HEARTBEAT_TTL_SECONDS = 30
 #       court's pending key
 # ARGV: now (ms), how long the pending marker lives (s), the court ID, the
 #       prefix of the court's per-user LIST keys
+#
+# The script builds the chosen user's LIST key itself, since it can't know
+# the user beforehand. Standalone Redis allows that; Redis Cluster would not.
 POP_NEXT_SCRIPT = """
 if redis.call('EXISTS', KEYS[4]) == 1 then
     return false
@@ -182,6 +191,27 @@ def daemon_is_alive() -> bool:
     return bool(get_redis_interface("CACHE").exists(_heartbeat_key()))
 
 
+def rate_to_interval_ms(rate: str) -> int:
+    """Turn a rate like "1/2s" into the minimum time between two requests.
+
+    Args:
+        rate: A rate as understood by parse_rate, e.g. "1/s" or "30/m".
+
+    Returns:
+        The interval in milliseconds, never below 1.
+
+    Raises:
+        ValueError: If the rate can't be parsed or allows no requests.
+    """
+    try:
+        num_requests, duration = parse_rate(rate)
+    except (IndexError, KeyError, ValueError) as e:
+        raise ValueError(f"Unable to parse the rate {rate!r}.") from e
+    if num_requests <= 0 or duration <= 0:
+        raise ValueError(f"The rate must allow some requests: {rate!r}.")
+    return max(duration * 1000 // num_requests, 1)
+
+
 def get_court_interval_ms(court_id: str) -> int:
     """Get the minimum time between two requests to a court.
 
@@ -191,13 +221,17 @@ def get_court_interval_ms(court_id: str) -> int:
     Returns:
         The interval in milliseconds, from the court's own rate if it has
         one, otherwise from settings.RECAP_FETCH_DEFAULT_COURT_RATE.
+
+    Raises:
+        ValueError: If settings.RECAP_FETCH_DEFAULT_COURT_RATE is invalid.
+            The daemon refuses to start in that case, and court rates are
+            checked when they are set.
     """
     r = get_redis_interface("CACHE")
     rate = r.hget(_rates_key(), court_id)
-    num_requests, duration = parse_rate(
+    return rate_to_interval_ms(
         str(rate) if rate else settings.RECAP_FETCH_DEFAULT_COURT_RATE
     )
-    return duration * 1000 // num_requests
 
 
 def set_court_rate(court_id: str, rate: str | None) -> None:
@@ -212,18 +246,15 @@ def set_court_rate(court_id: str, rate: str | None) -> None:
             None removes the court's own rate, returning it to the default.
 
     Raises:
-        ValueError, KeyError: If the rate cannot be parsed or allows no
-            requests at all.
+        ValueError: If the rate cannot be parsed or allows no requests at
+            all.
     """
     r = get_redis_interface("CACHE")
     if rate is None:
         r.hdel(_rates_key(), court_id)
         return
     # Reject a bad rate here, rather than every time the court is scheduled.
-    # A rate of zero would make get_court_interval_ms divide by zero.
-    num_requests, duration = parse_rate(rate)
-    if num_requests <= 0 or duration <= 0:
-        raise ValueError(f"The rate must allow some requests: {rate}")
+    rate_to_interval_ms(rate)
     r.hset(_rates_key(), court_id, rate)
 
 
@@ -415,17 +446,29 @@ def report_fetch_started(court_id: str, fq_pk: int) -> None:
     them run inside a database transaction, so the daemon can't see their
     status change until they finish.
 
-    It never raises: if Redis is unreachable, the daemon still releases the
-    court once it sees the task's status, or after PENDING_TTL_SECONDS.
+    It is called for every fetch, queued or not, and never raises: if it
+    fails, the daemon still releases the court once it sees the task's
+    status, or after PENDING_TTL_SECONDS.
 
     Args:
         court_id: The court the task is querying.
         fq_pk: The PK of the PacerFetchQueue row the task is processing.
     """
     try:
+        # Most fetches never went through the queue, so check first whether
+        # the court is waiting on this one at all. mark_fetch_started checks
+        # again atomically.
+        r = get_redis_interface("CACHE")
+        if r.get(_pending_key(court_id)) != str(fq_pk):
+            return
         mark_fetch_started(court_id, fq_pk)
     except RedisError:
         logger.warning(
+            "Unable to tell the fetch queue that request %s started.", fq_pk
+        )
+    except Exception:
+        # The queue's bookkeeping must never break the fetch itself.
+        logger.exception(
             "Unable to tell the fetch queue that request %s started.", fq_pk
         )
 

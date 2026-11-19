@@ -23,7 +23,7 @@ from cl.recap.fetch_queue import (
     get_courts_with_waiting_fetches,
     set_court_rate,
 )
-from cl.search.models import Court
+from cl.search.models import Court, FederalCourtsQuerySet
 
 
 class Command(VerboseCommand):
@@ -64,8 +64,8 @@ class Command(VerboseCommand):
             self._check_court(court_id)
             try:
                 set_court_rate(court_id, rate)
-            except (ValueError, KeyError) as e:
-                raise CommandError(f"Invalid rate {rate!r}: {e}") from e
+            except ValueError as e:
+                raise CommandError(str(e)) from e
             self.stdout.write(f"{court_id} now uses {rate}.")
         else:
             court_id = options["clear_rate"]
@@ -78,16 +78,20 @@ class Command(VerboseCommand):
 
     @staticmethod
     def _check_court(court_id: str) -> None:
-        """Make sure a court ID belongs to a federal court.
+        """Make sure a court ID belongs to a court the Fetch API accepts.
 
         Args:
             court_id: The court ID given on the command line.
 
         Raises:
-            CommandError: If no federal court has that ID.
+            CommandError: If no current PACER court has that ID.
         """
-        if not Court.federal_courts.all().filter(pk=court_id).exists():
-            raise CommandError(f"No federal court has the ID {court_id!r}.")
+        # The queryset is built directly because type checkers can't see the
+        # methods Court.federal_courts gets from it. It's the same check the
+        # Fetch API runs.
+        pacer_courts = FederalCourtsQuerySet(Court).all_pacer_courts()
+        if not pacer_courts.filter(pk=court_id).exists():
+            raise CommandError(f"No PACER court has the ID {court_id!r}.")
 
     def _print_status(self) -> None:
         """Print each waiting court's queue, then the courts' own rates."""

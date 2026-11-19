@@ -15,11 +15,12 @@ import time
 from typing import Any
 
 from django.conf import settings
+from django.core.management import CommandError
 from django.db import close_old_connections
 from sentry_sdk import capture_exception
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.recap.fetch_queue import touch_daemon_heartbeat
+from cl.recap.fetch_queue import rate_to_interval_ms, touch_daemon_heartbeat
 from cl.recap.fetch_scheduler import fail_stale_fetches, run_dispatch_cycle
 
 # Seconds to wait after one dispatch cycle finishes before starting the next.
@@ -84,6 +85,15 @@ class Command(VerboseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Dispatch and sweep in a loop until a signal or the setting stops it."""
         super().handle(*args, **options)
+
+        # A typo in the default rate would fail every cycle while the
+        # heartbeat of an idle daemon stayed fresh. Fail loudly instead.
+        try:
+            rate_to_interval_ms(settings.RECAP_FETCH_DEFAULT_COURT_RATE)
+        except ValueError as e:
+            raise CommandError(
+                f"RECAP_FETCH_DEFAULT_COURT_RATE is invalid: {e}"
+            ) from e
 
         signal.signal(signal.SIGTERM, _request_shutdown)
         signal.signal(signal.SIGINT, _request_shutdown)

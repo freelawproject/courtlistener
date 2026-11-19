@@ -14,6 +14,7 @@ from rest_framework.permissions import (
     DjangoModelPermissions,
     IsAuthenticated,
 )
+from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from cl.api.api_permissions import IsOwner, V3APIPermission
@@ -196,7 +197,9 @@ class PacerFetchRequestViewSet(
             "-id"
         )
 
-    def perform_create(self, serializer):
+    def perform_create(
+        self, serializer: BaseSerializer[PacerFetchQueue]
+    ) -> None:
         """Save the fetch request for the requesting user and start the fetch."""
         fq = serializer.save(user=self.request.user)
         if (
@@ -205,7 +208,7 @@ class PacerFetchRequestViewSet(
         ):
             # Not a model field: the serializer reads it off the instance so
             # the estimate appears in the response to this POST.
-            fq.estimated_execution_delay = delay
+            setattr(fq, "estimated_execution_delay", delay)
             return
         do_pacer_fetch(fq)
 
