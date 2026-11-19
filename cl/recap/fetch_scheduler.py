@@ -21,7 +21,6 @@ from redis.exceptions import RedisError
 from sentry_sdk import capture_exception
 from waffle import flag_is_active
 
-from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.recap.fetch_queue import (
     clear_pending_fetch,
@@ -36,7 +35,7 @@ from cl.recap.fetch_queue import (
     remove_fetch,
 )
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.recap.tasks import do_pacer_fetch, mark_fq_status
+from cl.recap.tasks import do_pacer_fetch, mark_fq_status, send_fq_webhooks
 from cl.recap.utils import get_court_id_from_fetch_queue
 
 logger = logging.getLogger(__name__)
@@ -185,24 +184,34 @@ def _fail_queued_fetch(
         it was read, e.g. the daemon handed it off or its task started, and
         it was left alone.
     """
-    # Claim the row only if nothing touched it since it was read.
-    claimed = (
-        PacerFetchQueue.objects.using("default")
-        .filter(
-            pk=fq_pk,
-            status=PROCESSING_STATUS.ENQUEUED,
-            date_modified=read_date_modified,
+    with transaction.atomic(using="default"):
+        # Claim the row only if nothing touched it since it was read. A row
+        # that is locked belongs to a task that is running right now: PDF and
+        # attachment tasks hold the lock until they finish, and we read the
+        # row as ENQUEUED only because their changes aren't committed yet.
+        # Skip it rather than stall the daemon until the task ends.
+        claimed = list(
+            PacerFetchQueue.objects.using("default")
+            .select_for_update(skip_locked=True)
+            .filter(
+                pk=fq_pk,
+                status=PROCESSING_STATUS.ENQUEUED,
+                date_modified=read_date_modified,
+            )
+            .values_list("pk", flat=True)
         )
-        .update(
+        if not claimed:
+            return False
+        PacerFetchQueue.objects.using("default").filter(pk=fq_pk).update(
             status=PROCESSING_STATUS.FAILED,
             message=message,
             date_modified=now(),
         )
-    )
-    if not claimed:
-        return False
-    fq = PacerFetchQueue.objects.using("default").get(pk=fq_pk)
-    async_to_sync(send_recap_fetch_webhooks)(fq)
+        # Webhooks go through Celery, so a slow endpoint can't hold up the
+        # daemon.
+        transaction.on_commit(
+            partial(send_fq_webhooks.delay, fq_pk), using="default"
+        )
     return True
 
 

@@ -2983,6 +2983,21 @@ def mark_fq_successful(fq_pk):
     async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
 
 
+@app.task(ignore_result=True)
+def send_fq_webhooks(fq_pk: int) -> None:
+    """Send the RECAP Fetch webhooks for a request in a final status.
+
+    For code that must not wait on users' webhook endpoints, like the fetch
+    scheduler daemon, where one slow endpoint would hold up every court.
+
+    Args:
+        fq_pk: The PK of the PacerFetchQueue row. Nothing is sent if the row
+            no longer exists.
+    """
+    if fq := PacerFetchQueue.objects.filter(pk=fq_pk).first():
+        async_to_sync(send_recap_fetch_webhooks)(fq)
+
+
 def fq_is_finished(fq: PacerFetchQueue) -> bool:
     """Check whether a fetch request already reached a final status.
 

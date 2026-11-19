@@ -8,7 +8,9 @@ from unittest import mock
 import time_machine
 from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from redis.exceptions import RedisError
 from rest_framework.test import APIClient
@@ -45,7 +47,11 @@ from cl.recap.fetch_scheduler import (
     schedule_fetch,
 )
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
-from cl.recap.tasks import fetch_docket, fetch_pacer_doc_by_rd
+from cl.recap.tasks import (
+    fetch_docket,
+    fetch_pacer_doc_by_rd,
+    send_fq_webhooks,
+)
 from cl.search.factories import CourtFactory, RECAPDocumentFactory
 from cl.search.models import Court
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -305,7 +311,7 @@ class SchedulerDatabaseTestCase(SchedulerRedisTestCase, TestCase):
 
 
 @override_settings(RECAP_FETCH_DEFAULT_COURT_RATE="1/s")
-@mock.patch("cl.recap.fetch_scheduler.send_recap_fetch_webhooks")
+@mock.patch("cl.recap.fetch_scheduler.send_fq_webhooks")
 @mock.patch("cl.recap.fetch_scheduler._has_pacer_session", return_value=True)
 @mock.patch("cl.recap.fetch_scheduler.do_pacer_fetch")
 class FetchDispatchTest(SchedulerDatabaseTestCase):
@@ -356,14 +362,15 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
             traveller.shift(timedelta(milliseconds=1))
             self._schedule(janes)
 
-            self.assertEqual(run_dispatch_cycle(), 0)
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertEqual(run_dispatch_cycle(), 0)
             self.assertEqual(run_dispatch_cycle(), 1)
 
         mock_do_pacer_fetch.assert_called_once_with(janes)
         bobs.refresh_from_db()
         self.assertEqual(bobs.status, PROCESSING_STATUS.FAILED)
         self.assertEqual(bobs.message, SESSION_EXPIRED_MESSAGE)
-        mock_webhooks.assert_called_once()
+        mock_webhooks.delay.assert_called_once_with(bobs.pk)
 
     def test_request_joins_the_line_only_after_its_commit(
         self,
@@ -413,7 +420,7 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
             self.assertEqual(run_dispatch_cycle(), 0)
 
 
-@mock.patch("cl.recap.fetch_scheduler.send_recap_fetch_webhooks")
+@mock.patch("cl.recap.fetch_scheduler.send_fq_webhooks")
 @mock.patch("cl.recap.fetch_scheduler._has_pacer_session")
 class FetchSweeperTest(SchedulerDatabaseTestCase):
     """No request stays ENQUEUED forever, and none that can still run fails."""
@@ -445,7 +452,10 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
             self._schedule(recent)
         remove_fetch(COURT, self.bob.pk, lost.pk)
 
-        with time_machine.travel(NOON, tick=False):
+        with (
+            time_machine.travel(NOON, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             self.assertEqual(fail_stale_fetches(), 2)
 
         expected = [
@@ -468,7 +478,10 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
 
         self.assertEqual(lost.message, LOST_MESSAGE)
         self.assertEqual(expired.message, SESSION_EXPIRED_MESSAGE)
-        self.assertEqual(mock_webhooks.call_count, 2)
+        self.assertCountEqual(
+            [call.args for call in mock_webhooks.delay.call_args_list],
+            [(lost.pk,), (expired.pk,)],
+        )
         # The expired request is gone from Redis, so it can't use a turn.
         self.assertNotIn(expired.pk, get_queued_fetches(COURT, self.jane.pk))
         self.assertIn(still_in_line.pk, get_queued_fetches(COURT, self.bob.pk))
@@ -529,12 +542,13 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
                 "cl.recap.fetch_scheduler.get_queued_fetches",
                 side_effect=start_then_read,
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             self.assertEqual(fail_stale_fetches(), 0)
 
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.ENQUEUED)
-        mock_webhooks.assert_not_called()
+        mock_webhooks.delay.assert_not_called()
 
     def test_sweeps_each_request_under_its_court_in_one_query(
         self, mock_has_session: mock.MagicMock, mock_webhooks: mock.MagicMock
@@ -566,6 +580,75 @@ class FetchSweeperTest(SchedulerDatabaseTestCase):
         with time_machine.travel(NOON, tick=False):
             self.assertEqual(fail_stale_fetches(), 1)
         self.assertEqual(get_queued_fetches(COURT, self.jane.pk), set())
+
+
+@mock.patch("cl.recap.fetch_scheduler.send_fq_webhooks")
+class FetchSweeperLockTest(SchedulerDatabaseTestCase):
+    """The sweeper never waits on a request that a running task holds."""
+
+    def test_skips_requests_a_running_task_has_locked(
+        self, mock_webhooks: mock.MagicMock
+    ) -> None:
+        """A PDF task's open transaction can't stall the daemon.
+
+        The task holds the row's lock until it finishes, and its changes
+        aren't committed yet, so the sweeper reads the row as a handed-off
+        request that never started. The claim must skip a locked row rather
+        than wait for it. Another connection can't see this test's rows, so
+        the test checks the SQL instead of holding a real lock.
+        """
+        with time_machine.travel(NOON - timedelta(hours=2), tick=False):
+            fq = PacerFetchQueueFactory(
+                user=self.bob,
+                request_type=REQUEST_TYPE.DOCKET,
+                court_id=COURT,
+                message=f"{HANDED_OFF_MESSAGE_PREFIX} {COURT}.",
+            )
+
+        with (
+            time_machine.travel(NOON, tick=False),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            self.assertEqual(fail_stale_fetches(), 1)
+
+        claims = [
+            query["sql"]
+            for query in queries.captured_queries
+            if "FOR UPDATE" in query["sql"]
+        ]
+        self.assertEqual(len(claims), 1)
+        self.assertIn("SKIP LOCKED", claims[0])
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
+
+
+@mock.patch(
+    "cl.recap.tasks.send_recap_fetch_webhooks", new_callable=mock.AsyncMock
+)
+class FetchWebhookTaskTest(SchedulerDatabaseTestCase):
+    """The daemon's webhooks are sent by Celery, not by the daemon."""
+
+    def test_sends_the_webhooks_of_a_failed_request(
+        self, mock_send: mock.AsyncMock
+    ) -> None:
+        """The task loads the request and sends its webhooks."""
+        fq = self._make_fq(self.bob, status=PROCESSING_STATUS.FAILED)
+
+        send_fq_webhooks.apply(args=(fq.pk,))
+
+        mock_send.assert_awaited_once_with(fq)
+
+    def test_does_nothing_for_a_deleted_request(
+        self, mock_send: mock.AsyncMock
+    ) -> None:
+        """A request deleted before the task ran has nobody to tell."""
+        fq = self._make_fq(self.bob, status=PROCESSING_STATUS.FAILED)
+        fq_pk = fq.pk
+        fq.delete()
+
+        send_fq_webhooks.apply(args=(fq_pk,))
+
+        mock_send.assert_not_awaited()
 
 
 class FetchTaskGuardTest(SchedulerDatabaseTestCase):
