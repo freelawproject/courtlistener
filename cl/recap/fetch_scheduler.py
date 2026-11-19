@@ -35,7 +35,7 @@ from cl.recap.fetch_queue import (
     remove_fetch,
 )
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.recap.tasks import do_pacer_fetch, mark_fq_status, send_fq_webhooks
+from cl.recap.tasks import do_pacer_fetch, send_fq_webhooks
 from cl.recap.utils import get_court_id_from_fetch_queue
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,10 @@ SESSION_EXPIRED_MESSAGE = (
 LOST_MESSAGE = (
     "This request was lost from the queue and was cancelled before anything "
     "was requested from PACER. Please submit it again."
+)
+
+UNSCHEDULABLE_MESSAGE = (
+    "We were unable to schedule this request. Please submit it again."
 )
 
 # A handed-off task may have reached PACER before it was lost or rolled back,
@@ -176,8 +180,30 @@ def schedule_fetch(fq: PacerFetchQueue) -> float | None:
         "the court's rate is lowered or if our workers are busy."
     )
     fq.save(update_fields=["message"])
-    transaction.on_commit(partial(enqueue_fetch, court_id, fq.user_id, fq.pk))
+    transaction.on_commit(partial(_enqueue_or_send, court_id, fq))
     return delay
+
+
+def _enqueue_or_send(court_id: str, fq: PacerFetchQueue) -> None:
+    """Put a scheduled request in line, or send it to Celery if that fails.
+
+    Runs once the request's row is committed. The row already says it is
+    waiting in the queue, so if Redis fails here, nothing would ever run it
+    and the user would get an error for a request that was saved.
+
+    Args:
+        court_id: The court to queue the request under.
+        fq: The PacerFetchQueue row.
+    """
+    try:
+        enqueue_fetch(court_id, fq.user_id, fq.pk)
+    except Exception:
+        # The estimate the user got is now too high, which is harmless: the
+        # task replaces the queue's message as soon as it starts.
+        logger.exception(
+            "Unable to queue fetch request %s. Sending it to Celery.", fq.pk
+        )
+        do_pacer_fetch(fq)
 
 
 def _has_pacer_session(user_id: int) -> bool:
@@ -234,9 +260,12 @@ def _fail_queued_fetch(
             date_modified=now(),
         )
         # Webhooks go through Celery, so a slow endpoint can't hold up the
-        # daemon.
+        # daemon. If Celery can't be reached, the webhook is lost but the
+        # failure is logged, and the daemon keeps going.
         transaction.on_commit(
-            partial(send_fq_webhooks.delay, fq_pk), using="default"
+            partial(send_fq_webhooks.delay, fq_pk),
+            using="default",
+            robust=True,
         )
     return True
 
@@ -280,13 +309,14 @@ def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
     # then knows the request may have reached PACER, and gives its task a
     # full STALE_AFTER from now to finish, even if a retry rolls back the
     # task's own status changes.
+    handed_off_at = now()
     claimed = (
         PacerFetchQueue.objects.using("default")
         .filter(pk=fq_pk, status=PROCESSING_STATUS.ENQUEUED)
         .update(
             message=f"{HANDED_OFF_MESSAGE_PREFIX} {court_id}. Waiting for "
             "one of them to start it.",
-            date_modified=now(),
+            date_modified=handed_off_at,
         )
     )
     if not claimed:
@@ -298,11 +328,7 @@ def hand_off_fetch(court_id: str, fq_pk: int) -> bool:
     except Exception as e:
         logger.exception("Unable to send fetch request %s to Celery.", fq_pk)
         capture_exception(e)
-        async_to_sync(mark_fq_status)(
-            fq,
-            "We were unable to schedule this request. Please submit it again.",
-            PROCESSING_STATUS.FAILED,
-        )
+        _fail_queued_fetch(fq_pk, handed_off_at, UNSCHEDULABLE_MESSAGE)
         clear_pending_fetch(court_id, fq_pk)
         return False
     return True
@@ -362,8 +388,9 @@ def fail_stale_fetches() -> int:
       because the task was lost, so nothing would ever finish it.
 
     A request that is still in line with a live session is left alone, even
-    if it is old: a user with a large batch keeps their session alive with
-    each new request.
+    if it is old. PACER sessions are cached for an hour after login, and a new
+    request only logs in again when the cached session is about to expire, so
+    in practice no request can wait much longer than an hour.
 
     Only requests that went through the queue are touched. Requests from
     other flows (recap.email, pacer_bulk_fetch) and requests whose task has

@@ -3007,6 +3007,11 @@ def fq_is_finished(fq: PacerFetchQueue) -> bool:
     the user has been told so and may have submitted it again. Running it
     anyway could bill their PACER account twice.
 
+    The check isn't atomic with the task's later status updates, so a request
+    failed in the moment between the two still runs. The scheduler only fails
+    a handed-off request after it waited in Celery for over an hour, so that
+    takes a very large backlog.
+
     Args:
         fq: The PacerFetchQueue item, freshly loaded from the database.
 

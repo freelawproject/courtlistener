@@ -9,7 +9,7 @@ from unittest import mock
 import time_machine
 from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
-from django.db import connection
+from django.db import connection, transaction
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -43,6 +43,7 @@ from cl.recap.fetch_scheduler import (
     SCHEDULER_FLAG,
     SESSION_EXPIRED_MESSAGE,
     STALLED_MESSAGE,
+    UNSCHEDULABLE_MESSAGE,
     fail_stale_fetches,
     hand_off_fetch,
     run_dispatch_cycle,
@@ -458,21 +459,54 @@ class FetchDispatchTest(SchedulerDatabaseTestCase):
         mock_has_session: mock.MagicMock,
         mock_webhooks: mock.MagicMock,
     ) -> None:
-        """A broker error fails the request rather than risk running it twice."""
+        """A broker error fails the request rather than risk running it twice.
+
+        The webhook still goes through Celery, and is queued so that failing
+        to reach Celery again only logs an error instead of stopping the
+        daemon's cycle.
+        """
         mock_do_pacer_fetch.side_effect = ConnectionError("Broker is down")
         fq = self._make_fq(self.bob)
         self._schedule(fq)
 
-        with mock.patch(
-            "cl.recap.tasks.send_recap_fetch_webhooks",
-            new_callable=mock.AsyncMock,
+        with (
+            self.captureOnCommitCallbacks(execute=True),
+            mock.patch(
+                "cl.recap.fetch_scheduler.transaction.on_commit",
+                wraps=transaction.on_commit,
+            ) as mock_on_commit,
         ):
             self.assertEqual(run_dispatch_cycle(), 0)
 
+        self.assertTrue(mock_on_commit.call_args.kwargs["robust"])
+
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.FAILED)
-        self.assertIn("unable to schedule", fq.message)
+        self.assertEqual(fq.message, UNSCHEDULABLE_MESSAGE)
+        mock_webhooks.delay.assert_called_once_with(fq.pk)
         self.assertEqual(get_pending_fetches([COURT]), {})
+
+    def test_request_that_cannot_join_the_line_goes_to_celery(
+        self,
+        mock_do_pacer_fetch: mock.MagicMock,
+        mock_has_session: mock.MagicMock,
+        mock_webhooks: mock.MagicMock,
+    ) -> None:
+        """A Redis error after the estimate doesn't strand the request."""
+        fq = self._make_fq(self.bob)
+
+        with (
+            mock.patch(
+                "cl.recap.fetch_scheduler.enqueue_fetch",
+                side_effect=RedisError("Redis is down"),
+            ),
+            mock.patch("cl.recap.fetch_scheduler.logger") as mock_logger,
+        ):
+            self._schedule(fq)
+
+        mock_logger.exception.assert_called_once()
+        mock_do_pacer_fetch.assert_called_once_with(fq)
+        self.assertEqual(get_courts_with_waiting_fetches(), [])
 
     def test_request_deleted_while_waiting_frees_its_court(
         self,
