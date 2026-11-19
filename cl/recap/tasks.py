@@ -4213,6 +4213,15 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             return
         case SCOTUSEmailType.DOCKET_ENTRY.value:
             data = handling_result["data"]
+            if not data:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    "SCOTUS docket result could not be processed.",
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                    "status_message",
+                )
+                self.request.chain = None
+                return
             try:
                 d, _, doc_pks = merge_scotus_docket(data)
             except Exception as e:
