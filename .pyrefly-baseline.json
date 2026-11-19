@@ -2508,27 +2508,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `recap_email`",
-      "severity": "error"
-    },
-    {
-      "column": 53,
-      "path": "cl/users/signals.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `user_profile` with type `UserProfile` in function `cl.users.models.generate_recap_email`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/users/signals.py",
       "name": "missing-attribute",
