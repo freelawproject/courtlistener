@@ -437,7 +437,7 @@ def match_opinion_lists(
 
     matches = {}
     for i, row in enumerate(scores):
-        j = row.argmax()  # type: ignore
+        j = row.argmax()
         file_opinion = re.sub(
             r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
         )

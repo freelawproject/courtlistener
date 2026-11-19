@@ -2423,7 +2423,7 @@ class V4DRFPaginationTest(TestCase):
             A valid cursor for testing.
         """
         position = 10 if "id" in ordering_key else now()
-        cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
+        cursor = Cursor(offset=1, reverse=False, position=position)
         encoded_cursor = paginator.encode_cursor(cursor)
         parsed_url = urlparse(encoded_cursor)
         query_params = parse_qs(parsed_url.query)

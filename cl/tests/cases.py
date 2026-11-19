@@ -294,7 +294,7 @@ class ESIndexTestCase(SimpleTestCase):
             with self.subTest(test_content=test_content):
                 node_count = len(
                     xml_tree.xpath(test_content, namespaces=namespaces)
-                )  # type: ignore
+                )
                 self.assertEqual(
                     node_count,
                     count,

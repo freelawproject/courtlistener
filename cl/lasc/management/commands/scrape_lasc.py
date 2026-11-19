@@ -2,7 +2,7 @@
 
 import argparse
 from datetime import date, timedelta
-from glob import glob
+from pathlib import Path
 
 from juriscraper.lib.date_utils import make_date_range_tuples
 
@@ -11,6 +11,7 @@ from cl.lasc.models import QueuedCase, QueuedPDF
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.utils import glob_files
 
 
 def date_search(options):
@@ -43,7 +44,7 @@ def add_or_update_case(options):
 def add_directory(options):
     """Import JSON files from a directory provided at the command line.
 
-    Use glob.globs' to identify JSON files to import.
+    Use a glob pattern to identify JSON files to import.
     """
     dir_glob = options["directory_glob"]
     skip_until = options["skip_until"]
@@ -54,7 +55,17 @@ def add_directory(options):
         )
     else:
         dir_glob = options["directory_glob"]
-        fps = sorted(glob(dir_glob))
+        # glob_files takes a root and a relative pattern, so split the
+        # user's pattern at the first component containing a wildcard.
+        parts = Path(dir_glob).parts
+        split = next(
+            (i for i, part in enumerate(parts) if set("*?[") & set(part)),
+            len(parts) - 1,
+        )
+        fps = sorted(
+            str(fp)
+            for fp in glob_files(Path(*parts[:split]), "/".join(parts[split:]))
+        )
         if skip_until:
             # Remove items from the list until the skip_until value is hit.
             try:
