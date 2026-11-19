@@ -27,6 +27,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from elastic_transport import ObjectApiResponse
 from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
 from elasticsearch.exceptions import (
     ApiError,
@@ -842,7 +843,6 @@ def update_children_docs_by_query(
         count_query = Position.objects.filter(person_id=parent_instance_id)
 
     elif es_document is ESRECAPDocument:
-        main_instance_id = None
         if event_table == EventTable.DOCKET_ENTRY:
             s = s.query("term", docket_entry_id=parent_instance_id)
             parent_instance = get_instance_from_db(
@@ -865,7 +865,7 @@ def update_children_docs_by_query(
             count_query = RECAPDocument.objects.filter(
                 docket_entry__docket_id=parent_instance_id
             )
-        if not main_instance_id:
+        else:
             return
         parent_doc_class = DocketDocument
         main_doc = parent_doc_class.exists(main_instance_id)
@@ -1281,9 +1281,15 @@ def index_parent_or_child_docs_in_es(
         source_name: The name of a registered ESDocketSource. For the
             RECAP search type, child instance_ids are its documents; other
             search types don't use it.
+
+    Raises:
+        ValueError: If indexing child documents for a search type that has
+            none.
     """
     parent_instances = QuerySet()
     child_instances = QuerySet()
+    child_es_document = None
+    child_id_property = None
     source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.RECAP:
@@ -1318,6 +1324,8 @@ def index_parent_or_child_docs_in_es(
         "_index": parent_es_document._index._name,
     }
     if document_type == "child":
+        if child_es_document is None:
+            raise ValueError(f"{search_type} has no child documents to index.")
         # Then index only child documents in bulk.
         failed_docs = index_documents_in_bulk_from_queryset(
             child_instances,
@@ -1808,7 +1816,7 @@ def remove_documents_by_query(
     testing_mode: bool = False,
     requests_per_second: int | None = None,
     max_docs: int = 0,
-) -> None | dict[str, str]:
+) -> ObjectApiResponse[Any] | None:
     """Remove documents from ES by query.
 
     This method deletes documents from a specified ES document type based on a
