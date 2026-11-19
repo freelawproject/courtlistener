@@ -30,34 +30,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `query_params`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `build_absolute_uri`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_search_after_sort_key`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_reverse_search_after_sort_key`",
-      "severity": "error"
-    },
-    {
       "column": 26,
       "path": "cl/api/pagination.py",
       "name": "bad-argument-type",
@@ -100,20 +72,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `initial`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `finalize_response`",
-      "severity": "error"
-    },
-    {
       "column": 58,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
@@ -135,101 +93,10 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `level`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `list`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `filter_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `ordering`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_serializer`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_paginated_response`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_serializer`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `get_ident`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `key` with type `str` in function `dict.get`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `fields`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -345,62 +212,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/management/commands/claims_activity_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/export_control.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 37,
       "path": "cl/corpus_importer/management/commands/update_scdb.py",
       "name": "missing-attribute",
@@ -461,27 +272,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `text`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -891,62 +681,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap/management/commands/monitor_pacer_websites.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 41,
       "path": "cl/recap/mergers.py",
       "name": "bad-index",
@@ -1336,13 +1070,6 @@
       "path": "cl/recap/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap_rss/management/commands/scrape_rss.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {

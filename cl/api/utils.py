@@ -24,21 +24,24 @@ from django.db import transaction
 from django.db.models import F, Model, Prefetch, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
-from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
 from django.utils.timezone import now
-from django.views.decorators.cache import cache_page
-from django.views.decorators.vary import vary_on_headers
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
 from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.generics import GenericAPIView
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.response import Response as DRFResponse
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import (
+    AnonRateThrottle,
+    BaseThrottle,
+    UserRateThrottle,
+)
+from rest_framework.views import APIView
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
@@ -512,7 +515,7 @@ def get_logging_prefix(api_version: str) -> str:
     return f"api:{api_version}"
 
 
-class LoggingMixin:
+class LoggingMixin(APIView):
     """Log requests to Redis.
 
     This draws inspiration from the code that can be found at:
@@ -632,9 +635,7 @@ class LoggingMixin:
             return
 
         membership = getattr(user, "membership", None)
-        is_active_member = membership and membership.is_active
-
-        if is_active_member:
+        if membership and membership.is_active:
             celery_chain(
                 create_or_update_zoho_account.s(user.pk, int(user_count)),
                 tag_zoho_record.s(membership.level),
@@ -643,17 +644,6 @@ class LoggingMixin:
             create_or_update_zoho_account.si(
                 user.pk, int(user_count)
             ).apply_async(ignore_result=True)
-
-
-class CacheListMixin:
-    """Cache listed results."""
-
-    @method_decorator(cache_page(60))
-    # Ensure that permissions are maintained and not cached!
-    @method_decorator(vary_on_headers("Cookie", "Authorization"))
-    def list(self, *args, **kwargs):
-        """List results, cached for a minute per cookie and authorization."""
-        return super().list(*args, **kwargs)
 
 
 def make_cache_key_for_no_filter_mixin(
@@ -669,7 +659,7 @@ def make_cache_key_for_no_filter_mixin(
     )
 
 
-class NoFilterCacheListMixin:
+class NoFilterCacheListMixin(GenericAPIView):
     """A mixin that caches list of results when there's no pagination and either a count is requested or no filters are applied to the queryset.
 
     It leverages Django's caching mechanism to store responses when no filters
@@ -680,6 +670,9 @@ class NoFilterCacheListMixin:
         no_filters_cache_key (str, optional): A custom prefix for the cache key.
             If not provided, the class name will be used as the prefix.
     """
+
+    # Provided by the view; it is the default ordering for cache keys.
+    ordering: str
 
     def list(self, request, *args, **kwargs):
         """List results, using and filling the cache for eligible requests.
@@ -1175,7 +1168,7 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
     return usage_rows
 
 
-class CloudFrontIdentMixin:
+class CloudFrontIdentMixin(BaseThrottle):
     """Identify anonymous clients by the address CloudFront saw.
 
     DRF identifies an anonymous client from X-Forwarded-For or REMOTE_ADDR.
@@ -2184,7 +2177,7 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
         )
 
 
-class DynamicFieldsMixin:
+class DynamicFieldsMixin(serializers.Serializer):
     """A serializer mixin that takes an additional `fields` argument that controls which fields should be displayed."""
 
     @property

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self, assert_never
+from typing import TYPE_CHECKING, Literal, Self, assert_never, cast
 from urllib.parse import quote
 
 import nh3
@@ -2285,8 +2285,12 @@ class Court(models.Model):
     )
 
     objects = models.Manager()
-    federal_courts = FederalCourtsQuerySet.as_manager()
-    state_courts = StateCourtsQuerySet.as_manager()
+    # as_manager() is typed as a plain Manager, which hides the custom
+    # queryset methods.
+    federal_courts = cast(
+        FederalCourtsQuerySet, FederalCourtsQuerySet.as_manager()
+    )
+    state_courts = cast(StateCourtsQuerySet, StateCourtsQuerySet.as_manager())
 
     def __str__(self) -> str:
         return f"{self.full_name}"
