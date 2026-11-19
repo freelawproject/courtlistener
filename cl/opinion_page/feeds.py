@@ -72,13 +72,20 @@ class DocketFeed(Feed):
         )
 
     def item_title(self, item: SourceDocketEntry) -> SafeText:
-        """Title an entry by its number, or by its filing date for minute entries."""
+        """Title an entry by its number, or by its filing date when it has none.
+
+        RECAP calls its unnumbered entries minute entries. Sources without
+        entry numbers, like Texas, have no such thing, so theirs are titled
+        plainly "Entry from <date>".
+        """
         docket_title = make_docket_title(item.docket)
         entry_number = _entry_number_of(item)
         if entry_number:
             preface = f"Entry #{entry_number}"
-        else:
+        elif item.docket.get_entry_source().has_entry_numbers:
             preface = f"Minute entry from {item.date_filed}"
+        else:
+            preface = f"Entry from {item.date_filed}"
         return mark_safe(f"{preface} in {docket_title}")
 
     def item_description(self, item: SourceDocketEntry) -> str:

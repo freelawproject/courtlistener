@@ -2633,14 +2633,15 @@ class TexasDocketPageTest(TestCase):
                 self.assertNotIn("Download PDF", content)
 
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
-        """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""
+        """Does the docket feed list Texas entries, which have no entry number, as "Entry from <date>" rather than RECAP's "Minute entry", with the text the docket page shows, linking each to its row on the page?"""
         TexasDocketEntry.objects.filter(
             pk=self.document.docket_entry_id
         ).update(date_filed=date(2026, 10, 1))
         r = self.client.get(reverse("docket_feed", args=[self.docket.pk]))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         content = r.content.decode()
-        self.assertIn("Minute entry from 2026-10-01", content)
+        self.assertIn("Entry from 2026-10-01", content)
+        self.assertNotIn("Minute entry", content)
         self.assertIn(
             f"#minute-entry-{self.document.docket_entry_id}", content
         )
