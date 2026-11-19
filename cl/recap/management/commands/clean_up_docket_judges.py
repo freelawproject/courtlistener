@@ -2,6 +2,7 @@
 """Find and fix the referred and assigned judges of dockets."""
 
 import time
+from datetime import date
 from functools import lru_cache
 
 from asgiref.sync import async_to_sync
@@ -15,7 +16,7 @@ from cl.search.models import Docket
 
 @lru_cache(maxsize=30_000)
 def cached_lookup_judge_by_full_name(
-    full_name: str, court_id: int, date_filed: str
+    full_name: str, court_id: str, date_filed: date | None
 ) -> Person | None:
     """Fetch a judge by full name with LRU caching. Store 30,000 judge lookups.
 

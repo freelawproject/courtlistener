@@ -1059,20 +1059,6 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/management/commands/clean_up_docket_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `court_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/management/commands/clean_up_docket_judges.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `event_date` with type `date | None`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/recap/management/commands/import_idb.py",
       "name": "missing-attribute",
@@ -1094,27 +1080,6 @@
       "severity": "error"
     },
     {
-      "column": 49,
-      "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `item` with type `FjcIntegratedDatabase` in function `cl.corpus_importer.tasks.make_fjc_idb_lookup_params`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_number`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `district_id`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/recap/management/commands/monitor_pacer_websites.py",
       "name": "missing-attribute",
@@ -1122,31 +1087,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `full_name` with type `HumanName | str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Any | None` is not assignable to parameter `full_name` with type `HumanName | str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
-      "severity": "error"
-    },
-    {
       "column": 41,
       "path": "cl/recap/mergers.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `dict[int, list[DocketEntry]]`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int | None` is not assignable to parameter `x` with type `Buffer | SupportsIndex | SupportsInt | str` in function `int.__new__`",
       "severity": "error"
     },
     {
@@ -1178,20 +1122,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str` in function `merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
-      "column": 44,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[RoleType]` is not assignable to parameter `dicts` with type `list[dict[Unknown, Unknown]]` in function `cl.lib.utils.remove_duplicate_dicts`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
@@ -1210,13 +1140,6 @@
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `bool | str` is not assignable to parameter `object` with type `bool` in function `list.append`",
       "severity": "error"
     },
     {
@@ -1339,13 +1262,6 @@
       "severity": "error"
     },
     {
-      "column": 22,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `process_orphan_documents`",
-      "severity": "error"
-    },
-    {
       "column": 32,
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
@@ -1374,20 +1290,6 @@
       "severity": "error"
     },
     {
-      "column": 49,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 62,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
@@ -1406,34 +1308,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
-      "severity": "error"
-    },
-    {
-      "column": 49,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 62,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 49,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
-      "severity": "error"
-    },
-    {
-      "column": 49,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -1514,13 +1388,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
@@ -1567,13 +1434,6 @@
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `pacer_doc_id` with type `str`",
-      "severity": "error"
-    },
-    {
-      "column": 59,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `DocketType` is not assignable to parameter `docket_data` with type `dict[str, Any]`",
       "severity": "error"
     },
     {

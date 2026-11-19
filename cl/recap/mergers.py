@@ -520,7 +520,7 @@ def update_case_names(d, new_case_name):
 
 
 async def update_docket_metadata(
-    d: Docket, docket_data: dict[str, Any]
+    d: Docket, docket_data: Mapping[str, Any]
 ) -> Docket:
     """Update the Docket object with the data from Juriscraper.
 
@@ -1356,10 +1356,13 @@ async def add_docket_entries(
             known_filing_dates.append(de.date_filed)
             # Consider the recent created entry in case the same entry number
             # appears again in this upload.
-            try:
-                des_by_entry_number[int(de.entry_number)].append(de)
-            except TypeError, ValueError:
-                pass
+            if de.entry_number is not None:
+                # entry_number still holds the raw parsed value, which is a
+                # string for appellate dockets.
+                try:
+                    des_by_entry_number[int(de.entry_number)].append(de)
+                except ValueError:
+                    pass
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -2259,7 +2262,7 @@ class _MergeAttachmentPageParams(TypedDict):
 
 async def merge_attachment_page_data(
     court: Court,
-    pacer_case_id: str,
+    pacer_case_id: str | None,
     pacer_doc_id: str,
     document_number: int | None,
     text: str | None,
@@ -2435,7 +2438,7 @@ async def merge_attachment_page_data(
         ]
         if not is_scotus:
             # Missing on sealed items.
-            sanity_checks.append(attachment.get("pacer_doc_id", False))
+            sanity_checks.append(bool(attachment.get("pacer_doc_id")))
         if not all(sanity_checks):
             continue
 
@@ -2661,8 +2664,8 @@ async def save_iquery_to_docket_base(
 
 async def process_orphan_documents(
     rds_created: list[RECAPDocument],
-    court_id: int,
-    docket_date: date,
+    court_id: str,
+    docket_date: date | None,
 ) -> None:
     """After we finish processing a docket upload add any PDFs we already had for that docket that were lingering in our processing queue. This addresses the issue that arises when somebody (somehow) uploads a PDF without first uploading a docket.
 
