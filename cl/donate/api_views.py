@@ -5,7 +5,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any
+from typing import Any, TypedDict
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -40,6 +40,15 @@ from cl.users.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _NeonMembershipData(TypedDict, total=False):
+    accountId: int
+    membershipId: str
+    termEndDate: str
+    membershipName: str
+    paymentStatus: str
+    status: str
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -124,7 +133,7 @@ class MembershipWebhookViewSet(
             "zip_code": addresses[0]["zipCode"],
         }
 
-    def _get_member_record(self, account_id: str) -> User:
+    def _get_member_record(self, account_id: int) -> User:
         """Retrieves a user record associated with a Neon CRM account ID.
 
         This method attempts to find a matching Django user in two ways:
@@ -190,7 +199,9 @@ class MembershipWebhookViewSet(
         return user
 
     @staticmethod
-    def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
+    def _get_membership_data(
+        webhook_data: dict[str, Any],
+    ) -> _NeonMembershipData:
         """Extracts relevant membership information from a Neon webhook payload.
 
         Args:
@@ -198,7 +209,7 @@ class MembershipWebhookViewSet(
             webhook.
 
         Returns:
-            dict[str, str]: A dictionary containing the extracted membership
+            A dictionary containing the extracted membership
             data, with the following keys:
             - membershipId: Unique identifier for the membership.
             - accountId: Identifier for the user account associated with the
@@ -214,32 +225,27 @@ class MembershipWebhookViewSet(
         # see: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433374045
         if "membership" in webhook_data["data"]:
             data = webhook_data["data"]["membership"]
-            membership = {
-                "membershipId": data["membershipId"],
-                "membershipName": data["membershipName"],
-            }
+            membership_id = data["membershipId"]
+            membership_name = data["membershipName"]
         else:
             data = webhook_data["data"]
-            membership = {
-                "membershipId": data["id"],
-                "membershipName": data["membershipLevel"]["name"],
-            }
+            membership_id = data["id"]
+            membership_name = data["membershipLevel"]["name"]
 
         payment_status = (
             data.get("payments")[0].get("paymentStatus", "").lower()
             if data.get("payments", [])
             else ""
         )
-        membership.update(
-            {
-                "accountId": data["accountId"],
-                "termEndDate": data["termEndDate"],
-                "status": data["status"].lower(),
-                "paymentStatus": payment_status,
-            }
-        )
 
-        return membership
+        return {
+            "membershipId": membership_id,
+            "membershipName": membership_name,
+            "accountId": data["accountId"],
+            "termEndDate": data["termEndDate"],
+            "status": data["status"].lower(),
+            "paymentStatus": payment_status,
+        }
 
     @staticmethod
     def _map_trigger_value(trigger_event: str) -> int:
