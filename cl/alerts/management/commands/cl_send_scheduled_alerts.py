@@ -1,3 +1,5 @@
+"""Send search alerts whose hits were scheduled for a given rate."""
+
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -25,6 +27,13 @@ DELETE_BATCH_SIZE = 5_000
 
 
 def json_date_parser(dct):
+    """Convert a dict's ISO-format string values to datetimes in place.
+
+    Strings that aren't ISO dates are left unchanged.
+
+    Returns:
+        The same dict.
+    """
     for key, value in dct.items():
         if isinstance(value, str):
             try:
@@ -64,17 +73,17 @@ def get_cut_off_date(
         local_tz = get_default_timezone()
         aware_local_dt = make_aware(cut_off_date, timezone=local_tz)
         return aware_local_dt.astimezone(pytz.UTC)
-    elif rate == Alert.DAILY or (rate == Alert.REAL_TIME and sweep_index):
+    if rate == Alert.DAILY or (rate == Alert.REAL_TIME and sweep_index):
         # Since scheduled daily alerts run early the next day, set cut_off_date
         # to the previous day unless a custom date is used.
         # When sending alerts using the sweep index, real-time alert hits are
         # ingested throughout the day, so the timestamp filter should behave
         # the same as for daily alerts.
         return d.date() - timedelta(days=1) if not custom_date else d.date()
-    elif rate == Alert.WEEKLY:
+    if rate == Alert.WEEKLY:
         # For weekly alerts, set cut_off_date to 7 days earlier.
         return d.date() - timedelta(days=7)
-    elif rate == Alert.MONTHLY:
+    if rate == Alert.MONTHLY:
         # Get the first of the month of the previous month regardless of the
         # current date
         early_last_month = d.date() - timedelta(days=28)
@@ -186,7 +195,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, now_time)
             qd = override_alert_query(alert, cut_off_date)
-            alert.query_run = qd.urlencode()  # type: ignore
+            # pyrefly: ignore[missing-attribute]
+            alert.query_run = qd.urlencode()
             hits.append((alert, search_type, documents, len(documents)))
 
         if hits:
@@ -226,6 +236,11 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 
 def send_scheduled_alerts(rate: str) -> None:
+    """Send the scheduled alerts for a rate.
+
+    Raises:
+        InvalidDateError: If monthly alerts are run after the 28th.
+    """
     if rate == Alert.MONTHLY:
         if date.today().day > 28:
             raise InvalidDateError(
@@ -293,9 +308,12 @@ def delete_old_scheduled_alerts() -> int:
 
 
 class Command(VerboseCommand):
+    """Send scheduled search alerts for one rate."""
+
     help = "Send scheduled Search Alerts."
 
     def add_arguments(self, parser):
+        """Add the required rate option."""
         parser.add_argument(
             "--rate",
             required=True,
@@ -304,5 +322,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Send the scheduled alerts for the given rate."""
         super().handle(*args, **options)
         send_scheduled_alerts(options["rate"])

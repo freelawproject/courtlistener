@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
@@ -69,9 +70,17 @@ class ESDocketSource:
     ``id`` and ``docket_entry_id`` fields instead.
 
     ``court_ids`` limits the source to Dockets from these courts, so
-    has_entries can rule out other courts without a query, and
-    recap_search_courts() adds them to the RECAP search court picker. Empty
-    means any court (RECAP, whose courts are the PACER ones).
+    has_entries can rule out other courts without a query. Also used where
+    only an indexed document's court is known, like percolation and the
+    alerts sweep. Empty means any court not claimed by another source
+    (RECAP).
+
+    ``percolator_setting`` names the boolean setting that turns on search
+    alerts (percolation) for this source's dockets and documents.
+
+    ``in_alerts_sweep`` is whether the daily RECAP alerts sweep
+    (cl_send_recap_alerts) covers this source. Sources outside it only
+    trigger alerts through the percolator.
     """
 
     name: str
@@ -80,10 +89,12 @@ class ESDocketSource:
     child_id_property: str
     docket_belongs: Callable[[Docket], bool]
     docket_filter: Callable[[], Q]
-    metadata_model: type[models.Model] | None = None
+    metadata_model: type[models.Model] | None
+    percolator_setting: str
     ready_to_index: Callable[[Docket], bool] = lambda docket: True
     uid_namespace: str | None = None
     court_ids: frozenset[str] = frozenset()
+    in_alerts_sweep: bool = True
 
     def has_entries(self, docket: Docket) -> bool:
         """Whether the Docket has any docket entries from this source.
@@ -143,6 +154,7 @@ RECAP_ES_SOURCE = ESDocketSource(
     docket_belongs=lambda docket: docket.source in Docket.RECAP_SOURCES(),
     docket_filter=lambda: Q(source__in=Docket.RECAP_SOURCES()),
     metadata_model=BankruptcyInformation,
+    percolator_setting="PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED",
 )
 SCOTUS_ES_SOURCE = ESDocketSource(
     name="scotus",
@@ -152,9 +164,13 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     docket_belongs=_scotus_docket_belongs,
     docket_filter=_scotus_docket_filter,
     metadata_model=ScotusDocketMetadata,
+    percolator_setting="PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED",
     ready_to_index=_scotus_ready_to_index,
     uid_namespace="scotus",
     court_ids=SCOTUS_COURT_IDS,
+    # The sweep reads RECAP's integer ids, which SCOTUS documents leave
+    # empty; SCOTUS alerts always go through the percolator.
+    in_alerts_sweep=False,
 )
 
 # Every known source, used wherever the shared code needs to loop over all
@@ -183,6 +199,24 @@ SOURCE_BY_MODEL: dict[type[models.Model], ESDocketSource] = {
 }
 
 
+def source_for_court(court_id: str) -> ESDocketSource:
+    """Return the source that owns the indexed dockets of a court.
+
+    Only valid for dockets that are in the RECAP index: e.g. a "scotus"
+    Docket created only to hold a scraped Opinion isn't SCOTUS content, but
+    it's never indexed either.
+    """
+    for source in ALL_ES_SOURCES:
+        if court_id in source.court_ids:
+            return source
+    return RECAP_ES_SOURCE
+
+
+def percolator_enabled(source: ESDocketSource) -> bool:
+    """Whether search alerts (percolation) are on for a source."""
+    return bool(getattr(settings, source.percolator_setting, False))
+
+
 def es_uid(model: type[models.Model], pk: int) -> str | None:
     """Return the ES uid of a source's object, its pk prefixed with the source's uid_namespace, e.g. "scotus_123". It's what ESRECAPDocument's uid and docket_entry_uid fields hold, so it can be used to match those documents in a search query.
 
@@ -196,13 +230,6 @@ def es_uid(model: type[models.Model], pk: int) -> str | None:
     if not source or not source.uid_namespace:
         return None
     return f"{source.uid_namespace}_{pk}"
-
-
-def skips_percolation(instance: models.Model) -> bool:
-    """True for a SCOTUS Docket, so callers must skip its percolator request. Temporary: remove once search alerts support SCOTUS."""
-    return isinstance(instance, Docket) and SCOTUS_ES_SOURCE.docket_belongs(
-        instance
-    )
 
 
 def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:

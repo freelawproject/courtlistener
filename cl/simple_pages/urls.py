@@ -1,3 +1,5 @@
+"""URL routes for simple pages, help pages, and redirects."""
+
 from django.conf import settings
 from django.urls import path
 from django.views.generic import RedirectView

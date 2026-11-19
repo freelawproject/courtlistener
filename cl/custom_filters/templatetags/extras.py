@@ -1,3 +1,5 @@
+"""General-purpose template tags and filters."""
+
 import random
 import re
 import urllib.parse
@@ -63,6 +65,7 @@ def get_full_host(context, username=None, password=None):
 
 @register.simple_tag(takes_context=True)
 def get_canonical_element(context: Context) -> SafeString:
+    """Render a canonical link element for the request's path on the full host."""
     href = f"{get_full_host(context)}{context['request'].path}"
     return format_html(
         '<link rel="canonical" href="{}" />',
@@ -108,16 +111,16 @@ def granular_date(
     if iso is False:
         if granularity == GRANULARITY_DAY:
             return date_format(d, format="F j, Y")
-        elif granularity == GRANULARITY_MONTH:
+        if granularity == GRANULARITY_MONTH:
             return date_format(d, format="F, Y")
-        elif granularity == GRANULARITY_YEAR:
+        if granularity == GRANULARITY_YEAR:
             return date_format(d, format="Y")
     else:
         if granularity == GRANULARITY_DAY:
             return date_format(d, format="Y-m-d")
-        elif granularity == GRANULARITY_MONTH:
+        if granularity == GRANULARITY_MONTH:
             return date_format(d, format="Y-m")
-        elif granularity == GRANULARITY_YEAR:
+        if granularity == GRANULARITY_YEAR:
             return date_format(d, format="Y")
 
     raise ValidationError(
@@ -139,6 +142,7 @@ def get(mapping, key):
 
 @register.simple_tag
 def random_int(a: int, b: int) -> int:
+    """Return a random integer from ``a`` to ``b``, inclusive."""
     return random.randint(a, b)
 
 
@@ -180,6 +184,7 @@ def get_es_doc_content(
 
 @register.simple_tag
 def citation(obj) -> str:
+    """Build the citation string for an object."""
     # Inline import to avoid circular dependency
     from cl.opinion_page.utils import build_citation_string
 

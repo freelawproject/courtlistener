@@ -1,6 +1,9 @@
+"""Base classes for management commands."""
+
 import logging
 import os
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import Any, ClassVar
 
 from django.core.management import BaseCommand, CommandError
@@ -11,12 +14,18 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class VerboseCommand(BaseCommand):
+    """Command whose log level follows its ``--verbosity`` option."""
+
     def handle(self, *args: Any, **options: Any) -> None:
+        """Set the log level from the verbosity.
+
+        Verbosity above 1 also sets Juriscraper's logger to debug.
+        """
         verbosity = options.get("verbosity")
         if not verbosity:
-            logger.setLevel(logging.WARN)
+            logger.setLevel(logging.WARNING)
         elif verbosity == 0:
-            logger.setLevel(logging.WARN)
+            logger.setLevel(logging.WARNING)
         elif verbosity == 1:  # default
             logger.setLevel(logging.INFO)
         elif verbosity > 1:
@@ -37,6 +46,7 @@ class ScraperCommand(VerboseCommand):
     juriscraper_module_type: ClassVar[str] = ""
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        """Add the required ``--courts`` option."""
         parser.add_argument(
             "--courts",
             dest="court_id",
@@ -66,7 +76,7 @@ class CommandUtils:
     @staticmethod
     def ensure_file_ok(file_path: str) -> None:
         """Check to make sure that a file path exists and is valid."""
-        if not os.path.exists(file_path):
+        if not Path(file_path).exists():
             raise CommandError(f"Unable to find file at {file_path}")
         if not os.access(file_path, os.R_OK):
             raise CommandError(f"Unable to read file at {file_path}")

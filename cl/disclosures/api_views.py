@@ -1,3 +1,5 @@
+"""REST API viewsets for financial disclosures and their parts."""
+
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions
 
@@ -43,12 +45,15 @@ from cl.disclosures.models import (
 
 
 def disclosure_child_queryset(model):
+    """Get all objects of a disclosure part model, newest first, with their disclosures."""
     return model.objects.select_related("financial_disclosure").order_by("-id")
 
 
 class AgreementViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for disclosed agreements."""
+
     queryset = disclosure_child_queryset(Agreement)
     serializer_class = AgreementSerializer
     permission_classes = [
@@ -68,6 +73,8 @@ class AgreementViewSet(
 
 
 class DebtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for disclosed debts."""
+
     queryset = disclosure_child_queryset(Debt)
     serializer_class = DebtSerializer
     permission_classes = [
@@ -89,6 +96,8 @@ class DebtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class FinancialDisclosureViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for financial disclosures."""
+
     queryset = (
         FinancialDisclosure.objects.select_related("person")
         .prefetch_related(
@@ -121,6 +130,8 @@ class FinancialDisclosureViewSet(
 
 
 class GiftViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
+    """API endpoint for disclosed gifts."""
+
     queryset = disclosure_child_queryset(Gift)
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
@@ -145,6 +156,8 @@ class InvestmentViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
+    """API endpoint for disclosed investments."""
+
     queryset = disclosure_child_queryset(Investment)
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter
@@ -166,6 +179,8 @@ class InvestmentViewSet(
 class NonInvestmentIncomeViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for disclosed non-investment income."""
+
     queryset = disclosure_child_queryset(NonInvestmentIncome)
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
@@ -187,6 +202,8 @@ class NonInvestmentIncomeViewSet(
 class PositionViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for disclosed positions."""
+
     queryset = disclosure_child_queryset(Position)
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
@@ -208,6 +225,8 @@ class PositionViewSet(
 class ReimbursementViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for disclosed reimbursements."""
+
     queryset = disclosure_child_queryset(Reimbursement)
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
@@ -229,6 +248,8 @@ class ReimbursementViewSet(
 class SpouseIncomeViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
+    """API endpoint for disclosed spouse income."""
+
     queryset = disclosure_child_queryset(SpouseIncome)
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter

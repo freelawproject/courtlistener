@@ -1,3 +1,5 @@
+"""Merge FJC Integrated Database rows into dockets."""
+
 import os
 
 from asgiref.sync import async_to_sync
@@ -28,6 +30,8 @@ PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 class Command(VerboseCommand, CommandUtils):
+    """Merge IDB rows into dockets, or fill in dockets' missing PACER case IDs."""
+
     help = (
         "Iterate over the IDB data and merge it into our existing "
         "datasets. Where we lack a Docket object for an item in the IDB, "
@@ -35,6 +39,7 @@ class Command(VerboseCommand, CommandUtils):
     )
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, task, and court options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -70,6 +75,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
+        """Run the ``merge_and_create`` or ``update_case_ids`` task."""
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "merge_and_create":
             self.join_fjc_with_dockets(options)
@@ -78,6 +84,11 @@ class Command(VerboseCommand, CommandUtils):
 
     @staticmethod
     def join_fjc_with_dockets(options):
+        """Queue tasks that merge civil IDB rows into dockets or create dockets for them.
+
+        Rows are queued in chunks of 25, honoring the court, offset, and
+        limit options.
+        """
         idb_rows = (
             FjcIntegratedDatabase.objects.filter(
                 dataset_source__in=[CV_2017, CV_2020, CV_2021],

@@ -1,3 +1,5 @@
+"""Settings for Sentry, initializing it when a DSN is configured."""
+
 import environ
 import sentry_sdk
 from sentry_sdk.integrations.asyncio import AsyncioIntegration

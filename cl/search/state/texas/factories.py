@@ -13,6 +13,8 @@ from cl.search.models import TexasDocketEntry, TexasDocument
 
 
 class TexasCaseDocumentDictFactory(DictFactory):
+    """Make a dict of fake Texas case document data."""
+
     document_url = Faker("url")
     media_id = Faker("uuid4")
     media_version_id = Faker("uuid4")
@@ -22,36 +24,50 @@ class TexasCaseDocumentDictFactory(DictFactory):
 
 
 class TexasDocketEntryDictFactory(DictFactory):
+    """Make a dict of fake Texas docket entry data with one attachment."""
+
     date = Faker("date_object")
     type = Faker("pystr", min_chars=3, max_chars=3)
     attachments = List([SubFactory(TexasCaseDocumentDictFactory)])
 
 
 class TexasAppellateBriefDictFactory(TexasDocketEntryDictFactory):
+    """Make a dict of fake Texas appellate brief data."""
+
     description = Faker("text")
 
 
 class TexasSupremeCourtAppellateBriefDictFactory(
     TexasAppellateBriefDictFactory
 ):
+    """Make a dict of fake Texas Supreme Court appellate brief data, with remarks."""
+
     remarks = Faker("text")
 
 
 class TexasCaseEventDictFactory(TexasDocketEntryDictFactory):
+    """Make a dict of fake Texas case event data."""
+
     disposition = Faker("text")
 
 
 class TexasSupremeCourtCaseEventDictFactory(TexasCaseEventDictFactory):
+    """Make a dict of fake Texas Supreme Court case event data, with remarks."""
+
     remarks = Faker("text")
 
 
 class TexasCasePartyDictFactory(DictFactory):
+    """Make a dict of fake Texas case party data."""
+
     name = Faker("name")
     type = Faker("pystr")
     representatives = List([Faker("name")])
 
 
 class TexasOriginatingCourtDictFactory(DictFactory):
+    """Make a dict of fake data for a Texas case's originating trial-level court."""
+
     name = Faker("court_name")
     court_type = Faker(
         "random_element",
@@ -75,6 +91,8 @@ class TexasOriginatingCourtDictFactory(DictFactory):
 class TexasOriginatingAppellateCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
+    """Make a dict of fake data for an originating Texas court of appeals."""
+
     court_type = court_type = Faker(
         "random_element", elements=(CourtType.APPELLATE.value,)
     )  # It looks odd, but it satisfies Pyrefly
@@ -92,6 +110,8 @@ class TexasOriginatingAppellateCourtDictFactory(
 class TexasOriginatingDistrictCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
+    """Make a dict of fake data for an originating Texas district court."""
+
     court_type = court_type = Faker(
         "random_element", elements=(CourtType.DISTRICT.value,)
     )
@@ -99,6 +119,11 @@ class TexasOriginatingDistrictCourtDictFactory(
 
 
 class TexasCommonDataDictFactory(DictFactory):
+    """Make a dict of fake docket data common to Texas appellate and final courts.
+
+    About one in ten case events is also included as an appellate brief.
+    """
+
     court_id = Faker(
         "random_element",
         elements=(
@@ -139,6 +164,8 @@ class TexasCommonDataDictFactory(DictFactory):
 
 
 class TexasDocketEntryFactory(DjangoModelFactory):
+    """Make a Texas docket entry on a new docket."""
+
     docket = SubFactory(DocketFactory)
     appellate_brief = Faker("pybool", truth_probability=10)
     description = Faker("text", max_nb_chars=25)
@@ -155,6 +182,8 @@ class TexasDocketEntryFactory(DjangoModelFactory):
 
 
 class TexasDocumentFactory(DjangoModelFactory):
+    """Make a Texas document on a new docket entry."""
+
     docket_entry = SubFactory(TexasDocketEntryFactory)
     description = Faker("text", max_nb_chars=25)
     media_id = Faker("uuid4")
@@ -262,6 +291,12 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
     @factory.post_generation
     @staticmethod
     def post_gen(obj, create, extracted, **kwargs):
+        """Adjust the generated docket for its court.
+
+        Supreme Court dockets get remarks on their case events and briefs,
+        and direct appeals get an empty appeals court. The
+        ``is_direct_appeal`` key is then removed.
+        """
         if not create:
             return
         if obj["court_id"] == CourtID.SUPREME_COURT.value:

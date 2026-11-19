@@ -1,3 +1,5 @@
+"""Views for the homepage, search results, advanced search, and search exports."""
+
 from datetime import date
 from typing import Any
 from urllib.parse import quote
@@ -80,6 +82,7 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
 
 @never_cache
 def new_homepage(request: HttpRequest) -> HttpResponse:
+    """Render the redesigned homepage with its statistics."""
     render_dict = {
         **get_v2_homepage_stats(),
         "private": False,  # VERY IMPORTANT!
@@ -326,6 +329,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
+    """Render the advanced search page for a search type, with its court options."""
     render_dict: dict[str, Any] = {"private": False}
     courts = courts_in_use = Court.objects.filter(in_use=True)
 
@@ -411,6 +415,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_5_per_d
 @require_POST
 def export_search_results(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Queue an email to the user with the results of the posted query."""
     email_search_results.delay(request.user.pk, request.POST.get("query", ""))
     # TODO: Update the frontend using Htmx to show a message indicating the
     # export of search results is in progress.

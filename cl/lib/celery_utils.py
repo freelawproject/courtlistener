@@ -1,3 +1,5 @@
+"""Helpers for managing Celery queues and throttling tasks."""
+
 import functools
 import inspect
 import time
@@ -190,9 +192,8 @@ def throttle_task[**P, R](
                     delay,
                 )
                 return task.retry(countdown=delay)
-            else:
-                # All set. Run the task.
-                return func(*args, **kwargs)
+            # All set. Run the task.
+            return func(*args, **kwargs)
 
         return wrapper
 

@@ -105,10 +105,10 @@ class PodcastTest(ESIndexTestCase, TestCase):
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
         first_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text
         )
         second_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text
         )
         first_item_pub_date_dt = datetime.datetime.strptime(
             first_item_pub_date_str, pub_date_format
@@ -162,7 +162,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
         xml_tree = etree.fromstring(response.content)
-        node_count = len(xml_tree.xpath("//channel/item"))  # type: ignore
+        node_count = len(xml_tree.xpath("//channel/item"))
         expected_item_count = 2
         self.assertEqual(
             node_count,
@@ -179,10 +179,10 @@ class PodcastTest(ESIndexTestCase, TestCase):
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
         first_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text
         )
         second_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text
         )
         first_item_pub_date_dt = datetime.datetime.strptime(
             first_item_pub_date_str, pub_date_format
@@ -229,12 +229,12 @@ class PodcastTest(ESIndexTestCase, TestCase):
         xml_tree = etree.fromstring(response.content)
 
         # Title should contain the query and CourtListener branding
-        title = xml_tree.xpath("//channel/title")[0].text  # type: ignore
+        title = xml_tree.xpath("//channel/title")[0].text
         self.assertIn("magnitsky", title)
         self.assertIn("CourtListener", title)
 
         # Description should contain the query
-        description = xml_tree.xpath("//channel/description")[0].text  # type: ignore
+        description = xml_tree.xpath("//channel/description")[0].text
         self.assertIn("magnitsky", description)
 
         # iTunes subtitle should also contain the query
@@ -243,7 +243,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             namespaces={
                 "itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
             },
-        )[0].text  # type: ignore
+        )[0].text
         self.assertIn("magnitsky", subtitle)
 
     def test_podcast_excludes_audios_without_processed_mp3(self) -> None:
@@ -933,3 +933,32 @@ class ViewAudioFileNoteTest(TestCase):
         note_form = r.context["note_form"]
         self.assertIsNone(note_form.instance.pk)
         self.assertTrue(note_form.initial["name"])
+
+
+class ViewAudioFileMissingMp3Test(TestCase):
+    """Regression coverage for #7223: a processed Audio with no mp3 renders its page without the player instead of raising a ValueError."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.audio = AudioWithParentsFactory(processing_complete=True)
+
+    async def test_page_renders_without_mp3(self) -> None:
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[self.audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotContains(r, 'id="jquery_jplayer_1"')
+        self.assertNotContains(r, "og:audio:url")
+        self.assertContains(r, self.audio.download_url)
+
+    async def test_unprocessed_page_renders_without_mp3(self) -> None:
+        audio = await sync_to_async(AudioWithParentsFactory)()
+
+        r = await self.async_client.get(
+            reverse("view_audio_file", args=[audio.pk, ""])
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "has not yet completed processing")
+        self.assertNotContains(r, "og:audio:url")

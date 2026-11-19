@@ -1,3 +1,5 @@
+"""RSS feed generator for iTunes podcasts."""
+
 from typing import Any
 from xml.sax.xmlreader import AttributesImpl
 
@@ -8,7 +10,10 @@ from django.utils.xmlutils import SimplerXMLGenerator
 # For more details on the Podcast "Spec" see:
 # https://help.apple.com/itc/podcasts_connect/#/itcb54353390
 class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
+    """RSS 2.0 feed with the iTunes podcast elements."""
+
     def rss_attributes(self) -> dict[str, str]:
+        """Add the Atom and iTunes namespaces to the RSS element."""
         return {
             **super().rss_attributes(),
             "xmlns:atom": "https://www.w3.org/2005/Atom",
@@ -16,6 +21,7 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
         }
 
     def add_root_elements(self, handler: SimplerXMLGenerator) -> None:
+        """Add the iTunes subtitle, author, summary, owner, image, and category to the channel."""
         super().add_root_elements(handler)
         handler.addQuickElement("itunes:subtitle", self.feed["subtitle"])
         handler.addQuickElement("itunes:author", self.feed["author_name"])
@@ -37,6 +43,7 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
     def add_item_elements(
         self, handler: SimplerXMLGenerator, item: dict[str, Any]
     ) -> None:
+        """Add the iTunes duration, explicit flag, and author to an item."""
         super().add_item_elements(handler, item)
         handler.addQuickElement("itunes:duration", item["duration"])
         handler.addQuickElement("itunes:explicit", item["explicit"])

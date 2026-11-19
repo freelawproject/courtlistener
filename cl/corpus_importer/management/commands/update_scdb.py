@@ -18,6 +18,7 @@ Once located, we update items:
 import csv
 import string
 from datetime import datetime
+from pathlib import Path
 
 from django.core.management import CommandError
 from django.db import IntegrityError
@@ -36,9 +37,12 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class Command(VerboseCommand):
+    """Update clusters with data from the SCDB Case Centered CSV."""
+
     help = "Import data from the SCDB Case Centered CSV."
 
     def add_arguments(self, parser):
+        """Add the debug, start row, file, and skip-human-review options."""
         parser.add_argument(
             "--debug",
             action="store_true",
@@ -66,6 +70,14 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Match each SCDB row to clusters and update the cluster it matches.
+
+        Rows matching no cluster are skipped, and rows matching several
+        clusters go to human review.
+
+        Raises:
+            CommandError: If human review is skipped without ``--debug``.
+        """
         super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
@@ -285,11 +297,16 @@ class Command(VerboseCommand):
 
         if len(good_cluster_ids) == 1:
             return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
-        else:
-            # Alas: No progress made.
-            return clusters
+        # Alas: No progress made.
+        return clusters
 
     def get_human_review(self, clusters, d):
+        """Log the candidate clusters and SCDB row, then ask which cluster to update.
+
+        Returns:
+            The chosen cluster, the first cluster when skipping human review,
+            or None if the input isn't a number.
+        """
         for i, cluster in enumerate(clusters):
             logger.info(
                 "%s: Cluster %s (%.3f sim):",
@@ -318,17 +335,16 @@ class Command(VerboseCommand):
             )
             self.skipped_count += 1
             return clusters[0]
-        else:
-            choice = input(
-                f"Which item should we update? [0-{len(clusters) - 1}] "
-            )
+        choice = input(
+            f"Which item should we update? [0-{len(clusters) - 1}] "
+        )
 
-            try:
-                choice = int(choice)
-                cluster = clusters[choice]
-            except ValueError:
-                cluster = None
-            return cluster
+        try:
+            choice = int(choice)
+            cluster = clusters[choice]
+        except ValueError:
+            cluster = None
+        return cluster
 
     def iterate_scdb_and_take_actions(
         self, action_zero, action_one, action_many, start_row=0
@@ -350,7 +366,7 @@ class Command(VerboseCommand):
 
         If action_zero or action_many return None, no action is taken.
         """
-        f = open(self.file)
+        f = Path(self.file).open()
         dialect = csv.Sniffer().sniff(f.read(1024))
         f.seek(0)
         reader = csv.DictReader(f, dialect=dialect)

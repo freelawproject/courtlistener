@@ -5,6 +5,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync
 from django.core import mail
 from django.core.files.base import ContentFile
+from django.forms import modelform_factory
 from django.test import TestCase
 
 from cl.alerts.models import DocketAlert
@@ -439,7 +440,13 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_indexes_parties_in_es(
         self, mock_index_parties: mock.MagicMock
     ) -> None:
-        """Party rows don't trigger ES signals, so merging a SCOTUS docket with parties must index them in ES explicitly, like RECAP does."""
+        """Check merging a SCOTUS docket indexes its parties in ES.
+
+        Party rows don't trigger ES signals, so merging a SCOTUS docket with
+        parties must index them in ES explicitly, like RECAP does. Like
+        RECAP, parties within the attorney limit percolate the docket after
+        they're indexed, on every merge.
+        """
         data = ScotusDocketDataFactory(
             lower_court=self.lower_court.full_name,
             parties=[SCOTUSPartyDataFactory()],
@@ -447,25 +454,68 @@ class ScotusDocketMergeTest(TestCase):
         )
 
         docket, _, _ = merge_scotus_docket(data, download_file=False)
-
         mock_index_parties.delay.assert_called_once_with(
-            docket.pk, percolate_parties=False
+            docket.pk, percolate_parties=True
+        )
+
+        mock_index_parties.reset_mock()
+        merge_scotus_docket(data, download_file=False)
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=True
         )
 
     @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
-    def test_merge_scotus_docket_skips_party_indexing_without_parties(
+    def test_merge_scotus_docket_without_parties(
         self, mock_index_parties: mock.MagicMock
     ) -> None:
-        """No parties means nothing to index."""
+        """Check merging a SCOTUS docket without parties.
+
+        A new docket is still percolated once through
+        index_docket_parties_in_es, but merging into an existing docket has
+        nothing to index.
+        """
         data = ScotusDocketDataFactory(
             lower_court=self.lower_court.full_name,
             parties=[],
             docket_entries=[],
         )
 
-        merge_scotus_docket(data, download_file=False)
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=True
+        )
 
+        mock_index_parties.reset_mock()
+        merge_scotus_docket(data, download_file=False)
         mock_index_parties.delay.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.index_docket_parties_in_es")
+    def test_merge_scotus_docket_percolates_opinion_docket_becoming_scotus(
+        self, mock_index_parties: mock.MagicMock
+    ) -> None:
+        """Check an opinion-only docket becoming SCOTUS content is percolated.
+
+        An existing opinion-only docket that gets its ScotusDocketMetadata
+        now is percolated once through index_docket_parties_in_es, even
+        without parties: its first ES write comes from the metadata save,
+        which isn't percolated.
+        """
+        opinion_docket = DocketFactory(
+            court=self.court, source=Docket.SCRAPER, docket_number="23-1234"
+        )
+        data = ScotusDocketDataFactory(
+            lower_court=self.lower_court.full_name,
+            docket_number="23-1234",
+            parties=[],
+            docket_entries=[],
+        )
+
+        docket, _, _ = merge_scotus_docket(data, download_file=False)
+
+        self.assertEqual(docket.pk, opinion_docket.pk)
+        mock_index_parties.delay.assert_called_once_with(
+            docket.pk, percolate_parties=True
+        )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
@@ -863,7 +913,7 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_document_triggers_download_correctly(
         self, mock_chain
     ) -> None:
-        """Confirm PDF download is triggered only when document is new or filename changes."""
+        """Confirm PDF download is triggered only when document is new, filename changes or it has no stored file."""
         docket = DocketFactory(
             court=self.court,
             docket_number="23-1435",
@@ -900,6 +950,10 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(scotus_doc.file_name, "document1.pdf")
         self.assertEqual(
             SCOTUSDocument.objects.count(), 1, "Should have 1 document"
+        )
+        # The download chain is mocked, so store the file it would have.
+        SCOTUSDocument.objects.filter(pk=doc_pk).update(
+            filepath_local="recap/document1.pdf"
         )
 
         # Case 2: Update same document with same filename, should NOT trigger download
@@ -965,6 +1019,19 @@ class ScotusDocketMergeTest(TestCase):
         scotus_doc.refresh_from_db()
         self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+        # Case 5: Same filename but no stored file (e.g. its download
+        # failed), should trigger download
+        SCOTUSDocument.objects.filter(pk=doc_pk).update(filepath_local="")
+        created, doc_pk_5 = merge_scotus_document(docket_entry, doc_data_4)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_5, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered when the document has no file",
+        )
 
     @mock.patch("cl.corpus_importer.tasks.chain")
     def test_merge_scotus_document_skips_download_when_flag_is_false(
@@ -1188,6 +1255,21 @@ class ScotusPlaceholderDocumentTest(CLTestCase):
                 document_number=310278, attachment_number=1
             ).exists()
         )
+
+    def test_placeholder_can_be_saved_in_forms(self) -> None:
+        """Do model forms, like the admin's, accept a placeholder's blank url?
+
+        Staff can then save the placeholder and the entry it's an inline of.
+        """
+        self._merge(attachments=[])
+        placeholder = SCOTUSDocument.objects.get(
+            docket_entry__docket=self.docket
+        )
+        form_class = modelform_factory(SCOTUSDocument, fields=["url"])
+
+        form = form_class(data={"url": ""}, instance=placeholder)
+
+        self.assertTrue(form.is_valid(), form.errors)
 
     @mock.patch(f"{DOWNLOAD_COMMAND}.CeleryThrottle")
     @mock.patch(f"{DOWNLOAD_COMMAND}.download_scotus_document_pdf")

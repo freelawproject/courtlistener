@@ -1,3 +1,5 @@
+"""Export a bulk archive of dockets to disk for a client."""
+
 from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
@@ -39,10 +41,13 @@ def do_bulk_export(options):
 
 
 class Command(VerboseCommand):
+    """Create a bulk archive of dockets for a client."""
+
     help = "Create a big archive of dockets for a client."
     tasks = ("bulk_export",)
 
     def add_arguments(self, parser):
+        """Add the queue, offset, limit, task, and output directory options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -76,6 +81,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task.
+
+        Raises:
+            NotImplementedError: If the task is unknown.
+        """
         super().handle(*args, **options)
         if options["task"] == "bulk_export":
             do_bulk_export(options)

@@ -1,10 +1,8 @@
 import re
 from datetime import datetime
-from os.path import join
-from typing import Any
 
 from django.conf import settings
-from juriscraper.OpinionSite import OpinionSite
+from juriscraper.OpinionSite import ExtractedMetaData, OpinionSite
 
 
 class Site(OpinionSite):
@@ -12,9 +10,9 @@ class Site(OpinionSite):
         super().__init__()
         self.court_id = self.__module__
         self.url = "http://test"
-        self.mock_url = join(
-            settings.INSTALL_ROOT,
-            "cl/scrapers/test_assets/test_opinion_site.xml",
+        self.mock_url = str(
+            settings.INSTALL_ROOT
+            / "cl/scrapers/test_assets/test_opinion_site.xml"
         )
         self.method = "LOCAL"
 
@@ -65,8 +63,8 @@ class Site(OpinionSite):
         path = "//lower_court_judge"
         return [i.text for i in self.html.xpath(path)]
 
-    def extract_from_text(self, scraped_text):
-        metadata: dict[str, str | dict[str, Any]] = {}
+    def extract_from_text(self, scraped_text: str) -> ExtractedMetaData:
+        metadata: ExtractedMetaData = {}
         docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
         disposition_regex = r"Disposition: (?P<disposition>\w+)"
         citation_regex = r"20\d{2} VT \d+"

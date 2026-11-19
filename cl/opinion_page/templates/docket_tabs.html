@@ -115,7 +115,7 @@
               <a href="{% url "docket_feed" docket.pk %}" rel="nofollow"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
-              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+              <a href="{% if docket.pacer_case_id %}{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}{% else %}{% url "new_docket_alert_by_id" docket.pk %}{% endif %}"
                 rel="nofollow"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
             </li>
             <li>

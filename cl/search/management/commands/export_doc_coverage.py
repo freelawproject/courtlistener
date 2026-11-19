@@ -1,3 +1,5 @@
+"""Export per-docket RECAP document coverage statistics to a CSV."""
+
 import time
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +15,8 @@ from cl.search.models import Docket
 
 
 class Command(BaseCommand):
+    """Export document counts per RECAP docket, month by month, from Postgres or Elasticsearch."""
+
     help = """Export docket index with document coverage statistics for preparing a pretraining dataset.
 
     Two options here, a psql and elastic approach. I'm guessing the elastic version
@@ -24,6 +28,7 @@ class Command(BaseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the output path, Postgres, overwrite, and sleep options."""
         parser.add_argument(
             "--out-path",
             type=str,
@@ -48,6 +53,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Append each month's statistics to the CSV, from January of the earliest docket's year to now.
+
+        Months with no statistics are skipped.
+
+        Raises:
+            FileExistsError: If the output file exists and ``--overwrite``
+                isn't set.
+        """
         out_path = Path(options["out_path"])
         if out_path.exists():
             if not options["overwrite"]:
@@ -98,6 +111,7 @@ class Command(BaseCommand):
         logger.info(f"Done! Saved to {out_path}")
 
     def handle_psql(self, year: int, month: int, options: dict):
+        """Count the documents of each RECAP docket filed in a month, using Postgres."""
         # Prep filters
         is_document = Q(
             docket_entries__recap_documents__document_type__isnull=False
@@ -143,6 +157,8 @@ class Command(BaseCommand):
         )
 
     def handle_es(self, year: int, month: int, options: dict):
+        """Count each docket's documents filed in a month, using Elasticsearch."""
+
         def get_composite_query(after=None):
             next_month = month + 1
             next_year = year
