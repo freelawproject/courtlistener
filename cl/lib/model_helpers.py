@@ -24,6 +24,8 @@ from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes
 
 if TYPE_CHECKING:
+    from django.utils.functional import _StrOrPromise
+
     from cl.audio.models import Audio
     from cl.lasc.models import LASCJSON
     from cl.search.models import (
@@ -38,6 +40,25 @@ appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def field_help_text(model: type[Model], field_name: str) -> _StrOrPromise:
+    """Get the help text of a field on a model, e.g. to reuse it in a form.
+
+    Args:
+        model: The model the field belongs to.
+        field_name: The name of a field declared on the model.
+
+    Raises:
+        TypeError: If ``field_name`` names a reverse relation, which has no
+            help text.
+    """
+    field = model._meta.get_field(field_name)
+    if not isinstance(field, Field):
+        raise TypeError(
+            f"{model.__name__}.{field_name} is a reverse relation, not a field."
+        )
+    return field.help_text
 
 
 def is_docket_number(value: str) -> bool:

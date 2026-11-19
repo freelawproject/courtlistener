@@ -1586,9 +1586,8 @@ async def citation_handler(
             status=HTTPStatus.NOT_FOUND,
         )
 
-    if cluster_count == 1:
+    if cluster_count == 1 and (clusters_first := await clusters.afirst()):
         # Total success. Redirect to correct location.
-        clusters_first = await clusters.afirst()
         return HttpResponseRedirect(clusters_first.get_absolute_url())
 
     if cluster_count > 1:

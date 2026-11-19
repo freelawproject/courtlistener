@@ -317,97 +317,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `date` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `help_text`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `str | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_absolute_url`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/opinion_page/sitemap.py",
       "name": "missing-attribute",
@@ -433,20 +342,6 @@
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `afirst`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `filter`",
       "severity": "error"
     },
     {

@@ -93,7 +93,7 @@ def resolve_fullcase_citation(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
 
-                if _count == 0 or clusters is None:
+                if _count == 0:
                     return UnmatchedResource.NO_MATCH
 
                 # exclude self links
