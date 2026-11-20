@@ -22,10 +22,7 @@
             {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}
           </td>
           <td>
-            {{ de.entry_type }}
-            {% if de.description %}<br>{{ de.description }}{% endif %}
-            {% if de.disposition %}<br>Disposition: {{ de.disposition }}{% endif %}
-            {% if de.remarks %}<br>Remarks: {{ de.remarks }}{% endif %}
+            {% for line in de.display_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
           </td>
           <td>
             {% for doc in de.texasdocument_set.all %}

@@ -2,11 +2,8 @@
 {% load extras %}
 
 {% block rows %}
-{% autoescape off %}{% for de in new_des %}Date Filed: {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}
-{{ de.entry_type|wordwrap:80 }}{% if de.description %}
-{{ de.description|wordwrap:80 }}{% endif %}{% if de.disposition %}
-Disposition: {{ de.disposition|wordwrap:80 }}{% endif %}{% if de.remarks %}
-Remarks: {{ de.remarks|wordwrap:80 }}{% endif %}{% for doc in de.texasdocument_set.all %}
+{% autoescape off %}{% for de in new_des %}Date Filed: {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}{% for line in de.display_lines %}
+{{ line|wordwrap:80 }}{% endfor %}{% for doc in de.texasdocument_set.all %}
 {{ doc.description|default:"Document" }}{% if doc.filepath_local %}
 Download from RECAP: {{ doc.filepath_local.url }}{% elif doc.url|http_url %}
 Download from TAMES: {{ doc.url|http_url }}{% endif %}{% endfor %}

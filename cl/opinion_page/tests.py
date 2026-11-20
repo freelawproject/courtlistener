@@ -2168,6 +2168,23 @@ class TexasEntryDisplayTextTest(SimpleTestCase):
                     expected,
                 )
 
+    def test_display_lines_are_shared_as_plain_text(self) -> None:
+        """Does display_lines, which the alert emails also render, list the same lines unescaped, leaving escaping to each caller?"""
+        entry = TexasDocketEntry(
+            entry_type="<b>Notice</b>",
+            description="",
+            disposition="Denied",
+            remarks="Oral argument set",
+        )
+        self.assertEqual(
+            entry.display_lines,
+            [
+                "<b>Notice</b>",
+                "Disposition: Denied",
+                "Remarks: Oral argument set",
+            ],
+        )
+
 
 class TrialCourtMetadataTest(TestCase):
     """Does the Texas source build a Trial Court Information section from a docket's TrialCourtData?"""
