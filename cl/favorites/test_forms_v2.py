@@ -161,8 +161,9 @@ class NoteFormComponentTest(TestCase):
     def test_counter_markup(self) -> None:
         """Does the notes field sit in an accessible counter?
 
-        The counter reads the textarea's own limit, keeps the visible count
-        from screen readers, and has a status region for the thresholds.
+        The counter reads the textarea's own limit, shows a visible count the
+        script links as the textarea's description, and has a status region
+        for the thresholds.
         """
         html = self.render()
 
@@ -172,7 +173,7 @@ class NoteFormComponentTest(TestCase):
         for markup in (
             'x-on:input="update"',
             'maxlength="500"',
-            'aria-hidden="true"',
+            'x-ref="count"',
             'x-text="remainingText"',
             'role="status"',
             'x-text="announcement"',
@@ -180,6 +181,7 @@ class NoteFormComponentTest(TestCase):
             with self.subTest(markup=markup):
                 self.assertIn(markup, html)
         self.assertNotIn("characters-remaining", html)
+        self.assertNotIn("aria-hidden", html)
 
 
 class NoteDialogComponentTest(TestCase):
