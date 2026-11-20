@@ -5774,7 +5774,9 @@ class DocketNoteFormV2Test(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.docket = DocketFactory(source=Docket.RECAP)
+        cls.docket = DocketFactory(
+            source=Docket.RECAP, idb_data=FjcIntegratedDatabaseFactory()
+        )
 
     async def test_docket_page_gets_the_v2_note_form(self) -> None:
         """Does the v2 docket page get the v2 note form?"""
@@ -5783,6 +5785,17 @@ class DocketNoteFormV2Test(TestCase):
         )
 
         self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIs(
+            type(r.context["note_form"]), favorites_forms_v2.NoteForm
+        )
+
+    async def test_idb_tab_gets_the_v2_note_form(self) -> None:
+        """Does the FJC IDB tab, which has a v2 template, get the v2 form?"""
+        r = await self.async_client.get(
+            reverse("docket_idb_data", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
         self.assertIs(
             type(r.context["note_form"]), favorites_forms_v2.NoteForm
         )

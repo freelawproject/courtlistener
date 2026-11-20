@@ -569,7 +569,16 @@ async def docket_idb_data(
     Raises:
         Http404: If the docket has no IDB data.
     """
-    docket, context = await core_docket_data(request, docket_id)
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
             pk=docket.idb_data_id
