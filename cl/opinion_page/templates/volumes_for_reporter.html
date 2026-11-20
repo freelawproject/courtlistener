@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load extras partition_util text_filters %}
+{% load extras humanize partition_util text_filters %}
 
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 
@@ -90,39 +90,137 @@
         <a href="{% url "citation_redirector" reporter|slugify %}">{{ volume_names|oxford_join }}</a>&nbsp;({{ reporter|nbsp }})
       </h1>
       {% include "includes/reporter_variations.html" %}
+      <p class="gray">
+        {{ volume_summary.case_count|intcomma }} case{{ volume_summary.case_count|pluralize }}{% if volume_summary.page_extent %}, spanning {{ volume_summary.page_extent|intcomma }} page{{ volume_summary.page_extent|pluralize }} ({{ volume_summary.first_page }}&ndash;{{ volume_summary.last_page }}){% endif %}.
+      </p>
+      <p class="hidden-print">
+        {% if order == "date" %}
+          <span class="gray">Listed by date filed.</span>
+          <a href="{% querystring order=None page=None %}"
+             class="btn btn-xs btn-default">List in page order</a>
+        {% else %}
+          <span class="gray">Listed in page order, as the volume is bound.</span>
+          <a href="{% querystring order="date" page=None %}"
+             class="btn btn-xs btn-default">List by date filed</a>
+        {% endif %}
+      </p>
       {% include "includes/pagination.html" with page_obj=cases%}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
     <div class="clearfix"></div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
     <div class="col-xs-12 col-md-10 col-lg-8">
-    {% for case in cases %}
-      <article class="{% cycle "odd" "even" %}">
-      <h3 class="bottom serif">
-        <a href="{{ case.get_absolute_url }}"
-           class="visitable"
-           {% if case.blocked %}rel="nofollow"{% endif %}
-        >{{ case|best_case_name|safe|v_wrapper }}</a>
-      </h3>
-      <div class="bottom">
-        <div class="inline-block">
-          <span class="meta-data-header">Date Filed:</span>
-          <time class="meta-data-value" datetime="{{ case.date_filed|date:"Y-m-d" }}">{{ case.date_filed|date:"F jS, Y"|default:"Unknown Date" }}
-          </time>
-        </div>
-        <div class="inline-block">
-          <span class="meta-data-header">Citations:</span>
-          <span class="meta-data-value">{{ case.citation_string }}</span>
-        </div>
-        {% if case.docket.docket_number %}
-          <div class="inline-block">
-            <span class="meta-data-header">Docket Number:</span>
-            <span class="meta-data-value select-all">{{ case.docket.docket_number }}</span>
-          </div>
+    {% if volume_summary.gap_count %}
+      <div class="alert alert-danger" role="alert">
+        <h4><i class="fa fa-flag"></i>&nbsp;Potential coverage gaps in this volume</h4>
+        <p>
+          In {{ volume_summary.gap_count|intcomma }} place{{ volume_summary.gap_count|pluralize }}
+          this volume printed pages that no case here accounts for &mdash;
+          {{ volume_summary.gap_pages|intcomma }} page{{ volume_summary.gap_pages|pluralize }}
+          in total. The rows are flagged below.
+        </p>
+        <p class="bottom">
+          Each flag means an opinion's own text stops before the next case
+          begins. That is evidence worth checking rather than proof: an
+          opinion whose text was stored incompletely looks the same from
+          here.
+          {% if volume_summary.unchecked_cases %}
+            A further {{ volume_summary.unchecked_cases|intcomma }} of
+            {{ volume_summary.case_count|intcomma }} cases carry no page
+            markers in their text and could not be checked at all, so this
+            is a floor, not a full count.
+          {% endif %}
+        </p>
+      </div>
+    {% elif volume_summary.checked_cases %}
+      <div class="alert alert-success" role="alert">
+        <i class="fa fa-check"></i>&nbsp;No coverage gaps detected.
+        Every one of the {{ volume_summary.checked_cases|intcomma }} checkable
+        case{{ volume_summary.checked_cases|pluralize }} here runs up to the
+        page where the next one begins.
+        {% if volume_summary.unchecked_cases %}
+          {{ volume_summary.unchecked_cases|intcomma }} case{{ volume_summary.unchecked_cases|pluralize }}
+          carr{{ volume_summary.unchecked_cases|pluralize:"ies,y" }} no page
+          markers and could not be checked.
         {% endif %}
       </div>
-      </article>
-    {% endfor %}
+    {% endif %}
+    <div class="table-responsive">
+      <table class="table table-condensed">
+        <thead>
+          <tr>
+            <th>Citation</th>
+            <th>Pages</th>
+            <th class="text-right">Length</th>
+            <th>Case Name</th>
+            <th>Year</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for case in cases %}
+          <tr{% if case.volume_span.has_gap %} class="danger"{% endif %}>
+            <td class="nowrap">
+              <a href="{{ case.get_absolute_url }}"
+                 class="visitable"
+                 {% if case.blocked %}rel="nofollow"{% endif %}
+              >{% if case.volume_span.page %}{{ volume }} {{ reporter|nbsp }} {{ case.volume_span.page }}{% else %}{{ case.citation_string }}{% endif %}</a>
+            </td>
+            <td class="nowrap">
+              {% if case.volume_span.label %}{{ case.volume_span.label }}{% else %}&mdash;{% endif %}
+              {% if case.volume_span.has_gap %}
+                <span class="text-danger nowrap"
+                      title="This opinion's own text ends on page {{ case.volume_span.text_last_page }}, but the next case in the volume does not begin until page {{ case.volume_span.next_page }}. CourtListener has no case for the pages in between.">
+                  <i class="fa fa-flag"></i>
+                  <strong>{{ case.volume_span.gap_pages }}&nbsp;missing</strong>
+                </span>
+              {% endif %}
+            </td>
+            <td class="nowrap text-right">
+              {% if case.volume_span.length_label %}
+                {% if case.volume_span.shares_first_page %}
+                  <abbr title="{{ case.volume_span.cases_on_page }} cases begin on page {{ case.volume_span.page }}, and the reporter gives no way to divide those pages between them. This is a bound, not a measurement.">{{ case.volume_span.length_label }}</abbr>
+                {% elif case.volume_span.length_is_measured %}
+                  <abbr title="Measured from the star pagination in the opinion's own text, which runs to page {{ case.volume_span.text_last_page }}.">{{ case.volume_span.length_label }}</abbr>
+                {% else %}
+                  {{ case.volume_span.length_label }}
+                {% endif %}
+              {% else %}&mdash;{% endif %}
+            </td>
+            <td class="serif">
+              <a href="{{ case.get_absolute_url }}"
+                 class="visitable"
+                 {% if case.blocked %}rel="nofollow"{% endif %}
+              >{{ case|best_case_name|safe|v_wrapper }}</a>
+            </td>
+            <td class="nowrap">
+              <time datetime="{{ case.date_filed|date:"Y-m-d" }}">{{ case.date_filed|date:"Y"|default:"Unknown" }}</time>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="gray small">
+      Where an opinion's stored text carries star pagination, its last page is
+      read from that text and the length shown is measured. Otherwise a
+      citation records only where a case begins, so the length falls back to
+      the distance to the next case's first page &mdash; which cannot reveal a
+      case missing in between, and is why the flags above depend on measured
+      text.
+      {% if volume_summary.shared_page_cases %}
+        Where more than one case begins on the same page
+        ({{ volume_summary.shared_page_cases|intcomma }} of
+        {{ volume_summary.case_count|intcomma }} cases here), the pages can't
+        be divided between them, so the length is given as a bound:
+        <strong>&lt;1</strong> for several cases inside a single page, or
+        <strong>&le;n</strong> for a run of pages they share.
+      {% endif %}
+      {% if volume_summary.unpaged_cases %}
+        {{ volume_summary.unpaged_cases|intcomma }} case{{ volume_summary.unpaged_cases|pluralize }}
+        in this volume {{ volume_summary.unpaged_cases|pluralize:"has,have" }} no
+        numeric page and {{ volume_summary.unpaged_cases|pluralize:"is,are" }} listed last.
+      {% endif %}
+    </p>
     {% include "includes/pagination.html" with page_obj=cases only%}
     </div>
   {% endif %}
