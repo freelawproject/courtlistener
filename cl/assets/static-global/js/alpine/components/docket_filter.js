@@ -1,29 +1,9 @@
 document.addEventListener("alpine:init", () => {
   Alpine.data("docketFilter", () => ({
+    ...createDatePicker(),
     init() {
       this.$nextTick(() => {
-        const config = {
-          dateFormat: "m/d/Y",
-          allowInput: true,
-          ariaDateFormat: "F j, Y",
-        };
-        for (const el of this.$el.querySelectorAll("[data-flatpickr-after], [data-flatpickr-before]")) {
-          flatpickr(el, config);
-          // With `allowInput`, flatpickr's own keydown handler on this input
-          // commits a typed date on Enter, closes the calendar, and blurs the
-          // input before returning. That blur happens mid-keydown, so the
-          // browser's implicit form submission never fires, and flatpickr's
-          // `onKeyDown` config hook is skipped on that path too. This listener
-          // is registered after flatpickr's on the same element, so it runs
-          // once the value is normalized and the calendar is closed. Only
-          // the date inputs need it: the other fields, in both the desktop
-          // and the mobile drawer forms, already submit on Enter through
-          // the browser's implicit submission.
-          el.addEventListener("keydown", (event) => {
-            if (event.key !== "Enter") return;
-            el.form?.requestSubmit();
-          });
-        }
+        this.initDatePickers(this.$el);
 
         // If the filter form was submitted with errors, open the mobile
         // dialog so the filters are in view. Only below the mobile

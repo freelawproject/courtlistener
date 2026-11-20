@@ -1,0 +1,31 @@
+{% load svg_tags %}
+
+{# One date input of the date range: its label, the calendar icon and the text field. Rendered inside `<c-corpus-search.date-selector>`, which owns the Alpine scope and ids the bindings below read from. #}
+{# which: "after" or "before". Picks the input's id, which the label's `for` points to. #}
+{# label: The visible label. Without one, the placeholder names the input and the label is only read by assistive technology. #}
+<c-vars which name placeholder label />
+
+<div class="flex flex-col gap-1.5">
+  <label
+    x-bind:for="calendarInputId"
+    data-date="{{ which }}"
+    class="{% if label %}text-sm font-medium text-greyscale-600{% else %}sr-only{% endif %}"
+  >{{ label|default:placeholder }}<span class="sr-only"> in format MM/DD/YYYY</span></label>
+  <div data-date-input x-on:click="openDatePicker" x-on:input="closeDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+    {# Hidden from assistive technology and the tab order: the calendar can't be operated with a keyboard, so typing the date is the accessible path. #}
+    <button type="button" tabindex="-1" aria-hidden="true">
+      {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
+    </button>
+    <input
+      type="text"
+      name="{{ name }}"
+      data-type="calendar"
+      data-date="{{ which }}"
+      x-bind:disabled="disabled"
+      x-bind:id="calendarInputId"
+      placeholder="{{ placeholder }}"
+      class="focus:ring-0 focus:outline-none w-full"
+      autocomplete="off"
+    >
+  </div>
+</div>
