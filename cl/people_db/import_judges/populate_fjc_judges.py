@@ -238,6 +238,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
     """
     # add position items (up to 6 of them)
     prev_politics = None
+    politics: PoliticalAffiliation | None = None
     for posnum in range(1, 7):
         # Save the position if we're running all positions or specifically
         # fixing this one.
@@ -255,6 +256,8 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             courtid = match_court_string(
                 item[f"Court Name{pos_str}"], federal_district=True
             )
+        else:
+            courtid = None
 
         if courtid is None:
             raise Exception
@@ -403,7 +406,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         p = item[f"Party of Appointing President{pos_str}"]
         if not pd.isnull(p) and p not in ["Assignment", "Reassignment"]:
             party = get_party(item[f"Party of Appointing President{pos_str}"])
-            if prev_politics is None:
+            if politics is None:
                 if pd.isnull(date_nominated):
                     politicsgran = ""
                 else:
@@ -495,16 +498,13 @@ def make_federal_judge(item, testing=False):
             if len(item["Middle Name"]) == 1:
                 item["Middle Name"] += "."
 
-        if not pd.isnull(item["Gender"]):
-            gender = get_gender(item["Gender"])
-
         # Instantiate Judge object.
         person = Person(
             name_first=item["First Name"],
             name_middle=item["Middle Name"],
             name_last=item["Last Name"],
             name_suffix=get_suffix(item["Suffix"]),
-            gender=gender,
+            gender=get_gender(item["Gender"]),
             fjc_id=item["jid"],
             date_dob=date_dob,
             date_granularity_dob=date_granularity_dob,
@@ -678,9 +678,6 @@ def make_mag_bk_judge(item, testing=False):
         if len(item["NAME_MIDDLE"]) == 1:
             item["NAME_MIDDLE"] += "."
 
-    if not pd.isnull(item["GENDER"]):
-        gender = get_gender(item["GENDER"])
-
     if not item["NAME_SUFFIX"] == "":
         suffix = get_suffix(item["NAME_SUFFIX"])
     else:
@@ -692,7 +689,7 @@ def make_mag_bk_judge(item, testing=False):
         name_middle=item["NAME_MIDDLE"],
         name_last=item["NAME_LAST"],
         name_suffix=suffix,
-        gender=gender,
+        gender=get_gender(item["GENDER"]),
     )
 
     if not testing:
@@ -701,12 +698,10 @@ def make_mag_bk_judge(item, testing=False):
     # Add position.
     if re.search("Bankruptcy", item["POSITION"]):
         position_type = Position.JUDGE
-        if item["COURT"]:
-            court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
+        court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
     else:
         position_type = Position.MAGISTRATE
-        if item["COURT"]:
-            court = FJC_DISTRICT_COURTS[item["COURT"]]
+        court = FJC_DISTRICT_COURTS[item["COURT"]]
 
     date_start = process_date_string(item["START_DATE"])
 

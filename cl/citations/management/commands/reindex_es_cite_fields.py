@@ -2,11 +2,13 @@
 
 import time
 from collections.abc import Callable
+from typing import Literal
 
 from django.db.models import QuerySet
 
 from cl import settings
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.search_index_utils import CiteCountUpdateDict
 from cl.search.documents import OpinionClusterDocument, OpinionDocument
 from cl.search.models import Opinion, OpinionCluster
 from cl.search.tasks import (
@@ -51,7 +53,14 @@ class Command(VerboseCommand):
             help="Size of the ids batch to send in a single Elastic bulk update",
         )
 
-    def handle(self, *args, **options):
+    def handle(
+        self,
+        *args,
+        reindex_target: Literal["citeCount", "cites"],
+        start_id: int | None,
+        end_id: int | None,
+        **options,
+    ):
         """Re-index the target field for objects in the ID range.
 
         The range includes ``--start-id`` and excludes ``--end-id``. Only
@@ -60,10 +69,6 @@ class Command(VerboseCommand):
         Raises:
             ValueError: If the start or end ID is missing.
         """
-        reindex_target = options["reindex_target"]
-        start_id = options["start_id"]
-        end_id = options["end_id"]
-
         if start_id is None or end_id is None:
             raise ValueError("`start_id` and `end_id` should have values")
 
@@ -143,18 +148,25 @@ class Command(VerboseCommand):
         Args:
             opinion_ids: the opinion ids
         """
-        base_doc = {
-            "_op_type": "update",
-            "_index": OpinionClusterDocument._index._name,
-        }
+        _op_type = "update"
+        _index = OpinionClusterDocument._index._name
 
-        documents_to_update = []
+        documents_to_update: list[CiteCountUpdateDict] = []
         for child_id in opinion_ids:
             cites_doc_to_update, _ = build_bulk_cites_doc(
                 OpinionDocument, child_id, Opinion
             )
-            cites_doc_to_update.update(base_doc)
-            documents_to_update.append(cites_doc_to_update)
+            if not cites_doc_to_update:
+                continue
+            documents_to_update.append(
+                {
+                    "_id": cites_doc_to_update["_id"],
+                    "_op_type": _op_type,
+                    "_index": _index,
+                    "_routing": cites_doc_to_update["_routing"],
+                    "doc": cites_doc_to_update["doc"],
+                }
+            )
 
         index_documents_in_bulk(documents_to_update)
 

@@ -83,7 +83,7 @@ def set_ordering_keys(opinions_content: list[tuple[dict, bytes, str]]) -> None:
 
 @transaction.atomic
 def make_objects(
-    item: dict[str, str | Any],
+    item: dict[str, Any],
     court: Court,
     opinions_content: list[tuple[dict, bytes, str]],
 ) -> tuple[
@@ -91,7 +91,7 @@ def make_objects(
     list[Opinion],
     OpinionCluster,
     list[Citation],
-    OriginatingCourtInformation,
+    OriginatingCourtInformation | None,
 ]:
     """Takes the meta data from the scraper and associates it with objects.
 

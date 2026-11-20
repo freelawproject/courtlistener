@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Never, TypedDict
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -27,6 +27,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from elastic_transport import ObjectApiResponse
 from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
 from elasticsearch.exceptions import (
     ApiError,
@@ -68,6 +69,7 @@ from cl.lib.microservice_utils import (
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
+    CiteCountUpdateDict,
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
     index_documents_in_bulk,
@@ -255,16 +257,11 @@ def es_save_document(
     match app_label:
         case "people_db.Position":
             parent_id = getattr(instance.person, "pk", None)
-            if not all(
-                [
-                    parent_id,
-                    # avoid indexing position records if the parent is not a judge
-                    instance.person.is_judge,
-                ]
-            ):
+            # avoid indexing position records if the parent is not a judge
+            if not parent_id or not instance.person.is_judge:
                 self.request.chain = None
                 return None
-            if not PersonDocument.exists(id=parent_id):
+            if not PersonDocument.exists(id=str(parent_id)):
                 person_first_time_indexing(parent_id, instance)
 
             doc_id = ES_CHILD_ID(instance.pk).POSITION
@@ -674,7 +671,7 @@ def should_percolate_update(
 
 def get_es_doc_id_and_parent_id(
     es_document: type[ESDocumentType], instance: ESModelType
-) -> tuple[int | str, int | None]:
+) -> tuple[str, int | None]:
     """Retrieve the Elasticsearch document ID and parent ID for a given ES document type and DB instance.
 
     Args:
@@ -698,7 +695,7 @@ def get_es_doc_id_and_parent_id(
         doc_id = ES_CHILD_ID(instance.pk).OPINION
         parent_id = getattr(instance, "cluster_id", None)
     else:
-        doc_id = instance.pk
+        doc_id = str(instance.pk)
         parent_id = None
 
     return doc_id, parent_id
@@ -719,13 +716,10 @@ def get_doc_from_es[DocumentT: ESDocumentType](
     """
     # Get doc_id and routing for parent and child documents.
     instance_id, parent_id = get_es_doc_id_and_parent_id(es_document, instance)
-    get_args: dict[str, int | str] = (
-        {"id": instance_id, "routing": parent_id}
-        if parent_id
-        else {"id": instance_id}
-    )
     try:
-        main_doc = es_document.get(**get_args)
+        main_doc = es_document.get(
+            id=instance_id, routing=parent_id if parent_id else None
+        )
     except NotFoundError:
         if isinstance(instance, Person) and not instance.is_judge:
             # If the instance is a Person and is not a Judge, avoid indexing.
@@ -835,14 +829,13 @@ def update_children_docs_by_query(
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance_id)
         parent_doc_class = PersonDocument
-        main_doc = parent_doc_class.exists(parent_instance_id)
+        main_doc = parent_doc_class.exists(str(parent_instance_id))
         parent_instance = get_instance_from_db(parent_instance_id, Person)
         if not parent_instance:
             return
         count_query = Position.objects.filter(person_id=parent_instance_id)
 
     elif es_document is ESRECAPDocument:
-        main_instance_id = None
         if event_table == EventTable.DOCKET_ENTRY:
             s = s.query("term", docket_entry_id=parent_instance_id)
             parent_instance = get_instance_from_db(
@@ -865,10 +858,10 @@ def update_children_docs_by_query(
             count_query = RECAPDocument.objects.filter(
                 docket_entry__docket_id=parent_instance_id
             )
-        if not main_instance_id:
+        else:
             return
         parent_doc_class = DocketDocument
-        main_doc = parent_doc_class.exists(main_instance_id)
+        main_doc = parent_doc_class.exists(str(main_instance_id))
     elif (
         es_document is OpinionDocument or es_document is OpinionClusterDocument
     ):
@@ -877,7 +870,7 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(
             parent_instance_id, OpinionCluster
         )
-        main_doc = parent_doc_class.exists(parent_instance_id)
+        main_doc = parent_doc_class.exists(str(parent_instance_id))
         if not parent_instance:
             return
         count_query = Opinion.objects.filter(cluster_id=parent_instance_id)
@@ -987,7 +980,9 @@ def index_docket_parties_in_es(
         for key, values in docket_document_dict.items()
         if key in party_fields
     }
-    docket_document = DocketDocument.get(id=docket_id)
+    docket_document = DocketDocument.get(id=str(docket_id))
+    if docket_document is None:
+        return
     Document.update(
         docket_document,
         **fields_to_update,
@@ -1202,7 +1197,7 @@ def index_parent_and_child_docs(
         else:
             return
 
-        if not parent_es_document.exists(instance_id):
+        if not parent_es_document.exists(str(instance_id)):
             # Parent document is not yet indexed, index it.
             doc = parent_es_document().prepare(instance)
             es_args = {
@@ -1281,9 +1276,15 @@ def index_parent_or_child_docs_in_es(
         source_name: The name of a registered ESDocketSource. For the
             RECAP search type, child instance_ids are its documents; other
             search types don't use it.
+
+    Raises:
+        ValueError: If indexing child documents for a search type that has
+            none.
     """
     parent_instances = QuerySet()
     child_instances = QuerySet()
+    child_es_document = None
+    child_id_property = None
     source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.RECAP:
@@ -1318,6 +1319,8 @@ def index_parent_or_child_docs_in_es(
         "_index": parent_es_document._index._name,
     }
     if document_type == "child":
+        if child_es_document is None:
+            raise ValueError(f"{search_type} has no child documents to index.")
         # Then index only child documents in bulk.
         failed_docs = index_documents_in_bulk_from_queryset(
             child_instances,
@@ -1371,7 +1374,7 @@ def index_parent_or_child_docs_in_es(
 def remove_document_from_es_index(
     self: Task,
     es_document_name: ESDocumentNameType,
-    instance_id: int,
+    instance_id: int | str,
     routing: int | None,
 ) -> None:
     """Remove a document from an Elasticsearch index.
@@ -1384,15 +1387,13 @@ def remove_document_from_es_index(
         routing: The routing value used to look up the document.
     """
     es_document = getattr(es_document_module, es_document_name)
-    delete_args: dict[str, int | str] = {
-        "index": es_document._index._name,
-        "id": instance_id,
-    }
-    if routing:
-        delete_args["routing"] = routing
     es = connections.get_connection()
     try:
-        es.delete(**delete_args)
+        es.delete(
+            index=es_document._index._name,
+            id=str(instance_id),
+            routing=str(routing) if routing else None,
+        )
         if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
             # Set auto-refresh, used for testing.
             es_document._index.refresh()
@@ -1470,11 +1471,17 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
+class _CiteCountUpdateDictPartial(TypedDict):
+    _id: int | str
+    _routing: int
+    doc: dict
+
+
 def build_bulk_cites_doc[ModelT: ESModelType](
     es_child_doc_class: type[ESDocumentType],
     child_id: int,
     child_doc_model: type[ModelT],
-) -> tuple[ESDictDocument, ModelT | None]:
+) -> tuple[_CiteCountUpdateDictPartial | dict[Never, Never], ModelT | None]:
     """Builds a bulk document for updating cites field in an ES document.
 
     Args:
@@ -1513,7 +1520,7 @@ def build_bulk_cites_doc[ModelT: ESModelType](
             {"id": child_instance.pk},
         )
 
-    doc_to_update = {
+    doc_to_update: _CiteCountUpdateDictPartial = {
         "_id": doc_id,
         "_routing": parent_document_id,
         "doc": {"cites": cites_prepared},
@@ -1544,17 +1551,9 @@ def percolate_document(
     ).apply_async()
 
 
-class _CiteCountUpdateDict(TypedDict):
-    _id: int | str
-    _op_type: Literal["update"]
-    _index: str
-    _routing: NotRequired[int]
-    doc: dict
-
-
 def build_cite_count_update(
     cluster_ids_to_update: list[int],
-) -> list[_CiteCountUpdateDict]:
+) -> list[CiteCountUpdateDict]:
     """Create update documents for OpinionClusterDocument.citeCount.
 
     Args:
@@ -1575,7 +1574,7 @@ def build_cite_count_update(
     documents_to_update = []
     _index = OpinionClusterDocument._index._name
     for cluster in clusters_with_sub_opinions:
-        if not OpinionClusterDocument.exists(id=cluster.pk):
+        if not OpinionClusterDocument.exists(id=str(cluster.pk)):
             # If the OpinionClusterDocument does not exist, it might
             # not be indexed yet. Raise a NotFoundError to retry the
             # task; hopefully, it will be indexed soon.
@@ -1586,7 +1585,7 @@ def build_cite_count_update(
             )
 
         # Build the OpinionCluster dicts for updating the citeCount.
-        doc_to_update: _CiteCountUpdateDict = {
+        doc_to_update: CiteCountUpdateDict = {
             "_id": cluster.pk,
             "doc": {"citeCount": cluster.citation_count},
             "_op_type": "update",
@@ -1654,16 +1653,12 @@ def index_related_cites_fields(
             order to trigger search alerts.
     """
     documents_to_update = []
-    cites_doc_to_update = {}
-    base_doc = {}
     citing_doc = None
     es_child_doc_class = None
     match model_name:
         case OpinionsCited.__name__:
-            base_doc = {
-                "_op_type": "update",
-                "_index": OpinionClusterDocument._index._name,
-            }
+            _index = OpinionClusterDocument._index._name
+
             documents_to_update.extend(
                 build_cite_count_update(cluster_ids_to_update or [])
             )
@@ -1677,25 +1672,34 @@ def index_related_cites_fields(
 
         case OpinionsCitedByRECAPDocument.__name__:
             # Build the RECAPDocument dict for updating the cites.
-            base_doc = {
-                "_op_type": "update",
-                "_index": DocketDocument._index._name,
-            }
+            _index = DocketDocument._index._name
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
             cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
+        case _:
+            # TODO: This whole match is weird
+            raise NotImplementedError(
+                "Only OpinionsCited and OpinionsCitedByRECAPDocument are supported"
+            )
 
-    if cites_doc_to_update and base_doc:
-        cites_doc_to_update.update(base_doc)
-        documents_to_update.append(cites_doc_to_update)
+    if cites_doc_to_update:
+        documents_to_update.append(
+            {
+                "_op_type": "update",
+                "_index": _index,
+                "_id": cites_doc_to_update["_id"],
+                "_routing": cites_doc_to_update["_routing"],
+                "doc": cites_doc_to_update["doc"],
+            }
+        )
 
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1808,7 +1812,7 @@ def remove_documents_by_query(
     testing_mode: bool = False,
     requests_per_second: int | None = None,
     max_docs: int = 0,
-) -> None | dict[str, str]:
+) -> ObjectApiResponse[Any] | None:
     """Remove documents from ES by query.
 
     This method deletes documents from a specified ES document type based on a
@@ -2131,7 +2135,7 @@ def save_embeddings(
 
 def download_embedding(
     storage: AWSMediaStorage, pk: int, directory: str = "opinions"
-) -> list[dict] | None:
+) -> dict | None:
     """Download a single embedding from S3.
 
     Args:
@@ -2223,11 +2227,10 @@ def index_embeddings(
     Returns:
         None if there are no documents to update.
     """
-    base_doc = {
-        "_op_type": "update",
-        "_index": OpinionClusterDocument._index._name,
-    }
-    documents_to_update = []
+    _op_type = "update"
+    _index = OpinionClusterDocument._index._name
+
+    documents_to_update: list[CiteCountUpdateDict] = []
     for embeddings_item in embeddings:
         opinion_id = embeddings_item["id"]
         opinion_instance = (
@@ -2239,16 +2242,18 @@ def index_embeddings(
             # The opinion has been removed from the DB or has a main version
             continue
 
-        doc_to_update = {
-            "_id": ES_CHILD_ID(opinion_id).OPINION,
-            "_routing": opinion_instance.cluster_id,
-            "doc": {
-                "embeddings": embeddings_item["embeddings"],
-                "timestamp": datetime.now(UTC),
-            },
-        }
-        doc_to_update.update(base_doc)
-        documents_to_update.append(doc_to_update)
+        documents_to_update.append(
+            {
+                "_id": ES_CHILD_ID(opinion_id).OPINION,
+                "_routing": opinion_instance.cluster_id,
+                "doc": {
+                    "embeddings": embeddings_item["embeddings"],
+                    "timestamp": datetime.now(UTC),
+                },
+                "_op_type": _op_type,
+                "_index": _index,
+            }
+        )
 
     if not documents_to_update:
         return

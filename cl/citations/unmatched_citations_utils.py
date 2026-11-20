@@ -117,6 +117,7 @@ def store_unmatched_citations(
         unmatched_citations: citations with 0 matches or more than 1 match
         citing_object: the citing Opinion or citing RECAPDocument
     """
+    # TODO: This needs a refactor to type check
     unmatched_citations_to_store = []
     seen_citations = set()
     unmatched_citation_model = (

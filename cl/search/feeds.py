@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -214,7 +215,7 @@ class JurisdictionFeed(Feed):
         """Get the court, or raise 404 if it doesn't exist."""
         return get_object_or_404(Court, pk=court)
 
-    def items(self, obj):
+    def items(self, obj) -> Response | list:
         """Do a search query here.
 
         Return the first 20 results JurisdictionFeed return Opinions instead of
@@ -240,7 +241,7 @@ class JurisdictionFeed(Feed):
         """Use the item's court as its author."""
         return get_item(item)["court"]
 
-    def item_pubdate(self, item):
+    def item_pubdate(self, item) -> datetime | None:
         """Use midnight Pacific Time on the item's filing date."""
         return midnight_pt(get_item(item)["dateFiled"])
 
@@ -248,7 +249,7 @@ class JurisdictionFeed(Feed):
         """Use the item's case name as its title."""
         return get_item(item)["caseName"]
 
-    def item_categories(self, item):
+    def item_categories(self, item) -> list[str] | None:
         """Use the item's precedential status as its only category."""
         return [get_item(item)["status"]]
 

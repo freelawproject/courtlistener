@@ -5,14 +5,13 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any
+from typing import Any, TypedDict
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
-from django.http import HttpResponse
 from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
@@ -41,6 +40,15 @@ from cl.users.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _NeonMembershipData(TypedDict, total=False):
+    accountId: int
+    membershipId: str
+    termEndDate: str
+    membershipName: str
+    paymentStatus: str
+    status: str
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -125,7 +133,7 @@ class MembershipWebhookViewSet(
             "zip_code": addresses[0]["zipCode"],
         }
 
-    def _get_member_record(self, account_id: str) -> User:
+    def _get_member_record(self, account_id: int) -> User:
         """Retrieves a user record associated with a Neon CRM account ID.
 
         This method attempts to find a matching Django user in two ways:
@@ -160,6 +168,7 @@ class MembershipWebhookViewSet(
         except User.DoesNotExist:
             client = NeonClient()
             neon_account = client.get_account_by_id(account_id)
+            contact_data = neon_account["primaryContact"]
             if (
                 "accountCustomFields" in neon_account
                 and "cl_user_id" in neon_account["accountCustomFields"]
@@ -167,11 +176,10 @@ class MembershipWebhookViewSet(
                 user_id = neon_account["accountCustomFields"]["cl_user_id"]
                 users = User.objects.filter(id=user_id)
             else:
-                contact_data = neon_account["primaryContact"]
                 users = filter_by_email(
                     User.objects.all(), contact_data["email1"]
                 ).order_by(F("last_login").desc(nulls_last=True))
-            if not users.exists():
+            if (user := users.first()) is None:
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]
                 )
@@ -183,8 +191,6 @@ class MembershipWebhookViewSet(
                     },
                     address,
                 )
-            else:
-                user = users.first()
 
             profile = user.profile
             profile.neon_account_id = neon_account["accountId"]
@@ -193,7 +199,9 @@ class MembershipWebhookViewSet(
         return user
 
     @staticmethod
-    def _get_membership_data(webhook_data: dict[str, Any]) -> dict[str, str]:
+    def _get_membership_data(
+        webhook_data: dict[str, Any],
+    ) -> _NeonMembershipData:
         """Extracts relevant membership information from a Neon webhook payload.
 
         Args:
@@ -201,7 +209,7 @@ class MembershipWebhookViewSet(
             webhook.
 
         Returns:
-            dict[str, str]: A dictionary containing the extracted membership
+            A dictionary containing the extracted membership
             data, with the following keys:
             - membershipId: Unique identifier for the membership.
             - accountId: Identifier for the user account associated with the
@@ -217,32 +225,27 @@ class MembershipWebhookViewSet(
         # see: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433374045
         if "membership" in webhook_data["data"]:
             data = webhook_data["data"]["membership"]
-            membership = {
-                "membershipId": data["membershipId"],
-                "membershipName": data["membershipName"],
-            }
+            membership_id = data["membershipId"]
+            membership_name = data["membershipName"]
         else:
             data = webhook_data["data"]
-            membership = {
-                "membershipId": data["id"],
-                "membershipName": data["membershipLevel"]["name"],
-            }
+            membership_id = data["id"]
+            membership_name = data["membershipLevel"]["name"]
 
         payment_status = (
             data.get("payments")[0].get("paymentStatus", "").lower()
             if data.get("payments", [])
             else ""
         )
-        membership.update(
-            {
-                "accountId": data["accountId"],
-                "termEndDate": data["termEndDate"],
-                "status": data["status"].lower(),
-                "paymentStatus": payment_status,
-            }
-        )
 
-        return membership
+        return {
+            "membershipId": membership_id,
+            "membershipName": membership_name,
+            "accountId": data["accountId"],
+            "termEndDate": data["termEndDate"],
+            "status": data["status"].lower(),
+            "paymentStatus": payment_status,
+        }
 
     @staticmethod
     def _map_trigger_value(trigger_event: str) -> int:
@@ -255,6 +258,9 @@ class MembershipWebhookViewSet(
         Returns:
             int: The integer value of the trigger event type according to
             the NeonWebhookEvent model
+
+        Raises:
+            NotImplementedError: If `trigger_event` is unrecognized.
         """
         match trigger_event:
             case "createMembership":
@@ -265,10 +271,14 @@ class MembershipWebhookViewSet(
                 trigger = NeonWebhookEvent.MEMBERSHIP_EDIT
             case "deleteMembership":
                 trigger = NeonWebhookEvent.MEMBERSHIP_DELETE
+            case _:
+                raise NotImplementedError(
+                    f"Unknown event trigger-{trigger_event}"
+                )
 
         return trigger
 
-    def _store_webhook_payload(self, webhook_data) -> None:
+    def _store_webhook_payload(self, webhook_data: dict[str, Any]) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
         if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
             membership_data = self._get_membership_data(webhook_data)
@@ -451,10 +461,6 @@ class MembershipWebhookViewSet(
             membership_data["membershipId"]
         )
         if neon_membership is None:
-            return HttpResponse(
-                "Error processing webhook, Membership not found",
-                status=HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            return
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
-        return None

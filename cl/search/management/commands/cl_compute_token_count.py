@@ -1,12 +1,13 @@
 """Estimate token counts for the RECAP and case law archives from a sample."""
 
+from collections.abc import Sequence
 from math import ceil
 from typing import cast
 
 import nh3
 from django.contrib.humanize.templatetags.humanize import intword
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import QuerySet
+from django.db.models.query import RawQuerySet
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import get_token_count_from_string
@@ -15,7 +16,7 @@ from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
 
 def get_recap_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
-) -> QuerySet[RECAPDocument]:
+) -> RawQuerySet[RECAPDocument]:
     """Creates a queryset that retrieves a random sample of RECAPDocuments from the database.
 
     This function utilizes the TABLESAMPLE SYSTEM clause within a raw SQL query
@@ -29,7 +30,8 @@ def get_recap_random_dataset(
             query. Defaults to "default".
 
     Returns:
-        A Django QuerySet containing a random sample of RECAPDocument objects.
+        A Django RawQuerySet containing a random sample of RECAPDocument
+        objects.
     """
     # TODO: Statically guarantee output will have non-null page count
     return RECAPDocument.objects.using(db_connection).raw(
@@ -40,7 +42,7 @@ def get_recap_random_dataset(
 
 def get_opinions_random_dataset(
     percentage: float = 0.1, db_connection: str = "default"
-) -> QuerySet[Opinion]:
+) -> RawQuerySet[Opinion]:
     """Creates a queryset that retrieves a random sample of Opinions from the database.
 
     Args:
@@ -50,7 +52,7 @@ def get_opinions_random_dataset(
             query. Defaults to "default".
 
     Returns:
-        A Django QuerySet containing a random sample of Opinion objects.
+        A Django RawQuerySet containing a random sample of Opinion objects.
     """
     return Opinion.objects.using(db_connection).raw(
         f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
@@ -105,11 +107,11 @@ def get_clean_opinion_text(opinion: Opinion) -> str:
     return nh3.clean(text, tags=set())
 
 
-def compute_avg_from_list(array: list[float]) -> float:
+def compute_avg_from_list(array: Sequence[float]) -> float:
     """Computes the average of a list of numbers.
 
     Args:
-        array (list[float]): A list containing numeric values.
+        array: A sequence containing numeric values.
 
     Returns:
         float: The average of the numbers in the list as a floating-point

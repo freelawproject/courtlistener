@@ -2,7 +2,7 @@
 
 import datetime
 import re
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator, Mapping
 from itertools import chain, islice, tee
 from pathlib import Path, PurePath
 from re import Match
@@ -119,12 +119,12 @@ def is_iter(item: Any) -> TypeIs[Iterable]:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
+def remove_duplicate_dicts[D: Mapping[str, object]](dicts: list[D]) -> list[D]:
     """Given a list of dicts, remove any that are the same.
 
-    See: https://stackoverflow.com/a/9427216/64911
+    The dicts' values must be hashable.
     """
-    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
+    return list({tuple(d.items()): d for d in dicts}.values())
 
 
 def glob_files(

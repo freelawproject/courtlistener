@@ -1,6 +1,7 @@
 """Celery tasks and helpers for importing financial disclosures."""
 
 import datetime
+from typing import TypedDict
 
 import requests
 from asgiref.sync import async_to_sync
@@ -165,7 +166,7 @@ def get_date(text: str, year: int) -> datetime.date | None:
         if int(date_found.year) == year:
             return date_found
         return None
-    except (ParserError, ChristmasError):
+    except ParserError, ChristmasError:
         return None
     except TypeError:
         # Dateutil sometimes goes sideways
@@ -328,7 +329,7 @@ def save_and_upload_disclosure(
     redis_db: Redis,
     disclosure_key: str,
     response: Response,
-    data: dict,
+    data: _DisclosureData,
 ) -> FinancialDisclosure | None:
     """Save disclosure PDF to S3 and generate a FinancialDisclosure object.
 
@@ -383,6 +384,13 @@ def save_and_upload_disclosure(
     return disclosure
 
 
+class _DisclosureData(TypedDict):
+    id: str
+    url: str
+    year: str
+    person_id: int
+
+
 @app.task(
     bind=True,
     autoretry_for=(RequestException, RedisConnectionError),
@@ -390,7 +398,7 @@ def save_and_upload_disclosure(
     interval_start=10,
     ignore_result=True,
 )
-def import_disclosure(self, data: dict[str, str | int | list]) -> None:
+def import_disclosure(self, data: _DisclosureData) -> None:
     """Import disclosures into Courtlistener.
 
     Args:

@@ -178,8 +178,8 @@ class Command(BaseCommand):
         jurisdiction = options.get("jurisdiction")
         court = options.get("court")
         skip_until = options.get("skip_until")
-        total_count = options.get("total")
-        queue = options.get("queue")
+        total_count = options["total"]
+        queue = options["queue"]
         db_connection = (
             "replica"
             if options.get("use_replica") and "replica" in settings.DATABASES

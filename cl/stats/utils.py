@@ -72,7 +72,9 @@ def _validate_labels(name: str, labels: dict[str, str]) -> None:
     # Check each value is valid
     for label_name, value in labels.items():
         allowed_enum = STAT_LABEL_VALUES.get(label_name)
-        allowed_values = [e.value for e in allowed_enum]
+        allowed_values = (
+            [e.value for e in allowed_enum] if allowed_enum else []
+        )
         if value not in allowed_values:
             raise ValueError(
                 f"Invalid value '{value}' for label '{label_name}'. "
@@ -151,7 +153,7 @@ def check_redis() -> bool:
     r = get_redis_interface("STATS")
     try:
         r.ping()
-    except (redis.exceptions.ConnectionError, ConnectionRefusedError):
+    except redis.exceptions.ConnectionError, ConnectionRefusedError:
         return False
     return True
 

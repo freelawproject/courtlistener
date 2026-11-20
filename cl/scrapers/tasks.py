@@ -1020,7 +1020,9 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
                     payload[name] = value
 
             anti_forgery_token = payload.get("__RequestVerificationToken")
-            if not anti_forgery_token:
+            if not anti_forgery_token or not isinstance(
+                anti_forgery_token, str
+            ):
                 raise ScrapeFailed(
                     "Could not find __RequestVerificationToken."
                 )

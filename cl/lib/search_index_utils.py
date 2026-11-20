@@ -3,7 +3,7 @@
 import re
 from collections.abc import Iterable
 from datetime import date
-from typing import Any, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from django.db.models import Model
 from elastic_transport import ApiResponseMeta
@@ -161,7 +161,19 @@ def check_bulk_indexing_exceptions(
     return conflict_found, raise_error
 
 
-def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
+class CiteCountUpdateDict(TypedDict):
+    """TypedDict for the output from `build_cite_count_update`."""
+
+    _id: int | str
+    _op_type: Literal["update"]
+    _index: str
+    _routing: NotRequired[int]
+    doc: dict
+
+
+def index_documents_in_bulk(
+    documents_to_index: list[CiteCountUpdateDict],
+) -> None:
     """Index documents in Elasticsearch using the bulk API.
 
     Args:
@@ -172,6 +184,7 @@ def index_documents_in_bulk(documents_to_index: list[dict[str, Any]]) -> None:
     # Execute the bulk update
     ids = [doc["_id"] for doc in documents_to_index]
     try:
+        # pyrefly:ignore[bad-argument-type]
         bulk(client, documents_to_index)
     except BulkIndexError as exc:
         # Catch any BulkIndexError exceptions to handle specific error message.

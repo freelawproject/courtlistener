@@ -4,7 +4,7 @@ import json
 import time
 from datetime import date
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Literal, TypedDict, Unpack, cast
 
 from django.conf import settings
 from django.core.management import CommandParser
@@ -34,6 +34,13 @@ class OptionsType(TypedDict):
     iteration_delay: float
     stop_threshold: int
     date_filed: date
+    task: Literal[
+        "scrape-iquery",
+        "set-case-ids",
+        "query-results",
+        "re-index-dockets",
+        "set-latest-case-ids",
+    ]
 
 
 def confirm_es_indexing(options):
@@ -482,7 +489,7 @@ class Command(VerboseCommand):
             help="Let the user decide which DB name to use",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options: Unpack[OptionsType]):
         """Run the task chosen with ``--task``."""
         r = get_redis_interface("CACHE")
         if options["task"] == "scrape-iquery":

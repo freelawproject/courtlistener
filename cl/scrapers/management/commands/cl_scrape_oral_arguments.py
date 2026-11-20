@@ -56,8 +56,8 @@ def save_everything(
             candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
                 af.judges, docket.court.pk, af.docket.date_argued
             )
-    else:
-        candidate_judges = get_scotus_judges(af.docket.date_argued)
+    elif date_argued := af.docket.date_argued:
+        candidate_judges = get_scotus_judges(date_argued)
 
     for candidate in candidate_judges:
         af.panel.add(candidate)
@@ -145,12 +145,14 @@ class Command(cl_scrape_opinions.Command):
             ConsecutiveDuplicatesError: If the scraper should stop because
                 of duplicates.
         """
-        content = await site.download_content(
-            item["download_urls"], media_root=settings.MEDIA_ROOT
+        # The downloaded content is sometimes a str, so force it all to be
+        # bytes, pleasing hashlib.
+        content = force_bytes(
+            await site.download_content(
+                item["download_urls"], media_root=settings.MEDIA_ROOT
+            )
         )
-        # request.content is sometimes a str, sometimes unicode, so
-        # force it all to be bytes, pleasing hashlib.
-        sha1_hash = sha1(force_bytes(content))
+        sha1_hash = sha1(content)
 
         await sync_to_async(dup_checker.press_on)(
             Audio,

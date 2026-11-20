@@ -137,7 +137,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
         "get_string_sans_alert": get_string_sans_alert,
     }
 
-    is_semantic_active = flag_is_active(request, "semantic_search_frontend")
+    is_semantic_active = bool(
+        flag_is_active(request, "semantic_search_frontend")
+    )
     edit_alert = "edit_alert" in request.GET
 
     if request.method == "POST":

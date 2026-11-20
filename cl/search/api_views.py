@@ -333,12 +333,13 @@ class OpinionClusterViewSet(
             # First, try to get the object normally
             return super().retrieve(request, *args, **kwargs)
         except Http404 as exc:
-            pk = kwargs.get("pk")
+            if (pk := kwargs.get("pk")) is None:
+                raise exc
             try:
                 redirection = ClusterRedirection.objects.get(
                     deleted_cluster_id=int(pk)
                 )
-            except (ValueError, TypeError, ClusterRedirection.DoesNotExist):
+            except ValueError, ClusterRedirection.DoesNotExist:
                 raise exc
 
             if redirection.reason == ClusterRedirection.SEALED:
@@ -586,10 +587,8 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
 
         search_query = result_serializer.document.search()
 
-        paginator = ESCursorPagination()
-        cleaned_data["request_date"] = (
-            paginator.initialize_context_from_request(request, search_type)
-        )
+        paginator = ESCursorPagination(request, search_type)
+        cleaned_data["request_date"] = paginator.request_date
         highlighting_fields = {}
         main_query, child_docs_query = do_es_api_query(
             search_query,
@@ -601,7 +600,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         es_list_instance = api_utils.CursorESList(
             main_query, child_docs_query, None, None, cleaned_data, request
         )
-        results_page, cached_response = paginator.paginate_queryset(
+        results_page, cached_response = paginator.paginate_es_list(
             es_list_instance, request
         )
 
@@ -619,7 +618,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Note: this isn't precisely a `list[dict]` it is actually a
         # `ReturnList[ReturnDict]`
         result_list = cast(list[dict], serializer.data)
-        return paginator.get_paginated_response(result_list, cached_response)
+        return paginator.get_es_paginated_response(
+            result_list, cached_response
+        )
 
     def list(self, request, *args, **kwargs):
         """Search and return a page of results, or the form's errors with a 400 status."""
