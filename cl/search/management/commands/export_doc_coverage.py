@@ -254,16 +254,16 @@ class Command(BaseCommand):
             if not buckets:
                 break
 
-            for bucket in buckets:
-                data.append(
-                    {
-                        "id": bucket.key.docket_id,
-                        "num_documents": bucket.doc_count,
-                        "num_main_documents": bucket.num_main_documents.doc_count,
-                        "num_available": bucket.num_available.doc_count,
-                        "num_main_available": bucket.num_main_available.doc_count,
-                    }
-                )
+            data.extend(
+                {
+                    "id": bucket.key.docket_id,
+                    "num_documents": bucket.doc_count,
+                    "num_main_documents": bucket.num_main_documents.doc_count,
+                    "num_available": bucket.num_available.doc_count,
+                    "num_main_available": bucket.num_main_available.doc_count,
+                }
+                for bucket in buckets
+            )
 
             after = response.aggregations.dockets.after_key
 
