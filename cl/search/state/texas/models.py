@@ -2,10 +2,12 @@
 
 import logging
 from collections.abc import Callable
+from pathlib import PurePosixPath
 from typing import IO
 
 import pghistory
 from django.db import models
+from django.urls import reverse
 
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
@@ -152,6 +154,42 @@ class TexasDocument(
             "ocr_status": self._get_readable_ocr_status,
             "filepath_local": self._get_full_filepath_local,
         }
+
+    def get_absolute_url(self) -> str:
+        """Get the URL of the document's page.
+
+        TAMES numbers neither documents nor attachments, so the page is keyed
+        by media_id, which stays the same when TAMES posts a new version of
+        the file. Callers should load docket_entry__docket to avoid a query.
+        """
+        return reverse(
+            "view_recap_document",
+            kwargs={
+                "docket_id": self.docket_entry.docket_id,
+                # Rows built in memory can still hold the UUID as a string.
+                "doc_num": str(self.media_id),
+                "slug": self.docket_entry.docket.slug,
+            },
+        )
+
+    @property
+    def is_available(self) -> bool:
+        """Whether the document has a local file."""
+        return bool(self.filepath_local)
+
+    @property
+    def file_extension(self) -> str:
+        """Return the stored file's extension in lowercase, like ".pdf", or an empty string when there's no file."""
+        return PurePosixPath(self.filepath_local.name or "").suffix.lower()
+
+    @property
+    def has_valid_pdf(self) -> bool:
+        """Whether the document has a local file that is a PDF.
+
+        TAMES also serves HTML, WordPerfect and MP3 files, which can't be
+        shown as a PDF or thumbnailed.
+        """
+        return self.is_available and self.file_extension == ".pdf"
 
     @classmethod
     def tmp_prefix(cls) -> str:

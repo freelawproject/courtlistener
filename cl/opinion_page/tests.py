@@ -2130,6 +2130,44 @@ class TexasDocketUrlTest(SimpleTestCase):
                 self.assertEqual(docket.texas_docket_url, expected)
 
 
+class TexasDocumentModelTest(TestCase):
+    """Does TexasDocument know its page URL and what kind of file it stores?"""
+
+    def test_get_absolute_url_is_keyed_by_media_id(self) -> None:
+        """Is the page URL the main document route with the media_id in place of a document number?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(docket=docket)
+        )
+        self.assertEqual(
+            document.get_absolute_url(),
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": docket.pk,
+                    "doc_num": str(document.media_id),
+                    "slug": docket.slug,
+                },
+            ),
+        )
+
+    def test_has_valid_pdf_only_for_stored_pdfs(self) -> None:
+        """Is a document a valid PDF only when its stored file is a PDF, whatever the extension's case?"""
+        cases = [
+            ("texas/brief.pdf", True, ".pdf", True),
+            ("texas/brief.PDF", True, ".pdf", True),
+            ("texas/argument.mp3", True, ".mp3", False),
+            ("texas/order.wpd", True, ".wpd", False),
+            ("", False, "", False),
+        ]
+        for path, available, extension, valid_pdf in cases:
+            with self.subTest(path=path):
+                document = TexasDocument(filepath_local=path)
+                self.assertEqual(document.is_available, available)
+                self.assertEqual(document.file_extension, extension)
+                self.assertEqual(document.has_valid_pdf, valid_pdf)
+
+
 class TexasEntryDisplayTextTest(SimpleTestCase):
     """Does the Texas source build each entry's text from its TAMES fields, one per line, escaped?"""
 
