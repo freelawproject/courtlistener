@@ -422,6 +422,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
 
         Each entry is (reverse_param, expected v2 template).
         """
+        super().setUpTestData()
         docket = DocketFactory(
             court=CourtFactory(id="canb", jurisdiction="FB"),
             source=Docket.RECAP,
