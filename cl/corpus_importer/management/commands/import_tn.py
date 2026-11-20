@@ -93,7 +93,7 @@ def import_tn_corpus(
     logger.info("Starting import")
     tn_corpus = sorted(json.load(file), key=lambda x: x["label"])
     if not ready:
-        case = [x for x in tn_corpus if x["label"] == skip_until][0]
+        case = next(x for x in tn_corpus if x["label"] == skip_until)
         logger.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
@@ -110,9 +110,9 @@ def import_tn_corpus(
         logger.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
-        pdf_path = list(
-            glob_files(Path(file.name).parent / case["label"], "*.pdf")
-        )[0]
+        pdf_path = next(
+            iter(glob_files(Path(file.name).parent / case["label"], "*.pdf"))
+        )
         with pdf_path.open("rb") as p:
             pdf_data = p.read()
 
