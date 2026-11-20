@@ -562,7 +562,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "Tags",
                 "Developer Tools",
                 "Prayers",
-                "Your Support",
+                "Membership",
                 "Account",
             ],
         )
