@@ -917,14 +917,14 @@ def get_attachment_values(
             end = rd_index + 1 + max_after  # Doesn't matter if this is over
         # Build each sibling's URL directly from its (docket_id, slug,
         # doc_num, attachment_number) - no need to modify `rd`.
-        for rdv in rd_values[start:end]:
-            attachments.append(
-                {
-                    "attachment_number": rdv[1],
-                    "url": document_url(docket_id, slug, doc_num, rdv[1]),
-                    "description": rdv[2],
-                }
-            )
+        attachments.extend(
+            {
+                "attachment_number": rdv[1],
+                "url": document_url(docket_id, slug, doc_num, rdv[1]),
+                "description": rdv[2],
+            }
+            for rdv in rd_values[start:end]
+        )
 
         if end < doc_len:
             attachments.append(

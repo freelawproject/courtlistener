@@ -153,12 +153,12 @@ def get_canonicals_from_reporter(reporter_or_slug: str) -> list[str]:
         list[str]: A list of potential canonical names for the reporter
     """
     reporter_slug = slugify_reporter(reporter_or_slug)
-    slugified_variations = {}
-    for variant, canonicals in VARIATIONS_ONLY.items():
-        slugged_canonicals = []
-        for canonical in canonicals:
-            slugged_canonicals.append(slugify_reporter(canonical))
-        slugified_variations[str(slugify(variant))] = slugged_canonicals
+    slugified_variations = {
+        str(slugify(variant)): [
+            slugify_reporter(canonical) for canonical in canonicals
+        ]
+        for variant, canonicals in VARIATIONS_ONLY.items()
+    }
 
     return slugified_variations.get(reporter_slug, [])
 

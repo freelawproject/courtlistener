@@ -976,14 +976,6 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
     if not harvard_file:
         opinion_text = soup.getText(separator=" ", strip=True)
     else:
-        opinions = []
-        for op in soup.find_all(
-            lambda tag: (
-                (tag.name == "opinion" and tag.get("data-type") is None)
-                or tag.get("data-type") == "opinion"
-            )
-        ):
-            opinions.append(op.text)
         opinion_text = "".join(
             [
                 op.text
