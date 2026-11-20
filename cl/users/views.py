@@ -57,7 +57,11 @@ from cl.api.utils import (
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.donate.models import NeonMembership
-from cl.donate.utils import DONOR_PORTAL_URL, get_membership_upgrade_url
+from cl.donate.utils import (
+    DONOR_PORTAL_URL,
+    FLP_MEMBERSHIP_URL,
+    get_membership_upgrade_url,
+)
 from cl.favorites.forms import NoteForm
 from cl.favorites.utils import NOTEABLE_MODELS
 from cl.lib.auth import filter_by_email
@@ -348,6 +352,7 @@ def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
             "upgrade_url": (
                 get_membership_upgrade_url(membership) if membership else ""
             ),
+            "membership_url": FLP_MEMBERSHIP_URL,
             "donor_portal_url": DONOR_PORTAL_URL,
         },
     )
