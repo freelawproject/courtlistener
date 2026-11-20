@@ -2,34 +2,6 @@
   "min_severity": "error",
   "errors": [
     {
-      "column": 5,
-      "path": "cl/ai/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/ai/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/ai/llm_providers/google.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/ai/llm_providers/google.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_name`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/ai/llm_providers/google.py",
       "name": "bad-assignment",
@@ -37,122 +9,10 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/alerts/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/alerts/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `alert_type`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/alerts/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `validate_alert_type_change`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/alerts/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
       "column": 18,
       "path": "cl/alerts/management/commands/cl_send_recap_alerts.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `alerts`",
-      "severity": "error"
-    },
-    {
-      "column": 11,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `alert_type`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 11,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `alert_type`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `total`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/alerts/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `list` has no attribute `hits`",
       "severity": "error"
     },
     {
@@ -167,34 +27,6 @@
       "path": "cl/api/api_permissions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `AbstractBaseUser` is not assignable to parameter `user` with type `User` in function `V3APIPermission.is_new_v3_user`",
-      "severity": "error"
-    },
-    {
-      "column": 30,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `query_params`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `build_absolute_uri`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_search_after_sort_key`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/api/pagination.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_reverse_search_after_sort_key`",
       "severity": "error"
     },
     {
@@ -240,20 +72,6 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `initial`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `finalize_response`",
-      "severity": "error"
-    },
-    {
       "column": 58,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
@@ -275,101 +93,10 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `level`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `list`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `filter_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 61,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `ordering`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `paginate_queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_serializer`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_paginated_response`",
-      "severity": "error"
-    },
-    {
-      "column": 22,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoFilterCacheListMixin` has no attribute `get_serializer`",
-      "severity": "error"
-    },
-    {
-      "column": 48,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `get_ident`",
-      "severity": "error"
-    },
-    {
       "column": 39,
       "path": "cl/api/utils.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str | None` is not assignable to parameter `key` with type `str` in function `dict.get`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/api/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `object` has no attribute `fields`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -394,66 +121,10 @@
       "severity": "error"
     },
     {
-      "column": 43,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 50,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/citations/annotate_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
       "column": 45,
       "path": "cl/citations/api_views.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `QuerySet[OpinionCluster, OpinionCluster] | None` is not assignable to parameter `clusters` with type `QuerySet[OpinionCluster, OpinionCluster]` in function `CitationLookupViewSet._format_cluster_response`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/citations/recap_citations.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 55,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster_id`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/citations/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Resource` has no attribute `cluster_id`",
       "severity": "error"
     },
     {
@@ -482,62 +153,6 @@
       "path": "cl/corpus_importer/management/commands/anon_2020_import.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[ResourceCitation]` is not assignable to parameter `found_cites` with type `list[Citation]` in function `check_publication_status`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/management/commands/claims_activity_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/export_control.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -604,41 +219,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/custom_filters/templatetags/component_tags.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `HttpRequest` has no attribute `_extensionless_scripts`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/disclosures/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/donate/api_views.py",
       "name": "bad-index",
@@ -678,34 +258,6 @@
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/donate/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/donate/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `id`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/favorites/decorators.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `update`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/favorites/decorators.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `update`",
       "severity": "error"
     },
     {
@@ -751,13 +303,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/lasc/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CaseIDQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
@@ -769,97 +314,6 @@
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `User` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `date` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `help_text`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `str | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `get_absolute_url`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `cluster`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
       "severity": "error"
     },
     {
@@ -888,20 +342,6 @@
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Docket` has no attribute `idb_data_id`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `afirst`",
-      "severity": "error"
-    },
-    {
-      "column": 34,
-      "path": "cl/opinion_page/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `filter`",
       "severity": "error"
     },
     {
@@ -975,20 +415,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/people_db/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `name_full`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_dod`",
-      "severity": "error"
-    },
-    {
       "column": 77,
       "path": "cl/people_db/models.py",
       "name": "missing-attribute",
@@ -1010,80 +436,10 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/people_db/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 46,
-      "path": "cl/people_db/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `slug`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/people_db/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Person` has no attribute `financial_disclosures`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap/management/commands/monitor_pacer_websites.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -1094,213 +450,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 31,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ClaimHistory` has no attribute `pacer_seq_no`",
-      "severity": "error"
-    },
-    {
-      "column": 10,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_doc_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_type`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `attachment_number`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `acms_document_guid`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `RECAPDocument | None` is not assignable to parameter `object` with type `RECAPDocument` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_type`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `description`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pacer_doc_id`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `document_number`",
-      "severity": "error"
-    },
-    {
-      "column": 12,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `page_count`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `page_count`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `file_size`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `RECAPDocument` has no attribute `document_url`",
-      "severity": "error"
-    },
-    {
-      "column": 42,
-      "path": "cl/recap/mergers.py",
-      "name": "bad-typed-dict-key",
-      "concise_description": "TypedDict `_MergeAttachmentDict` does not have key `document_url`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `asave`",
-      "severity": "error"
-    },
-    {
-      "column": 32,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_iquery_sweep`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/recap/mergers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Docket` has no attribute `skip_iquery_sweep`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/recap/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `objects`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
       "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/recap/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `encode`",
       "severity": "error"
     },
     {
@@ -1371,13 +524,6 @@
       "path": "cl/recap/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `data`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -1472,66 +618,10 @@
       "severity": "error"
     },
     {
-      "column": 20,
-      "path": "cl/recap/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap_rss/management/commands/scrape_rss.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `content`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `raise_for_status`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/recap_rss/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `status_code`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/scrapers/DupChecker.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `sha1`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/scrapers/DupChecker.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/scrapers/management/commands/cl_back_scrape_citations.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/scrapers/management/commands/cl_back_scrape_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Command` has no attribute `save_everything`",
       "severity": "error"
     },
     {
@@ -1542,38 +632,10 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `replace`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/scrapers/management/commands/clone_from_cl.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `Unknown | None` is not assignable to parameter `*args` with type `PathLike[str] | str` in function `pathlib.PurePath.__new__`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/scrapers/management/commands/delete_duplicates.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `ClusterSources` has no class attribute `parts_to_source_mapper`",
-      "severity": "error"
-    },
-    {
       "column": 5,
       "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `Opinion` has no attribute `unmatched_citations`",
-      "severity": "error"
-    },
-    {
-      "column": 29,
-      "path": "cl/scrapers/management/commands/merge_opinion_versions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `exclude`",
       "severity": "error"
     },
     {
@@ -1588,27 +650,6 @@
       "path": "cl/scrapers/management/commands/scrape_harvard_ia.py",
       "name": "bad-specialization",
       "concise_description": "`dict[str, Any]` is not assignable to upper bound `str | tuple[str, Any]` of type variable `T`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/scrapers/management/commands/update_from_text.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `save`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/scrapers/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `AbstractSite` has no attribute `extract_from_text`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/scrapers/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `RECAPDocument` has no attribute `citation_queue`",
       "severity": "error"
     },
     {
@@ -1766,27 +807,6 @@
       "severity": "error"
     },
     {
-      "column": 21,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `all_editions`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_reporter`",
-      "severity": "error"
-    },
-    {
-      "column": 14,
-      "path": "cl/scrapers/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_page`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/scrapers/utils.py",
       "name": "bad-index",
@@ -1857,13 +877,6 @@
       "severity": "error"
     },
     {
-      "column": 27,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
       "column": 58,
       "path": "cl/search/api_utils.py",
       "name": "unexpected-keyword",
@@ -1875,20 +888,6 @@
       "path": "cl/search/api_utils.py",
       "name": "bad-return",
       "concise_description": "Returned type `tuple[list[defaultdict[str, None]], Unknown, Response | None, Response | None, Literal[False]]` is not assignable to declared return type `tuple[list[defaultdict[Unknown, Unknown]], int, Response, Response | None, bool]`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `hits`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/api_utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `defaultdict` has no attribute `meta`",
       "severity": "error"
     },
     {
@@ -2011,136 +1010,10 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 38,
-      "path": "cl/search/management/commands/cl_index_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `group`",
-      "severity": "error"
-    },
-    {
       "column": 35,
       "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `FieldTracker` is not assignable to parameter `tracked_set` with type `FieldInstanceTracker` in function `cl.lib.es_signal_processor.check_fields_that_changed`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/search/management/commands/export_doc_coverage.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `year`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/management/commands/fix_rd_broken_links.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 35,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/llm_clean_docket_number_daemon.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `needs_extraction`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `filepath_local`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `maybe_wait`",
-      "severity": "error"
-    },
-    {
-      "column": 41,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/management/commands/pacer_bulk_fetch.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 21,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `order_by`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `ClusterCitationQuerySet` has no attribute `_clone`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/search/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CitationBase` has no attribute `corrected_reporter`",
       "severity": "error"
     },
     {
@@ -2186,45 +1059,10 @@
       "severity": "error"
     },
     {
-      "column": 32,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `parties`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
-      "column": 56,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "column": 37,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `case_name`",
-      "severity": "error"
-    },
-    {
       "column": 29,
       "path": "cl/search/tasks.py",
       "name": "missing-attribute",
       "concise_description": "Object of type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` has no attribute `docket_entry`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Class `NoneType` has no class attribute `count`",
       "severity": "error"
     },
     {
@@ -2263,20 +1101,6 @@
       "severity": "error"
     },
     {
-      "column": 15,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
       "column": 13,
       "path": "cl/search/views.py",
       "name": "missing-attribute",
@@ -2295,13 +1119,6 @@
       "path": "cl/search/views.py",
       "name": "unsupported-operation",
       "concise_description": "Cannot set item in `QueryDict`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/settings/third_party/pghistory.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `tracks`",
       "severity": "error"
     },
     {
@@ -2361,52 +1178,10 @@
       "severity": "error"
     },
     {
-      "column": 34,
-      "path": "cl/sitemaps_infinite/sitemap_generator.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `next_cursor`",
-      "severity": "error"
-    },
-    {
       "column": 21,
       "path": "cl/sitemaps_infinite/sitemap_generator.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `TaskCursorData` is not assignable to parameter `mapping` with type `Mapping[_Key, _Value]` in function `redis.commands.core.HashCommands.hset`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/stats/metrics.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CollectorRegistry` has no attribute `_cl_stat_metrics_collector_registered`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/stats/metrics.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CollectorRegistry` has no attribute `_cl_celery_queue_collector_registered`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `queryset`",
-      "severity": "error"
-    },
-    {
-      "column": 5,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `FunctionType` has no attribute `short_description`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/admin.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `profile`",
       "severity": "error"
     },
     {
@@ -2424,59 +1199,10 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `CleanEmailMixin` has no attribute `cleaned_data`",
-      "severity": "error"
-    },
-    {
-      "column": 26,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `user`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
       "column": 24,
       "path": "cl/users/forms.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `webhooks`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/users/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Field` has no attribute `choices`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/users/management/commands/cl_get_zoho_tokens.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `token`",
       "severity": "error"
     },
     {
@@ -2505,20 +1231,6 @@
       "path": "cl/users/models.py",
       "name": "bad-index",
       "concise_description": "Cannot index into `dict[str, dict[str, int]]`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/users/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
       "severity": "error"
     },
     {

@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from django.core.management import CommandError
 from django.db.models import Count, Q
 from elasticsearch.dsl import Search
 from tqdm import tqdm
@@ -71,7 +72,10 @@ class Command(BaseCommand):
 
         handler = self.handle_psql if options["psql"] else self.handle_es
 
-        min_year = Docket.objects.earliest("date_filed").date_filed.year
+        earliest_date = Docket.objects.earliest("date_filed").date_filed
+        if earliest_date is None:
+            raise CommandError("No dockets have a filing date.")
+        min_year = earliest_date.year
         max_date = datetime.now()
 
         date_ranges = []

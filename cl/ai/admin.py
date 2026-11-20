@@ -122,6 +122,7 @@ class LLMTaskAdmin(admin.ModelAdmin):
             return obj.request.get_provider_display()
         return None
 
+    @admin.display(description="Target Object")
     def link_to_target_object(self, obj):
         """Creates a link to the Generic Foreign Key object in the list view."""
         if obj.content_object:
@@ -137,10 +138,7 @@ class LLMTaskAdmin(admin.ModelAdmin):
             )
         return "-"
 
-    link_to_target_object.short_description = "Target Object"
-
+    @admin.display(description="View Target Object")
     def link_to_target_object_detail(self, obj):
         """Creates a link to the Generic Foreign Key object in the Detail/Edit view."""
         return self.link_to_target_object(obj)
-
-    link_to_target_object_detail.short_description = "View Target Object"

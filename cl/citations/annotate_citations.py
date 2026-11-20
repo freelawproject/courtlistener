@@ -8,11 +8,7 @@ from django.urls import reverse
 from eyecite import annotate_citations
 from eyecite.models import CitationBase, IdCitation, SupraCitation
 
-from cl.citations.match_citations import (
-    MULTIPLE_MATCHES_RESOURCE,
-    NO_MATCH_RESOURCE,
-)
-from cl.citations.types import MatchedResourceType
+from cl.citations.types import MatchedResourceType, UnmatchedResource
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
 
@@ -34,7 +30,8 @@ def generate_annotations(
 
     annotations: list[Annotation] = []
     for opinion, citations in citation_resolutions.items():
-        if opinion is NO_MATCH_RESOURCE:  # If unsuccessfully matched...
+        # If unsuccessfully matched...
+        if opinion is UnmatchedResource.NO_MATCH:
             annotation_pre, annotation_post = (
                 '<span class="citation no-link">',
                 "</span>",
@@ -46,7 +43,7 @@ def generate_annotations(
                     for c in citations
                 ]
             )
-        elif opinion is MULTIPLE_MATCHES_RESOURCE:
+        elif opinion is UnmatchedResource.MULTIPLE_MATCHES:
             # Multiple matches, can't disambiguate
             for c in citations:
                 # Annotate all citations can't be disambiguated to citation

@@ -27,9 +27,13 @@ def _script_registry_for(request):
 
 def _extensionless_registry_for(request: HttpRequest) -> set[str]:
     """Gets or sets the registry of scripts required without an extension."""
-    if not hasattr(request, "_extensionless_scripts"):
-        setattr(request, "_extensionless_scripts", set())
-    return request._extensionless_scripts
+    registry: set[str] | None = getattr(
+        request, "_extensionless_scripts", None
+    )
+    if registry is None:
+        registry = set()
+        setattr(request, "_extensionless_scripts", registry)
+    return registry
 
 
 def _coerce_defer(value, script_path):

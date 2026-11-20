@@ -16,7 +16,9 @@ from cl.donate.models import NeonWebhookEvent
     sender=NeonWebhookEvent,
     dispatch_uid="truncate_webhook_events",
 )
-def truncate_webhook_events(sender, instance=None, created=False, **kwargs):
+def truncate_webhook_events(
+    sender, instance: NeonWebhookEvent, created: bool, **kwargs
+) -> None:
     """Delete old webhook events when a saved event's ID is a multiple of ``NEON_MAX_WEBHOOK_NUMBER``.
 
     Deletes events at least ``NEON_MAX_WEBHOOK_NUMBER`` IDs older than the

@@ -25,7 +25,7 @@ def get_total_estimate_count(table_name: str) -> int:
 
 async def get_clusters_from_citation_str(
     reporter: str, volume: str, page: str
-) -> tuple[QuerySet[OpinionCluster] | None, int]:
+) -> tuple[QuerySet[OpinionCluster], int]:
     """This function attempts to retrieve opinion clusters related to a citation string.
 
     This helper first tries to find an exact match of the citation string within
@@ -44,13 +44,13 @@ async def get_clusters_from_citation_str(
             found.
     """
     citation_str = " ".join([volume, reporter, page])
-    clusters = None
     try:
         clusters = OpinionCluster.objects.filter(
             citation=citation_str
         ).select_related("docket__court")
     except ValueError:
         # Unable to parse the citation.
+        clusters = OpinionCluster.objects.none()
         cluster_count = 0
     else:
         cluster_count = await clusters.acount()

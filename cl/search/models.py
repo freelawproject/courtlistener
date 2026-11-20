@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self, assert_never
+from typing import TYPE_CHECKING, Literal, Self, assert_never, cast
 from urllib.parse import quote
 
 import nh3
@@ -37,6 +37,7 @@ from django.utils.encoding import force_str
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from eyecite import get_citations
+from eyecite.models import ResourceCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
@@ -310,6 +311,9 @@ class Docket(AbstractDateTimeModel, DocketSources):
     # SCOTUS) so the ES signal processor doesn't percolate a save that will be
     # percolated later, e.g. after the docket's parties are indexed.
     skip_percolator_request: bool
+    # Not a model field - set transiently by mergers so the save signal
+    # doesn't trigger an iquery sweep for the docket.
+    skip_iquery_sweep: bool
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
@@ -1096,6 +1100,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             process_docket_data(self, UPLOAD_TYPE.IA_XML_FILE)
 
         # Then layer the uploads on top of that.
+        # pyrefly:ignore[missing-attribute] GenericRelation's descriptor always returns a manager, even when null=True
         for html in self.html_documents.order_by("date_created"):
             process_docket_data(
                 self, html.upload_type, filepath=html.filepath.path
@@ -1344,6 +1349,10 @@ class RECAPDocument(
     AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
 ):
     """The model for Docket Documents and Attachments."""
+
+    # Not a model field - batch jobs set this transiently so the post_save
+    # signal enqueues citation extraction on the given Celery queue.
+    citation_queue: str | None
 
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
@@ -2285,8 +2294,12 @@ class Court(models.Model):
     )
 
     objects = models.Manager()
-    federal_courts = FederalCourtsQuerySet.as_manager()
-    state_courts = StateCourtsQuerySet.as_manager()
+    # as_manager() is typed as a plain Manager, which hides the custom
+    # queryset methods.
+    federal_courts = cast(
+        FederalCourtsQuerySet, FederalCourtsQuerySet.as_manager()
+    )
+    state_courts = cast(StateCourtsQuerySet, StateCourtsQuerySet.as_manager())
 
     def __str__(self) -> str:
         return f"{self.full_name}"
@@ -2395,29 +2408,26 @@ class ClusterCitationQuerySet[M: OpinionCluster](models.QuerySet[M]):
         Raises:
             ValueError: If the ``citation`` string can't be parsed.
         """
-        clone = self._clone()
         citation_str = kwargs.pop("citation", None)
         if citation_str:
-            try:
-                c = get_citations(
-                    citation_str,
-                    remove_ambiguous=False,
-                    tokenizer=HYPERSCAN_TOKENIZER,
-                )[0]
-            except IndexError:
+            citations = get_citations(
+                citation_str,
+                remove_ambiguous=False,
+                tokenizer=HYPERSCAN_TOKENIZER,
+            )
+            if not citations or not isinstance(
+                c := citations[0], ResourceCitation
+            ):
                 raise ValueError(f"Unable to parse citation '{citation_str}'")
-            else:
-                clone.query.add_q(
-                    Q(
-                        citations__volume=c.groups["volume"],
-                        citations__reporter=c.corrected_reporter(),
-                        citations__page=c.groups["page"],
-                    )
-                )
-
-        # Add the rest of the args & kwargs
-        clone.query.add_q(Q(*args, **kwargs))
-        return clone
+            args = (
+                Q(
+                    citations__volume=c.groups["volume"],
+                    citations__reporter=c.corrected_reporter(),
+                    citations__page=c.groups["page"],
+                ),
+                *args,
+            )
+        return super().filter(*args, **kwargs)
 
 
 @pghistory.track()

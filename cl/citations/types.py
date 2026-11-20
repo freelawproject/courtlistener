@@ -1,12 +1,12 @@
 """Types for matching citations and the citation lookup API."""
 
-from typing import NotRequired, TypedDict
+from enum import Enum, auto
+from typing import Literal, NotRequired, TypedDict
 
 from django.db.models import QuerySet
 from eyecite.models import (
     FullCaseCitation,
     IdCitation,
-    Resource,
     ShortCaseCitation,
     SupraCitation,
 )
@@ -16,7 +16,19 @@ from cl.search.models import Opinion, OpinionCluster
 SupportedCitationType = (
     FullCaseCitation | ShortCaseCitation | SupraCitation | IdCitation
 )
-type MatchedResourceType = Opinion | Resource
+
+
+class UnmatchedResource(Enum):
+    """Placeholder resources for citations that did not resolve to exactly one opinion."""
+
+    NO_MATCH = auto()
+    MULTIPLE_MATCHES = auto()
+
+
+type MatchedResourceType = (
+    Opinion
+    | Literal[UnmatchedResource.NO_MATCH, UnmatchedResource.MULTIPLE_MATCHES]
+)
 ResolvedFullCite = tuple[FullCaseCitation, MatchedResourceType]
 ResolvedFullCites = list[ResolvedFullCite]
 

@@ -1,6 +1,7 @@
 """Prometheus metrics and collectors for CourtListener."""
 
 import logging
+from weakref import WeakKeyDictionary
 
 from django.conf import settings
 from prometheus_client import Counter, Histogram
@@ -9,7 +10,7 @@ from prometheus_client.core import (
     CounterMetricFamily,
     GaugeMetricFamily,
 )
-from prometheus_client.registry import Collector
+from prometheus_client.registry import Collector, CollectorRegistry
 from sentry_sdk import capture_exception
 
 from cl.lib.celery_utils import get_queue_length
@@ -134,22 +135,39 @@ class StatMetricsCollector(Collector):
             yield counter
 
 
-def register_stat_metrics_collector(registry=REGISTRY) -> bool:
+_registered_collectors: WeakKeyDictionary[
+    CollectorRegistry, set[type[Collector]]
+] = WeakKeyDictionary()
+
+
+def _register_collector_once(
+    registry: CollectorRegistry, collector_class: type[Collector]
+) -> bool:
+    """Register a collector of the given class unless the registry already has one.
+
+    Returns:
+        True if the collector was registered, False if it already was.
+    """
+    registered = _registered_collectors.setdefault(registry, set())
+    if collector_class in registered:
+        return False
+    registry.register(collector_class())
+    registered.add(collector_class)
+    return True
+
+
+def register_stat_metrics_collector(
+    registry: CollectorRegistry = REGISTRY,
+) -> bool:
     """Register StatMetricsCollector once per registry."""
-    if getattr(registry, "_cl_stat_metrics_collector_registered", False):
-        return False
-    registry.register(StatMetricsCollector())
-    registry._cl_stat_metrics_collector_registered = True
-    return True
+    return _register_collector_once(registry, StatMetricsCollector)
 
 
-def register_celery_queue_collector(registry=REGISTRY) -> bool:
+def register_celery_queue_collector(
+    registry: CollectorRegistry = REGISTRY,
+) -> bool:
     """Register CeleryQueueCollector once per registry."""
-    if getattr(registry, "_cl_celery_queue_collector_registered", False):
-        return False
-    registry.register(CeleryQueueCollector())
-    registry._cl_celery_queue_collector_registered = True
-    return True
+    return _register_collector_once(registry, CeleryQueueCollector)
 
 
 register_stat_metrics_collector()

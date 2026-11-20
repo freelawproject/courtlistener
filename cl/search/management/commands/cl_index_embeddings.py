@@ -36,7 +36,7 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         """Build the command with no throttle or queues set yet."""
         super().__init__(*args, **kwargs)
-        self.throttle = None
+        self.throttle: CeleryThrottle
         self.retrieval_queue = None
         self.indexing_queue = None
         self.batch_size: int
@@ -200,6 +200,10 @@ class Command(VerboseCommand):
                         # Skip row if auto-resume is enabled
                         continue
                     opinion_id_match = id_pattern.search(row[1])
+                    if opinion_id_match is None:
+                        raise CommandError(
+                            f"No opinion ID in row {idx} of {media_path}: {row[1]}"
+                        )
                     opinion_id = int(opinion_id_match.group(1))
                     chunk.append(opinion_id)
                     processed_count += 1

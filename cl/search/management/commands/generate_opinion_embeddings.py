@@ -1,5 +1,7 @@
 """Queue tasks to generate opinion text embeddings and save them to S3."""
 
+from typing import cast
+
 from celery import chain
 from django.conf import settings
 
@@ -9,7 +11,7 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, Opinion
+from cl.search.models import SEARCH_TYPES, Opinion, OpinionQuerySet
 from cl.search.tasks import create_opinion_text_embeddings, save_embeddings
 
 
@@ -30,7 +32,7 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
-        self.throttle = None
+        self.throttle: CeleryThrottle
 
     def add_arguments(self, parser):
         """Add the database, token, start, resume, count, queue, throttle, device, and opinion ID options."""
@@ -172,7 +174,9 @@ class Command(VerboseCommand):
             opinions_to_process = (
                 opinions[:count] if count is not None else opinions
             )
-        opinions_with_best_text = opinions.with_best_text()
+        opinions_with_best_text = cast(
+            OpinionQuerySet[Opinion], opinions
+        ).with_best_text()
         opinions_with_best_text = (
             opinions_with_best_text[:count] if count is not None else opinions
         )

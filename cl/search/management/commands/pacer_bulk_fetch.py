@@ -117,7 +117,7 @@ class Command(VerboseCommand):
         """Build the command with default limits and PACER credentials from the environment or settings."""
         super().__init__(*args, **kwargs)
         self.options = None
-        self.user = None
+        self.user: User
         self.min_page_count: int = 0
         self.max_page_count: int = 10_000
         self.username: str
@@ -131,7 +131,7 @@ class Command(VerboseCommand):
         self.pacer_password = os.environ.get(
             "PACER_PASSWORD", settings.PACER_PASSWORD
         )
-        self.throttle = None
+        self.throttle: CeleryThrottle
         self.queue_name: str = "batch0"
         self.interval: int
         self.initial_backoff_time: float
@@ -537,7 +537,9 @@ class Command(VerboseCommand):
         total_fq_queues = fetch_queues.count()
         processed_count = 0
         for fq in fetch_queues:
-            rd = fq.recap_document
+            if (rd := fq.recap_document) is None:
+                # The RD was deleted after it was fetched.
+                continue
             needs_ocr = rd.needs_extraction
             has_pdf = rd.filepath_local is not None
             fetch_was_successful = fq.status == PROCESSING_STATUS.SUCCESSFUL

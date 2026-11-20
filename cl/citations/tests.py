@@ -45,8 +45,6 @@ from cl.citations.group_parentheticals import (
 )
 from cl.citations.match_citations import (
     MULTIPLE_MATCHES_FLAG,
-    MULTIPLE_MATCHES_RESOURCE,
-    NO_MATCH_RESOURCE,
     do_resolve_citations,
     resolve_fullcase_citation,
 )
@@ -61,7 +59,7 @@ from cl.citations.tasks import (
     store_opinion_citations_and_update_parentheticals,
     store_recap_citations,
 )
-from cl.citations.types import MatchedResourceType
+from cl.citations.types import MatchedResourceType, UnmatchedResource
 from cl.citations.unmatched_citations_utils import (
     handle_unmatched_citations,
     update_unmatched_citations_status,
@@ -247,7 +245,7 @@ class CitationTextTest(TestCase):
                     continue
                 citation_resolutions: dict[
                     MatchedResourceType, list[CitationBase]
-                ] = {NO_MATCH_RESOURCE: citations}
+                ] = {UnmatchedResource.NO_MATCH: citations}
 
                 created_html = create_cited_html(citation_resolutions, {})
                 self.assertEqual(
@@ -286,7 +284,7 @@ class CitationTextTest(TestCase):
             patch(
                 "cl.citations.tasks.do_resolve_citations",
                 side_effect=lambda citations, _opinion: {
-                    NO_MATCH_RESOURCE: citations
+                    UnmatchedResource.NO_MATCH: citations
                 },
             ),
         ):
@@ -390,7 +388,7 @@ class CitationTextTest(TestCase):
                 # to receive.
                 citation_resolutions: dict[
                     MatchedResourceType, list[CitationBase]
-                ] = {NO_MATCH_RESOURCE: citations}
+                ] = {UnmatchedResource.NO_MATCH: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -522,7 +520,7 @@ class CitationTextTest(TestCase):
                 # to receive.
                 citation_resolutions: dict[
                     MatchedResourceType, list[CitationBase]
-                ] = {NO_MATCH_RESOURCE: citations}
+                ] = {UnmatchedResource.NO_MATCH: citations}
 
                 created_html = create_cited_html(
                     citation_resolutions, get_citations_kwargs
@@ -1272,7 +1270,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             # Test matching multiple full citations to different documents
             ([full1, full2], {opinion1: [full1], opinion2: [full2]}),
             # Test matching an unmatchacble full citation
-            ([full_na], {NO_MATCH_RESOURCE: [full_na]}),
+            ([full_na], {UnmatchedResource.NO_MATCH: [full_na]}),
             # Test resolving a supra citation
             ([full1, supra1], {opinion1: [full1, supra1]}),
             # Test resolving a supra citation when its antecedent guess matches
@@ -1285,7 +1283,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             # Test resolving a supra citation when the previous citation
             # match failed.
             # We expect the supra citation to not be matched.
-            ([full_na, supra1], {NO_MATCH_RESOURCE: [full_na]}),
+            ([full_na, supra1], {UnmatchedResource.NO_MATCH: [full_na]}),
             # Test resolving a short form citation with a meaningful antecedent
             ([full1, short1], {opinion1: [full1, short1]}),
             # Test resolving a short form citation when its reporter and
@@ -1318,7 +1316,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             # Test resolving a short form citation when the previous citation
             # match failed.
             # We expect the short form citation to not be matched.
-            ([full_na, short1], {NO_MATCH_RESOURCE: [full_na]}),
+            ([full_na, short1], {UnmatchedResource.NO_MATCH: [full_na]}),
             # Test resolving an Id. citation
             ([full1, id], {opinion1: [full1, id]}),
             # Test resolving an Id. citation when the previous citation match
@@ -1331,10 +1329,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             # Test resolving an Id. citation when the previous citation match
             # failed because a normal full citation lookup returned nothing.
             # We expect the Id. citation to be matched to the
-            # NO_MATCH_RESOURCE placeholder object.
+            # UnmatchedResource.NO_MATCH placeholder object.
             (
                 [full1, full_na, id],
-                {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
+                {opinion1: [full1], UnmatchedResource.NO_MATCH: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
             # unknown document. Since we can't match those documents (yet),
@@ -1349,10 +1347,10 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ([id], {}),
             # Test resolving a law citation. Since we don't support these yet,
             # we expect no matches to be returned.
-            ([law], {NO_MATCH_RESOURCE: [law]}),
+            ([law], {UnmatchedResource.NO_MATCH: [law]}),
             # Test resolving a journal citation. Since we don't support these
             # yet, we expect no matches to be returned.
-            ([journal], {NO_MATCH_RESOURCE: [journal]}),
+            ([journal], {UnmatchedResource.NO_MATCH: [journal]}),
         ]
 
         # fmt: on
@@ -1384,7 +1382,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         assert isinstance(citation, FullCaseCitation)
         results = resolve_fullcase_citation(citation)
-        self.assertEqual(NO_MATCH_RESOURCE, results)
+        self.assertEqual(UnmatchedResource.NO_MATCH, results)
 
     def test_citation_resolve_with_corrected_reporter(self) -> None:
         """Resolve to corrected reporter."""
@@ -1422,7 +1420,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         ]
         assert isinstance(citation, FullCaseCitation)
         results = resolve_fullcase_citation(citation)
-        self.assertEqual(MULTIPLE_MATCHES_RESOURCE, results)
+        self.assertEqual(UnmatchedResource.MULTIPLE_MATCHES, results)
 
         # Verify if the annotated citation is correct
         opinion = self.citation8.cluster.sub_opinions.all().first()

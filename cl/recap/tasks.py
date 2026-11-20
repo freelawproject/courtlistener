@@ -888,7 +888,7 @@ async def find_subdocket_att_page_rds(
     """
     pq = await ProcessingQueue.objects.aget(pk=pk)
     pq, att_data, text = await get_att_data_from_pq(pq)
-    if not att_data:
+    if not att_data or text is None:
         # Bad attachment page.
         return []
 

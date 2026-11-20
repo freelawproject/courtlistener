@@ -1,6 +1,7 @@
 """REST API serializers for tags, prayers, and event counts."""
 
 import re
+from typing import cast
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -61,9 +62,9 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
             and request.method not in SAFE_METHODS
             and request.user.is_authenticated
         ):
-            self.fields["tag"].queryset = UserTag.objects.filter(
-                user=request.user
-            )
+            cast(
+                serializers.PrimaryKeyRelatedField, self.fields["tag"]
+            ).queryset = UserTag.objects.filter(user=request.user)
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):

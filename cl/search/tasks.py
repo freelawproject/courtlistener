@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Never, TypedDict
+from typing import Any, Never, TypedDict, cast
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -110,6 +110,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionQuerySet,
     OpinionsCited,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
@@ -390,6 +391,7 @@ def document_fields_to_update(
                         if (
                             es_document == DocketDocument
                             and doc_field == "party"
+                            and isinstance(main_instance, Docket)
                         ):
                             # Get party from docket case_name if no normalized
                             # parties are available.
@@ -757,7 +759,7 @@ def handle_ubq_retries(
         | NotFoundError
         | ApiError
     ),
-    count_query=QuerySet | None,
+    count_query: QuerySet | None,
 ) -> None:
     """Handles the retry logic for update_children_docs_by_query task based on the exception received and number of documents to update.
 
@@ -1957,7 +1959,11 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
         self: The Celery task.
         pk: The primary key of the opinion to process.
     """
-    opinion = Opinion.objects.filter(id=pk).with_best_text().first()
+    opinion = (
+        cast(OpinionQuerySet[Opinion], Opinion.objects.filter(id=pk))
+        .with_best_text()
+        .first()
+    )
     if not opinion:
         return
 
@@ -2020,7 +2026,9 @@ def create_opinion_text_embeddings(
         The cache key used to temporarily store embeddings.
     """
     opinions = (
-        Opinion.objects.filter(id__in=batch).with_best_text().using(database)
+        cast(OpinionQuerySet[Opinion], Opinion.objects.filter(id__in=batch))
+        .with_best_text()
+        .using(database)
     )
     opinions_to_vectorize = [
         {"id": opinion.pk, "text": opinion.clean_text} for opinion in opinions

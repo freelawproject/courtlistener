@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.management import CommandError
 from zohocrmsdk.src.com.zoho.api.authenticator.oauth_token import OAuthToken
 from zohocrmsdk.src.com.zoho.crm.api.initializer import Initializer
 
@@ -39,6 +40,7 @@ class Command(VerboseCommand):
             store=settings.ZOHO_STORE,
             resource_path=settings.ZOHO_RESOURCE_PATH,
         )
-        init = Initializer.get_initializer()
+        if (init := Initializer.get_initializer()) is None:
+            raise CommandError("The Zoho SDK failed to initialize.")
         token = init.token.get_refresh_token()
         cache.set(f"{get_zoho_cache_key()}:refresh", token, timeout=None)

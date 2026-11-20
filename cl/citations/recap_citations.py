@@ -6,11 +6,9 @@ from eyecite.models import CitationBase
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.match_citations import (
-    MULTIPLE_MATCHES_RESOURCE,
-    NO_MATCH_RESOURCE,
     do_resolve_citations,
+    split_resolutions,
 )
-from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.citations.unmatched_citations_utils import handle_unmatched_citations
 from cl.citations.utils import make_get_citations_kwargs
 from cl.search.documents import ESRECAPDocument
@@ -45,16 +43,8 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     # Resolve all those different citation objects to Opinion objects,
     # using a variety of heuristics.
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ] = do_resolve_citations(citations, document)
-
-    # Delete the unmatched citations
-    unmatched_citations = citation_resolutions.pop(NO_MATCH_RESOURCE, [])
-
-    # Delete multiple matches citations
-    ambiguous_citations = citation_resolutions.pop(
-        MULTIPLE_MATCHES_RESOURCE, []
+    citation_resolutions, unmatched_citations, ambiguous_citations = (
+        split_resolutions(do_resolve_citations(citations, document))
     )
 
     with transaction.atomic():
