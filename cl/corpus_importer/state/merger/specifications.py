@@ -109,6 +109,28 @@ class MergerSpecification[Scrape, Params, Output](ABC):
             return
         self._name = name
 
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        """Compute the field's value for a merger that has no object to merge into yet.
+
+        A merger stores the values it has computed on itself, so this is only
+        reached for a specification that reads the database, before the
+        merger's `update` has run. The value is the one the field has with
+        nothing stored, and is kept on the merger.
+
+        Raises:
+            AttributeError: If the merge has ended without the value having
+                been computed.
+        """
+        from .base import Merger
+
+        if not isinstance(instance, Merger):
+            return self
+        if not isinstance(state := instance.state, MergerState.DerivedData):
+            raise AttributeError(self._name)
+        value = self.transform(state.scrape, state.params, None)
+        vars(instance)[self._name] = value
+        return value
+
     @abstractmethod
     def transform[M: Model](
         self, scrape: Scrape, params: Params, database: M | None

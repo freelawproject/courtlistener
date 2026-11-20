@@ -1485,6 +1485,67 @@ class DatabaseSpecTest(TestCase):
         self.blank_docket.refresh_from_db()
         self.assertEqual(self.blank_docket.case_name, "Scraped Name")
 
+    def test_lookup_matches_on_scraped_value_of_database_spec(self) -> None:
+        """Can an attribute that falls back to the database be the natural key, with the object found by the scraped value?"""
+        court = self.court
+
+        class TestMerger(Merger[dict[str, str], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, key=("docket_number",), reads=DOCKET_SAVE_READS
+            )
+
+            court_id: str = Constant(court.pk)
+            source: int = Constant(DocketSources.SCRAPER)
+            docket_number: str = Coalesce(
+                Scrape(dict)["docket_number"],
+                Database(Docket.docket_number),
+                default="",
+            )
+            case_name: str = Scrape(dict)["case_name"]
+
+        result = TestMerger(
+            {"docket_number": "DB-1", "case_name": "Scraped Name"},
+            params=None,
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.create)
+        self.assertIn(self.docket.pk, result.updates["Docket"])
+
+    def test_database_spec_holds_scraped_value_until_update(self) -> None:
+        """Does a lookup see the scraped version of an attribute that reads the database, and the merger the stored one once the object is found?"""
+        seen: list[str] = []
+        court = self.court
+
+        class TestMerger(Merger[dict[str, str], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, key=("docket_number",), reads=DOCKET_SAVE_READS
+            )
+
+            court_id: str = Constant(court.pk)
+            source: int = Constant(DocketSources.SCRAPER)
+            docket_number: str = Scrape(dict)["docket_number"]
+            case_name: str = Fn(_prefer_stored)(
+                Database(CASE_NAME), Scrape(dict)["case_name"]
+            )
+
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[dict[str, str], None, Docket]
+            ) -> MergerState.LookupOutput[dict[str, str], None, Docket]:
+                seen.append(self.case_name)
+                return super().lookup(state)
+
+        merger = TestMerger(
+            {"docket_number": "DB-1", "case_name": "Scraped Name"},
+            params=None,
+        )
+        result = merger.merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertEqual(seen, ["Scraped Name"])
+        self.assertEqual(merger.case_name, "Stored Name")
+
     def test_fields_read_from_database_are_loaded(self) -> None:
         """Is a field a spec reads from the database loaded, though no spec merges into it?"""
 
