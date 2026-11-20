@@ -102,15 +102,16 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
 
     # Build search args - each term is matched against all four name fields
     # using istartswith for the initial filter
-    search_args = []
-    for term in search_terms:
+    search_args = [
+        Q(**{field: term})
+        for term in search_terms
         for field in (
             "name_first__istartswith",
             "name_last__istartswith",
             "name_middle__istartswith",
             "name_suffix__istartswith",
-        ):
-            search_args.append(Q(**{field: term}))
+        )
+    ]
 
     # Build hit count annotation for sorting (counts exact matches in SQL)
     hit_count_annotation = build_hit_count_annotation(search_terms)
