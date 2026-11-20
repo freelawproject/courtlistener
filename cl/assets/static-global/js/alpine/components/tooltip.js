@@ -68,10 +68,11 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * Closes the tooltip when focus moves outside the component, so it never
-     * covers the next focused element and reopening announces it again.
+     * covers the next focused element and reopening announces it again. A
+     * null relatedTarget is ignored: Safari doesn't focus buttons on click.
      */
     hideOnFocusOut(event) {
-      if (!this.$root.contains(event.relatedTarget)) this.hide();
+      if (event.relatedTarget && !this.$root.contains(event.relatedTarget)) this.hide();
     },
 
     /**
