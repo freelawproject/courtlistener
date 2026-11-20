@@ -72,10 +72,7 @@ def get_court_parent_ids(courts: list[MinimalCourtData]) -> set[str]:
         A set containing the unique parent court IDs, excluding None
         values.
     """
-    court_ids = {
-        court.parent_court_id for court in courts if court.parent_court_id
-    }
-    return court_ids
+    return {court.parent_court_id for court in courts if court.parent_court_id}
 
 
 def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:

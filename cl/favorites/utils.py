@@ -226,7 +226,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     )
 
     # Annotate each RECAPDocument with the number of prayers and the number of docket views, plus whether it is currently unavailable
-    documents = (
+    return (
         RECAPDocument.objects.filter(id__in=Subquery(waiting_prayers))
         .select_related(
             "docket_entry",
@@ -273,8 +273,6 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         )
     )
 
-    return documents
-
 
 async def get_user_prayers(
     user: User, status: str | None = None
@@ -288,7 +286,7 @@ async def get_user_prayers(
     if status is not None:
         filters &= Q(prayers__status=status)
 
-    documents = (
+    return (
         RECAPDocument.objects.filter(filters)
         .select_related(
             "docket_entry",
@@ -326,8 +324,6 @@ async def get_user_prayers(
         )
         .order_by("-prayers__date_created")
     )
-
-    return documents
 
 
 async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:

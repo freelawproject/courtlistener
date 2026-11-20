@@ -30,8 +30,7 @@ def handle_cluster_redirection[
         request: Request, *args: P.args, **kwargs: P.kwargs
     ) -> HttpResponse:
         try:
-            response = await view_func(request, *args, **kwargs)
-            return response
+            return await view_func(request, *args, **kwargs)
         except Http404 as exc:
             try:
                 redirection = await ClusterRedirection.objects.aget(

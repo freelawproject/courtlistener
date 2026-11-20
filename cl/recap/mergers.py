@@ -627,7 +627,8 @@ async def update_docket_appellate_metadata(d, docket_data):
             cl_id = map_pacer_to_cl_id(court_id)
         else:
             logger.error(
-                f"unexpected court_id type expected str, found {type(court_id).__name__}"
+                "unexpected court_id type expected str, found %s",
+                type(court_id).__name__,
             )
             cl_id = court_id
         if (
@@ -715,7 +716,7 @@ def get_order_of_docket(
         try:
             current_num = int(de["document_number"])
             nxt_num = int(nxt["document_number"])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             # One or the other can't be cast to an int. Continue until we have
             # two consecutive ints we can compare.
             continue
@@ -723,7 +724,7 @@ def get_order_of_docket(
         if current_num == nxt_num:
             # Not sure if this is possible. No known instances in the wild.
             continue
-        elif current_num < nxt_num:
+        if current_num < nxt_num:
             order = "asc"
         elif current_num > nxt_num:
             order = "desc"
@@ -801,15 +802,14 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
                 current_date_filed, de["recap_sequence_index"]
             )
             continue
-        else:
-            # prev is None --> First item on the list; OR
-            # current is different than previous --> Changed date.
-            # Take same action: Reset the index & assign it.
-            de["recap_sequence_index"] = 1
-            de["recap_sequence_number"] = make_recap_sequence_number(
-                current_date_filed, de["recap_sequence_index"]
-            )
-            continue
+        # prev is None --> First item on the list; OR
+        # current is different than previous --> Changed date.
+        # Take same action: Reset the index & assign it.
+        de["recap_sequence_index"] = 1
+        de["recap_sequence_number"] = make_recap_sequence_number(
+            current_date_filed, de["recap_sequence_index"]
+        )
+        continue
 
     # Cleanup
     [de.pop("recap_sequence_index", None) for de in docket_entries]
@@ -915,7 +915,7 @@ def resolve_docket_entry_in_memory(
     # We need to cast it for the lookup to match.
     try:
         entry_number = int(docket_entry["document_number"])
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     candidates = des_by_entry_number.get(entry_number, [])
     pacer_seq_no = docket_entry.get("pacer_seq_no")
@@ -927,7 +927,7 @@ def resolve_docket_entry_in_memory(
         return candidates[0] if len(candidates) == 1 else None
     try:
         seq = int(pacer_seq_no)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     seq_matches = [de for de in candidates if de.pacer_sequence_number == seq]
     if len(seq_matches) == 1:
@@ -1260,7 +1260,7 @@ async def add_docket_entries(
                 if entry_data.get("document_number"):
                     try:
                         entry_numbers.add(int(entry_data["document_number"]))
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         continue
             if entry_numbers and d.pk:
                 existing_de_ids = []
@@ -1304,8 +1304,7 @@ async def add_docket_entries(
         )
         if response is None:
             continue
-        else:
-            de, de_created = response[0], response[1]
+        de, de_created = response[0], response[1]
 
         # Snapshot the merged fields so the save (and its ES indexing and
         # pghistory side effects) can be skipped when a re-uploaded entry is
@@ -1359,7 +1358,7 @@ async def add_docket_entries(
             # appears again in this upload.
             try:
                 des_by_entry_number[int(de.entry_number)].append(de)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
@@ -2055,8 +2054,7 @@ def get_data_from_att_report(text: str, court_id: str) -> dict[str, str]:
     """Parse a district or bankruptcy attachment page's text for a court."""
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    att_data = att_page.data
-    return att_data
+    return att_page.data
 
 
 def get_data_from_appellate_att_report(
@@ -2073,8 +2071,7 @@ def get_data_from_appellate_att_report(
     """
     att_page = AppellateAttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    att_data = att_page.data
-    return att_data
+    return att_page.data
 
 
 async def add_tags_to_objs(
@@ -2379,10 +2376,9 @@ async def merge_attachment_page_data(
                             await main_rd.asave()
                         found_main_rd = True
                         break
-                    else:
-                        # Unclear how to proceed and we don't want to associate
-                        # this data with the wrong case. We must punt.
-                        raise exc
+                    # Unclear how to proceed and we don't want to associate
+                    # this data with the wrong case. We must punt.
+                    raise exc
                 except RECAPDocument.DoesNotExist:
                     continue
         # Can't find the docket to associate with the attachment metadata
@@ -2392,17 +2388,16 @@ async def merge_attachment_page_data(
         # the attachment page.
         if not found_main_rd:
             raise exc
-        else:
-            rd = RECAPDocument(
-                docket_entry=main_rd.docket_entry,
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=main_rd.document_number,
-                description=migrated_description,
-                pacer_doc_id=pacer_doc_id,
-            )
-            rds_created.append(rd)
-            rds_affected.append(rd)
-            await rd.asave()
+        rd = RECAPDocument(
+            docket_entry=main_rd.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number=main_rd.document_number,
+            description=migrated_description,
+            pacer_doc_id=pacer_doc_id,
+        )
+        rds_created.append(rd)
+        rds_affected.append(rd)
+        await rd.asave()
 
     # We got the right item. Update/create all the attachments for
     # the docket entry.
@@ -2675,7 +2670,7 @@ async def process_orphan_documents(
     if not await sync_to_async(switch_is_active)(
         PROCESS_ORPHAN_DOCUMENTS_SWITCH
     ):
-        return None
+        return
 
     pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
     if docket_date:
@@ -2762,4 +2757,4 @@ def process_case_query_report(
         # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(report_text.encode()),
     )
-    return None
+    return

@@ -5,7 +5,6 @@
 
 <c-vars
   docket=""
-  docket_source=""
   form=""
   page_obj=""
   sort_order_asc="True"
@@ -17,10 +16,7 @@
   {# From md up, dividers are drawn by .divided-row-item, so none dangles when the row wraps. The mobile row never wraps, and its justify-between needs dividers that are flex items. #}
   <div class="divided-row">
     <div class="flex flex-wrap items-center md:items-start md:justify-start justify-between sm:gap-3 gap-1 md:-ml-[--divided-row-gap] md:gap-x-0">
-      {# Hidden for sources whose entries aren't in the search index. #}
-      {% if docket_source.supports_entry_search %}
-        <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="max-w-60 hidden md:block divided-row-item" />
-      {% endif %}
+      <c-docket-filter.search-form :docket="docket" input_id="de-search-desktop" class="max-w-60 hidden md:block divided-row-item" />
       <c-docket-filter.dialog :docket="docket" />
 
       <c-docket-filter.form :form="form" layout="desktop">

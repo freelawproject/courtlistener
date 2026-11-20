@@ -3,7 +3,6 @@ import csv
 import datetime
 import io
 import json
-import os
 import re
 import shutil
 import threading
@@ -13,6 +12,7 @@ from datetime import date
 from hashlib import md5
 from http import HTTPStatus
 from itertools import product
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
@@ -2337,17 +2337,6 @@ class TexasDocketEntrySourceTest(TestCase):
                     docket_entry_sources.TEXAS,
                 )
 
-    def test_only_sources_that_send_alerts_opt_in(self) -> None:
-        """Do RECAP, SCOTUS and Texas, whose mergers send docket alerts, opt in?"""
-        cases = {
-            "RECAP": (docket_entry_sources.RECAP, True),
-            "SCOTUS": (docket_entry_sources.SCOTUS, True),
-            "TEXAS": (docket_entry_sources.TEXAS, True),
-        }
-        for name, (source, expected) in cases.items():
-            with self.subTest(source=name):
-                self.assertEqual(source.supports_docket_alerts, expected)
-
     def test_download_label_follows_the_stored_format(self) -> None:
         """Is a Texas file's download button named after its stored format, since TAMES also serves HTML, WordPerfect and MP3 files, while RECAP keeps "Download PDF"?"""
         cases = [
@@ -2371,17 +2360,6 @@ class TexasDocketEntrySourceTest(TestCase):
             ),
             "Download PDF",
         )
-
-    def test_only_indexed_sources_opt_into_entry_search(self) -> None:
-        """Do RECAP and SCOTUS, whose entries are in the search index, opt into "Search this docket", while Texas keeps the default of no search box?"""
-        cases = {
-            "RECAP": (docket_entry_sources.RECAP, True),
-            "SCOTUS": (docket_entry_sources.SCOTUS, True),
-            "TEXAS": (docket_entry_sources.TEXAS, False),
-        }
-        for name, (source, expected) in cases.items():
-            with self.subTest(source=name):
-                self.assertEqual(source.supports_entry_search, expected)
 
     def test_entries_and_documents_load_in_two_queries(self) -> None:
         """Do the docket page's entries and their documents take two queries, however many entries there are?"""
@@ -2474,7 +2452,11 @@ class TexasDocketPageTest(TestCase):
             county="Travis",
         )
         cls.coa_docket = DocketFactory(
-            court=CourtFactory(short_name="Tex. App. - Austin"),
+            court=CourtFactory(
+                id="txctapp3",
+                jurisdiction="SA",
+                short_name="Tex. App. - Austin",
+            ),
             docket_number="03-25-00042-CV",
         )
         CaseTransferFactory(
@@ -2499,6 +2481,60 @@ class TexasDocketPageTest(TestCase):
                 self.assertIn("Tex. App. - Austin", content)
                 self.assertIn(self.coa_docket.get_absolute_url(), content)
                 self.assertIn("03-25-00042-CV", content)
+
+    def test_appeal_from_a_court_of_appeals_shows_once(self) -> None:
+        """On a Supreme Court docket appealed from a court of appeals, does each stack list the appeal once, under Case Transfers, and show that court's justice under their own label rather than as the trial judge?"""
+        self.docket.appeal_from = self.coa_docket.court
+        self.docket.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="03-25-00042-CV",
+                assigned_to_str="Darlene Byrne",
+            )
+        )
+        self.docket.save()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertEqual(content.count("Appealed From"), 1)
+                self.assertIn("Court of Appeals Justice", content)
+                self.assertIn("Darlene Byrne", content)
+                self.assertNotIn("Trial Judge", content)
+
+    def test_appeal_from_a_trial_court_keeps_the_trial_judge(self) -> None:
+        """When the appeal comes straight from a trial court, as death penalty cases do, does each stack keep the common section, with the judge as the trial judge?"""
+        trial_court = CourtFactory(
+            id="texdistct262", jurisdiction="ST", short_name="Tex. Dist. Ct."
+        )
+        CaseTransferFactory(
+            origin_court=trial_court,
+            origin_docket=None,
+            origin_docket_number="D-1-DC-25-000042",
+            destination_court=self.docket.court,
+            destination_docket=self.docket,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+        self.docket.appeal_from = trial_court
+        self.docket.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="D-1-DC-25-000042",
+                assigned_to_str="Karen Sage",
+            )
+        )
+        self.docket.save()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Trial Judge", content)
+                self.assertIn("Karen Sage", content)
+                self.assertNotIn("Court of Appeals Justice", content)
 
     def test_trial_court_section_in_both_stacks(self) -> None:
         """Does each stack show the Trial Court Information section with the docket's trial court data?"""
@@ -2580,7 +2616,7 @@ class TexasDocketPageTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     def test_docket_renders_entries_and_tames_links(self) -> None:
-        """With the flag on, does each stack list the entry, link the docket and the document to TAMES, and leave out the PACER-only controls?"""
+        """With the flag on, does each stack list the entry, link the docket and the document to TAMES and the attribution to our Texas coverage page, and leave out the PACER-only controls?"""
         for new_design in (False, True):
             with (
                 self.subTest(new_design=new_design),
@@ -2600,31 +2636,22 @@ class TexasDocketPageTest(TestCase):
                     "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
                     content,
                 )
+                self.assertIn(settings.WIKI_COVERAGE_TEXAS_URL, content)
                 self.assertNotIn('name="entry_gte"', content)
                 self.assertNotIn("Buy on PACER", content)
 
-    def test_alerts_menu_follows_supports_docket_alerts(self) -> None:
-        """Does each stack show the alerts menu for Texas, whose mergers send docket alerts, and hide it for a source that doesn't?"""
-        without_alerts = replace(
-            docket_entry_sources.TEXAS, supports_docket_alerts=False
-        )
-        cases = (
-            ("texas", docket_entry_sources.TEXAS, True),
-            ("source without alerts", without_alerts, False),
-        )
-        for name, source, shows_menu in cases:
-            for new_design in (False, True):
-                with (
-                    self.subTest(source=name, new_design=new_design),
-                    mock.patch.dict(
-                        docket_entry_sources.BY_COURT_ID, {"tex": source}
-                    ),
-                    override_flag("texas_docket_page", active=True),
-                    override_flag("use_new_design", active=new_design),
-                ):
-                    content = self.client.get(self.url).content.decode()
-                    self.assertEqual("Get Alerts" in content, shows_menu)
-                    self.assertEqual("Share Alert Link" in content, shows_menu)
+    def test_alerts_menu_and_search_box_show_in_both_stacks(self) -> None:
+        """Does each stack show the alerts menu and "Search this docket" on a Texas docket, as for RECAP and SCOTUS? The page stays behind texas_docket_page until both work."""
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn("Get Alerts", content)
+                self.assertIn("Share Alert Link", content)
+                self.assertIn('placeholder="Search this docket"', content)
 
     def test_download_button_names_the_stored_format(self) -> None:
         """Does each stack label a stored MP3 "Download MP3" rather than promise a PDF?"""
@@ -2641,40 +2668,16 @@ class TexasDocketPageTest(TestCase):
                 self.assertIn("Download MP3", content)
                 self.assertNotIn("Download PDF", content)
 
-    def test_search_box_follows_supports_entry_search(self) -> None:
-        """Is "Search this docket" hidden for Texas, whose entries aren't in the search index, and shown again once its source supports entry search, in both stacks?"""
-        searchable = replace(
-            docket_entry_sources.TEXAS, supports_entry_search=True
-        )
-        cases = (
-            ("texas", docket_entry_sources.TEXAS, False),
-            ("texas indexed", searchable, True),
-        )
-        for name, source, shows_search in cases:
-            for new_design in (False, True):
-                with (
-                    self.subTest(source=name, new_design=new_design),
-                    mock.patch.dict(
-                        docket_entry_sources.BY_COURT_ID, {"tex": source}
-                    ),
-                    override_flag("texas_docket_page", active=True),
-                    override_flag("use_new_design", active=new_design),
-                ):
-                    content = self.client.get(self.url).content.decode()
-                    self.assertEqual(
-                        'placeholder="Search this docket"' in content,
-                        shows_search,
-                    )
-
     def test_docket_feed_lists_entries_without_numbers(self) -> None:
-        """Does the docket feed list Texas entries, which have no entry number, with the text the docket page shows, linking each to its row on the page?"""
+        """Does the docket feed list Texas entries, which have no entry number, as "Entry from <date>" rather than RECAP's "Minute entry", with the text the docket page shows, linking each to its row on the page?"""
         TexasDocketEntry.objects.filter(
             pk=self.document.docket_entry_id
         ).update(date_filed=date(2026, 10, 1))
         r = self.client.get(reverse("docket_feed", args=[self.docket.pk]))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         content = r.content.decode()
-        self.assertIn("Minute entry from 2026-10-01", content)
+        self.assertIn("Entry from 2026-10-01", content)
+        self.assertNotIn("Minute entry", content)
         self.assertIn(
             f"#minute-entry-{self.document.docket_entry_id}", content
         )
@@ -3130,7 +3133,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_texas_docket_needs_its_flag"
     )
     def test_texas_docket_needs_its_flag(self) -> None:
-        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown with the alerts button, since Texas sends docket alerts?"""
+        """Is a Texas docket a 404 without texas_docket_page, like its docket page, and, with it, shown with the alerts button?"""
         # Sync, since override_flag queries the DB when it's entered.
         self.client.login(username="pandora", password="password")
         url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
@@ -3143,26 +3146,6 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             self.assertIn(
                 'data-enable-message="Get Alerts"', r.content.decode()
             )
-
-    @override_settings(
-        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_source_without_alerts_offers_no_button"
-    )
-    @override_flag("texas_docket_page", active=True)
-    def test_source_without_alerts_offers_no_button(self) -> None:
-        """Does the page leave out the alerts button for a source that doesn't send docket alerts?"""
-        self.client.login(username="pandora", password="password")
-        without_alerts = replace(
-            docket_entry_sources.TEXAS, supports_docket_alerts=False
-        )
-        url = reverse("new_docket_alert_by_id", args=[self.texas_docket.pk])
-        with mock.patch.dict(
-            docket_entry_sources.BY_COURT_ID, {"tex": without_alerts}
-        ):
-            r = self.client.get(url)
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertNotIn(
-            'data-enable-message="Get Alerts"', r.content.decode()
-        )
 
     @override_settings(
         WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_share_link_on_the_docket_page"
@@ -3355,7 +3338,7 @@ class BlockedSitemapTest(SitemapTest):
 
 
 @override_settings(
-    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
+    MEDIA_ROOT=Path(settings.INSTALL_ROOT) / "cl/assets/media/test"
 )
 @mock.patch(
     "cl.lib.storage.get_name_by_incrementing",
@@ -3500,8 +3483,9 @@ class UploadPublication(TestCase):
         }
 
     def tearDown(self) -> None:
-        if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
-            shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
+        pdf_dir = Path(settings.MEDIA_ROOT) / "pdf/2019"
+        if pdf_dir.exists():
+            shutil.rmtree(pdf_dir)
         Docket.objects.all().delete()
 
     async def test_access_upload_page(self, mock: MagicMock) -> None:
@@ -4400,20 +4384,59 @@ class DocketEntryFileDownload(TestCase):
         self.client.get(download_path)
         mock_is_ratelimited.assert_called_once()
 
-    def test_csv_export_when_first_entry_has_no_documents(self) -> None:
-        """The CSV header doesn't depend on the first entry having a document."""
-        scotus_court = CourtFactory(id="scotus", jurisdiction="F")
-        docket = DocketFactory(court=scotus_court, source=Docket.SCRAPER)
-        empty_entry = SCOTUSDocketEntryFactory(docket=docket)
-        entry = SCOTUSDocketEntryFactory(docket=docket)
-        SCOTUSDocumentFactory(docket_entry=entry)
+    def test_csv_export_keeps_entries_without_documents(self) -> None:
+        """Does an entry without documents get its own row, with empty document columns, for RECAP and SCOTUS too, with the header taken from the first entry that has a document?"""
+        cases = {
+            "RECAP": (
+                "cand",
+                Docket.RECAP,
+                DocketEntryFactory,
+                RECAPDocumentFactory,
+                "recapdocument_id",
+            ),
+            "SCOTUS": (
+                "scotus",
+                Docket.SCRAPER,
+                SCOTUSDocketEntryFactory,
+                SCOTUSDocumentFactory,
+                "scotusdocument_id",
+            ),
+        }
+        for name, (
+            court_id,
+            source,
+            entry_factory,
+            document_factory,
+            document_id_column,
+        ) in cases.items():
+            with self.subTest(source=name):
+                docket = DocketFactory(
+                    court=CourtFactory(id=court_id, jurisdiction="F"),
+                    source=source,
+                )
+                empty_entry = entry_factory(docket=docket)
+                entry = entry_factory(docket=docket)
+                document = document_factory(docket_entry=entry)
 
-        header, *rows = csv.reader(
-            io.StringIO(generate_docket_entries_csv_data([empty_entry, entry]))
-        )
+                header, *rows = csv.reader(
+                    io.StringIO(
+                        generate_docket_entries_csv_data([empty_entry, entry])
+                    )
+                )
 
-        self.assertIn("scotusdocument_id", header)
-        self.assertEqual([row[0] for row in rows], [str(entry.pk)])
+                self.assertEqual(
+                    [row[0] for row in rows],
+                    [str(empty_entry.pk), str(entry.pk)],
+                )
+                empty_row, entry_row = rows
+                self.assertEqual(len(empty_row), len(header))
+                self.assertEqual(
+                    empty_row[header.index(document_id_column)], ""
+                )
+                self.assertEqual(
+                    entry_row[header.index(document_id_column)],
+                    str(document.pk),
+                )
 
     @override_settings(
         WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
@@ -6263,14 +6286,14 @@ class DocketFilterRenderTestCase(TestCase):
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        template_path = os.path.join(
-            settings.INSTALL_ROOT,
-            "cl",
-            "opinion_page",
-            "test_assets",
-            "docket_filter_wrapper.html",
+        template_path = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "opinion_page"
+            / "test_assets"
+            / "docket_filter_wrapper.html"
         )
-        with open(template_path, encoding="utf-8") as f:
+        with template_path.open(encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
         template = engines["django"].from_string(compiled)
         return template.render(

@@ -416,7 +416,7 @@ class Command(VerboseCommand):
                         queryset, SEARCH_TYPES.RECAP
                     )
                     return
-                elif document_type == "child":
+                if document_type == "child":
                     # Get the source's documents by pk_offset.
                     queryset = (
                         source.document_model.objects.filter(pk__gte=pk_offset)

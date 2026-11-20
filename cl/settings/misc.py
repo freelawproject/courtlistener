@@ -1,7 +1,7 @@
 """Miscellaneous settings: credentials for outside services, wiki URLs, and assorted limits."""
 
-import os
 from datetime import date
+from pathlib import Path
 
 import environ
 
@@ -41,9 +41,9 @@ LASC_PASSWORD = env("LASC_PASSWORD", default="")
 TAMES_USER = env("TAMES_USER", default="")
 
 # Google auth
-here = os.path.dirname(os.path.realpath(__file__))
+here = Path(__file__).resolve().parent
 GOOGLE_AUTH = {
-    "PATH": os.path.join(here, "google_auth.json"),
+    "PATH": str(here / "google_auth.json"),
     "PROJECT": "courtlistener-development",
 }
 
@@ -72,6 +72,9 @@ WIKI_COVERAGE_OPINIONS_URL = f"{WIKI_COVERAGE_BASE_URL}/case-law"
 WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/federal-cases-and-filings"
 WIKI_COVERAGE_SCOTUS_URL = (
     f"{WIKI_COVERAGE_BASE_URL}/supreme-court-cases-and-filings"
+)
+WIKI_COVERAGE_TEXAS_URL = (
+    f"{WIKI_COVERAGE_BASE_URL}/state-court-cases-and-filings#texas"
 )
 
 ##############

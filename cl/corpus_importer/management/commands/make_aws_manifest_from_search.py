@@ -7,7 +7,7 @@ from functools import reduce
 from typing import Any
 
 import boto3
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.dsl import Q
 
@@ -85,8 +85,7 @@ def build_base_query(options: dict[str, Any]) -> Search:
     # Build the sorting settings for an ES query to work with the
     # 'search_after' pagination
     unique_sorting = build_sort_results(cd, False, "v4")
-    search_query = search_query.sort(unique_sorting)
-    return search_query
+    return search_query.sort(unique_sorting)
 
 
 class Command(VerboseCommand):

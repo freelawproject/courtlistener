@@ -7,6 +7,7 @@ import socket
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import TypedDict, cast
 
 import requests
@@ -278,8 +279,7 @@ def process_docket_data(
         )
 
     if filepath:
-        with open(filepath) as f:
-            text = f.read()
+        text = Path(filepath).read_text()
     else:
         # This is an S3 path, so get it remotely.
         text = d.filepath_local.read().decode()
@@ -490,11 +490,10 @@ def normalize_attorney_contact(
             if m:
                 atty_info["fax"] = normalize_us_phone_number(clean_line)
             continue
-        else:
-            m = phone_digits_re.search(clean_line)
-            if m:
-                atty_info["phone"] = normalize_us_phone_number(clean_line)
-                continue
+        m = phone_digits_re.search(clean_line)
+        if m:
+            atty_info["phone"] = normalize_us_phone_number(clean_line)
+            continue
 
         # First line containing an ampersand? These are usually law firm names.
         if "&" in line and i == 0:
@@ -629,8 +628,7 @@ def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
-        court_status = pickle.loads(pickle_status)
-        return court_status
+        return pickle.loads(pickle_status)
 
     # Unable to find court_status in cache, getting it from request.
     connection_info = check_pacer_court_connectivity(court_id)
@@ -699,5 +697,4 @@ def is_pacer_court_accessible(court_id: str) -> bool:
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
 
-    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
-    return court_status
+    return get_or_cache_pacer_court_status(pacer_court_id, ip_addr)

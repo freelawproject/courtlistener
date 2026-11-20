@@ -234,7 +234,8 @@ class DocketEntrySource:
     block, so they render as part of that block with no heading or visual
     division (e.g. the SCOTUS docket metadata). ``metadata_sections``
     returns standalone titled sections rendered before the common ones
-    (e.g. RECAP's Bankruptcy Information).
+    (e.g. RECAP's Bankruptcy Information). A section titled like a common
+    one replaces it, as Texas does with Originating Court Information.
 
     ``docket_url`` returns the docket's page on the source's own site, or
     None when the source has no page for it. core_docket_data() resolves
@@ -265,34 +266,16 @@ class DocketEntrySource:
     ``entry_number``. When False, the docket page drops its "Documents"
     range filter, since there is nothing to filter on.
 
-    ``supports_docket_alerts`` says whether subscribers of the source's
-    dockets get docket alerts. When False, both stacks hide the docket's
-    alerts menu, so nobody subscribes to alerts that would never be sent.
-    It defaults to False so a new source only shows the menu once its
-    mergers send alerts and it opts in.
-
     ``entry_display_text`` returns the text the docket page shows for an
     entry, which the view puts on ``entry.display_text``. The legacy stack
     renders it unescaped, as it always did for RECAP descriptions, so a
     source that builds it from scraped fields MUST escape them, e.g. with
     ``format_html``, as ``_texas_entry_display_text`` does.
 
-    ``supports_entry_search`` says whether the source's entries are in the
-    search index that "Search this docket" queries. When False, both stacks
-    hide that box, since it could never find anything. Like
-    ``supports_docket_alerts``, it defaults to False so a new source only
-    shows the box once it's indexed.
-
     ``document_download_label`` returns the label of the button that
     downloads a document's stored file, which ``attach_display_fields`` puts
     on ``document.download_label``. It's "Download PDF" unless the source
     stores other formats.
-
-    ``exports_entries_without_documents`` says whether the CSV export gives
-    an entry with no documents its own row, with empty document columns.
-    Without it, the export only writes one row per document, which suits
-    sources whose entries always have one, like RECAP and SCOTUS (with its
-    placeholders), but would drop most Texas entries.
 
     ``document_display_description`` does the same for each document's
     description, which ``attach_display_fields`` puts on
@@ -345,12 +328,9 @@ class DocketEntrySource:
     )
     launch_flag: str | None = None
     has_entry_numbers: bool = True
-    supports_docket_alerts: bool = False
-    supports_entry_search: bool = False
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
     document_download_label: Callable[[Any], str] = _download_pdf_label
-    exports_entries_without_documents: bool = False
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -575,8 +555,6 @@ RECAP: DocketEntrySource = DocketEntrySource(
     documents_for_docket_and_number=_recap_documents_for_docket_and_number,
     get_document_for_render=_get_recap_document_for_render,
     initial_document_buttons=_recap_initial_document_buttons,
-    supports_docket_alerts=True,
-    supports_entry_search=True,
 )
 
 
@@ -767,8 +745,6 @@ SCOTUS: DocketEntrySource = DocketEntrySource(
     ),
     admin_document_label="SCOTUS Document",
     launch_flag="scotus_docket_page",
-    supports_docket_alerts=True,
-    supports_entry_search=True,
 )
 
 
@@ -829,12 +805,21 @@ def _texas_document_download_label(document: TexasDocument) -> str:
     return f"Download {extension.lstrip('.').upper()}"
 
 
+# The fifteen Texas Courts of Appeals: every TAMES court but the two courts
+# of last resort.
+_TEXAS_COURTS_OF_APPEALS: frozenset[str] = TAMES_COURT_IDS - {
+    "tex",
+    "texcrimapp",
+}
+
+
 def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a Texas docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
     # imports from this module.
     from cl.opinion_page.utils import (
         build_case_transfer_metadata,
+        build_originating_court_metadata,
         build_trial_court_metadata,
     )
 
@@ -881,7 +866,7 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "destination_docket__slug",
         )
     )
-    return [
+    sections: list[MetadataSection] = [
         {
             "items": build_trial_court_metadata(trial_court),
             "title": "Trial Court Information",
@@ -891,6 +876,33 @@ def _texas_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "title": "Case Transfers",
         },
     ]
+    # On a Supreme Court or Court of Criminal Appeals docket, the merger
+    # keeps the court of appeals' case in the originating court information.
+    # Case Transfers already lists that appeal, with a link to the docket, so
+    # drop the "Appealed From" row, and name the judge for what they are:
+    # that court's justice. Appeals that come straight from a trial court,
+    # like death penalty cases, keep the common section and its Trial Judge.
+    appealed_from_court_of_appeals = docket.appeal_from_id in (
+        _TEXAS_COURTS_OF_APPEALS
+    ) and any(
+        transfer.destination_docket_id == docket.pk
+        and transfer.origin_court_id == docket.appeal_from_id
+        for transfer in transfers
+    )
+    if appealed_from_court_of_appeals:
+        items: list[MetadataItem] = []
+        for item in build_originating_court_metadata(
+            docket, docket.originating_court_information
+        ):
+            if item["label"] == "Appealed From":
+                continue
+            if item["label"] == "Trial Judge":
+                item["label"] = "Court of Appeals Justice"
+            items.append(item)
+        sections.append(
+            {"items": items, "title": "Originating Court Information"}
+        )
+    return sections
 
 
 def _texas_main_docs_prefetch() -> Prefetch:
@@ -1026,12 +1038,10 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     ),
     admin_document_label="Texas Document",
     launch_flag="texas_docket_page",
-    supports_docket_alerts=True,
     has_entry_numbers=False,
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
     document_download_label=_texas_document_download_label,
-    exports_entries_without_documents=True,
     metadata_sections=_texas_metadata_sections,
 )
 

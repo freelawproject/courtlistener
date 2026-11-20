@@ -372,8 +372,7 @@ class EmailFlag(AbstractDateTimeModel):
         """
         if now() < self.next_retry_date:
             return True
-        else:
-            return False
+        return False
 
     def __str__(self) -> str:
         return f"{self.get_flag_type_display()} for {self.email_address}"
@@ -557,7 +556,7 @@ def generate_recap_email(
     )
     if append is not None and append >= 100:
         raise FieldError("Too many requests made to generate recap email.")
-    elif len(user_profiles_with_match) > 0:
+    if len(user_profiles_with_match) > 0:
         return generate_recap_email(user_profile, (append or 0) + 1)
     return recap_email
 

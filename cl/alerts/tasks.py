@@ -656,7 +656,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             triggered the alerts and The related app label model.
     """
     if not response:
-        return None
+        return
 
     scheduled_hits_to_create = []
 
@@ -780,7 +780,8 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
         qd = override_alert_query(alert_triggered)
-        alert_triggered.query_run = qd.urlencode()  # type: ignore
+        # pyrefly: ignore[missing-attribute]
+        alert_triggered.query_run = qd.urlencode()
 
         # Compose RT hit to send.
         hits = [
@@ -1028,7 +1029,7 @@ def es_save_alert_document(
             "it may have been deleted by the user.",
             alert_id,
         )
-        return None
+        return
     alert_doc = {
         "timestamp": document.prepare_timestamp(alert),
         "rate": alert.rate,
@@ -1038,7 +1039,7 @@ def es_save_alert_document(
     }
     if not alert_doc["percolator_query"]:
         logger.warning("Skipping invalid query for Alert ID: %s", alert.pk)
-        return None
+        return
 
     meta: dict[str, int | str] = {"id": alert.pk}
     if custom_index_name:

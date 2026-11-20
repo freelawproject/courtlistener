@@ -32,11 +32,9 @@
 
       <div class="flex flex-col gap-4 max-h-[--mobile-dialog-panel-height] px-6">
         <c-docket-filter.errors :form="form" only />
-        {% if docket_source.supports_entry_search %}
-          <div class="pb-4 border-b border-greyscale-200">
-            <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
-          </div>
-        {% endif %}
+        <div class="pb-4 border-b border-greyscale-200">
+          <c-docket-filter.search-form :docket="docket" input_id="de-search-mobile" class="w-full h-11" />
+        </div>
 
         <c-docket-filter.form :form="form" layout="mobile">
           {# This form has no sort control, so carry the current sort through explicitly; omitting it would fall back to the profile default. #}

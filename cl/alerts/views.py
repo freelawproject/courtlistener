@@ -77,8 +77,7 @@ def delete_alert(request, pk):
     )
     if request.POST.get("redirect_to_search_page", None):
         return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
-    else:
-        return HttpResponseRedirect(reverse("profile_search_alerts"))
+    return HttpResponseRedirect(reverse("profile_search_alerts"))
 
 
 @login_required
@@ -358,10 +357,9 @@ def _toggle_docket_alert_legacy(
             msg = "Alerts are now enabled for this docket"
 
         return HttpResponse(msg)
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"}, content="Not an ajax POST request."
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"}, content="Not an ajax POST request."
+    )
 
 
 async def new_docket_alert(
@@ -423,14 +421,10 @@ async def render_new_docket_alert(
     title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
     # docket_alerts_button.html gates the alerts button on the docket
-    # having a page at its source, mirroring the docket page toolbar, which
-    # also hides it for sources that don't send docket alerts.
-    source = docket.get_entry_source()
-    docket_source_url = (
-        await sync_to_async(source.docket_url)(docket)
-        if source.supports_docket_alerts
-        else None
-    )
+    # having a page at its source, mirroring the docket page toolbar.
+    docket_source_url = await sync_to_async(
+        docket.get_entry_source().docket_url
+    )(docket)
     return TemplateResponse(
         request,
         "docket_alert_new.html",

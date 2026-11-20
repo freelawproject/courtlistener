@@ -317,8 +317,7 @@ class School(AbstractDateTimeModel):
     def __str__(self) -> str:
         if self.is_alias_of:
             return f"{self.pk}: {self.name} (alias: {self.is_alias_of.name})"
-        else:
-            return f"{self.pk}: {self.name}"
+        return f"{self.pk}: {self.name}"
 
     @property
     def is_alias(self):
@@ -1423,8 +1422,9 @@ class CriminalCount(models.Model):
         """Convert a status string into one of COUNT_STATUSES."""
         if status_str == "pending":
             return CriminalCount.PENDING
-        elif status_str == "terminated":
+        if status_str == "terminated":
             return CriminalCount.TERMINATED
+        return None
 
 
 class CriminalComplaint(models.Model):

@@ -3,8 +3,7 @@
 import argparse
 import json
 import logging
-import os
-from glob import glob
+from pathlib import Path
 from typing import IO
 
 from dateutil import parser
@@ -12,6 +11,7 @@ from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.crypto import sha1
+from cl.lib.utils import glob_files
 from cl.people_db.models import Person
 from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
@@ -20,6 +20,8 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
 from cl.scrapers.tasks import extract_opinion_content
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion
+
+logger = logging.getLogger(__name__)
 
 
 def make_item(case):
@@ -88,11 +90,11 @@ def import_tn_corpus(
     if log:
         logging.getLogger().setLevel(logging.INFO)
 
-    logging.info("Starting import")
+    logger.info("Starting import")
     tn_corpus = sorted(json.load(file), key=lambda x: x["label"])
     if not ready:
         case = [x for x in tn_corpus if x["label"] == skip_until][0]
-        logging.info(
+        logger.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
     courts = {
@@ -105,20 +107,20 @@ def import_tn_corpus(
             ready = True
         if not ready:
             continue
-        logging.info(
+        logger.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
-        pdf_path = glob(f"{os.path.dirname(file.name)}/{case['label']}/*.pdf")[
-            0
-        ]
-        with open(pdf_path, "rb") as p:
+        pdf_path = list(
+            glob_files(Path(file.name).parent / case["label"], "*.pdf")
+        )[0]
+        with pdf_path.open("rb") as p:
             pdf_data = p.read()
 
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
             op = ops[0]
-            logging.warning(
+            logger.warning(
                 "Document already in database. See: %s at %s",
                 op.get_absolute_url(),
                 op.cluster.case_name,
@@ -144,7 +146,7 @@ def import_tn_corpus(
             opinions[0].pk,
             ocr_available=ocr_available,
         )
-        logging.info(
+        logger.info(
             "Successfully added Tennessee object cluster: %s", cluster.id
         )
 

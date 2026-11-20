@@ -4,10 +4,9 @@ import difflib
 import itertools
 import json
 import logging
-import os
 import re
 from datetime import date, datetime, timedelta
-from glob import glob
+from pathlib import Path
 from typing import Any, TypedDict, cast
 
 import requests
@@ -28,13 +27,15 @@ from cl.corpus_importer.utils import (
     match_based_text,
 )
 from cl.lib.argparse_types import _argparse_volumes
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import trunc
-from cl.lib.utils import human_sort
+from cl.lib.utils import glob_files, human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -81,7 +82,7 @@ def _make_glob_from_args(
     volumes: range | None,
     page: str | None,
 ) -> list[str]:
-    """Make list of glob paths.
+    """Make list of glob patterns relative to the Harvard corpus directory.
 
     Args:
         reporter: The reporter to filter if any
@@ -89,39 +90,18 @@ def _make_glob_from_args(
         page: The page to filter to, if any
 
     Returns:
-        A list of glob paths
+        A list of glob patterns
     """
     if reporter and volumes and page:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"law.free.cap.{reporter}.{volumes[0]}",
-            f"{page}.*.json",
-        )
-        return [glob_path]
-    elif reporter and volumes:
-        glob_paths = []
-        for volume in volumes:
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"law.free.cap.{reporter}.{volume}",
-                "*.json",
-            )
-            glob_paths.append(glob_path)
-        return glob_paths
-    elif reporter:
+        return [f"law.free.cap.{reporter}.{volumes[0]}/{page}.*.json"]
+    if reporter and volumes:
+        return [
+            f"law.free.cap.{reporter}.{volume}/*.json" for volume in volumes
+        ]
+    if reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT,
-            "harvard_corpus",
-            f"{reporter_key}.*/*.json",
-        )
-    else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-        )
-    return [glob_path]
+        return [f"{reporter_key}.*/*.json"]
+    return ["law.free.cap.*/*.json"]
 
 
 def filepath_list(
@@ -148,11 +128,12 @@ def filepath_list(
         A sorted list of file paths
     """
     files = []
-    glob_paths = _make_glob_from_args(reporter, volumes, page)
-    for glob_path in glob_paths:
-        files.extend(glob(glob_path))
-    files = human_sort(files, key=None)  # type: ignore
-    return files  # type: ignore
+    corpus_dir = Path(settings.MEDIA_ROOT) / "harvard_corpus"
+    for glob_pattern in _make_glob_from_args(reporter, volumes, page):
+        files.extend(
+            str(path) for path in glob_files(corpus_dir, glob_pattern)
+        )
+    return human_sort(files, key=None)
 
 
 def check_for_match(new_case: str, possibilities: list[str]) -> bool:
@@ -295,13 +276,13 @@ def read_json(file_path: str, ia_download_url: str) -> Any | None:
         JSON object if available
     """
     try:
-        with open(file_path) as f:
+        with Path(file_path).open() as f:
             data = json.load(f)
     except ValueError:
-        logger.warning(f"Empty json: missing case at: {ia_download_url}")
+        logger.warning("Empty json: missing case at: %s", ia_download_url)
         return None
     except Exception as e:
-        logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        logger.warning("Unknown error %s for: %s", e, ia_download_url)
         return None
     return data
 
@@ -337,7 +318,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     fix_list = get_fix_list()
 
     for file_path in filepaths:
-        logger.info(f"Processing opinion at {file_path}")
+        logger.info("Processing opinion at %s", file_path)
 
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
@@ -346,7 +327,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         oc = OpinionCluster.objects.filter(filepath_json_harvard=file_path)
         if len(oc) > 0:
             logger.info(
-                f"Skipping {oc[0].id} - already in system {ia_download_url}"
+                "Skipping %s - already in system %s", oc[0].id, ia_download_url
             )
             continue
 
@@ -356,7 +337,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         identifier = "/".join(file_path.rsplit("/", 2)[1:])
         if identifier in fix_list:
-            logger.info(f"Fetching fixes and merging data at {file_path}")
+            logger.info("Fetching fixes and merging data at %s", file_path)
             data = merge_fixes(data, identifier)
 
         # Cleanup whitespace on citations
@@ -364,7 +345,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         cites = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
-            logger.warning(f"No citation found for {clean_cite}")
+            logger.warning("No citation found for %s", clean_cite)
             continue
 
         case_name = harmonize(data["name_abbreviation"])
@@ -383,7 +364,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 location=options["location"],
             )
             if len(found_court) != 1:
-                logging.warning(
+                logger.warning(
                     "Court not found for %s at %s",
                     data["court"]["name"],
                     file_path,
@@ -392,14 +373,14 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             court_id = found_court[0]
 
         if not Court.objects.filter(id=court_id).exists():
-            logger.warning(f"Court not found in Courtlistener: {court_id}")
+            logger.warning("Court not found in Courtlistener: %r", court_id)
             continue
 
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         if not date_filed:
             logger.warning(
-                f"No date found for {data['decision_date']} at {file_path}"
+                "No date found for %s at %s", data["decision_date"], file_path
             )
             continue
         case_body = data["casebody"]["data"]
@@ -408,7 +389,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
-            logger.warning(f"No opinion in Harvard XML at {file_path}")
+            logger.warning("No opinion in Harvard XML at %s", file_path)
             continue
 
         previously_imported_case = find_previously_imported_cases(
@@ -429,14 +410,16 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                     cluster_id=previously_imported_case.id,
                 )
                 logger.info(
-                    f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
+                    "Adding citations for case at https://www.courtlistener.com/opinion/%s/%s",
+                    previously_imported_case.id,
+                    previously_imported_case.slug,
                 )
                 # Add the filepath to the harvard file for the associated opinion
                 previously_imported_case.filepath_json_harvard = file_path
                 previously_imported_case.save()
             continue
 
-        logger.info(f"Adding case {case_name_full}")
+        logger.info("Adding case %s", case_name_full)
         add_new_case(
             data,
             case_body,
@@ -521,7 +504,9 @@ def add_new_case(
 
     with transaction.atomic():
         logger.info(
-            f"Adding docket for {case_name}: {citation.corrected_citation()}"
+            "Adding docket for %s: %s",
+            case_name,
+            citation.corrected_citation(),
         )
         docket = update_or_create_docket(
             case_name,
@@ -583,7 +568,9 @@ def add_new_case(
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
-        f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
+        "Finished adding case at https://www.courtlistener.com/opinion/%s/%s",
+        cluster.id,
+        cluster.slug,
     )
 
 
@@ -723,7 +710,7 @@ def find_previously_imported_cases(
             harvard_characters,
             docket_number,
             case_name_full,
-            possible_cases,  # type: ignore
+            possible_cases,
             data["name_abbreviation"],
             citation,
         )

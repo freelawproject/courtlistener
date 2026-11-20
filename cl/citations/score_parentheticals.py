@@ -67,5 +67,4 @@ def parenthetical_score(
     # approximately between 0 and 1
     normalized_score = score / 1000
     # Now cap the score between 0 and 1
-    normalized_score = min(max(normalized_score, 0.0), 1.0)
-    return normalized_score
+    return min(max(normalized_score, 0.0), 1.0)

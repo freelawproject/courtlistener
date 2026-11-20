@@ -3,6 +3,7 @@
 import argparse
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -96,13 +97,11 @@ def fetch_cleaned_columbia_text(filepath: str) -> str:
     Returns:
         the opinion text cleaned up
     """
-    with open(filepath, encoding="utf-8") as f:
-        content = f.read()
+    content = Path(filepath).read_text(encoding="utf-8")
 
     columbia_xml = BeautifulSoup(content, "html.parser")
     clean_columbia_text = re.sub(r"[^a-zA-Z0-9\s]+", " ", columbia_xml.text)
-    clean_columbia_text = re.sub(r"\s+", " ", clean_columbia_text)
-    return clean_columbia_text
+    return re.sub(r"\s+", " ", clean_columbia_text)
 
 
 def generate_ngrams(words: list[str]) -> list[list[str]]:
@@ -163,8 +162,7 @@ def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
                 match_index = columbia_words.find(phrase)
                 break
         matches.append([opinion_id, opinion_type, match_index])
-    ordered_opinions = sorted(matches, key=lambda x: x[-1])
-    return ordered_opinions
+    return sorted(matches, key=lambda x: x[-1])
 
 
 def sort_columbia_opinions(options: dict) -> None:
@@ -203,7 +201,7 @@ def sort_columbia_opinions(options: dict) -> None:
             # Only one opinion is shown, no need to order
             logger.info("Skipping opinion cluster with only one opinion.")
             continue
-        elif (
+        if (
             len(op_types) == 2
             and Opinion.LEAD in op_types
             and len(set(op_types)) == 2

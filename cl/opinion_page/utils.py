@@ -908,7 +908,7 @@ def make_docket_title(docket: Docket) -> str:
 
     Blank parts are left out.
     """
-    title = ", ".join(
+    return ", ".join(
         [
             s
             for s in [
@@ -918,7 +918,6 @@ def make_docket_title(docket: Docket) -> str:
             if s and s.strip()
         ]
     )
-    return title
 
 
 async def _common_metadata_sections(
@@ -1020,14 +1019,23 @@ async def core_docket_data(
     # undivided block; each stack styles that section itself.
     # Source sections come before the common ones to preserve the
     # long-standing order: Bankruptcy Information, then Originating
-    # Court Information.
+    # Court Information. A source section replaces the common section
+    # with the same title.
+    source_sections = await sync_to_async(docket_source.metadata_sections)(
+        docket
+    )
+    source_titles = {section.get("title") for section in source_sections}
     metadata_sections: list[MetadataSection] = [
         {
             "items": docket_metadata
             + await sync_to_async(docket_source.metadata_items)(docket)
         },
-        *await sync_to_async(docket_source.metadata_sections)(docket),
-        *await _common_metadata_sections(docket, og_info),
+        *source_sections,
+        *[
+            section
+            for section in await _common_metadata_sections(docket, og_info)
+            if section.get("title") not in source_titles
+        ],
     ]
 
     parties = await docket.parties.aexists()
@@ -1102,7 +1110,9 @@ def generate_docket_entries_csv_data(
 
     for docket_entry in docket_entries:
         documents = list(source.documents_for_entry(docket_entry))
-        if not documents and source.exports_entries_without_documents:
+        # An entry without documents still gets a row, with empty document
+        # columns, so the export lists every entry the docket page shows.
+        if not documents:
             csvwriter.writerow(
                 docket_entry.to_csv_row() + [""] * len(document_columns)
             )
@@ -1134,11 +1144,11 @@ async def build_cites_clusters_query(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
-    search_query = (
+    return (
         cluster_cites_query.sort({"citeCount": {"order": "desc"}})
         .source(
             includes=[
@@ -1155,7 +1165,6 @@ async def build_cites_clusters_query(
         .extra(size=20, track_total_hits=True)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 async def build_related_clusters_query(
@@ -1186,7 +1195,7 @@ async def build_related_clusters_query(
     )
 
     cluster_related_query = cluster_search.query(main_query)
-    search_query = (
+    return (
         cluster_related_query.sort({"_score": {"order": "desc"}})
         .source(
             includes=[
@@ -1203,7 +1212,6 @@ async def build_related_clusters_query(
         .extra(size=20)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 @dataclass
@@ -1462,7 +1470,7 @@ async def es_cited_case_count(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
