@@ -168,7 +168,7 @@ class MergerSpecRegistry[Scrape, Params]:
 
         return errors
 
-    def register(self, spec: MergerSpecification[Scrape, Params, Any]):
+    def register(self, spec: MergerSpecification[Scrape, Params, Any]) -> None:
         """Add a specification under its name, by kind; unknown kinds are logged."""
         match spec:
             case AttributeMerger():
@@ -243,7 +243,12 @@ class MergerConfig[M: Model]:
     )
     fields: tuple[str, ...] = field(init=False, default=())
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Work out which fields to load from the specs, key and reads.
+
+        The base merger's placeholder config, for `Model` itself, loads
+        nothing.
+        """
         if self.model is Model:
             return
         self.fields = tuple(
@@ -578,7 +583,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             if not o2o_spec.forward:
                 continue
             o2o_result = o2o_spec.merge(
-                state.instance, state.scrape, state.params
+                state.instance, getattr(self, name), state.params
             )
             model_name = o2o_spec.merger.config.model.__name__
             if model_name in o2o_result.creates:
@@ -606,7 +611,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 continue
             field = self.config.model._meta.get_field(name)
             attname = getattr(field, "attname", f"{name}_id")
-            result |= spec.merge(None, state.scrape, state.params)
+            result |= spec.merge(None, getattr(self, name), state.params)
             model_name = spec.merger.config.model.__name__
             if model_name in result.creates:
                 o2o_params[attname] = next(iter(result.creates[model_name]))
@@ -653,7 +658,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             # the parent stores the key.
             if isinstance(rm, OneToOneMerger) and rm.forward:
                 continue
-            result |= rm.merge(state.parent, state.scrape, state.params)
+            result |= rm.merge(
+                state.parent, getattr(self, rm._name), state.params
+            )
 
         return state.complete(state.parent, result)
 
