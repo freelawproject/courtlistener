@@ -4949,20 +4949,21 @@ class DocketPartiesV2TemplateTest(TestCase):
         return r
 
     async def test_renders_groups_parties_and_attorneys(self) -> None:
-        """Party types are h2 headings and parties h3 headings.
+        """Party types are h3 headings and parties h4 headings.
 
-        Each party with attorneys gets one "Represented By:" heading and
-        each charged party one "Criminal Charges:" heading with its data.
+        They sit under the tab's own h2. Each party with attorneys gets one
+        "Represented By:" heading and each charged party one "Criminal
+        Charges:" heading with its data.
         """
         content = (await self.get_page()).content.decode()
         card = fromstring(content).get_element_by_id("tab-content")
         self.assertEqual(
-            [h.text_content().strip() for h in card.iter("h2")],
+            [h.text_content().strip() for h in card.iter("h3")],
             ["Amicus", "Defendant"],
         )
         self.assertIn(
             "AMERICAN ASSOCIATION OF LAW LIBRARIES",
-            [h.text_content().strip() for h in card.iter("h3")],
+            [h.text_content().strip() for h in card.iter("h4")],
         )
         self.assertEqual(content.count("Represented By:"), 2)
         self.assertEqual(content.count("Criminal Charges:"), 1)
@@ -5006,11 +5007,11 @@ class DocketPartiesV2TemplateTest(TestCase):
                 for h in headings
             ],
             [
-                ("h3", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
-                ("h4", "Represented By:"),
-                ("h3", "UNITED STATES OF AMERICA"),
-                ("h4", "Represented By:"),
-                ("h4", "Criminal Charges:"),
+                ("h4", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
+                ("h5", "Represented By:"),
+                ("h4", "UNITED STATES OF AMERICA"),
+                ("h5", "Represented By:"),
+                ("h5", "Criminal Charges:"),
             ],
         )
         self.assertIn(groups[1], groups[0].iterdescendants())
