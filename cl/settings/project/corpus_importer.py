@@ -77,3 +77,14 @@ AUDIO_REENQUEUE_WAIT = env.int("AUDIO_REENQUEUE_WAIT", default=60)
 AUDIO_REENQUEUE_MAX_PER_SWEEP = env.int(
     "AUDIO_REENQUEUE_MAX_PER_SWEEP", default=5
 )
+
+# RECAP Fetch scheduler. The daemon is the only thing that hands scheduled
+# Fetch API requests to Celery. Until it is running, the
+# "recap_fetch_scheduler" waffle flag has no effect.
+RECAP_FETCH_SCHEDULER_DAEMON_ENABLED = env.bool(
+    "RECAP_FETCH_SCHEDULER_DAEMON_ENABLED", default=False
+)
+# How fast we send requests to a single court's PACER server.
+RECAP_FETCH_DEFAULT_COURT_RATE = env(
+    "RECAP_FETCH_DEFAULT_COURT_RATE", default="1/s"
+)

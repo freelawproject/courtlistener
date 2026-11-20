@@ -3476,6 +3476,7 @@ class RecapFetchApiSerializationTestCase(TestCase):
                 "de_date_end",
                 "de_number_start",
                 "de_number_end",
+                "estimated_execution_delay",
             ],
         )
 

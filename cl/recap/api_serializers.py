@@ -298,6 +298,13 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
     pacer_username = serializers.CharField(write_only=True)
     pacer_password = serializers.CharField(write_only=True)
     client_code = serializers.CharField(write_only=True, required=False)
+    estimated_execution_delay = serializers.SerializerMethodField(
+        help_text="Our estimate, in seconds, of how long this request will "
+        "wait before we begin it against PACER. It is not an estimate of "
+        "when the request will finish, and it is not a promise: it can grow "
+        "if other users join the queue for the same court. Only provided in "
+        "the response to the request that created the item; null otherwise.",
+    )
 
     class Meta:
         model = PacerFetchQueue
@@ -309,6 +316,17 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
             "status",
             "message",
         )
+
+    def get_estimated_execution_delay(
+        self, obj: PacerFetchQueue
+    ) -> float | None:
+        """Return the wait estimated when the request was scheduled.
+
+        The estimate is attached to the instance by the view that creates the
+        request and is not stored, so it is None whenever the request is
+        serialized later, e.g. on a GET or in a webhook.
+        """
+        return getattr(obj, "estimated_execution_delay", None)
 
     def validate(self, attrs):
         """Validate a fetch request and check the PACER credentials.
