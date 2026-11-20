@@ -1,3 +1,5 @@
+"""Client for the Neon CRM API."""
+
 from typing import Any, NotRequired, TypedDict
 
 import requests
@@ -9,10 +11,14 @@ NEON_API_URL = "https://api.neoncrm.com/v2"
 
 
 class NeonStateProvince(TypedDict):
+    """A state or province in a Neon address."""
+
     code: str
 
 
 class NeonAddress(TypedDict):
+    """An address in a Neon account."""
+
     isPrimaryAddress: NotRequired[bool]
     addressLine1: str
     addressLine2: str
@@ -22,6 +28,8 @@ class NeonAddress(TypedDict):
 
 
 class NeonContact(TypedDict):
+    """The primary contact of a Neon account."""
+
     firstName: str
     lastName: str
     email1: str
@@ -29,7 +37,10 @@ class NeonContact(TypedDict):
 
 
 class NeonClient:
+    """Client for reading and writing Neon accounts and memberships."""
+
     def __init__(self, timeout: int = 10) -> None:
+        """Build the client with a request timeout in seconds."""
         self._timeout = timeout
         self._basic = HTTPBasicAuth(
             settings.NEON_ORG_ID, settings.NEON_API_KEY
@@ -163,7 +174,7 @@ class NeonClient:
             "email1": user.email,
         }
 
-        profile = user.profile  # type: ignore
+        profile = user.profile  # pyrefly: ignore[missing-attribute]
         address_dict: NeonAddress = {
             "addressLine1": profile.address1,
             "addressLine2": profile.address2,

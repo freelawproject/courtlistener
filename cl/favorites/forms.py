@@ -1,3 +1,5 @@
+"""Forms for creating and editing notes."""
+
 from collections.abc import Awaitable, Callable
 from typing import Any
 

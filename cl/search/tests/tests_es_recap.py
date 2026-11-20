@@ -11,6 +11,7 @@ import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.core.paginator import Paginator
@@ -4509,6 +4510,19 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
     test_score = CharField(read_only=True)
 
 
+RECAP_API_V4_COURT_LIST_KEY = "recap_search_api_v4:minimal-court-list"
+
+
+# Patch the cached court list access to prevent inconsistent results from
+# parallel test workers editing it.
+@mock.patch(
+    "cl.lib.courts.get_cache_key_for_court_list",
+    new=lambda: RECAP_API_V4_COURT_LIST_KEY,
+)
+@mock.patch(
+    "cl.search.signals.get_cache_key_for_court_list",
+    new=lambda: RECAP_API_V4_COURT_LIST_KEY,
+)
 class RECAPSearchAPIV4Test(
     AuthenticatedClientMixin,
     RECAPSearchAPICommonTests,
@@ -4523,6 +4537,8 @@ class RECAPSearchAPIV4Test(
 
     @classmethod
     def setUpTestData(cls):
+        # Clear anything from a previous run
+        cache.delete(RECAP_API_V4_COURT_LIST_KEY)
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now().replace(day=15, hour=0)
@@ -7227,10 +7243,11 @@ class SCOTUSESIndexingSignalTest(
             with self.subTest(field=field):
                 de = SCOTUSDocketEntry.objects.get(pk=entry.pk)
                 setattr(de, field, new_value)
+                # Queued with .si(): it's chained with the percolation tasks.
                 with mock.patch(
-                    "cl.lib.es_signal_processor.update_es_document.delay",
+                    "cl.lib.es_signal_processor.update_es_document.si",
                     side_effect=lambda *args, **kwargs: self.count_task_calls(
-                        update_es_document, False, *args, **kwargs
+                        update_es_document, True, *args, **kwargs
                     ),
                 ):
                     de.save()
@@ -7357,8 +7374,12 @@ class SCOTUSESIndexingSignalTest(
         self.assertFalse(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).SCOTUS))
         self.assertTrue(ESRECAPDocument.exists(id=ES_CHILD_ID(rd.pk).RECAP))
 
-    def test_scotus_dockets_are_not_sent_to_the_percolator(self) -> None:
-        """Search alerts don't support SCOTUS yet, so a SCOTUS Docket's ES save or update returns nothing to percolate, unlike a RECAP Docket's."""
+    def test_scotus_dockets_are_sent_to_the_percolator(self) -> None:
+        """Check SCOTUS Docket saves and updates are percolated.
+
+        A SCOTUS Docket's ES save and update are percolated, like a RECAP
+        Docket's.
+        """
         # Not indexed yet: es_save_document only percolates a first write.
         with override_settings(ELASTICSEARCH_DISABLED=True):
             scotus_docket = ScotusDocketMetadataFactory(
@@ -7369,7 +7390,7 @@ class SCOTUSESIndexingSignalTest(
             )
 
         for docket, percolates in [
-            (scotus_docket, False),
+            (scotus_docket, True),
             (recap_docket, True),
         ]:
             with self.subTest(source=docket.source):
@@ -7948,13 +7969,11 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             xml_tree.xpath(
                 "//atom:entry[2]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         second_item_published_str = str(
             xml_tree.xpath(
                 "//atom:entry[3]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         first_item_published_dt = datetime.datetime.strptime(
             first_item_published_str, published_format

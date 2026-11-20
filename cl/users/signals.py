@@ -1,3 +1,5 @@
+"""Signal handlers for SES bounces and complaints, and for new users, profiles, and webhooks."""
+
 import json
 import logging
 import random
@@ -31,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 class SESEventType(StrEnum):
+    """The SES notification event types that are handled."""
+
     BOUNCE = "bounce"
     COMPLAINT = "complaint"
 
@@ -47,8 +51,7 @@ def get_message_id(mail_obj: dict) -> str:
     headers = mail_obj["headers"]
     for header in headers:
         if header["name"] == "X-CL-ID":
-            message_id = header["value"]
-            return message_id
+            return header["value"]
     return ""
 
 
@@ -71,12 +74,12 @@ def store_bounce_or_complaint_obj(
             storing_rate = settings.BOUNCES_STORE_RATE
         case _:
             assert_never(obj_type)
-            return None
+            return
 
     if random.random() >= storing_rate or not email_recipient:
         # Ignore events that exceed the random sampling rate or have no
         # email recipient.
-        return None
+        return
 
     try:
         storage = S3PrivateUUIDStorage()
@@ -93,7 +96,7 @@ def store_bounce_or_complaint_obj(
             obj_type.value,
             email_recipient,
         )
-        return None
+        return
 
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")
@@ -165,6 +168,7 @@ def complaint_handler(
     dispatch_uid="create_auth_token",
 )
 def create_auth_token(sender, instance=None, created=False, **kwargs):
+    """Create an API token for each new user and count the new account."""
     if created:
         Token.objects.create(user=instance)
         accounts_created_total.inc()
@@ -176,6 +180,7 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
     dispatch_uid="create_superuser_profile_object",
 )
 def superuser_creation(sender, instance, created, **kwargs):
+    """Create a confirmed profile for each new superuser."""
     # Create a profile whenever createsuperuser is run
     if created and instance.is_superuser:
         UserProfile.objects.create(
@@ -188,6 +193,7 @@ def superuser_creation(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
 def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+    """Give each new profile a unique ``@recap.email`` address."""
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()

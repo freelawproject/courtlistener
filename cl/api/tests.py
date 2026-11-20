@@ -161,6 +161,7 @@ from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Citation,
     ClusterRedirection,
     Court,
     Docket,
@@ -366,7 +367,7 @@ class JurisdictionsV2TemplateTest(TestCase):
     }
 )
 class WikiDataRssFeedTests(TestCase):
-    """Test the markdown fragments rendered by the wiki-data endpoint."""
+    """Test the payload rendered by the wiki-data endpoint."""
 
     @classmethod
     def setUpTestData(cls):
@@ -470,6 +471,21 @@ class WikiDataRssFeedTests(TestCase):
         self.assertNotIn(
             "D. Full Feed", data["podcasts"]["oral_argument_courts"]
         )
+
+    @patch("cl.api.views.get_total_estimate_count", return_value=12345)
+    async def test_citation_count_uses_estimate(
+        self, mock_estimate: MagicMock
+    ) -> None:
+        """Is citation_count read from Postgres's estimate, not COUNT(*)?
+
+        An exact count of the citations table outlasts the request timeout
+        in production, and the payload is only cached once it's built, so
+        an exact count leaves the endpoint timing out on every request.
+        """
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(json.loads(r.content)["citation_count"], 12345)
+        mock_estimate.assert_called_once_with(Citation._meta.db_table)
 
     async def test_bust_cache_param(self) -> None:
         """Does ?bust_cache rebuild the cached response for staff only?
@@ -814,7 +830,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-        await sync_to_async(view)(request, **{"version": f"{api_version}"})
+        await sync_to_async(view)(request, version=f"{api_version}")
 
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
@@ -923,7 +939,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # IP address
         keys = self.r.keys("api:v3-Test.d:*")
-        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        ip_key = next(k for k in keys if k.endswith("ip_map"))
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
@@ -960,7 +976,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # IP address
         keys = self.r.keys("api:v4-Test.d:*")
-        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        ip_key = next(k for k in keys if k.endswith("ip_map"))
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
@@ -2373,13 +2389,15 @@ class V4DRFPaginationTest(TestCase):
         return list(self.pagination.paginate_queryset(self.queryset, request))
 
     async def _compare_page_results(self, results, sort_key, start, end):
-        page_2_expected = []
-        async for pk in (
-            Docket.objects.all()
-            .order_by(sort_key)[start:end]
-            .values_list("pk", flat=True)
-        ):
-            page_2_expected.append(pk)
+        page_2_expected = [
+            pk
+            async for pk in (
+                Docket.objects.all()
+                .order_by(sort_key)[start:end]
+                .values_list("pk", flat=True)
+            )
+        ]
+
         self.assertEqual(
             results,
             list(page_2_expected),
@@ -2393,6 +2411,7 @@ class V4DRFPaginationTest(TestCase):
             return await api_client.get(url, params)
         if method == "post":
             return await api_client.post(url, params)
+        return None
 
     @classmethod
     def generate_test_cursor(cls, paginator, ordering_key: str) -> str | None:
@@ -2406,7 +2425,7 @@ class V4DRFPaginationTest(TestCase):
             A valid cursor for testing.
         """
         position = 10 if "id" in ordering_key else now()
-        cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
+        cursor = Cursor(offset=1, reverse=False, position=position)
         encoded_cursor = paginator.encode_cursor(cursor)
         parsed_url = urlparse(encoded_cursor)
         query_params = parse_qs(parsed_url.query)

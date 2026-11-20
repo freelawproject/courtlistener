@@ -1,4 +1,7 @@
+"""Models for RECAP uploads, recap.email notifications, PACER fetches, and the FJC IDB."""
+
 import logging
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -73,14 +76,17 @@ class PROCESSING_QUEUE_SOURCE:
 
 
 def make_recap_processing_queue_path(instance, filename):
+    """Make a dated upload path under ``recap_processing_queue``."""
     return make_path("recap_processing_queue", filename)
 
 
 def make_recap_data_path(instance, filename):
+    """Make a dated upload path under ``recap-data``."""
     return make_path("recap-data", filename)
 
 
 def make_recap_email_processing_queue_aws_path(instance, filename: str) -> str:
+    """Make an upload path under ``recap-email``."""
     return f"recap-email/{filename}"
 
 
@@ -117,6 +123,8 @@ class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
 
 
 class PROCESSING_STATUS:
+    """Processing statuses of RECAP queue items."""
+
     ENQUEUED = 1
     SUCCESSFUL = 2
     FAILED = 3
@@ -246,10 +254,9 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return f"ProcessingQueue {self.pk}: {self.court_id} case #{self.pacer_case_id} ({self.get_upload_type_display()})"
-        elif self.upload_type == UPLOAD_TYPE.PDF:
+        if self.upload_type == UPLOAD_TYPE.PDF:
             return f"ProcessingQueue: {self.pk}: {self.court_id}.{self.pacer_case_id or None}.{self.document_number or None}.{self.attachment_number or 0} ({self.get_upload_type_display()})"
-        else:
-            return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
+        return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
     class Meta:
         permissions = (
@@ -258,10 +265,11 @@ class ProcessingQueue(AbstractDateTimeModel):
 
     @property
     def file_contents(self) -> str:
-        with open(self.filepath_local.path) as f:
-            return f.read()
+        """The contents of the uploaded file."""
+        return Path(self.filepath_local.path).read_text()
 
     def print_file_contents(self) -> None:
+        """Print the contents of the uploaded file."""
         print(self.file_contents)
 
 
@@ -375,6 +383,7 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         )
 
     def get_related_objects(self) -> QuerySet | None:
+        """Get the objects the email produced, or None if no related model is set."""
         if not self.related_model:
             logger.warning(
                 "Call to EmailProcessingQueue.get_related_objects() with null related_model."
@@ -388,6 +397,8 @@ class EmailProcessingQueue(AbstractDateTimeModel):
 
 
 class REQUEST_TYPE:
+    """The kinds of PACER fetch requests."""
+
     DOCKET = 1
     PDF = 2
     ATTACHMENT_PAGE = 3

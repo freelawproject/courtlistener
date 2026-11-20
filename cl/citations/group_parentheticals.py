@@ -66,6 +66,8 @@ stemmer = Stemmer("english")
 
 @dataclass
 class ComputedParentheticalGroup:
+    """A cluster of similar parentheticals, with its representative and score."""
+
     # So named to avoid collision with the database model named ParentheticalGroup
     parentheticals: list[Parenthetical]
     representative: Parenthetical
@@ -120,17 +122,19 @@ def compute_parenthetical_groups(
     # start the visited_nodes set here to prevent recomputing components, since
     # the same component will be found when starting from any of it's nodes
     visited_nodes: set[str] = set()
-    for node, neighbors in similarity_graph.items():
-        if component := get_graph_component(
-            node, similarity_graph, visited_nodes
-        ):
-            parenthetical_groups.append(
-                get_group_from_component(
-                    component,
-                    parenthetical_objects,
-                    similarity_graph,
-                )
+    parenthetical_groups.extend(
+        get_group_from_component(
+            component,
+            parenthetical_objects,
+            similarity_graph,
+        )
+        for node in similarity_graph.keys()
+        if (
+            component := get_graph_component(
+                node, similarity_graph, visited_nodes
             )
+        )
+    )
     return sorted(
         parenthetical_groups, key=lambda group: group.score, reverse=True
     )
@@ -225,13 +229,12 @@ def get_group_from_component(
     representative = get_representative_parenthetical(
         pars_in_group, similarity_graph
     )
-    parenthetical_group = ComputedParentheticalGroup(
+    return ComputedParentheticalGroup(
         parentheticals=pars_in_group,
         representative=representative,
         size=len(pars_in_group),
         score=group_score,
     )
-    return parenthetical_group
 
 
 BEST_PARENTHETICAL_SEARCH_THRESHOLD = 0.2
@@ -282,5 +285,4 @@ def get_parenthetical_tokens(text: str) -> list[str]:
     # Treat "holding", "recognizing" etc. at first position as a stop word
     if len(tokens) > 0 and GERUND_WORD.match(tokens[0]):
         del tokens[0]
-    tokens = stemmer.stemWords(tokens)
-    return tokens
+    return stemmer.stemWords(tokens)

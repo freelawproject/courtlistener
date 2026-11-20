@@ -1,3 +1,5 @@
+"""Settings for the corpus importer's probing daemons and audio processing."""
+
 import environ
 
 env = environ.FileAwareEnv()

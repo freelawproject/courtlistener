@@ -105,6 +105,7 @@ class CloneException(Exception):
     """Error found in clone process."""
 
     def __init__(self, message: str) -> None:
+        """Store the error message."""
         self.message = message
 
 
@@ -271,8 +272,10 @@ def clone_opinion_cluster(
                         path = pathlib.PurePath(
                             cluster_data.get("filepath_json_harvard")
                         )
-                        json_path = os.path.join(
-                            "harvard_corpus", path.parent.name, path.name
+                        json_path = str(
+                            pathlib.PurePath(
+                                "harvard_corpus", path.parent.name, path.name
+                            )
                         )
                         opinion_cluster.filepath_json_harvard.save(
                             json_path, ContentFile(json_harvard_content)
@@ -408,7 +411,6 @@ def clone_opinion(
             print(
                 ">> Can't download file, check that your API keys are set and not expired to save the file."
             )
-            pass
 
     action = "Created" if created else "Updated"
     print(f"({action}) Opinion id: {op.pk}")
@@ -1066,12 +1068,15 @@ def clone_court(session: Session, court_ids: list, no_update: bool = False):
 
 
 class Command(BaseCommand):
+    """Clone objects from CourtListener.com into a development database."""
+
     help = (
         "Clone data from CourtListener.com into dev environment. It "
         "requires to set CL_API_TOKEN variable in the .env file."
     )
 
     def __init__(self, *args, **kwargs):
+        """Build the command with an HTTP session authenticated by ``CL_API_TOKEN``."""
         super().__init__(*args, **kwargs)
         self.type = None
         self.ids = []
@@ -1082,6 +1087,7 @@ class Command(BaseCommand):
         }
 
     def add_arguments(self, parser):
+        """Add the object type and IDs, plus flags for which related objects and files to clone."""
         parser.add_argument(
             "--type",
             type=str,
@@ -1173,6 +1179,12 @@ class Command(BaseCommand):
         no_update: bool,
         **options,
     ):
+        """Clone the requested objects of the given type.
+
+        Writes an error and does nothing without ``CL_API_TOKEN``, outside a
+        development environment, or when downloading opinion files without
+        AWS credentials.
+        """
         self.type = type
         self.ids = ids
 

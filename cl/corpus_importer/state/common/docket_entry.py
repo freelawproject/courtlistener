@@ -8,19 +8,22 @@ target model are per-state).
 
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
 from juriscraper.state.docket import Document as ScrapeDocument
 
 from cl.corpus_importer.state.merger import (
-    Attribute,
+    Fn,
     ManyStrategy,
     Merger,
+    MergerConfig,
+    MergerState,
     OneToManyRelation,
+    Params,
     RelatedParams,
-    overwrite,
+    Scrape,
 )
 from cl.search.state.shared import (
     AbstractStateDocument,
@@ -29,23 +32,10 @@ from cl.search.state.shared import (
 )
 
 
-def _entry_type(entry: ScrapeDocketEntry[Any], params: Any) -> int:
-    """Map Juriscraper's `DocketEntryType` enum to CL's integer mirror."""
-    return cast(int, getattr(DocketEntryType, entry.entry_type.name))
-
-
-def _entry_date_filed(entry: ScrapeDocketEntry[Any], params: Any) -> date:
-    return entry.date_filed
-
-
 def _entry_attachments[DocType: ScrapeDocument](
     entry: ScrapeDocketEntry[DocType], params: Any
 ) -> Sequence[DocType]:
     return entry.attachments
-
-
-def _document_url(document: ScrapeDocument, params: Any) -> str:
-    return document.url
 
 
 class DocumentMerger[
@@ -53,29 +43,38 @@ class DocumentMerger[
     ParamType,
     M: AbstractStateDocument,
 ](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
-    url: str = Attribute(_document_url, strategy=overwrite)
+    """Base merger for a scraped state document.
+
+    When a document's URL changes, its stored file and OCR status are reset
+    so it is downloaded again.
+    """
+
+    config: ClassVar[MergerConfig[AbstractStateDocument]] = MergerConfig(
+        model=AbstractStateDocument,
+        reads=("filepath_local", "processing_error"),
+    )
+
+    url: str = Scrape(ScrapeDocument).url
 
     @override
     def needs_update(self) -> bool:
         """Force the update path for a document with no stored file and no recorded processing error -- its download failed transiently, and reporting an update gets the download re-dispatched on re-ingest."""
+        if not isinstance(state := self.state, MergerState.Update):
+            return False
+        document = cast(AbstractStateDocument, state.instance)
         return (
-            self.existing is not None
-            and not cast(AbstractStateDocument, self.existing).filepath_local
-            and cast(AbstractStateDocument, self.existing).processing_error
-            is None
+            not document.filepath_local and document.processing_error is None
         )
 
     @override
     def pre_update(self, updated_fields: list[str]) -> list[str]:
         updated = super().pre_update(updated_fields)
-        # This hook only runs on the update path, so `existing` is set; the
-        # guard narrows the type for mypy.
-        if (
-            existing := cast(AbstractStateDocument | None, self.existing)
-        ) is None:
+        # This hook only runs on the update path; the guard narrows the type.
+        if not isinstance(self.state, MergerState.Update):
             return updated
         if "url" not in updated_fields:
             return updated
+        existing = cast(AbstractStateDocument, self.state.instance)
         if existing.processing_error == ProcessingError.BAD_URL:
             existing.processing_error = None
             updated.append("processing_error")
@@ -94,9 +93,14 @@ def AttachmentRelation(
     transform: Callable[[Any, Any], Any] = _entry_attachments,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
+    """Declare a docket entry's attachments as a one-to-many relation.
+
+    Defaults to merging the scraped entry's attachments and appending them
+    to the entry's existing documents.
+    """
     return OneToManyRelation(
         merger,
-        transform,
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
     )
 
@@ -106,6 +110,10 @@ class DocketEntryMerger[
     ParamType,
     M: Model,
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
-    date_filed: date = Attribute(_entry_date_filed, strategy=overwrite)
-    entry_type: int = Attribute(_entry_type, strategy=overwrite)
+    """Base merger for a scraped state docket entry and its attachments."""
+
+    date_filed: date = Scrape(ScrapeDocketEntry).date_filed
+    entry_type: int = Fn(getattr)(
+        DocketEntryType, Scrape(ScrapeDocketEntry).entry_type.name
+    )
     documents: list[Any] = AttachmentRelation()

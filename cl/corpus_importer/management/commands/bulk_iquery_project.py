@@ -1,9 +1,11 @@
+"""Scrape PACER iquery pages across courts."""
+
 import itertools
 import time
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django.db.models import F, Window
 from django.db.models.functions import RowNumber
 from redis.exceptions import ConnectionError
@@ -18,6 +20,8 @@ from cl.search.models import Court, Docket
 
 
 class OptionsType(TypedDict):
+    """The command options used when scraping iquery pages."""
+
     queue: str
     courts: list[str]
     iterations: int
@@ -151,9 +155,12 @@ def update_open_cases(options) -> None:
 
 
 class Command(VerboseCommand):
+    """Run the ``everything`` or ``byu-project`` iquery task."""
+
     help = "Scrape all iquery pages sequentially."
 
     def add_arguments(self, parser: CommandParser):
+        """Add the queue, courts, iteration, task, and skip-rows options."""
         parser.add_argument(
             "--queue",
             default="batch2",
@@ -194,6 +201,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the chosen task."""
         if options["task"] == "everything":
             add_all_cases_to_cl(options)
         elif options["task"] == "byu-project":

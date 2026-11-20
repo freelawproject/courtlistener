@@ -1,3 +1,5 @@
+"""Helpers for reporters, citation types, and finding citations in text."""
+
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -151,12 +153,12 @@ def get_canonicals_from_reporter(reporter_or_slug: str) -> list[str]:
         list[str]: A list of potential canonical names for the reporter
     """
     reporter_slug = slugify_reporter(reporter_or_slug)
-    slugified_variations = {}
-    for variant, canonicals in VARIATIONS_ONLY.items():
-        slugged_canonicals = []
-        for canonical in canonicals:
-            slugged_canonicals.append(slugify_reporter(canonical))
-        slugified_variations[str(slugify(variant))] = slugged_canonicals
+    slugified_variations = {
+        str(slugify(variant)): [
+            slugify_reporter(canonical) for canonical in canonicals
+        ]
+        for variant, canonicals in VARIATIONS_ONLY.items()
+    }
 
     return slugified_variations.get(reporter_slug, [])
 
@@ -223,7 +225,7 @@ def chunk_text(text: str, chunk_size: int):
 
 
 def make_get_citations_kwargs(
-    document: "RECAPDocument | Opinion", chunk_size: int = 200_000
+    document: RECAPDocument | Opinion, chunk_size: int = 200_000
 ) -> list[dict]:
     """Prepare markup kwargs for `get_citations` - chunked.
 

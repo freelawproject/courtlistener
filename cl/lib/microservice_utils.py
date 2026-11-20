@@ -1,7 +1,10 @@
+"""Helpers for calling the document processing microservices."""
+
 import json
 import logging
 from contextlib import nullcontext
 from io import BufferedReader
+from pathlib import Path
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -138,7 +141,7 @@ async def microservice(
         upload_context = nullcontext(upload_file)
         if upload_file is None and filepath:
             filename = filepath
-            upload_context = open(filepath, "rb")
+            upload_context = Path(filepath).open("rb")
 
         with upload_context as upload_file:
             files = (
@@ -152,7 +155,7 @@ async def microservice(
             ) as client:
                 req = client.build_request(
                     method=method,
-                    url=services[service]["url"],  # type: ignore
+                    url=services[service]["url"],
                     # pyrefly:ignore[bad-argument-type] httpx's stubs omit the (deprecated) raw-content form of data it still accepts
                     data=data,
                     files=files,
@@ -179,11 +182,10 @@ async def doc_page_count_service(doc: AbstractPDF) -> Response:
         Response object
     """
     try:
-        response = await microservice(
+        return await microservice(
             service="page-count",
             item=doc,
         )
-        return response
     except ClientError as error:
         if error.response["Error"]["Code"] == "NoSuchKey":
             raise NoSuchKey("Key not found: The specified key does not exist.")
