@@ -14,6 +14,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import AnonymousUser, User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import (
     EmptyPage,
@@ -106,6 +107,12 @@ from cl.opinion_page.utils import (
     es_related_case_count,
     generate_docket_entries_csv_data,
     separate_syllabus,
+)
+from cl.opinion_page.volume_toc import (
+    VolumeSummary,
+    parse_star_pages,
+    sequence_volume,
+    summarize_volume,
 )
 from cl.people_db.models import (
     AttorneyOrganization,
@@ -1400,6 +1407,54 @@ async def get_prev_next_volumes(
     return volume_next, volume_previous
 
 
+# A volume's listing is a table of contents, so it reads best whole: page
+# spans only confirm a volume is complete if you can see the run of them at
+# once. Set high enough that every volume in the corpus fits on one page,
+# while still bounding the response for any outlier.
+VOLUME_CASES_PER_PAGE = 1000
+
+# Scanning a volume's opinion text for star pagination means reading every
+# opinion in it, so the result is cached. Volumes are closed and published;
+# the markers in them only change when the text is reimported.
+VOLUME_STAR_PAGES_CACHE_SECONDS = 60 * 60 * 24 * 7
+
+
+def get_volume_star_pages(
+    reporter: str, volume: str, cluster_ids: list[int]
+) -> dict[int, list[int]]:
+    """Collect each case's star-pagination pages for one reporter volume.
+
+    Star pagination is the only record in the database of where an opinion
+    *ends*, which is what makes a missing case detectable: a Citation says
+    only where a case begins, so spans derived from the next case can never
+    reveal that a case between them is absent.
+
+    :param reporter: The reporter abbreviation being listed.
+    :param volume: The volume being listed.
+    :param cluster_ids: Primary keys of the clusters in that volume.
+    :return: Cluster id mapped to the page numbers marked in its text.
+    """
+    key = f"volume-star-pages:{reporter}:{volume}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    pages: dict[int, list[int]] = defaultdict(list)
+    opinions = Opinion.objects.filter(cluster_id__in=cluster_ids)
+    # filter() widens the custom queryset back to a plain QuerySet as far as
+    # the type checker can see, so with_best_text() reads as missing here.
+    # pyrefly:ignore[missing-attribute]
+    rows = opinions.with_best_text().values_list("cluster_id", "best_text")
+    # Opinion text runs to megabytes a volume, so stream it rather than
+    # holding it all at once; only the parsed page numbers are kept.
+    for cluster_id, text in rows.iterator(chunk_size=50):
+        pages[cluster_id].extend(parse_star_pages(text))
+
+    found = dict(pages)
+    cache.set(key, found, VOLUME_STAR_PAGES_CACHE_SECONDS)
+    return found
+
+
 async def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
@@ -1489,20 +1544,52 @@ async def reporter_or_volume_handler(
     )
 
     page = request.GET.get("page", 1)
+    # Page order is the order the volume is actually bound in, so it's the
+    # default. The old date-filed ordering stays reachable for anyone who
+    # relies on it.
+    order = "date" if request.GET.get("order") == "date" else "page"
 
     @sync_to_async
-    def paginate_volumes(
+    def sequence_and_paginate(
         volumes: QuerySet[OpinionCluster], volume_page: int | str
-    ) -> Page:
-        paginator = Paginator(volumes, 100, orphans=10)
-        try:
-            return paginator.page(volume_page)
-        except PageNotAnInteger:
-            return paginator.page(1)
-        except EmptyPage:
-            return paginator.page(paginator.num_pages)
+    ) -> tuple[Page, VolumeSummary]:
+        """Work out each case's page span, then paginate for display.
 
-    cases_page = await paginate_volumes(cases_in_volume, page)
+        Sequencing needs the whole volume in hand -- a case's extent is
+        derived from the first page of the case that follows it, which may
+        land on a later paginated page. So the volume is materialized here
+        and the resulting list is what gets paginated.
+        """
+        clusters = list(volumes)
+        star_pages = get_volume_star_pages(
+            reporter, volume, [c.pk for c in clusters]
+        )
+        sequenced = sequence_volume(
+            clusters,
+            reporter,
+            volume,
+            markers=lambda c: star_pages.get(c.pk, []),
+        )
+        summary = summarize_volume(sequenced)
+        # Hang the span off each cluster so the template can reach it
+        # without unpacking tuples.
+        for cluster, span in sequenced:
+            cluster.volume_span = span  # type: ignore[attr-defined]
+        ordered = [cluster for cluster, _ in sequenced]
+        if order == "date":
+            # Spans are unaffected by display order; only the listing moves.
+            ordered.sort(key=lambda c: (c.date_filed is None, c.date_filed))
+        paginator = Paginator(ordered, VOLUME_CASES_PER_PAGE, orphans=10)
+        try:
+            return paginator.page(volume_page), summary
+        except PageNotAnInteger:
+            return paginator.page(1), summary
+        except EmptyPage:
+            return paginator.page(paginator.num_pages), summary
+
+    cases_page, volume_summary = await sequence_and_paginate(
+        cases_in_volume, page
+    )
     if cases_page.paginator.count == 0:
         return await throw_404(
             request,
@@ -1531,6 +1618,8 @@ async def reporter_or_volume_handler(
             "volume_names": volume_names,
             "volume_previous": volume_previous,
             "volume_next": volume_next,
+            "volume_summary": volume_summary,
+            "order": order,
             "private": has_blocked_cases,
         },
     )
