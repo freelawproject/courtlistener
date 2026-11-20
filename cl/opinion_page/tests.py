@@ -30,7 +30,7 @@ from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse, QueryDict
 from django.middleware.csrf import CSRF_TOKEN_LENGTH
-from django.template import TemplateDoesNotExist, engines
+from django.template import TemplateDoesNotExist
 from django.template.loader import get_template, render_to_string
 from django.template.response import TemplateResponse
 from django.test import (
@@ -43,7 +43,6 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import SafeString
-from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
 from lxml.html import fromstring
@@ -66,6 +65,7 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
+    CottonRenderMixin,
     SearchTestCase,
     SimpleUserDataMixin,
     SitemapTest,
@@ -4598,7 +4598,7 @@ class DocketIdbV2TemplateTest(TestCase):
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
-class DocketPageV2TemplateTest(TestCase):
+class DocketPageV2TemplateTest(CottonRenderMixin, TestCase):
     """Test that the v2 docket page renders correctly.
 
     `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
@@ -4690,24 +4690,16 @@ class DocketPageV2TemplateTest(TestCase):
         # Rendered through a wrapper string so the component's own c-vars
         # don't shadow the context, as DocketFilterDrawerAttrPropagationTest
         # explains.
-        compiled = CottonCompiler().process(
-            '<c-metadata-section :items="items" />'
-        )
-        html = (
-            engines["django"]
-            .from_string(compiled)
-            .render(
+        html = self.render_cotton(
+            '<c-metadata-section :items="items" />',
+            items=[
+                {"label": "Cause", "value": "28:1331"},
                 {
-                    "items": [
-                        {"label": "Cause", "value": "28:1331"},
-                        {
-                            "label": "Citation",
-                            "value": "601 U.S. 416",
-                            "one_click_select": True,
-                        },
-                    ]
-                }
-            )
+                    "label": "Citation",
+                    "value": "601 U.S. 416",
+                    "one_click_select": True,
+                },
+            ],
         )
         details = list(fromstring(html).iter("dd"))
         self.assertEqual(len(details), 2)
@@ -5371,7 +5363,7 @@ class DocketEntryRowsV2Test(TestCase):
                     )
 
 
-class DocketFilterRenderTestCase(TestCase):
+class DocketFilterRenderTestCase(CottonRenderMixin, TestCase):
     """Renders `<c-docket-filter>` for a RECAP docket with no entries, so subclasses can assert on the toolbar's markup."""
 
     @classmethod
@@ -5396,16 +5388,14 @@ class DocketFilterRenderTestCase(TestCase):
             / "docket_filter_wrapper.html"
         )
         with template_path.open(encoding="utf-8") as f:
-            compiled = CottonCompiler().process(f.read())
-        template = engines["django"].from_string(compiled)
-        return template.render(
-            {
-                "docket": self.docket,
-                "docket_source": docket_entry_sources.RECAP,
-                "form": form,
-                "page_obj": self.empty_page,
-                "request": request,
-            }
+            source = f.read()
+        return self.render_cotton(
+            source,
+            docket=self.docket,
+            docket_source=docket_entry_sources.RECAP,
+            form=form,
+            page_obj=self.empty_page,
+            request=request,
         )
 
 
