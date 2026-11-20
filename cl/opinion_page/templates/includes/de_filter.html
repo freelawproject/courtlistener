@@ -45,18 +45,20 @@
             {{ form.filed_before }}
           </div>
         </div>
-        <!-- Document group -->
-        <div class="tight-input col-xs-6 col-sm-4 col-md-3">
-          <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
-            <label for="id_entry_gte" class="control-label">Documents</label>
-            {{ form.entry_gte }}
+        <!-- Document group: the form drops these fields for sources without entry numbers -->
+        {% if "entry_gte" in form.fields %}
+          <div class="tight-input col-xs-6 col-sm-4 col-md-3">
+            <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+              <label for="id_entry_gte" class="control-label">Documents</label>
+              {{ form.entry_gte }}
+            </div>
+            <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+              <label for="id_entry_lte"
+                     class="control-label">to</label>
+              {{ form.entry_lte }}
+            </div>
           </div>
-          <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
-            <label for="id_entry_lte"
-                   class="control-label">to</label>
-            {{ form.entry_lte }}
-          </div>
-        </div>
+        {% endif %}
         <!-- sort ordering -->
         <div class="tight-input col-xs-6 col-sm-3 col-md-2">
           <div id="sort-buttons"

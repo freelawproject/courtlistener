@@ -73,6 +73,9 @@ WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/federal-cases-and-filings"
 WIKI_COVERAGE_SCOTUS_URL = (
     f"{WIKI_COVERAGE_BASE_URL}/supreme-court-cases-and-filings"
 )
+WIKI_COVERAGE_TEXAS_URL = (
+    f"{WIKI_COVERAGE_BASE_URL}/state-court-cases-and-filings#texas"
+)
 
 ##############
 # Super Misc #
