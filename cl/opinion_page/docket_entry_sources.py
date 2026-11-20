@@ -198,6 +198,21 @@ def _download_pdf_label(document: Any) -> str:
     return "Download PDF"
 
 
+def _pdf_format_label(document: Any) -> str:
+    """Return the format name the document page shows for a source whose stored files are always PDFs."""
+    return "PDF"
+
+
+def _numbered_document_reference(document: Any) -> str:
+    """Return how the document page title refers to a numbered document, like "#12" or "#12, Att. #3"."""
+    attachment = (
+        f", Att. #{document.attachment_number}"
+        if document.attachment_number
+        else ""
+    )
+    return f"#{document.document_number}{attachment}"
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -277,6 +292,14 @@ class DocketEntrySource:
     on ``document.download_label``. It's "Download PDF" unless the source
     stores other formats.
 
+    ``document_format_label`` names the stored file's format, like "PDF",
+    for the document page's tab and links. ``attach_display_fields`` puts
+    it on ``document.format_label``.
+
+    ``document_reference`` returns how the document page title refers to a
+    document: "#12, Att. #3" by default, for sources that number their
+    documents.
+
     ``document_display_description`` does the same for each document's
     description, which ``attach_display_fields`` puts on
     ``document.display_description``. The legacy stack renders it unescaped
@@ -331,6 +354,8 @@ class DocketEntrySource:
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
     document_download_label: Callable[[Any], str] = _download_pdf_label
+    document_format_label: Callable[[Any], str] = _pdf_format_label
+    document_reference: Callable[[Any], str] = _numbered_document_reference
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -344,6 +369,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
         document
     )
     document.download_label = source.document_download_label(document)
+    document.format_label = source.document_format_label(document)
 
 
 # RECAP

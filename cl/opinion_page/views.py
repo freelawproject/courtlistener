@@ -83,7 +83,9 @@ from cl.lib.utils import human_sort
 from cl.opinion_page import forms_v2
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_entry_sources import (
+    DocketEntrySource,
     SourceDocketEntry,
+    SourceDocument,
     attach_display_fields,
     document_url,
 )
@@ -125,7 +127,6 @@ from cl.search.models import (
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
-    SCOTUSDocument,
     sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
@@ -635,17 +636,18 @@ async def docket_authorities(
     )
 
 
-def make_rd_title(rd: RECAPDocument | SCOTUSDocument) -> str:
-    """This will result in three database loads if rd hasn't already cached the objects."""
+def make_rd_title(rd: SourceDocument, source: DocketEntrySource) -> str:
+    """Build the document page's title, referring to the document the way its source does.
+
+    This will result in three database loads if rd hasn't already cached the
+    objects.
+    """
     de = rd.docket_entry
     d = de.docket
     court = d.court
-    return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
+    return "{desc}{reference} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
-        doc_num=rd.document_number,
-        att_num=(
-            f", Att. #{rd.attachment_number}" if rd.attachment_number else ""
-        ),
+        reference=source.document_reference(rd),
         case_name=best_case_name(d),
         court=court.citation_string,
         docket_number=f", {d.docket_number}" if d.docket_number else "",
@@ -811,7 +813,8 @@ async def recap_document_context(
         if source.has_pay_and_pray and external_url and redirect_or_modal:
             redirect_to_pacer_modal = True
 
-    title = make_rd_title(rd)
+    await sync_to_async(attach_document_page_fields)(source, rd)
+    title = make_rd_title(rd, source)
     needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
     if all([needs_thumb, rd.has_valid_pdf, is_og_bot]):
         await make_png_thumbnail_for_instance(
@@ -876,8 +879,23 @@ async def recap_document_context(
     )
 
 
+def attach_document_page_fields(
+    source: DocketEntrySource, rd: SourceDocument
+) -> None:
+    """Resolve what the document page shows for a document and its entry from the document's source, in place.
+
+    Callers in async views MUST wrap this in sync_to_async, since the
+    source's callables may touch the ORM.
+    """
+    attach_display_fields(source, rd)
+    # display_text is a page-only attribute, like the ones
+    # attach_display_fields sets, so the entry is typed loosely.
+    entry: Any = rd.docket_entry
+    entry.display_text = source.entry_display_text(entry)
+
+
 def get_attachment_values(
-    rd: RECAPDocument | SCOTUSDocument,
+    rd: SourceDocument,
     rd_values: list[tuple[int, int | None, str]],
     docket_id: int,
     slug: str,
@@ -896,8 +914,14 @@ def get_attachment_values(
             start = 0
             end = doc_len
         else:
+            # Find the row by pk alone, since some sources don't number
+            # their documents.
             rd_index = (
-                rd_values.index((rd.pk, rd.attachment_number, rd.description))
+                next(
+                    i
+                    for i, values in enumerate(rd_values)
+                    if values[0] == rd.pk
+                )
                 + 1
             )
             max_after = max_displayed - max_before

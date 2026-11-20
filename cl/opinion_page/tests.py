@@ -104,8 +104,10 @@ from cl.opinion_page.utils import (
 )
 from cl.opinion_page.views import (
     fetch_docket_entries,
+    get_attachment_values,
     get_downloads_context,
     get_prev_next_volumes,
+    make_rd_title,
     view_recap_document,
 )
 from cl.people_db.factories import (
@@ -811,6 +813,64 @@ class ViewRecapDocumentTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    def test_title_refers_to_the_document_and_attachment_numbers(
+        self,
+    ) -> None:
+        """Does the title still refer to a RECAP document by its number, and to an attachment by both numbers?"""
+        rd = RECAPDocumentFactory(
+            docket_entry__docket=self.docket,
+            description="Motion",
+            document_number="5",
+        )
+        attachment = RECAPAttachmentFactory(
+            docket_entry=rd.docket_entry,
+            description="Exhibit",
+            document_number="5",
+            attachment_number=2,
+        )
+        docket = self.docket
+        suffix = (
+            f" in {docket.case_name} ({docket.court.citation_string}, "
+            f"{docket.docket_number})"
+        )
+        cases = [
+            (rd, f"Motion &ndash; #5{suffix}"),
+            (attachment, f"Exhibit &ndash; #5, Att. #2{suffix}"),
+        ]
+        for document, expected in cases:
+            with self.subTest(document=document.description):
+                self.assertEqual(
+                    make_rd_title(document, docket_entry_sources.RECAP),
+                    expected,
+                )
+
+    async def test_entry_description_is_escaped(self) -> None:
+        """Is the entry's description still escaped on the document page?"""
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket,
+            docket_entry__description="<b>Order</b>",
+        )
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number
+        )
+        self.assertContains(r, "<p>&lt;b&gt;Order&lt;/b&gt;</p>")
+        self.assertNotContains(r, "<p><b>Order</b></p>")
+
+    def test_attachment_window_finds_the_document_by_pk(self) -> None:
+        """Does the attachments window center on the document by its pk, so it also works for documents without an attachment number?"""
+        rd_values: list[tuple[int, int | None, str]] = [
+            (pk, None, f"Doc {pk}") for pk in range(30)
+        ]
+        # TexasDocument has no attachment_number attribute at all.
+        attachments = get_attachment_values(
+            TexasDocument(pk=15), rd_values, self.docket.pk, "slug", "uuid"
+        )
+        self.assertEqual(attachments[0]["description"], "...and 9 previous")
+        self.assertEqual(
+            [a["description"] for a in attachments[1:]],
+            [f"Doc {pk}" for pk in range(9, 30)],
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_page_waffle")
