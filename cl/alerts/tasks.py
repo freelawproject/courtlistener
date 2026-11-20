@@ -368,8 +368,8 @@ def send_alert_and_webhook(
      The second email comes in to atty1@recap.email. We:
      -Do nothing.
 
-    Entries and email templates are resolved per docket source (RECAP vs.
-    SCOTUS) via Docket.get_alert_source() -- see
+    Entries and email templates are resolved per docket source (RECAP,
+    SCOTUS or Texas) via Docket.get_alert_source() -- see
     cl/alerts/docket_alert_sources.py.
 
     Args:

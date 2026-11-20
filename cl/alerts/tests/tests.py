@@ -1163,27 +1163,37 @@ class DocketAlertSourceTest(TestCase):
     def test_texas_source_lookups_return_new_entries_oldest_first(
         self,
     ) -> None:
-        """Do both Texas lookups return TexasDocketEntry rows oldest first, and does entries_since leave out the ones created before `since`?"""
-        docket = DocketFactory(court=CourtFactory(id="tex", jurisdiction="S"))
-        old_entry = TexasDocketEntryFactory(
-            docket=docket, sequence_number="2025-01-01.001"
-        )
-        before = now()
-        des = [
-            TexasDocketEntryFactory(docket=docket, sequence_number=seq)
-            for seq in ("2025-01-03.001", "2025-01-02.001")
-        ]
+        """Do both Texas lookups return TexasDocketEntry rows oldest first, and does entries_since leave out the ones created before `since` and the ones on other dockets?"""
+        court = CourtFactory(id="tex", jurisdiction="S")
+        docket = DocketFactory(court=court)
+        since = now()
+        with time_machine.travel(since - timedelta(seconds=1), tick=False):
+            old_entry = TexasDocketEntryFactory(
+                docket=docket, sequence_number="2025-01-01.001"
+            )
+        with time_machine.travel(since, tick=False):
+            des = [
+                TexasDocketEntryFactory(docket=docket, sequence_number=seq)
+                for seq in ("2025-01-03.001", "2025-01-02.001")
+            ]
+            # Created at the same time, so only the docket filter leaves it
+            # out of entries_since.
+            other_docket_entry = TexasDocketEntryFactory(
+                docket=DocketFactory(court=court),
+                sequence_number="2025-01-04.001",
+            )
         expected = ["2025-01-02.001", "2025-01-03.001"]
         lookups = {
             "entries_by_pk": TEXAS_ALERT_SOURCE.entries_by_pk(
                 [de.pk for de in des]
             ),
-            "entries_since": TEXAS_ALERT_SOURCE.entries_since(docket, before),
+            "entries_since": TEXAS_ALERT_SOURCE.entries_since(docket, since),
         }
         for lookup_name, qs in lookups.items():
             with self.subTest(lookup=lookup_name):
                 self.assertEqual([de.sequence_number for de in qs], expected)
                 self.assertNotIn(old_entry, list(qs))
+                self.assertNotIn(other_docket_entry, list(qs))
 
     def test_texas_entries_since_loads_in_two_queries(self) -> None:
         """Does the Texas lookup load its entries, their docket and their documents (minus plain_text) in two queries, however many entries there are?"""
