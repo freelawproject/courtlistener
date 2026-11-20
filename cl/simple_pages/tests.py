@@ -5,17 +5,15 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.urls import resolve, reverse
-from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import HtmlElement, fromstring
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.svg_tags import svg
 from cl.lib.middleware import WIP_PROPS
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import CottonRenderMixin, SimpleUserDataMixin
 from cl.lib.types import TabItem
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -825,18 +823,12 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertNotIn('nonce=""', html)
 
 
-class DialogComponentTest(SimpleTestCase):
+class DialogComponentTest(CottonRenderMixin, SimpleTestCase):
     """The c-dialog component renders a trigger only when given one."""
-
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
 
     def test_trigger_slot_renders_a_trigger(self) -> None:
         """Trigger content renders the default trigger button."""
-        html = self.render(
+        html = self.render_cotton(
             '<c-dialog><c-slot name="button_content">Open</c-slot>'
             '<c-slot name="panel">Body</c-slot></c-dialog>'
         )
@@ -844,14 +836,14 @@ class DialogComponentTest(SimpleTestCase):
 
     def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
         """A dialog opened by other means, such as an event listener, has no trigger button."""
-        html = self.render(
+        html = self.render_cotton(
             '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
 
 
-class TabsComponentTest(SimpleTestCase):
+class TabsComponentTest(CottonRenderMixin, SimpleTestCase):
     """c-tabs renders link tabs or panel tabs, depending on its tab list."""
 
     ROOT_ID = "my-tabs-tabs"
@@ -882,11 +874,8 @@ class TabsComponentTest(SimpleTestCase):
         ]
 
     def render(self, source: str, **context: Any) -> HtmlElement:
-        """Compiles a Cotton snippet, renders it and parses the result."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        context["request"] = RequestFactory().get("/")
-        return fromstring(template.render(context))
+        """Renders a Cotton snippet and parses the result."""
+        return fromstring(self.render_cotton(source, **context))
 
     def test_link_tabs_render_a_nav_of_links(self) -> None:
         """Link tabs are links in a nav, and htmx targets the component's root."""
@@ -1053,16 +1042,8 @@ class TabsComponentTest(SimpleTestCase):
                 )
 
 
-class IconComponentTest(SimpleTestCase):
+class IconComponentTest(CottonRenderMixin, SimpleTestCase):
     """Tests sizing, variant selection and accessibility of c-icon."""
-
-    def render(
-        self, source: str, context: dict[str, Any] | None = None
-    ) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render(context or {})
 
     def path_data(self, html: str) -> list[str]:
         """Returns the drawing data of every path in the given SVG markup."""
@@ -1070,39 +1051,41 @@ class IconComponentTest(SimpleTestCase):
 
     def test_icon_is_hidden_from_assistive_technology_by_default(self) -> None:
         """An icon without an aria_label is decorative."""
-        icon = fromstring(self.render('<c-icon name="chevron" />'))
+        icon = fromstring(self.render_cotton('<c-icon name="chevron" />'))
         self.assertEqual(icon.get("aria-hidden"), "true")
         self.assertIsNone(icon.get("aria-label"))
 
     def test_aria_label_gives_the_icon_an_accessible_name(self) -> None:
         """An icon with an aria_label is named and not hidden."""
         icon = fromstring(
-            self.render('<c-icon name="chevron" aria_label="Next page" />')
+            self.render_cotton(
+                '<c-icon name="chevron" aria_label="Next page" />'
+            )
         )
         self.assertEqual(icon.get("aria-label"), "Next page")
         self.assertIsNone(icon.get("aria-hidden"))
 
     def test_bound_aria_label_is_escaped(self) -> None:
         """An aria_label bound from the context can't break out of its attribute."""
-        html = self.render(
+        html = self.render_cotton(
             '<c-icon name="chevron" :aria_label="name" />',
-            {"name": 'A "b" <c> & d'},
+            name='A "b" <c> & d',
         )
         self.assertIn('aria-label="A &quot;b&quot; &lt;c&gt; &amp; d"', html)
         self.assertNotIn("<c>", html)
 
     def test_renders_without_surrounding_whitespace(self) -> None:
         """The icon can sit inline next to text without adding a space."""
-        html = self.render('<c-icon name="chevron" />')
+        html = self.render_cotton('<c-icon name="chevron" />')
         self.assertTrue(html.startswith("<svg"), repr(html[:20]))
         self.assertTrue(html.endswith("</svg>"), repr(html[-20:]))
 
     def test_bound_class_is_escaped(self) -> None:
         """A class bound from the context can't add attributes to the icon."""
         icon = fromstring(
-            self.render(
+            self.render_cotton(
                 '<c-icon name="chevron" :class="classes" />',
-                {"classes": '" onload="alert(1)'},
+                classes='" onload="alert(1)',
             )
         )
         self.assertIsNone(icon.get("onload"))
@@ -1117,7 +1100,7 @@ class IconComponentTest(SimpleTestCase):
         for source, expected_file in cases:
             with self.subTest(source=source):
                 self.assertEqual(
-                    self.path_data(self.render(source)),
+                    self.path_data(self.render_cotton(source)),
                     self.path_data(svg(expected_file)),
                 )
 
@@ -1133,7 +1116,9 @@ class IconComponentTest(SimpleTestCase):
         for size, expected_class in cases.items():
             with self.subTest(size=size):
                 icon = fromstring(
-                    self.render(f'<c-icon name="chevron" size="{size}" />')
+                    self.render_cotton(
+                        f'<c-icon name="chevron" size="{size}" />'
+                    )
                 )
                 self.assertEqual(
                     icon.get("class").split(), ["shrink-0", expected_class]
@@ -1142,7 +1127,7 @@ class IconComponentTest(SimpleTestCase):
     def test_class_is_added_after_the_size_class(self) -> None:
         """Extra classes keep the size class and follow it."""
         icon = fromstring(
-            self.render(
+            self.render_cotton(
                 '<c-icon name="chevron" size="sm" class="rotate-90" />'
             )
         )
@@ -1153,7 +1138,7 @@ class IconComponentTest(SimpleTestCase):
     def test_custom_size_leaves_sizing_to_class(self) -> None:
         """A custom size sets no size class, leaving sizing to `class`."""
         icon = fromstring(
-            self.render(
+            self.render_cotton(
                 '<c-icon name="chevron" size="custom" class="size-3" />'
             )
         )

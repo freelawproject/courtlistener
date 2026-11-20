@@ -8,8 +8,11 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.template import engines
+from django.test import RequestFactory
 from django.test.testcases import SerializeMixin
 from django.utils import timezone
+from django_cotton.compiler_regex import CottonCompiler
 from lxml import etree
 
 from cl.audio.factories import AudioFactory
@@ -1350,6 +1353,25 @@ class SimpleUserDataMixin:
             user__username="pandora",
             user__password=make_password("password"),
         )
+
+
+class CottonRenderMixin:
+    """Renders Cotton markup in tests without a template file."""
+
+    def render_cotton(self, source: str, **context: Any) -> str:
+        """Compiles Cotton markup and renders it as a Django template.
+
+        Args:
+            source: The Cotton markup to render.
+            **context: Template context. A request is added if none is given,
+                since components that use require_script need one.
+
+        Returns:
+            The rendered HTML.
+        """
+        context.setdefault("request", RequestFactory().get("/"))
+        compiled = CottonCompiler().process(source)
+        return engines["django"].from_string(compiled).render(context)
 
 
 class SitemapTest(TestCase):
