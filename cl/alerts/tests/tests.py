@@ -1376,7 +1376,30 @@ class DocketAlertTexasTest(TestCase):
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertNotIn("<script>alert(1)</script>", html)
         self.assertNotIn("Document<br>Number", html)
+        self.assertIn(">From TAMES</a>", html)
+        self.assertIn(
+            "Download from TAMES: https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+            message.body,
+        )
         mock_webhooks.delay.assert_not_called()
+
+    def test_stored_file_is_offered_from_recap_instead_of_tames(self) -> None:
+        """When we already have the file, does each part link it as "From RECAP", like the SCOTUS email, and leave out the TAMES copy?"""
+        TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(docket=self.docket),
+            description="Brief",
+            filepath_local="texas/brief.pdf",
+            url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=2",
+        )
+        send_alert_and_webhook(self.docket.pk, self.before)
+        message = mail.outbox[0]
+        html = message.alternatives[0][0]
+        self.assertIn(">From RECAP</a>", html)
+        self.assertIn("Download from RECAP: ", message.body)
+        self.assertIn("texas/brief.pdf", message.body)
+        for part in (message.body, html):
+            self.assertNotIn("TAMES", part)
+            self.assertNotIn("MediaID=2", part)
 
     def test_only_the_courtlistener_docket_link_is_offered(self) -> None:
         """Does the email link the docket on CourtListener only, like the SCOTUS email, and not on TAMES?"""

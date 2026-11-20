@@ -29,13 +29,9 @@
           </td>
           <td>
             {% for doc in de.texasdocument_set.all %}
-              {% if doc.filepath_local %}
-                <a href="{{ doc.filepath_local.url }}">{{ doc.description|default:"Document" }}</a>
-              {% elif doc.url|http_url %}
-                <a href="{{ doc.url|http_url }}">{{ doc.description|default:"Document" }} (TAMES)</a>
-              {% else %}
-                {{ doc.description|default:"Document" }}
-              {% endif %}{% if not forloop.last %}<br>{% endif %}
+              {{ doc.description|default:"Document" }}{% if doc.filepath_local %}:
+                <a href="{{ doc.filepath_local.url }}">From RECAP</a>{% elif doc.url|http_url %}:
+                <a href="{{ doc.url|http_url }}">From TAMES</a>{% endif %}{% if not forloop.last %}<br>{% endif %}
             {% endfor %}
           </td>
         </tr>
