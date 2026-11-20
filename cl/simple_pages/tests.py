@@ -9,6 +9,7 @@ from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
+from django.utils.safestring import mark_safe
 from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
@@ -848,6 +849,124 @@ class DialogComponentTest(SimpleTestCase):
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
+
+
+class TooltipComponentTest(SimpleTestCase):
+    """The c-tooltip component renders a help button and its message."""
+
+    def render(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Compiles a Cotton snippet and renders it with an optional context."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render(
+            {"request": RequestFactory().get("/"), **(context or {})}
+        )
+
+    def test_button_is_named_after_what_it_explains(self) -> None:
+        """The icon-only button gets a name that says what it explains."""
+        tree = fromstring(
+            self.render('<c-tooltip label="Last Updated" message="Message" />')
+        )
+        button = tree.xpath("//button")[0]
+        self.assertEqual(button.get("aria-label"), "More about Last Updated")
+        self.assertEqual(button.get("type"), "button")
+
+    def test_button_exposes_whether_the_tooltip_is_open(self) -> None:
+        """The button's aria-expanded is bound to the open state."""
+        html = self.render('<c-tooltip label="Item" message="Message" />')
+        self.assertIn('x-bind:aria-expanded="isOpen"', html)
+
+    def test_live_region_starts_empty(self) -> None:
+        """The live region is empty until the tooltip opens, so the message is announced as new content."""
+        tree = fromstring(
+            self.render('<c-tooltip label="Item" message="Message" />')
+        )
+        live = tree.xpath("//*[@role='status']")[0]
+        self.assertEqual(len(live), 0)
+        self.assertFalse((live.text or "").strip())
+
+    def test_message_html_is_not_escaped(self) -> None:
+        """A safe message, such as the Last Updated <strong>, renders as markup."""
+        html = self.render(
+            '<c-tooltip label="Item" :message="message" />',
+            {"message": mark_safe("Updated by <strong>RECAP</strong>")},
+        )
+        self.assertIn("<strong>RECAP</strong>", html)
+
+    def test_arrow_renders_only_when_requested(self) -> None:
+        """has_arrow adds the arrow; leaving it out gives the no-arrow variant."""
+        cases = [
+            ('<c-tooltip label="Item" has_arrow message="Message" />', 1),
+            ('<c-tooltip label="Item" message="Message" />', 0),
+        ]
+        for source, expected in cases:
+            with self.subTest(source=source):
+                tree = fromstring(self.render(source))
+                self.assertEqual(len(tree.xpath("//*[@data-arrow]")), expected)
+
+    def test_description_renders_only_when_given(self) -> None:
+        """A description adds supporting text and the roomier padding."""
+        with_description = self.render(
+            '<c-tooltip label="Item" description="Supporting text" message="Message" />'
+        )
+        self.assertIn("Supporting text", with_description)
+        self.assertIn("p-3", with_description)
+
+        without_description = self.render(
+            '<c-tooltip label="Item" message="Message" />'
+        )
+        self.assertIn("px-3 py-2", without_description)
+        self.assertNotIn("p-3", without_description)
+
+    def test_variant_picks_the_theme(self) -> None:
+        """Dark is the default theme and light is opt-in."""
+        cases = [
+            (
+                '<c-tooltip label="Item" message="Message" />',
+                "bg-greyscale-900",
+            ),
+            (
+                '<c-tooltip label="Item" variant="light" message="Message" />',
+                "bg-white",
+            ),
+        ]
+        for source, background in cases:
+            with self.subTest(background=background):
+                self.assertIn(background, self.render(source))
+
+    def test_position_is_passed_to_the_anchor(self) -> None:
+        """The position prop sets the x-anchor placement and its padding axis.
+
+        Defaults to bottom; only that axis is padded to bridge the hover gap.
+        """
+        cases = [
+            (
+                '<c-tooltip label="Item" message="Message" />',
+                "bottom",
+                "py-1.5",
+            ),
+            (
+                '<c-tooltip label="Item" position="top-start" message="Message" />',
+                "top-start",
+                "py-1.5",
+            ),
+            (
+                '<c-tooltip label="Item" position="right" message="Message" />',
+                "right",
+                "px-1.5",
+            ),
+        ]
+        for source, position, padding in cases:
+            with self.subTest(position=position):
+                live = fromstring(self.render(source)).xpath(
+                    "//*[@role='status']"
+                )[0]
+                self.assertEqual(
+                    live.get(f"x-anchor.{position}"), "$refs.trigger"
+                )
+                self.assertIn(padding, live.get("class").split())
 
 
 class IconComponentTest(SimpleTestCase):
