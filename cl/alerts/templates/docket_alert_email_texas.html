@@ -1,0 +1,35 @@
+{% extends "docket_alert_email_base.html" %}
+{% load extras text_filters %}
+
+{# TAMES text is scraped, so unlike the RECAP and SCOTUS templates nothing here is rendered with |safe, the case name included. #}
+
+{% block case_name %}{{ docket|best_case_name }}{% endblock %}
+
+{% block preheader %}
+      {% for de in new_des %}{% if forloop.first %}{{ de.entry_type }}{% endif %}{% endfor %}{% endblock %}
+
+{% block table_head %}
+      <tr>
+        <th>Date&nbsp;Filed</th>
+        <th>Description</th>
+        <th>Documents</th>
+      </tr>{% endblock %}
+
+{% block rows %}
+      {% for de in new_des %}
+        <tr>
+          <td>
+            {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}
+          </td>
+          <td>
+            {% for line in de.display_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          </td>
+          <td>
+            {% for doc in de.texasdocument_set.all %}
+              {{ doc.description|default:"Document" }}{% if doc.filepath_local %}:
+                <a href="{{ doc.filepath_local.url }}">From RECAP</a>{% elif doc.url|http_url %}:
+                <a href="{{ doc.url|http_url }}">From TAMES</a>{% endif %}{% if not forloop.last %}<br>{% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}{% endblock %}
