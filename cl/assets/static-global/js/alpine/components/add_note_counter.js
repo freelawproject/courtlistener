@@ -3,21 +3,23 @@
  *
  * Reads the limit from the textarea's maxlength, so the number lives only in
  * the form widget. The visible count is also the textarea's description, read
- * on focus and on demand. Announces when the remaining count drops to
- * START_ANNOUNCE_AT or reaches zero, instead of on every keystroke.
+ * on focus and on demand. Within the last START_ANNOUNCE_AT characters, the
+ * remaining count is announced each time the user pauses typing, never on a
+ * keystroke.
  */
 document.addEventListener("alpine:init", () => {
   const START_ANNOUNCE_AT = 50;
+  const PAUSE_MS = 1000;
 
   Alpine.data("noteCounter", () => ({
     remaining: 0,
     announcement: "",
-    bandzone: null,
+    announceTimer: null,
 
     init() {
       this.textarea = this.$el.querySelector("textarea");
       this.describeTextarea();
-      this.update();
+      this.remaining = this.countRemaining();
     },
 
     // Link the visible count from the textarea's aria-describedby. Any
@@ -32,19 +34,22 @@ document.addEventListener("alpine:init", () => {
       this.textarea.setAttribute("aria-describedby", ids.join(" "));
     },
 
+    // Each keystroke empties the status region and restarts the timer, so
+    // nothing is spoken while typing. A pause puts the count back, which is
+    // always a change, so the same count can be announced again.
     update() {
-      this.remaining = this.textarea.maxLength - this.textarea.value.length;
+      this.remaining = this.countRemaining();
+      clearTimeout(this.announceTimer);
+      this.announcement = "";
+      if (this.remaining > START_ANNOUNCE_AT) return;
 
-      /* Announce when entering a band, not while staying in it, so typing
-        within the last 50 characters is silent. Leaving every band clears
-        the message so the same text can be announced again later. */
-      const bandzone =
-        this.remaining <= 0 ? "limit" : this.remaining <= START_ANNOUNCE_AT ? "low" : null;
+      this.announceTimer = setTimeout(() => {
+        this.announcement = this.remainingText;
+      }, PAUSE_MS);
+    },
 
-      if (bandzone === this.bandzone) return;
-
-      this.bandzone = bandzone;
-      this.announcement = bandzone ? this.remainingText : "";
+    countRemaining() {
+      return this.textarea.maxLength - this.textarea.value.length;
     },
 
     get remainingText() {
