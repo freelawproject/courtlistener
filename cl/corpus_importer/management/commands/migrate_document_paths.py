@@ -250,6 +250,7 @@ class Manifest:
     """
 
     def __init__(self, path: Path) -> None:
+        """Open the manifest for appending, writing the header if it is new or empty."""
         self._lock = threading.Lock()
         write_header = not path.exists() or path.stat().st_size == 0
         self._file: TextIO = path.open("a", newline="")
@@ -279,6 +280,7 @@ class PathMigrator:
         manifest: Manifest,
         dry_run: bool,
     ) -> None:
+        """Build a migrator for one model's spec, target bucket, and manifest."""
         self.spec = spec
         self.target = target
         self.manifest = manifest
@@ -525,6 +527,8 @@ def check_destination_prefixes(spec_name: str) -> dict[str, int]:
 
 
 class Command(VerboseCommand):
+    """Migrate one model's document files to the RECAP storage layout."""
+
     help = (
         "Copy SCOTUS, Texas or Florida document files to the RECAP storage "
         "layout in S3 and point their rows at the new keys. Old objects are "
@@ -532,6 +536,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the model, manifest, concurrency, batching, dry-run, resume, and check options."""
         parser.add_argument(
             "--model",
             required=True,
@@ -587,6 +592,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Run the migration, or only count destination objects with ``--check-destination``.
+
+        Raises:
+            CommandError: If migrating without ``--manifest`` or with fewer
+                than one worker.
+        """
         super().handle(*args, **options)
         spec_name = options["model"]
 

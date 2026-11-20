@@ -1,3 +1,5 @@
+"""Settings for the Neon CRM API and membership webhooks."""
+
 import environ
 
 env = environ.FileAwareEnv()

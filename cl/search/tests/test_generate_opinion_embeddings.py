@@ -1,6 +1,6 @@
 import datetime
 import json
-import os
+from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
@@ -27,6 +27,16 @@ class FakeS3IntelligentTieringStorage:
         if isinstance(file_data, bytes):
             file_data = file_data.decode("utf-8")
         self.saved_files[file_path] = file_data
+
+
+def expected_embedding_path(record_id: int) -> str:
+    """Storage path where an opinion's embedding file is expected to be saved."""
+    return str(
+        Path("embeddings")
+        / "opinions"
+        / settings.NLP_EMBEDDING_MODEL
+        / f"{record_id}.json"
+    )
 
 
 def inception_batch_request_mock(opinions_to_vectorize):
@@ -203,12 +213,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             with self.subTest(embedding):
                 embedding_dict = json.loads(embedding)
                 record_id = embedding_dict["id"]
-                expected_path = os.path.join(
-                    "embeddings",
-                    "opinions",
-                    settings.NLP_EMBEDDING_MODEL,
-                    f"{record_id}.json",
-                )
+                expected_path = expected_embedding_path(record_id)
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
 
@@ -253,12 +258,7 @@ class GenerateOpinionEmbeddingTest(TestCase):
             with self.subTest(embedding):
                 embedding_dict = json.loads(embedding)
                 record_id = embedding_dict["id"]
-                expected_path = os.path.join(
-                    "embeddings",
-                    "opinions",
-                    settings.NLP_EMBEDDING_MODEL,
-                    f"{record_id}.json",
-                )
+                expected_path = expected_embedding_path(record_id)
                 self.assertEqual(expected_path, path)
                 self.assertIn(embedding_dict, expected_embeddings)
 

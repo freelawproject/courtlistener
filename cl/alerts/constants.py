@@ -1,3 +1,5 @@
+"""Membership URLs and per-tier RECAP alert quotas."""
+
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
 

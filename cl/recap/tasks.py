@@ -1,3 +1,5 @@
+"""Celery tasks for processing RECAP uploads, recap.email notifications, and PACER fetches."""
+
 import asyncio
 import concurrent.futures
 import hashlib
@@ -9,7 +11,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, overload
+from typing import Any, TypedDict, Unpack, overload
 from zipfile import ZipFile
 
 import httpx
@@ -42,6 +44,7 @@ from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
+    SCOTUSDocketEntryEmailHandlingResult,
     SCOTUSEmailType,
     SCOTUSNotificationEmail,
 )
@@ -65,6 +68,8 @@ from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.scotus_daemon_utils import save_scotus_raw_to_s3
 from cl.corpus_importer.tasks import (
+    AppellateDocketReportQueryParams,
+    DocketReportQueryParams,
     download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
@@ -235,7 +240,6 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     Args:
         fq: The PacerFetchQueue item to process
     """
-    result = None
     match fq.request_type:
         case REQUEST_TYPE.DOCKET:
             court_id = get_court_id_from_fetch_queue(fq)
@@ -262,8 +266,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
                 f"Unsupported request_type: {fq.request_type}"
             )
 
-    result = c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
-    return result
+    return c.apply_async(queue=settings.CELERY_PACER_FETCH_QUEUE)
 
 
 async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
@@ -413,7 +416,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
             # Sometimes we don't have the case ID from PACER. Try to make this
             # work anyway.
             rd = await RECAPDocument.objects.aget(pacer_doc_id=pq.pacer_doc_id)
-    except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
+    except RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned:
         # Try again but this time using Docket and Docket Entry to get
         # the RECAPDocument instance. If not found, we create a new one.
         retries = 5
@@ -582,7 +585,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
     if not pq.debug:
         try:
             await rd.asave()
-        except (IntegrityError, ValidationError):
+        except IntegrityError, ValidationError:
             msg = "Failed to save RECAPDocument (unique_together constraint or doc type issue)"
             await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             await sync_to_async(rd.filepath_local.delete)(save=False)
@@ -763,7 +766,7 @@ async def process_recap_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1111,7 +1114,7 @@ async def process_recap_claims_register(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1218,7 +1221,7 @@ async def process_recap_docket_history_report(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1332,7 +1335,7 @@ async def process_case_query_page(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1461,7 +1464,7 @@ async def process_recap_appellate_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1587,7 +1590,7 @@ async def process_recap_acms_docket(pk):
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1709,7 +1712,7 @@ async def process_recap_acms_appellate_attachment(
                     text,
                 )
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         await mark_pq_status(
             pq,
             f"We encountered a parsing error while processing this item: {e}",
@@ -1846,7 +1849,7 @@ def process_recap_appellate_case_query_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1859,7 +1862,7 @@ def process_recap_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task(bind=True)
@@ -1872,7 +1875,7 @@ def process_recap_appellate_case_query_result_page(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query result pages not yet supported. Coming soon."
     async_to_sync(mark_pq_status)(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    return
 
 
 @app.task
@@ -2008,7 +2011,7 @@ def create_or_merge_from_idb_chunk(idb_chunk):
             logger.info(msg, idb_row)
             create_new_docket_from_idb(idb_row)
             continue
-        elif count == 1:
+        if count == 1:
             d = ds[0]
             msg = "Merging Docket %s with IDB row: %s"
             logger.info(msg, d, idb_row)
@@ -2034,7 +2037,7 @@ def update_docket_from_hidden_api(data):
             or None if looking up the item failed.
     """
     if data is None:
-        return None
+        return
 
     d = Docket.objects.get(pk=data["pass_through"])
 
@@ -2105,7 +2108,7 @@ def fetch_pacer_doc_by_rd_base(
         msg = "PDF already marked as 'is_available'. Doing nothing."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
         self.request.chain = None
-        return
+        return None
 
     if not pacer_doc_id:
         msg = (
@@ -2119,14 +2122,14 @@ def fetch_pacer_doc_by_rd_base(
             fq, msg, PROCESSING_STATUS.INVALID_CONTENT
         )
         self.request.chain = None
-        return
+        return None
 
     session_data = async_to_sync(get_pacer_cookie_from_cache)(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
@@ -2148,11 +2151,11 @@ def fetch_pacer_doc_by_rd_base(
                 magic_number,
                 de_seq_num=de_seq_num,
             )
-    except (httpx.RequestError, httpx.HTTPError):
+    except httpx.RequestError, httpx.HTTPError:
         msg = "Failed to get PDF from network."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
     except PacerLoginException as exc:
         msg = f"PacerLoginException while getting document for rd: {rd.pk}."
         if self.request.retries == self.max_retries:
@@ -2183,7 +2186,7 @@ def fetch_pacer_doc_by_rd_base(
     if success is False:
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
-        return
+        return None
 
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     subdocket_pqs_to_replicate = []
@@ -2265,7 +2268,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
         fq = PacerFetchQueue.objects.get(pk=fq_pk)
         msg = "Successfully completed fetch and save."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-    return None
+    return
 
 
 @app.task(
@@ -2368,10 +2371,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
-            self.request.chain = None
-            return []
+        async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return []
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting attachment page"
         if self.request.retries == self.max_retries:
@@ -2506,7 +2508,7 @@ def replicate_fq_pdf_to_subdocket_rds(
         async_to_sync(process_recap_pdf)(pq_pk)
 
 
-def get_fq_docket_kwargs(fq):
+def get_fq_docket_kwargs(fq: PacerFetchQueue) -> DocketReportQueryParams:
     """Gather the kwargs for the Juriscraper DocketReport from the fq object.
 
     Args:
@@ -2526,7 +2528,9 @@ def get_fq_docket_kwargs(fq):
     }
 
 
-def get_fq_appellate_docket_kwargs(fq: PacerFetchQueue):
+def get_fq_appellate_docket_kwargs(
+    fq: PacerFetchQueue,
+) -> AppellateDocketReportQueryParams:
     """Gather the kwargs for the Juriscraper AppellateDocketReport from the fq object.
 
     Args:
@@ -2651,7 +2655,7 @@ async def purchase_appellate_docket_by_docket_number(
     court_id: str,
     docket_number: str,
     fq: PacerFetchQueue,
-    **kwargs,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> _CreateUpdateDocketFromFetchDict:
     """Purchases and processes an appellate docket from PACER by docket number.
 
@@ -2675,14 +2679,13 @@ async def purchase_appellate_docket_by_docket_number(
         )
 
     pacer_court_id = map_cl_to_pacer_id(court_id)
-    report_class = ACMSDocketReport if acms_case_id else AppellateDocketReport
-    report = report_class(pacer_court_id, session)
-
     if acms_case_id:
         # ACMSDocketReport only accepts the case ID; filters are not currently
         # supported for ACMS docket reports.
+        report = ACMSDocketReport(pacer_court_id, session)
         await report.query(acms_case_id)
     else:
+        report = AppellateDocketReport(pacer_court_id, session)
         await report.query(docket_number, **kwargs)
 
     docket_data = report.data
@@ -2956,6 +2959,7 @@ async def fetch_docket_base(
 
 @app.task
 def mark_fq_successful(fq_pk):
+    """Mark a PACER fetch request as successfully completed."""
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     msg = "Successfully completed fetch and save."
     async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -2991,12 +2995,11 @@ def get_recap_email_recipients(
         List of recap.email addresses
     """
     # Select only @recap.email addresses
-    recap_email_recipients = [
+    return [
         recap_email.lower()
         for recap_email in email_recipients
         if "@recap.email" in recap_email
     ]
-    return recap_email_recipients
 
 
 async def get_attachment_page_by_url(
@@ -3081,12 +3084,12 @@ async def save_pacer_doc_from_pq(
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-        return
+        return None
 
     if pq.status == PROCESSING_STATUS.FAILED or not pq.filepath_local:
         await set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
         await mark_fq_status(fq, pq.error_message, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     pdf_bytes = await read_file_bytes(pq.filepath_local)
 
@@ -3108,7 +3111,7 @@ async def save_pacer_doc_from_pq(
 
     if success is False:
         await mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
+        return None
 
     msg = "Successfully completed fetch and save."
     await mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -3325,6 +3328,8 @@ def get_and_copy_recap_attachment_docs(
 
 @dataclass
 class DocketUpdatedData:
+    """A docket and the entries and documents merged into it."""
+
     docket: Docket
     des_returned: list
     rds_updated: list
@@ -3357,9 +3362,8 @@ def open_and_validate_email_notification(
                 epq, msg, PROCESSING_STATUS.FAILED, "status_message"
             )
             return None, ""
-        else:
-            # Do a retry. Hopefully the file will be in place soon.
-            raise self.retry(exc=exc)
+        # Do a retry. Hopefully the file will be in place soon.
+        raise self.retry(exc=exc)
 
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
@@ -3915,6 +3919,7 @@ def process_recap_email(
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
+    """Queue processing of a recap.email notification, then extraction of its documents."""
     return chain(
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
@@ -3964,9 +3969,8 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
-        else:
-            raise self.retry(exc=exc)
+            return
+        raise self.retry(exc=exc)
 
     texas_email_parser = TamesEmail()
     texas_email_parser._parse_text(body)
@@ -3980,7 +3984,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
@@ -3995,7 +3999,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
         case _:
             docket_parser = TexasCourtOfAppealsScraper(
                 court_id=email_data["court_id"]
@@ -4053,7 +4057,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     try:
         result = merge_texas_docket(docket_data, download_attachments=True)
@@ -4065,7 +4069,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     else:
         changed_documents = list(
             result.creates.get("TexasDocument", set())
@@ -4083,7 +4087,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
 
-    return None
+    return
 
 
 def fetch_and_archive_scotus_docket_followup(
@@ -4091,7 +4095,7 @@ def fetch_and_archive_scotus_docket_followup(
     notification: SCOTUSNotificationEmail,
     followup_url: str,
     timeout: float = 10.0,
-) -> dict[str, str | dict[str, str]]:
+) -> SCOTUSDocketEntryEmailHandlingResult:
     """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3, and parse it.
 
     Args:
@@ -4170,9 +4174,8 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
-        else:
-            raise self.retry(exc=exc)
+            return
+        raise self.retry(exc=exc)
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
@@ -4197,7 +4200,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
 
     if email_type == SCOTUSEmailType.CONFIRMATION.value:
         if data == SCOTUSConfirmationResult.Success.value:
@@ -4208,7 +4211,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
                 "status_message",
             )
             self.request.chain = None
-            return None
+            return
 
         async_to_sync(mark_pq_status)(
             epq,
@@ -4217,7 +4220,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             "status_message",
         )
         self.request.chain = None
-        return None
+        return
     try:
         d, _, doc_pks = merge_scotus_docket(data)
     except Exception as e:
@@ -4233,11 +4236,11 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
             rd_id=doc_pks,
             model_name="search.SCOTUSDocument",
         )
-        msg = f"SCOTUS docket {data['docket_number']} updated successfully."
+        msg = f"SCOTUS docket {d.docket_number} updated successfully."
         status = PROCESSING_STATUS.SUCCESSFUL
         async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
-    return None
+    return
 
 
 @app.task(
@@ -4262,7 +4265,7 @@ def check_pdf_redactions(rd_pk: int) -> None:
     try:
         redaction_response = async_to_sync(check_redactions_service)(rd)
     except Exception:
-        logger.error("Redaction check failed for RD %s", rd_pk, exc_info=True)
+        logger.exception("Redaction check failed for RD %s", rd_pk)
         raise
 
     if not redaction_response.is_success:

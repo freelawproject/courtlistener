@@ -1,8 +1,11 @@
+"""Hashing and random key helpers."""
+
 # File roughly ordered by quality of hashing algo. Better ones further down.
 import hashlib
 import json
 import secrets
 import uuid
+from pathlib import Path
 
 
 def md5(s: bytes | str) -> str:
@@ -66,7 +69,7 @@ def sha1_of_file(file_path: str, buffer_size: int = 2**16) -> str:
         A hexadecimal SHA1 hash of the file.
     """
     sha1sum = hashlib.sha1()
-    with open(file_path, "rb") as f:
+    with Path(file_path).open("rb") as f:
         while True:
             data = f.read(buffer_size)
             if not data:

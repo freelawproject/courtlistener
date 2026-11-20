@@ -1,3 +1,5 @@
+"""Views for simple pages such as about, help, contact, and component demos."""
+
 import logging
 import re
 from datetime import date
@@ -38,10 +40,12 @@ async def about(request: HttpRequest) -> HttpResponse:
 
 
 async def help_home(request: HttpRequest) -> HttpResponse:
+    """Render the help home page."""
     return TemplateResponse(request, "help/index.html", {"private": False})
 
 
 async def broken_email_help(request: HttpRequest) -> HttpResponse:
+    """Render the help page for broken email."""
     return TemplateResponse(
         request,
         "help/broken_email_help.html",
@@ -167,14 +171,18 @@ async def contact(
 
 
 async def contact_thanks(request: HttpRequest) -> HttpResponse:
+    """Render the page thanking the user for contacting us."""
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
+    """Respond with the Web of Trust site verification token."""
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
 async def components(request: HttpRequest) -> HttpResponse:
+    """Render a demo page of UI components with mock data."""
+
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
         PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT

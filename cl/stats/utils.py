@@ -1,3 +1,5 @@
+"""Helpers for tallying stats and checking the health of services."""
+
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
@@ -145,6 +147,7 @@ def tally_stat(
 
 
 def check_redis() -> bool:
+    """Check if the stats Redis database responds to a ping."""
     r = get_redis_interface("STATS")
     try:
         r.ping()

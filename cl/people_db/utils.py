@@ -1,3 +1,6 @@
+"""Helpers for displaying people."""
+
+
 async def make_title_str(person):
     """Make a nice title for somebody."""
     locations = ", ".join(

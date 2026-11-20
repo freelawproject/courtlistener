@@ -1,3 +1,5 @@
+"""Find duplicate scraped opinions and merge or delete them."""
+
 import importlib
 import re
 from collections import defaultdict
@@ -237,7 +239,7 @@ def delete_cleaned_up_content_duplicates(
         # iteration is ordered by descending date; the first element in each
         # hash group is the most recent opinion and duplicates should be
         # collapsed into it
-        hash_groups = defaultdict(lambda: [])
+        hash_groups = defaultdict(list)
         file_errors = 0
         for opinion in duplicate_candidates:
             try:
@@ -302,7 +304,7 @@ def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
             return
         logger.info("Processing group %s", group)
 
-        hash_groups = defaultdict(lambda: [])
+        hash_groups = defaultdict(list)
         for candidate in duplicate_candidates:
             if candidate.plain_text:
                 extracted_content = candidate.plain_text
@@ -330,9 +332,12 @@ def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
 
 
 class Command(VerboseCommand):
+    """Find and remove duplicate opinions with one of several matching methods."""
+
     help = "Find and merge Opinion objects that are versions of each other"
 
     def add_arguments(self, parser):
+        """Add the method, cluster source, court ID, and Juriscraper module options."""
         super().add_arguments(parser)
         parser.add_argument(
             "method",
@@ -373,6 +378,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Remove duplicates with the chosen method and log the resulting stats.
+
+        Raises:
+            ValueError: If the method is unsupported, or ``cleanup_content``
+                is used without a court ID and a Juriscraper module that
+                implements ``cleanup_content``.
+        """
         super().handle(*args, **options)
         stats = defaultdict(lambda: 0)
         method = options["method"]

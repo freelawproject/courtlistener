@@ -1,3 +1,5 @@
+"""URL routes for search pages and feeds."""
+
 from django.urls import path, re_path
 
 from cl.search.feeds import (

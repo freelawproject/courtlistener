@@ -1,3 +1,5 @@
+"""PACER sessions that go through a proxy, and helpers for storing their cookies."""
+
 import pickle
 import random
 from dataclasses import dataclass
@@ -86,6 +88,7 @@ class ProxyPacerSession(PacerSession):
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        """Build the session, picking a proxy if none is given."""
         self.proxy_address: str = (
             proxy if proxy else self._pick_proxy_connection()
         )
@@ -242,6 +245,7 @@ def get_pacer_cookie_from_cache(
         except Exception:
             pass
         r.delete(session_key % user_pk)
+    return None
 
 
 @sync_to_async

@@ -1,3 +1,5 @@
+"""Rate-limiting decorators and helpers for identifying clients."""
+
 import contextlib
 import functools
 import hashlib
@@ -33,7 +35,9 @@ class RatelimitDecorator(Protocol):
         Response: HttpResponseBase | Coroutine[Any, Any, HttpResponseBase],
     ](
         self, view: DjangoViewType[P, Request, Response]
-    ) -> DjangoViewType[P, Request, Response]: ...
+    ) -> DjangoViewType[P, Request, Response]:
+        """Protocol signature for decorating a view, returning a view of the same type."""
+        ...
 
 
 def get_viewer_ip(request: HttpRequest) -> str:
@@ -209,6 +213,10 @@ ratelimiter_all_2_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="2/m" if "test" not in sys.argv else None,
 )
+ratelimiter_all_5_per_m: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="5/m" if "test" not in sys.argv else None,
+)
 ratelimiter_unsafe_3_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="3/m" if "test" not in sys.argv else None,
@@ -223,6 +231,10 @@ ratelimiter_unsafe_10_per_m: RatelimitDecorator = make_ratelimiter(
     key=get_ip_for_ratelimiter,
     rate="10/m" if "test" not in sys.argv else None,
     method=UNSAFE,
+)
+ratelimiter_all_10_per_m: RatelimitDecorator = make_ratelimiter(
+    key=get_ip_for_ratelimiter,
+    rate="10/m" if "test" not in sys.argv else None,
 )
 ratelimiter_all_10_per_h: RatelimitDecorator = make_ratelimiter(
     key=get_path_to_make_key,

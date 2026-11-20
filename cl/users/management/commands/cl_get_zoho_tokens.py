@@ -1,3 +1,5 @@
+"""Exchange a Zoho grant token for a refresh token and cache it."""
+
 from django.conf import settings
 from django.core.cache import cache
 from zohocrmsdk.src.com.zoho.api.authenticator.oauth_token import OAuthToken
@@ -8,9 +10,12 @@ from cl.lib.zoho import get_zoho_cache_key
 
 
 class Command(VerboseCommand):
+    """Manually get a Zoho refresh token from a grant token."""
+
     help = "Command to manually get the ZOHO refresh token"
 
     def add_arguments(self, parser):
+        """Add the grant token option."""
         parser.add_argument(
             "--grant-token",
             type=str,
@@ -19,6 +24,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Initialize the Zoho SDK with the grant token and cache the resulting refresh token."""
         super().handle(*args, **options)
         self.options = options
         grant_token = options["grant_token"]
