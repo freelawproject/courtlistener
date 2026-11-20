@@ -1946,7 +1946,7 @@ def group_search_results(
     )
     aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
 
-    order_by_field = list(order_by.keys())[0]
+    order_by_field = next(iter(order_by.keys()))
     if order_by_field != "score":
         # If order field is other than score (elasticsearch relevance)
         # Add a max aggregation to calculate the max value of the provided

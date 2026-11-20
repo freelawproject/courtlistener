@@ -67,14 +67,12 @@ def tokenize_case_name(case_name: str) -> set[str]:
     Returns:
         list of words
     """
-    words = []
-    for word in WORD_PATTERN.findall(case_name):
-        if len(word) > 1:
-            # Only keep words with more than one character
-            words.append(word.lower())
-
-    # Return only valid words
-    return set(words) - FALSE_POSITIVES
+    # Only keep words with more than one character and return only valid words
+    return {
+        word.lower()
+        for word in WORD_PATTERN.findall(case_name)
+        if len(word) > 1
+    } - FALSE_POSITIVES
 
 
 def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
@@ -134,7 +132,7 @@ def parse_date(date_str: str) -> date | None:
     for fmt in DATE_FORMATS:
         try:
             return datetime.strptime(date_str, fmt).date()
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
     logger.warning("Invalid date format: %s", date_str)
     return None

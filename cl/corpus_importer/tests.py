@@ -3384,7 +3384,7 @@ class TexasMergerTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_document(docket_entry, input_document)
         document = TexasDocument.objects.get(
-            pk=list(result.creates["TexasDocument"])[0]
+            pk=next(iter(result.creates["TexasDocument"]))
         )
 
         self.assertEqual(response.call_count, 1)
