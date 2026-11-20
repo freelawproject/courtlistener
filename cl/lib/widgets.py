@@ -1,8 +1,11 @@
 """Form widgets with CourtListener's new-stack defaults."""
 
+from collections.abc import Mapping
 from typing import Any
 
 from django import forms
+from django.core.files.uploadedfile import UploadedFile
+from django.utils.datastructures import MultiValueDict
 
 NEW_STACK_WIDGET_CLASSES = "focus:ring-0 focus:outline-none w-full"
 INPUT_TEXT_CLASS = "input-text"
@@ -63,3 +66,21 @@ class Textarea(forms.Textarea):
         attrs.setdefault("rows", 4)
 
         super().__init__(attrs=attrs)
+
+    def value_from_datadict(
+        self,
+        data: Mapping[str, Any],
+        files: MultiValueDict[str, UploadedFile],
+        name: str,
+    ) -> Any:
+        """Return the submitted text with CRLF line breaks turned into LF.
+
+        Browsers count a line break as one character for maxlength but submit
+        it as CRLF, so without this a value that fits the textarea can fail
+        the field's max_length. Fields read the value through here before
+        they clean or validate it.
+        """
+        value = super().value_from_datadict(data, files, name)
+        if isinstance(value, str):
+            return value.replace("\r\n", "\n")
+        return value

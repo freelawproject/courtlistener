@@ -1,3 +1,5 @@
+from django.utils.datastructures import MultiValueDict
+
 from cl.lib.widgets import (
     NEW_STACK_WIDGET_CLASSES,
     Select,
@@ -121,3 +123,13 @@ class TextareaTest(SimpleTestCase):
 
         self.assertEqual(widget.attrs["class"], "custom-class")
         self.assertEqual(widget.attrs["rows"], 8)
+
+    def test_submitted_line_breaks_become_lf(self) -> None:
+        """Turn submitted CRLF line breaks into LF, as maxlength counts them."""
+        widget = Textarea()
+
+        value = widget.value_from_datadict(
+            {"note": "a\r\nb"}, MultiValueDict(), "note"
+        )
+
+        self.assertEqual(value, "a\nb")

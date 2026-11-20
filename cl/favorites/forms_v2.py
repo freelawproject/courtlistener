@@ -1,32 +1,9 @@
 """Forms for creating and editing notes on the new-stack (v2) pages."""
 
-from typing import Any
-
 from django import forms
 
 from cl.favorites.forms import NoteForm as V1NoteForm
 from cl.lib import widgets
-
-
-class LineBreakCharField(forms.CharField):
-    """A CharField that counts a line break as one character.
-
-    Browsers count a textarea line break as one character for maxlength but
-    submit it as CRLF, so without this a note that fits the counter can fail
-    max_length.
-    """
-
-    def to_python(self, value: Any) -> str | None:
-        """Normalize CRLF to LF.
-
-        Runs before the length validators, which is why this isn't a
-        clean_notes() method.
-        """
-        cleaned = super().to_python(value)
-        if not cleaned:
-            return cleaned
-
-        return cleaned.replace("\r\n", "\n")
 
 
 class NoteForm(V1NoteForm):
@@ -46,7 +23,6 @@ class NoteForm(V1NoteForm):
 
     class Meta(V1NoteForm.Meta):
         labels = {"name": "Name", "notes": "Notes"}
-        field_classes = {"notes": LineBreakCharField}
         widgets = {
             "content_type": forms.HiddenInput(),
             "object_id": forms.HiddenInput(),
