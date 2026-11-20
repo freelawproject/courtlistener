@@ -85,7 +85,10 @@ def convert_to_stub_account(user: User) -> User:
     user.first_name = "Deleted"
     user.last_name = ""
     user.is_active = False
-    user.username = md5(user.email)
+    # Emails aren't unique in auth_user, so a hash of the address alone can
+    # collide with a donation stub or an earlier deleted account that holds
+    # the same address. The pk makes it unique per row.
+    user.username = md5(f"{user.email}{user.pk}")
     user.set_unusable_password()
     user.save()
 

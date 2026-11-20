@@ -880,6 +880,60 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
 
+    def test_deleting_an_account_whose_email_another_stub_holds(self) -> None:
+        """Can an account be deleted when a stub account already holds the same email address? Emails aren't unique, and the stub's username is a hash of the address."""
+        email = "shared@example.com"
+        create_stub_account(
+            {"email": email, "first_name": "Donor", "last_name": "Person"},
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        profile = UserProfileWithParentsFactory(user__email=email)
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+
+        response = self.client.post(
+            reverse("delete_account"), {"password": "password"}
+        )
+
+        self.assertRedirects(response, reverse("delete_profile_done"))
+        profile.refresh_from_db()
+        self.assertTrue(profile.stub_account)
+        self.assertFalse(profile.user.is_active)
+
+    def test_failed_account_deletion_changes_nothing(self) -> None:
+        """Does a failure while converting the account to a stub leave the user's assets in place and send no deletion notice?"""
+        profile = UserProfileWithParentsFactory()
+        Token.objects.get_or_create(user=profile.user)
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+        mail.outbox.clear()
+
+        with (
+            patch(
+                "cl.users.views.convert_to_stub_account",
+                side_effect=IntegrityError("username"),
+            ),
+            self.assertRaises(IntegrityError),
+        ):
+            self.client.post(
+                reverse("delete_account"), {"password": "password"}
+            )
+
+        self.assertTrue(Token.objects.filter(user=profile.user).exists())
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:
         """Deleting an account hard-deletes the user's logged data, API credentials and the PII left behind in the pghistory event tables, keeps (but disables) donation records, and leaves a second user's data untouched."""
         victim = UserProfileWithParentsFactory()
