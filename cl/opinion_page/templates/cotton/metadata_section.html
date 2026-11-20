@@ -47,7 +47,7 @@
             <c-description-term class="{% if item.tooltip_message %}flex items-center gap-1{% endif %}">
               {{ item.label }}
               {% if item.tooltip_message %}
-                <c-tooltip :label="item.label" :message="item.tooltip_message" position="right" has_arrow />
+                <c-tooltip :label="item.label" :message="item.tooltip_message" has_arrow />
               {% endif %}
             </c-description-term>
             <c-description-details class="{% if item.one_click_select %}select-all cursor-text{% endif %}">
@@ -80,7 +80,7 @@
                     {% endif %}
                   >{{ item.suffix_text }}</a>)
                   {% if item.suffix_tooltip_message %}
-                    <c-tooltip label="the docket number search" :message="item.suffix_tooltip_message" position="right" has_arrow />
+                    <c-tooltip label="the docket number search" :message="item.suffix_tooltip_message" has_arrow />
                   {% endif %}
                 {% else %}
                   ({{ item.suffix_text }})
