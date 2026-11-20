@@ -31,6 +31,10 @@ lint.select = [
   "PTH",
   # pygrep-hooks
   "PGH",
+  # perflint
+  "PERF",
+  # unnecessary-iterable-allocation-for-first-element
+  "RUF015",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

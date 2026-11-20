@@ -1773,7 +1773,7 @@ def invert_user_logs(
     for k, v in out.items():
         try:
             user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
+        except User.DoesNotExist, ValueError:
             user_keyed_out[k] = v
         else:
             user_keyed_out[user.username] = v
@@ -2458,9 +2458,9 @@ class RetrieveFilteredFieldsMixin:
             # with them.
             field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
-            for name in field_names:
-                if should_defer(name, items):
-                    child_names.append(name)
+            child_names.extend(
+                name for name in field_names if should_defer(name, items)
+            )
 
             if child_names:
                 nested_defer_map[parent] = (nested_model, child_names)
