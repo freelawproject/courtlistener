@@ -48,7 +48,6 @@
                     variant="primary"
                     size="xl"
                     href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
-                    aria-label="Sign into your account."
                 >
                     Sign In
                 </c-button>
@@ -56,7 +55,6 @@
                     variant="outline"
                     size="xl"
                     href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}"
-                    aria-label="Register as a new member."
                 >
                     Register
                 </c-button>
