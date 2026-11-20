@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.15.*"
 resolution-markers = [
     "platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
@@ -1551,8 +1551,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11" },
-    { name = "truststore" },
+    { name = "h11", marker = "sys_platform != 'emscripten'" },
+    { name = "truststore", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z" }
 wheels = [
@@ -1923,7 +1923,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "4.0.3"
+version = "4.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1940,9 +1940,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/34/c3/086ed157b9ce3d0a5fd49a227d2e9210154e96b011dc46968a6f686e4dab/juriscraper-4.0.3.tar.gz", hash = "sha256:2aebd6438cf194e6cec7a42417a4cff6c39003fbb7e7bd9dd9645a6174c35a7d", size = 490690, upload-time = "2026-11-13T15:37:27.875Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/b6/696e3d868280f69bbca7e71ae5577f5d34eae471085fb46f35c93ca86ee8/juriscraper-4.0.4.tar.gz", hash = "sha256:bc8e6884ddf125ff74b8363ae86cb1e013cba44d26647c491a108c305da02b16", size = 493305, upload-time = "2026-11-18T19:50:03.215Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/82/cb9a67074f2965a2771c9b79a09621d8a533ae38f52e3542763d5573e82e/juriscraper-4.0.3-py3-none-any.whl", hash = "sha256:dbdfddd905212ff059d6ee8af1e0f7933d7747a778b1a5e0c58063b7a79e225d", size = 735508, upload-time = "2026-11-13T15:37:26.183Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/de/cc3b3ad7f4784b257bed1878e7e6ab1a33298b61981deb76891d741025ba/juriscraper-4.0.4-py3-none-any.whl", hash = "sha256:32b1b71213a08eeab9e643866e81854d0854720be61e11a563d11f0e5f36dcbe", size = 740764, upload-time = "2026-11-18T19:50:00.918Z" },
 ]
 
 [[package]]
@@ -2453,7 +2453,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
