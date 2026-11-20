@@ -70,6 +70,8 @@ class DerivedData[Scrape, Params]:
 class _QueryState[Scrape, Params, M: Model](
     State, DerivedData[Scrape, Params]
 ):
+    """A stage in which the object to merge into is still being determined."""
+
     def create(
         self,
     ) -> Create[Scrape, Params, M]:
@@ -93,6 +95,8 @@ class _QueryState[Scrape, Params, M: Model](
 class _Penultimate[Scrape, Params, M: Model](
     State, DerivedData[Scrape, Params]
 ):
+    """A stage from which the merge can finish successfully."""
+
     def complete(
         self, output: M, result: MergeResult
     ) -> Complete[Scrape, Params, M]:

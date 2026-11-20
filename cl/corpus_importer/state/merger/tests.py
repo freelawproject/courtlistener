@@ -1402,6 +1402,11 @@ def _prefer_stored(stored: str | None, scraped: str) -> str:
     return stored or scraped
 
 
+def _if_stored(stored: str | None, scraped: Any) -> Any:
+    """Use a scraped value only when a value is already stored."""
+    return scraped if stored else None
+
+
 class DatabaseSpecTest(TestCase):
     """Specs that read the object being merged into."""
 
@@ -1546,6 +1551,50 @@ class DatabaseSpecTest(TestCase):
         self.assertEqual(seen, ["Scraped Name"])
         self.assertEqual(merger.case_name, "Stored Name")
 
+    def test_relation_input_reads_stored_value(self) -> None:
+        """Is a relation whose input reads the database merged with the value stored on the object being merged into?"""
+
+        class OriginMerger(
+            Merger[dict[str, str], Any, OriginatingCourtInformation]
+        ):
+            config: ClassVar[MergerConfig[OriginatingCourtInformation]] = (
+                MergerConfig(model=OriginatingCourtInformation)
+            )
+
+            docket_number: str = Scrape(dict)["docket_number"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                model=Docket, reads=DOCKET_SAVE_READS
+            )
+
+            docket_entries: list[DocketEntry] = OneToManyRelation(
+                KeyedEntryMerger,
+                Fn(_if_stored)(Database(CASE_NAME), Scrape(dict)["entries"]),
+            )
+            originating_court_information: OriginatingCourtInformation = (
+                OneToOneRelation(
+                    OriginMerger,
+                    Fn(_if_stored)(
+                        Database(CASE_NAME), Scrape(dict)["origin"]
+                    ),
+                )
+            )
+
+        result = TestMerger(
+            {
+                "entries": [{"description": "Entry"}],
+                "origin": {"docket_number": "ORIGIN-1"},
+            },
+            params=None,
+            existing=Update(self.loaded(TestMerger, self.docket)),
+        ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        for model in ("DocketEntry", "OriginatingCourtInformation"):
+            with self.subTest(model):
+                self.assertEqual(len(result.creates.get(model, ())), 1)
+
     def test_fields_read_from_database_are_loaded(self) -> None:
         """Is a field a spec reads from the database loaded, though no spec merges into it?"""
 
@@ -1681,6 +1730,18 @@ class SpecAccessTrackingTest(SimpleTestCase):
                 False,
                 {"case_name"},
             ),
+            (
+                "item keyed by database",
+                Constant(cast(Any, {}))[Database(CASE_NAME)],
+                False,
+                {"case_name"},
+            ),
+            (
+                "item keyed by scrape",
+                Constant(cast(Any, {}))[Scrape(dict)["a"]],
+                True,
+                set(),
+            ),
         ]
         for name, spec, uses_scrape, db_fields in cases:
             with self.subTest(name):
@@ -1692,6 +1753,14 @@ class SpecAccessTrackingTest(SimpleTestCase):
         spec: Any = Scrape(dict)[Params(str)]
 
         self.assertEqual(spec.transform({"a": 1}, "a", None), 1)
+
+    def test_attribute_chained_on_database_value(self) -> None:
+        """Is an attribute chained onto a stored field read from the field's value rather than from the object holding it?"""
+        spec: Any = cast(str, Database(CASE_NAME)).upper()
+
+        self.assertEqual(
+            spec.transform({}, None, Docket(case_name="Stored")), "STORED"
+        )
 
 
 def _raise(*_: Any) -> Any:
