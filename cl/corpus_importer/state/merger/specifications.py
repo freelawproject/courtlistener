@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import logging
 import operator
 import typing
@@ -18,6 +19,7 @@ from typing import (
     Any,
     cast,
     final,
+    overload,
     override,
 )
 
@@ -32,6 +34,8 @@ from django.db.models import (
     QuerySet,
     prefetch_related_objects,
 )
+from django.db.models.query_utils import DeferredAttribute
+from model_utils.tracker import DescriptorWrapper
 
 from cl.corpus_importer.state.utils import MergeResult
 
@@ -43,7 +47,6 @@ from .parameters import (
     ThroughParameters,
     Update,
 )
-from .strategy import Strategy, overwrite
 
 if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
@@ -52,8 +55,8 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-type Transformer[Scrape, Params, Transformed] = Callable[
-    [Scrape, Params], Transformed
+type Transformer[Scrape, Params, Database: Model, Transformed] = Callable[
+    [Scrape, Params, Database | None], Transformed
 ]
 
 
@@ -64,11 +67,32 @@ class MergerSpecification[Scrape, Params, Output](ABC):
     the attribute's name, which must be a field of the merger's model.
     """
 
-    __slots__ = ("_name",)
+    __slots__ = ("_name", "_uses_scrape", "_db_fields")
 
-    def __init__(self, /):
+    def __init__(self, /) -> None:
         """Build a specification; its name is set when it is assigned on a merger."""
         self._name: str = ""
+        self._uses_scrape: bool = False
+        self._db_fields: tuple[str, ...] = ()
+
+    def _depend_on(self, *sources: Any) -> None:
+        """Record that this specification reads everything `sources` read.
+
+        Args:
+            *sources: The values this specification is built from. Only
+                those that are specifications contribute anything.
+        """
+        specs = [s for s in sources if isinstance(s, MergerSpecification)]
+        self._uses_scrape = self._uses_scrape or any(
+            s._uses_scrape for s in specs
+        )
+        self._db_fields = tuple(
+            dict.fromkeys(
+                itertools.chain(
+                    self._db_fields, *(s._db_fields for s in specs)
+                )
+            )
+        )
 
     def run_validation(
         self, merger: type[Merger[Scrape, Params, Any]]
@@ -97,16 +121,41 @@ class MergerSpecification[Scrape, Params, Output](ABC):
         """
         return []
 
-    def __set_name__(self, owner: type, name: str):
+    def __set_name__(self, owner: type, name: str) -> None:
+        """Take the name of the merger attribute this specification is assigned to."""
         from .base import Merger
 
         if not issubclass(owner, Merger):
             return
         self._name = name
 
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        """Compute the field's value for a merger that has no object to merge into yet.
+
+        A merger stores the values it has computed on itself, so this is only
+        reached for a specification that reads the database, before the
+        merger's `update` has run. The value is the one the field has with
+        nothing stored, and is kept on the merger.
+
+        Raises:
+            AttributeError: If the merge has ended without the value having
+                been computed.
+        """
+        from .base import Merger
+
+        if not isinstance(instance, Merger):
+            return self
+        if not isinstance(state := instance.state, MergerState.DerivedData):
+            raise AttributeError(self._name)
+        value = self.transform(state.scrape, state.params, None)
+        vars(instance)[self._name] = value
+        return value
+
     @abstractmethod
-    def transform(self, scrape: Scrape, params: Params) -> Output:
-        """Get the field's value from the scrape and params."""
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Output:
+        """Get the field's value from the scrape, params, and existing DB model if any."""
         ...
 
 
@@ -121,30 +170,18 @@ class AttributeMerger[Scrape, Params, Transform](
 
     Because attribute access is proxied, a name that isn't defined on the class
     becomes a deferred lookup that fails when the merge runs.
-
-    Attributes:
-        strategy: How the computed value is reconciled with the value already
-            in the DB.
     """
 
-    __slots__ = (
-        "strategy",
-        "_transform",
-    )
+    __slots__ = ("_transform",)
 
-    _transform: Transformer[Any, Any, Any]
-
-    def __init__(self):
-        """Create an expression."""
-        super().__init__()
-        self.strategy: Strategy = overwrite
+    _transform: Transformer[Any, Any, Any, Any]
 
     def __getattr__(self, name: str) -> _AttrProxy | Any:
         """Build an expression reading an attribute of this one's value.
 
         Names defined on the class resolve to the expression's own attribute
-        instead, so a scraped attribute called e.g. `strategy` or `transform`
-        cannot be reached this way.
+        instead, so a scraped attribute called e.g. `transform` cannot be
+        reached this way.
 
         Args:
             name: The attribute to read at merge time.
@@ -193,17 +230,20 @@ class AttributeMerger[Scrape, Params, Transform](
 
     @override
     @final
-    def transform(self, scrape: Scrape, params: Params) -> Transform:
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Transform:
         """Evaluate this expression.
 
         Args:
             scrape: The scrape being merged.
             params: The params passed to the merger.
+            database: The existing model instance from the database, if any.
 
         Returns:
             The value of the expression for this scrape and params.
         """
-        return self._transform(scrape, params)
+        return self._transform(scrape, params, database)
 
 
 class _AncestorProxy[M: Model](AttributeMerger):
@@ -219,13 +259,16 @@ class _AncestorProxy[M: Model](AttributeMerger):
         self._transform = functools.partial(_ancestor, model)
 
 
-def _ancestor[M: Model](model: type[M], scrape: Any, params: Any) -> M:
+def _ancestor[M: Model](
+    model: type[M], scrape: Any, params: Any, database: M | None
+) -> M:
     """Find the nearest parent of a given type among nested `RelatedParams`.
 
     Args:
         model: The model class of the parent to find.
         scrape: Unused.
         params: The params of the merger being run.
+        database: The existing model instance from the database, if any.
 
     Returns:
         The nearest parent that is an instance of `model`.
@@ -254,7 +297,7 @@ class _ConstantProxy(AttributeMerger):
                 merge, so it should not be mutated.
         """
         super().__init__()
-        self._transform = lambda s, p: value
+        self._transform = lambda s, p, m: value
         self._value = value
 
 
@@ -264,7 +307,8 @@ class _ScrapeProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the scrape."""
         super().__init__()
-        self._transform = lambda s, p: s
+        self._uses_scrape = True
+        self._transform = lambda s, p, m: s
 
 
 class _ParamsProxy(AttributeMerger):
@@ -273,7 +317,54 @@ class _ParamsProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the params."""
         super().__init__()
-        self._transform = lambda s, p: p
+        self._transform = lambda s, p, m: p
+
+
+class _DatabaseProxy(AttributeMerger):
+    """Expression evaluation to the DB row matched by a merger."""
+
+    __slots__ = ("_field",)
+
+    def __init__(
+        self, attribute: DeferredAttribute | DescriptorWrapper | Field
+    ) -> None:
+        """Create an expression evaluating to a field of the matched DB row.
+
+        Args:
+            attribute: The field to read, as accessed from the model class.
+        """
+        super().__init__()
+        if not isinstance(attribute, Field):
+            field = attribute.field
+        else:
+            field = attribute
+        # Read the column itself, so a foreign key yields its ID rather than
+        # fetching the related row.
+        getter = operator.attrgetter(field.attname)
+        self._field: Field = field
+        self._transform = lambda s, p, m: getter(m) if m is not None else None
+        self._db_fields = (*self._db_fields, field.name)
+
+    @override
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Check that the field merged into is concrete and on a model that has the field read."""
+        errors = super().validate(field)
+
+        if not field.concrete:
+            errors.append(
+                TypeError(
+                    f"Field {field.name} must be concrete to be used in merger specifications."
+                )
+            )
+
+        if not issubclass(field.model, self._field.model):
+            errors.append(
+                TypeError(
+                    f"Field {self._field.name} is from {self._field.model.__name__} and cannot be merged into {field.model.__name__}.{field.name}"
+                )
+            )
+
+        return errors
 
 
 class _AttrProxy(AttributeMerger):
@@ -289,6 +380,7 @@ class _AttrProxy(AttributeMerger):
             key: The name of the attribute to read.
         """
         super().__init__()
+        self._depend_on(previous)
         if isinstance(previous, _AttrProxy):
             key = f"{previous._key}.{key}"
             previous = previous._previous
@@ -297,19 +389,21 @@ class _AttrProxy(AttributeMerger):
         getter = operator.attrgetter(key)
         match previous:
             case _ScrapeProxy():
-                self._transform = lambda s, p: getter(s)
+                self._transform = lambda s, p, m: getter(s)
             case _ParamsProxy():
-                self._transform = lambda s, p: getter(p)
+                self._transform = lambda s, p, m: getter(p)
             case _ConstantProxy():
                 v = previous._value
-                self._transform = lambda s, p: getter(v)
+                self._transform = lambda s, p, m: getter(v)
             case _:
                 g = previous._transform
-                self._transform = lambda s, p: getter(g(s, p))
+                self._transform = lambda s, p, m: getter(g(s, p, m))
 
 
 class _ItemProxy(AttributeMerger):
     """Expression indexing another expression's value."""
+
+    __slots__ = ()
 
     def __init__(self, previous: AttributeMerger, key: AttributeMerger | Any):
         """Create an expression indexing a value.
@@ -320,36 +414,39 @@ class _ItemProxy(AttributeMerger):
                 merge time; anything else is used as-is.
         """
         super().__init__()
+        self._depend_on(previous, key)
         if isinstance(key, AttributeMerger):
             f = key._transform
             match previous:
                 case _ScrapeProxy():
-                    self._transform = lambda s, p: s[f(s, p)]
+                    self._transform = lambda s, p, m: s[f(s, p, m)]
                 case _ParamsProxy():
-                    self._transform = lambda s, p: p[f(s, p)]
+                    self._transform = lambda s, p, m: p[f(s, p, m)]
                 case _ConstantProxy():
                     v = previous._value
-                    self._transform = lambda s, p: v[f(s, p)]
+                    self._transform = lambda s, p, m: v[f(s, p, m)]
                 case _:
                     g = previous._transform
-                    self._transform = lambda s, p: g(s, p)[f(s, p)]
+                    self._transform = lambda s, p, m: g(s, p, m)[f(s, p, m)]
         else:
             getter = operator.itemgetter(key)
             match previous:
                 case _ScrapeProxy():
-                    self._transform = lambda s, p: getter(s)
+                    self._transform = lambda s, p, m: getter(s)
                 case _ParamsProxy():
-                    self._transform = lambda s, p: getter(p)
+                    self._transform = lambda s, p, m: getter(p)
                 case _ConstantProxy():
                     v = previous._value
-                    self._transform = lambda s, p: getter(v)
+                    self._transform = lambda s, p, m: getter(v)
                 case _:
                     g = previous._transform
-                    self._transform = lambda s, p: getter(g(s, p))
+                    self._transform = lambda s, p, m: getter(g(s, p, m))
 
 
 class _CallProxy(AttributeMerger):
     """Expression calling another expression's value."""
+
+    __slots__ = ()
 
     def __init__(
         self,
@@ -372,7 +469,7 @@ class _CallProxy(AttributeMerger):
         # Three cheers for unintuitive behavior! (late binding)
         def _make_transform(
             v: AttributeMerger | Any,
-        ) -> Transformer[Any, Any, Any]:
+        ) -> Transformer[Any, Any, Any, Any]:
             """Wrap an argument so expressions and plain values evaluate alike.
 
             Args:
@@ -383,24 +480,54 @@ class _CallProxy(AttributeMerger):
             """
             if isinstance(v, AttributeMerger):
                 return v._transform
-            return lambda s, p: v
+            return lambda s, p, m: v
 
         arg_fns = tuple(_make_transform(arg) for arg in args)
         kwarg_fns = {k: _make_transform(kwarg) for k, kwarg in kwargs.items()}
 
+        self._depend_on(previous, *args, *kwargs.values())
+
         match previous:
             case _ConstantProxy():
                 f = previous._value
-                self._transform = lambda s, p: f(
-                    *(a(s, p) for a in arg_fns),
-                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                self._transform = lambda s, p, m: f(
+                    *(a(s, p, m) for a in arg_fns),
+                    **{k: v(s, p, m) for k, v in kwarg_fns.items()},
                 )
             case _:
                 f = previous._transform
-                self._transform = lambda s, p: f(s, p)(
-                    *(a(s, p) for a in arg_fns),
-                    **{k: v(s, p) for k, v in kwarg_fns.items()},
+                self._transform = lambda s, p, m: f(s, p, m)(
+                    *(a(s, p, m) for a in arg_fns),
+                    **{k: v(s, p, m) for k, v in kwarg_fns.items()},
                 )
+
+
+class _CoalesceProxy(AttributeMerger):
+    """Expression evaluating to the first usable value among several expressions."""
+
+    __slots__ = ()
+
+    def __init__(self, *args: AttributeMerger, default: Any) -> None:
+        """Create an expression choosing between values.
+
+        Args:
+            *args: The expressions to choose between, in order of
+                preference. Those after the first one yielding a truthy
+                value or an integer are not evaluated.
+            default: The value to evaluate to when no expression yields a
+                usable one. It is used as-is, even if it is an expression.
+        """
+        super().__init__()
+
+        self._depend_on(*args)
+        self._transform = lambda s, p, m: next(
+            (
+                v
+                for arg in args
+                if bool((v := arg._transform(s, p, m))) or isinstance(v, int)
+            ),
+            default,
+        )
 
 
 def Fn[F: Callable](f: F) -> F:
@@ -455,6 +582,24 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
+# TODO: Correctly type this once Pyrefly updates to handle Django field descriptors
+def Database[GT](field: GT) -> GT | None:
+    """Start an expression from a model field passed to the merger.
+
+    For example, `Database(Docket.docket_number)`.
+
+    Args:
+        field: The model field accessed from the model class.
+
+    Returns:
+        An expression typed as the type of the model field so chained accesses type-check. It
+        is not that type: it has no value until the merge runs, so it is only meaningful
+        as (part of) a merger attribute.
+    """
+    # pyrefly: ignore[bad-return,bad-argument-type]
+    return _DatabaseProxy(field)
+
+
 def Ancestor[M: Model](model: type[M]) -> M:
     """Start an expression from a parent this merger is nested under.
 
@@ -490,28 +635,25 @@ def Constant[T](value: T) -> T:
     return _ConstantProxy(value)
 
 
-def WithStrategy[T](specification: T, strategy: Strategy) -> T:
-    """Set how an attribute expression's value is reconciled with the DB.
-
-    This mutates `specification` rather than copying it, so an expression
-    shared between attributes takes on the strategy everywhere it is used.
+@overload
+def Coalesce[T](*args: T | None, default: T) -> T: ...
+@overload
+def Coalesce[T](*args: T, default: None = ...) -> T: ...
+def Coalesce[T](*args: T | None, default: T | None = None) -> T | None:
+    """Output the first truthy, boolean, or integer argument, with a default.
 
     Args:
-        specification: The attribute expression to change.
-        strategy: The strategy to use.
+        *args: The values to coalesce
+        default: The value to output if all arguments are non-integer, non-boolean falsy
+            values. Will be treated as a literal value; specifications passed to this
+            parameter will not be evaluated
 
     Returns:
-        The same `specification` object that was passed in.
-
-    Raises:
-        TypeError: If `specification` is not an attribute expression.
+        An expression typed `T | None`. It is not that expression, this is only
+        to help the type checker enforce valid merger specifications
     """
-    if not isinstance(specification, AttributeMerger):
-        raise TypeError(
-            f"Specification must be an AttributeMerger. Found {type(specification)!r}"
-        )
-    specification.strategy = strategy
-    return specification
+    # pyrefly:ignore[bad-return,bad-argument-type]
+    return _CoalesceProxy(*args, default=default)
 
 
 class RelatedMerger[
@@ -546,6 +688,7 @@ class RelatedMerger[
         super().__init__()
         self.merger: type[Merger[Child, RelatedParams[Params], RM]] = merger
         self.attribute: AttributeMerger[Scrape, Params, Transform] = attribute
+        self._depend_on(attribute)
         self.after: frozenset[str] = frozenset(after)
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
@@ -580,7 +723,7 @@ class RelatedMerger[
         return [
             Prefetch(
                 self._name,
-                self.merger.loading(
+                self.merger.config.loading(
                     cast(
                         QuerySet[RM],
                         self.merger.config.model._default_manager.all(),
@@ -591,14 +734,25 @@ class RelatedMerger[
 
     @abstractmethod
     def merge(
-        self, parent: RM | None, scrape: Scrape, params: Params
+        self, parent: RM | None, merger_input: Transform, params: Params
     ) -> MergeResult:
-        """Merge the related objects for ``parent`` from the scrape."""
+        """Merge the related objects for ``parent``.
+
+        Args:
+            parent: The object the related objects belong to, if it exists
+                yet.
+            merger_input: The value `transform` computed for this relation
+                in the parent's merge.
+            params: The params of the parent's merger.
+        """
         ...
 
     @override
-    def transform(self, scrape: Scrape, params: Params) -> Transform:
-        return self.attribute.transform(scrape, params)
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M | None
+    ) -> Transform:
+        """Get the scrape data for the related objects."""
+        return self.attribute.transform(scrape, params, database)
 
 
 class OneToOneMerger[Scrape, Params, Child, RM: Model](
@@ -640,10 +794,9 @@ class OneToOneMerger[Scrape, Params, Child, RM: Model](
         return errors
 
     def merge(
-        self, parent: RM | None, scrape: Scrape, params: Params
+        self, parent: RM | None, merger_input: Child | None, params: Params
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
-        merger_input = self.transform(scrape, params)
         if merger_input is None:
             return MergeResult.unnecessary()
 
@@ -730,11 +883,15 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         super().__init__(merger, attribute, after=after)
         self.strategy: ManyStrategy = strategy
 
-    def _transform_result_and_manager(
-        self, parent: RM | None, scrape: Scrape, params: Params
+    def _children_result_and_manager(
+        self, parent: RM, transformed: Sequence[Child]
     ) -> tuple[Sequence[Child], MergeResult, RelatedManager[Any]]:
+        """Get the children to merge, the result so far, and the parent's manager for the relation.
+
+        A string is a sequence, but never one of children: it yields no
+        children and a failed result.
+        """
         related_manager: RelatedManager[Any] = getattr(parent, self._name)
-        transformed = self.transform(scrape, params)
         if isinstance(transformed, (str, bytes)):
             return (
                 [],
@@ -744,7 +901,10 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         return transformed, MergeResult.unnecessary(), related_manager
 
     def merge(
-        self, parent: RM | None, scrape: Scrape, params: Params
+        self,
+        parent: RM | None,
+        merger_input: Sequence[Child],
+        params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         if parent is None:
@@ -752,7 +912,7 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
             return MergeResult.failed(self.merger.config.model.__name__)
 
         transformed, result, related_manager = (
-            self._transform_result_and_manager(parent, scrape, params)
+            self._children_result_and_manager(parent, merger_input)
         )
 
         if not transformed:
@@ -914,6 +1074,7 @@ class ManyToManyMerger[
     @property
     @override
     def prefetch(self) -> list[Prefetch]:
+        """The `prefetch_related` lookups loading the related objects, of which there are none with a through merger."""
         if self.through is not None:
             # The related objects are looked up among every object of their
             # model rather than among those the parent already holds.
@@ -921,7 +1082,10 @@ class ManyToManyMerger[
         return super().prefetch
 
     def merge(
-        self, parent: RM | None, scrape: Scrape, params: Params
+        self,
+        parent: RM | None,
+        merger_input: Sequence[Transform],
+        params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
         if parent is None:
@@ -929,10 +1093,10 @@ class ManyToManyMerger[
             return MergeResult.failed(self.merger.config.model.__name__)
         if self.through is None:
             # If there's no `through` model, everything is functionally the same as `OneToMany`
-            return super().merge(parent, scrape, params)
+            return super().merge(parent, merger_input, params)
 
         transformed, result, related_manager = (
-            self._transform_result_and_manager(parent, scrape, params)
+            self._children_result_and_manager(parent, merger_input)
         )
 
         if not transformed:

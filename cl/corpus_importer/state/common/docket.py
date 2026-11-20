@@ -13,7 +13,7 @@ from juriscraper.state.docket import Party as ScrapeParty
 from cl.corpus_importer.state.common.docket_entry import DocketEntryMerger
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
 from cl.corpus_importer.state.merger import (
-    Constant,
+    Database,
     Fn,
     ManyStrategy,
     ManyToManyRelation,
@@ -22,14 +22,13 @@ from cl.corpus_importer.state.merger import (
     OneToManyRelation,
     Params,
     Scrape,
-    WithStrategy,
 )
 from cl.people_db.models import Party
 from cl.search.models import Docket
 
 
-def add_scraper_source(scrape: int | None, db: int | None) -> int:
-    """Add the scraper to a docket's stored source, ignoring the scraped value.
+def add_scraper_source(db: int | None) -> int:
+    """Add the scraper to a docket's stored source.
 
     A missing source is treated as 0. Sources that already include the
     scraper are kept as they are.
@@ -102,7 +101,7 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
 
     config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
-    source: int = WithStrategy(Constant(Docket.SCRAPER), add_scraper_source)
+    source: int = Fn(add_scraper_source)(Database(Docket.source))
     date_filed: date | None = Scrape(ScrapeDocket).date_filed
     case_name: str = Scrape(ScrapeDocket).case_name
     case_name_full: str = Scrape(ScrapeDocket).case_name_full

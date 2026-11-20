@@ -52,10 +52,6 @@ from .specifications import (
     Params,
 )
 from .specifications import Scrape as ScrapeProxy
-from .strategy import (
-    overwrite,
-    overwrite_if_present,
-)
 
 # Sizes for the benches that scale with the amount of scraped data.
 ATTRIBUTE_COUNT = 20
@@ -235,7 +231,7 @@ class SpecificationBench:
     def bench_attr_transform_custom(self, benchmark: BenchmarkFixture):
         spec = cast(AttributeMerger, Constant("abcdefg"))
 
-        benchmark(spec.transform, None, None)
+        benchmark(spec.transform, None, None, None)
 
     def bench_attr_transform_default_no_params(
         self, benchmark: BenchmarkFixture
@@ -243,7 +239,7 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Constant("abcdefg"))
         spec._name = "docket_number"
 
-        benchmark(spec.transform, None, None)
+        benchmark(spec.transform, None, None, None)
 
     def bench_attr_transform_default_dict_params(
         self, benchmark: BenchmarkFixture
@@ -251,7 +247,7 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Constant("abcdefg"))
         spec._name = "docket_number"
 
-        benchmark(spec.transform, None, {"docket_number": "hijklmn"})
+        benchmark(spec.transform, None, {"docket_number": "hijklmn"}, None)
 
     def bench_attr_transform_default_object_params(
         self, benchmark: BenchmarkFixture
@@ -259,13 +255,9 @@ class SpecificationBench:
         spec = cast(AttributeMerger, Params(DocketParams).court_id)
         spec._name = "court_id"
 
-        benchmark(spec.transform, None, DocketParams(court_id=STUB_COURT.pk))
-
-    def bench_strategy_overwrite(self, benchmark: BenchmarkFixture):
-        benchmark(overwrite, "scrape", "db")
-
-    def bench_strategy_overwrite_if_present(self, benchmark: BenchmarkFixture):
-        benchmark(overwrite_if_present, None, "db")
+        benchmark(
+            spec.transform, None, DocketParams(court_id=STUB_COURT.pk), None
+        )
 
     def bench_attr_validation(self, benchmark: BenchmarkFixture):
         spec = cast(AttributeMerger, Constant("abcdefg"))

@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import (
+    Any,
     ClassVar,
-    Literal,
+    LiteralString,
     TypeIs,
     cast,
 )
@@ -17,20 +18,40 @@ from django.db.models import Model, QuerySet
 from cl.corpus_importer.state.utils import MergeResult
 
 
-class State[Enter: State | None, Exit: State]:
-    """A stage of a merge, typed by the states it can be entered from and exited to."""
+@dataclass(slots=True, frozen=True)
+class ModelUpdate[M: Model]:
+    """Represents a pending update to a row."""
+
+    instance: M
+    """The model instance to save. Changes should already have been made and be awaiting save."""
+    fields: Sequence[str]
+    """The changed fields to save. Nothing outside of this set will be updated."""
+    force: bool
+    """Whether to force recording this update even if no fields are changed. A forced updated will not be saved to the DB, it will only be recorded."""
+
+
+@dataclass(slots=True, frozen=True)
+class ModelCreate[M: Model]:
+    """Represents pending creation of a new row."""
+
+    fields: Mapping[str, Any]
+    """Mapping of names to values for fields in the new model."""
+
+
+type ModelOperation[M: Model] = ModelCreate[M] | ModelUpdate[M]
+
+
+@dataclass(slots=True, frozen=True)
+class State:
+    """A stage of a merge."""
+
+    name: ClassVar[LiteralString]
 
     def failed[Scrape, Params, M: Model](
         self, reason: str, result: MergeResult
     ) -> Failed[Scrape, Params, M]:
         """Shorthand to transition to a failure state."""
         return Failed(cast(NonTerminal, self), reason, result)
-
-    def complete[Scrape, Params, M: Model](
-        self, output: M, result: MergeResult
-    ) -> Complete[Scrape, Params, M]:
-        """Shorthand to transition to a success state."""
-        return Complete(cast(NonTerminal, self), output, result)
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,13 +65,20 @@ class DerivedData[Scrape, Params]:
     relation_params: Mapping[str, Model]
     """Extra model parameters for foreign object relationships"""
 
-    def create[M: Model](
+
+@dataclass(slots=True, frozen=True)
+class _QueryState[Scrape, Params, M: Model](
+    State, DerivedData[Scrape, Params]
+):
+    """A stage in which the object to merge into is still being determined."""
+
+    def create(
         self,
     ) -> Create[Scrape, Params, M]:
         """Shorthand to transition to a create state."""
         return Create(self.scrape, self.params, self.relation_params)
 
-    def update[M: Model](
+    def update(
         self,
         instance: M,
     ) -> Update[Scrape, Params, M]:
@@ -62,7 +90,32 @@ class DerivedData[Scrape, Params]:
             instance,
         )
 
-    def resolve[M: Model](
+
+@dataclass(slots=True, frozen=True)
+class _Penultimate[Scrape, Params, M: Model](
+    State, DerivedData[Scrape, Params]
+):
+    """A stage from which the merge can finish successfully."""
+
+    def complete(
+        self, output: M, result: MergeResult
+    ) -> Complete[Scrape, Params, M]:
+        """Shorthand to transition to a success state."""
+        return Complete(cast(NonTerminal, self), output, result)
+
+
+type LookupOutput[Scrape, Params, M: Model] = (
+    "Resolve[Scrape, Params, M] | Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Lookup[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
+    """Looking for an existing object to merge into."""
+
+    name = "lookup"
+
+    def resolve(
         self, candidates: QuerySet[M] | Sequence[M]
     ) -> Resolve[Scrape, Params, M]:
         """Shorthand to transition to a resolve state."""
@@ -73,7 +126,95 @@ class DerivedData[Scrape, Params]:
             candidates,
         )
 
-    def children[M: Model](
+
+type ResolveOutput[Scrape, Params, M: Model] = (
+    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Resolve[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
+    """Choosing which of the lookup's candidates to merge into."""
+
+    name = "resolve"
+
+    candidates: QuerySet[M] | Sequence[M]
+    """Objects to choose between"""
+
+
+type CreateOutput[Scrape, Params, M: Model] = (
+    "Save[Scrape, Params, M, ModelCreate[M]] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Create[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
+    """Creating a new object, since none exists to merge into."""
+
+    name = "create"
+
+    def save(
+        self, fields: Mapping[str, Any], result: MergeResult
+    ) -> Save[Scrape, Params, M, ModelCreate[M]]:
+        """Shorthand to transition to a save state."""
+        return Save(
+            self.scrape,
+            self.params,
+            self.relation_params,
+            ModelCreate(fields),
+            result,
+        )
+
+
+type UpdateOutput[Scrape, Params, M: Model] = (
+    "Save[Scrape, Params, M, ModelUpdate[M]] | Failed[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Update[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
+    """Merging into an existing object."""
+
+    name = "update"
+
+    instance: M
+    """The object to update"""
+
+    def save(
+        self,
+        instance: M,
+        fields: Sequence[str],
+        result: MergeResult,
+        force: bool = False,
+    ) -> Save[Scrape, Params, M, ModelUpdate[M]]:
+        """Shorthand to transition to a save state."""
+        return Save(
+            self.scrape,
+            self.params,
+            self.relation_params,
+            ModelUpdate(instance, fields, force),
+            result,
+        )
+
+
+type SaveOutput[Scrape, Params, M: Model] = (
+    "Children[Scrape, Params, M] | Complete[Scrape, Params, M]"
+)
+
+
+@dataclass(slots=True, frozen=True)
+class Save[Scrape, Params, M: Model, Operation = ModelOperation](
+    _Penultimate[Scrape, Params, M]
+):
+    """Save the result of an operation to the database before continuing."""
+
+    name = "save"
+
+    operation: Operation
+    """The operation to complete"""
+    result: MergeResult
+
+    def children(
         self, parent: M, result: MergeResult
     ) -> Children[Scrape, Params, M]:
         """Shorthand to transition to a child state."""
@@ -86,101 +227,16 @@ class DerivedData[Scrape, Params]:
         )
 
 
-type LookupInput[Scrape, Params, M: Model] = None
-type LookupOutput[Scrape, Params, M: Model] = (
-    "Resolve[Scrape, Params, M] | Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Lookup[Scrape, Params, M: Model](
-    State[
-        LookupInput[Scrape, Params, M],
-        LookupOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Looking for an existing object to merge into."""
-
-
-type ResolveInput[Scrape, Params, M: Model] = Lookup[Scrape, Params, M]
-type ResolveOutput[Scrape, Params, M: Model] = (
-    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Resolve[Scrape, Params, M: Model](
-    State[
-        ResolveInput[Scrape, Params, M],
-        ResolveOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Choosing which of the lookup's candidates to merge into."""
-
-    candidates: QuerySet[M] | Sequence[M]
-    """Objects to choose between"""
-
-
-type CreateInput[Scrape, Params, M: Model] = (
-    Resolve[Scrape, Params, M] | Lookup[Scrape, Params, M]
-)
-type CreateOutput[Scrape, Params, M: Model] = (
-    "Children[Scrape, Params, M] | Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Create[Scrape, Params, M: Model](
-    State[
-        CreateInput[Scrape, Params, M],
-        CreateOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Creating a new object, since none exists to merge into."""
-
-
-type UpdateInput[Scrape, Params, M: Model] = (
-    Resolve[Scrape, Params, M] | Lookup[Scrape, Params, M]
-)
-type UpdateOutput[Scrape, Params, M: Model] = (
-    "Children[Scrape, Params, M] | Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Update[Scrape, Params, M: Model](
-    State[
-        UpdateInput[Scrape, Params, M],
-        UpdateOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
-    """Merging into an existing object."""
-
-    instance: M
-    """The object to update"""
-
-
-type ChildrenInput[Scrape, Params, M: Model] = (
-    Create[Scrape, Params, M] | Update[Scrape, Params, M]
-)
 type ChildrenOutput[Scrape, Params, M: Model] = (
     "Complete[Scrape, Params, M] | Failed[Scrape, Params, M]"
 )
 
 
 @dataclass(slots=True, frozen=True)
-class Children[Scrape, Params, M: Model](
-    State[
-        ChildrenInput[Scrape, Params, M],
-        ChildrenOutput[Scrape, Params, M],
-    ],
-    DerivedData[Scrape, Params],
-):
+class Children[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
     """Merging the related objects of a created or updated object."""
+
+    name = "children"
 
     parent: M
     """The object to attach child objects to"""
@@ -192,23 +248,20 @@ type NonTerminal[Scrape, Params, M: Model] = (
     Lookup[Scrape, Params, M]
     | Resolve[Scrape, Params, M]
     | Create[Scrape, Params, M]
+    | Save[Scrape, Params, M]
     | Update[Scrape, Params, M]
     | Children[Scrape, Params, M]
 )
 
 
-type CompleteInput[Scrape, Params, M: Model] = NonTerminal[Scrape, Params, M]
 type CompleteOutput[Scrape, Params, M: Model] = "Complete[Scrape, Params, M]"
 
 
 @dataclass(slots=True, frozen=True)
-class Complete[Scrape, Params, M: Model](
-    State[
-        CompleteInput[Scrape, Params, M],
-        CompleteOutput[Scrape, Params, M],
-    ]
-):
+class Complete[Scrape, Params, M: Model](State):
     """The merge finished successfully."""
+
+    name = "complete"
 
     state: NonTerminal[Scrape, Params, M]
     """The state of the merge before failure"""
@@ -218,18 +271,14 @@ class Complete[Scrape, Params, M: Model](
     """The result of the entire merge operation"""
 
 
-type FailedInput[Scrape, Params, M: Model] = "AnyState[Scrape, Params, M]"
 type FailedOutput[Scrape, Params, M: Model] = "Failed[Scrape, Params, M]"
 
 
 @dataclass(slots=True, frozen=True)
-class Failed[Scrape, Params, M: Model](
-    State[
-        FailedInput[Scrape, Params, M],
-        FailedOutput[Scrape, Params, M],
-    ]
-):
+class Failed[Scrape, Params, M: Model](State):
     """The merge could not finish."""
+
+    name = "failed"
 
     state: NonTerminal[Scrape, Params, M] | None
     """The state of the merge before failure"""
@@ -253,10 +302,6 @@ type AnyState[Scrape, Params, M: Model] = (
     NonTerminal[Scrape, Params, M] | Terminal[Scrape, Params, M]
 )
 
-type StateName = Literal[
-    "lookup", "resolve", "create", "update", "children", "failed", "complete"
-]
-
 
 @dataclass(slots=True)
 class Machine[Scrape, Params, M: Model](ABC):
@@ -264,17 +309,6 @@ class Machine[Scrape, Params, M: Model](ABC):
 
     Methods can be overridden to customize handling of specific states.
     """
-
-    runners: ClassVar[Mapping[type[AnyState], StateName]] = {
-        Lookup: "lookup",
-        Resolve: "resolve",
-        Create: "create",
-        Update: "update",
-        Children: "children",
-        Failed: "failed",
-        Complete: "complete",
-    }
-    """Utility mapping from states to the name of their runner methods."""
 
     state: AnyState[Scrape, Params, M]
     """The current state of the merge operation"""
@@ -287,7 +321,7 @@ class Machine[Scrape, Params, M: Model](ABC):
         Returns:
             The next state
         """
-        state = getattr(self, self.runners[self.state.__class__])(self.state)
+        state = getattr(self, self.state.name)(self.state)
 
         self.state = state
         return self.state
@@ -315,6 +349,12 @@ class Machine[Scrape, Params, M: Model](ABC):
         self, state: Update[Scrape, Params, M]
     ) -> UpdateOutput[Scrape, Params, M]:
         """Merge attributes and 1-1 relations in-place."""
+
+    @abstractmethod
+    def save(
+        self, state: Save[Scrape, Params, M]
+    ) -> SaveOutput[Scrape, Params, M]:
+        """Save changes to self to the database."""
 
     @abstractmethod
     def children(

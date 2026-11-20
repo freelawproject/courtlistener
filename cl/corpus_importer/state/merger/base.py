@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import (
-    Callable,
-    Iterable,
     Mapping,
     Sequence,
 )
@@ -17,6 +15,7 @@ from typing import (
     ClassVar,
     Final,
     cast,
+    final,
     override,
 )
 
@@ -45,6 +44,7 @@ from .specifications import (
     MergerSpecification,
     OneToManyMerger,
     OneToOneMerger,
+    Transformer,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,9 +90,12 @@ class MergerSpecRegistry[Scrape, Params]:
     many_to_many: dict[
         str, ManyToManyMerger[Scrape, Params, Model, Any, Any]
     ] = field(default_factory=dict)
-    _transformers: dict[str, Callable[[Scrape, Params], Any]] = field(
+    _transformers: dict[str, Transformer[Scrape, Params, Any, Any]] = field(
         default_factory=dict
     )
+    _deferred_transformers: dict[
+        str, Transformer[Scrape, Params, Any, Any]
+    ] = field(default_factory=dict)
 
     @cached_property
     def related(self) -> dict[str, AnyRelatedMerger[Scrape, Params]]:
@@ -165,7 +168,7 @@ class MergerSpecRegistry[Scrape, Params]:
 
         return errors
 
-    def register(self, spec: MergerSpecification[Scrape, Params, Any]):
+    def register(self, spec: MergerSpecification[Scrape, Params, Any]) -> None:
         """Add a specification under its name, by kind; unknown kinds are logged."""
         match spec:
             case AttributeMerger():
@@ -179,11 +182,42 @@ class MergerSpecRegistry[Scrape, Params]:
             case _:
                 logger.error("Unknown merger spec type: %r", spec)
                 return
-        self._transformers[spec._name] = spec.transform
+        if spec._db_fields:
+            self._deferred_transformers[spec._name] = spec.transform
+        else:
+            self._transformers[spec._name] = spec.transform
 
-    def transform(self, scrape: Scrape, params: Params) -> dict[str, Any]:
+    def transform[M: Model](
+        self, scrape: Scrape, params: Params, database: None
+    ) -> dict[str, Any]:
         """Get every specification's transformed value, by field name."""
-        return {k: v(scrape, params) for k, v in self._transformers.items()}
+        return {
+            k: v(scrape, params, database)
+            for k, v in self._transformers.items()
+        }
+
+    def deferred_transform[M: Model](
+        self, scrape: Scrape, params: Params, database: M
+    ) -> dict[str, Any]:
+        """Get the value of every specification that reads the database, by field name, given the object being merged into."""
+        return {
+            k: v(scrape, params, database)
+            for k, v in self._deferred_transformers.items()
+        }
+
+    def all(
+        self,
+    ) -> dict[
+        str,
+        AttributeMerger[Scrape, Params, Any]
+        | ManyToManyMerger[Scrape, Params, Model, Any, Any]
+        | OneToManyMerger[Scrape, Params, Any, Model]
+        | OneToOneMerger[Scrape, Params, Any, Model],
+    ]:
+        """All the specifications stored in this registry."""
+        return (
+            self.attr | self.one_to_one | self.one_to_many | self.many_to_many
+        )
 
 
 @dataclass(slots=True)
@@ -198,17 +232,79 @@ class MergerConfig[M: Model]:
     :ivar registry: The specs declared on the merger. Filled in when the
         merger class is created, so it should not be passed.
     :ivar fields: The model fields loaded of an object read to be merged
-        into; every other field is deferred. Filled in when the merger class
-        is created, so it should not be passed.
+        into; every other field is deferred.
     """
 
     model: Final[type[M]]
-    key: Final[Iterable[str]] = ()
-    reads: Final[Iterable[str]] = ()
+    key: Final[tuple[str, ...]] = ()
+    reads: Final[tuple[str, ...]] = ()
     registry: MergerSpecRegistry[Any, Any] = field(
         default_factory=MergerSpecRegistry
     )
-    fields: tuple[str, ...] = ()
+    fields: tuple[str, ...] = field(init=False, default=())
+
+    def __post_init__(self) -> None:
+        """Work out which fields to load from the specs, key and reads.
+
+        The base merger's placeholder config, for `Model` itself, loads
+        nothing.
+        """
+        if self.model is Model:
+            return
+        self.fields = tuple(
+            {
+                *self.registry.attr,
+                *self.key,
+                *self.reads,
+                *(
+                    f
+                    for m in self.registry.all().values()
+                    for f in m._db_fields
+                ),
+                *(
+                    f.attname
+                    for f in self.model._meta.concrete_fields
+                    if f.is_relation
+                ),
+            }
+        )
+
+    def loading[QModel: Model](
+        self, objects: QuerySet[QModel]
+    ) -> QuerySet[QModel]:
+        """Have a query load only the fields this merger and the mergers of its relations use.
+
+        Args:
+            objects: A query for objects of this merger's model.
+
+        Returns:
+            The narrowed query.
+        """
+        return objects.only(*self.fields).prefetch_related(
+            *self.registry.prefetch
+        )
+
+    @classmethod
+    def inherit(
+        cls, parent: type[Merger], registry: MergerSpecRegistry
+    ) -> MergerConfig:
+        """Build a config for a subclass of ``parent`` using ``registry``.
+
+        The subclass reads every field read by any of its mergers in the MRO.
+        """
+        return MergerConfig(
+            parent.config.model,
+            parent.config.key,
+            reads=tuple(
+                {
+                    read
+                    for base in parent.__mro__
+                    if issubclass(base, Merger)
+                    for read in base.config.reads
+                }
+            ),
+            registry=registry,
+        )
 
 
 class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
@@ -216,9 +312,13 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     The value computed for each declared spec is stored on the instance under
     the spec's name, unless the input failed validation.
+
+    A spec that reads the database has, until `update` runs, the value it
+    would have with nothing stored, so `lookup` and `resolve` can match on
+    what was scraped.
     """
 
-    config: ClassVar[MergerConfig[Model]]
+    config: ClassVar[MergerConfig[Model]] = MergerConfig(Model)
     """Configurable information determining merger behavior."""
 
     def __init_subclass__(cls, abstract: bool = False) -> None:
@@ -244,32 +344,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
         errors = registry.validate(cls)
 
-        model = cls.config.model
-        reads = tuple(
-            dict.fromkeys(
-                chain.from_iterable(
-                    config.reads
-                    for base in cls.__mro__
-                    if (config := vars(base).get("config")) is not None
-                )
-            )
-        )
-        # Django reads a row's foreign keys to tie it to the objects it is
-        # related to, so deferring one costs a query per row.
-        foreign_keys = [
-            f.attname for f in model._meta.concrete_fields if f.is_relation
-        ]
-        cls.config = MergerConfig(
-            model,
-            cls.config.key,
-            reads,
-            registry,
-            tuple(
-                dict.fromkeys(
-                    chain(registry.attr, cls.config.key, reads, foreign_keys)
-                )
-            ),
-        )
+        cls.config = MergerConfig.inherit(cls, registry)
 
         if errors:
             raise TypeError(
@@ -361,7 +436,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             not isinstance(self.state, MergerState.Failed)
             or self.state.state is not None
         ):
-            vars(self).update(self.config.registry.transform(scrape, params))
+            vars(self).update(
+                self.config.registry.transform(scrape, params, None)
+            )
 
         if manager is None:
             manager = cast(Manager[M], self.config.model._default_manager)
@@ -372,6 +449,21 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         self.siblings: SiblingLookup[M] = siblings
         if isinstance(self.state, MergerState.Lookup):
             siblings.claim(self.natural_key(self.state), self)
+
+    @final
+    def populate_from_db(
+        self, state: MergerState.Update[Scrape, Params, M]
+    ) -> None:
+        """Compute the fields that read the database from the object being merged into, replacing any value read before it was found.
+
+        Args:
+            state: The update the merger is carrying out.
+        """
+        vars(self).update(
+            self.config.registry.deferred_transform(
+                state.scrape, state.params, state.instance
+            )
+        )
 
     @staticmethod
     def validator(scrape: Scrape) -> bool:
@@ -401,25 +493,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             ),
         )
 
-    @classmethod
-    def loading(cls, objects: QuerySet[M]) -> QuerySet[M]:
-        """Have a query load what merging its objects takes and no more: the fields this merger uses, and everything the mergers of its relations look for.
-
-        The related objects come without their other fields too, and so does
-        anything queried through the relation they were loaded into. Deleting
-        through such a relation hands the deletion signals objects with
-        fields missing; delete through the model's manager instead.
-
-        Args:
-            objects: A query for objects of this merger's model.
-
-        Returns:
-            The narrowed query.
-        """
-        return objects.only(*cls.config.fields).prefetch_related(
-            *cls.config.registry.prefetch
-        )
-
     @property
     def stored(self) -> QuerySet[M]:
         """The objects this merger can merge into, loaded with only the fields it uses. A lookup that evaluates its own query should build it from this rather than from `manager`."""
@@ -430,25 +503,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     ) -> QuerySet[M]:
         """The objects matching this merger's natural key."""
         return self.stored.filter(**self.natural_key(state).filters)
-
-    def pre_update(self, updated_fields: list[str]) -> list[str]:
-        """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
-
-        Args:
-            updated_fields: The fields that were updated.
-
-        Returns:
-            A list of additional attribute names that should be updated.
-        """
-        return []
-
-    def needs_update(self) -> bool:
-        """Whether to take the update path even when no attribute changed. Useful for re-triggering downstream processing (e.g. a re-download) driven by the merge result's updates.
-
-        Returns:
-            True to force the update path.
-        """
-        return False
 
     @override
     def lookup(
@@ -511,20 +565,17 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def update(
         self, state: MergerState.Update[Scrape, Params, M]
     ) -> MergerState.UpdateOutput[Scrape, Params, M]:
-        obj = cast(
-            M, self.config.model(**self._attributes(state.relation_params))
-        )
+        self.populate_from_db(state)
 
         updated: list[str] = []
-        for name, spec in self.config.registry.attr.items():
-            obj_v = getattr(obj, name)
+        for name in self.config.registry.attr:
+            obj_v = getattr(self, name)
             db_v = getattr(state.instance, name)
-            merged = spec.strategy(obj_v, db_v)
-            if merged != db_v:
+            if obj_v != db_v:
                 setattr(
                     state.instance,
                     name,
-                    merged,
+                    obj_v,
                 )
                 updated.append(name)
         result = MergeResult.unnecessary()
@@ -532,7 +583,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             if not o2o_spec.forward:
                 continue
             o2o_result = o2o_spec.merge(
-                state.instance, state.scrape, state.params
+                state.instance, getattr(self, name), state.params
             )
             model_name = o2o_spec.merger.config.model.__name__
             if model_name in o2o_result.creates:
@@ -546,24 +597,13 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             if o2o_result.update or o2o_result.create:
                 updated.append(name)
             result |= o2o_result
-        if updated or self.needs_update():
-            result |= MergeResult.updated(
-                self.config.model.__name__, state.instance.pk
-            )
-            updated += self.pre_update(updated)
-            if updated:
-                updated += auto_now_fields(self.config.model)
-            state.instance.save(update_fields=updated)
 
-        if self.config.registry.related:
-            return state.children(state.instance, result)
-        return state.complete(state.instance, result)
+        return state.save(state.instance, updated, result)
 
     @override
     def create(
         self, state: MergerState.Create[Scrape, Params, M]
     ) -> MergerState.CreateOutput[Scrape, Params, M]:
-        """Create the object from the transformed attributes, merging its forward one-to-one relations first."""
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.config.registry.one_to_one.items():
@@ -571,18 +611,42 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 continue
             field = self.config.model._meta.get_field(name)
             attname = getattr(field, "attname", f"{name}_id")
-            result |= spec.merge(None, state.scrape, state.params)
+            result |= spec.merge(None, getattr(self, name), state.params)
             model_name = spec.merger.config.model.__name__
             if model_name in result.creates:
                 o2o_params[attname] = next(iter(result.creates[model_name]))
-        db_obj = self.manager.create(
-            **(self._attributes(state.relation_params) | o2o_params),
+
+        return state.save(
+            self._attributes(state.relation_params) | o2o_params, result
         )
-        result |= MergeResult.created(self.config.model.__name__, db_obj.pk)
+
+    @override
+    def save(
+        self, state: MergerState.Save[Scrape, Params, M]
+    ) -> MergerState.SaveOutput[Scrape, Params, M]:
+        result = state.result
+        match state.operation:
+            case MergerState.ModelCreate(fields):
+                instance = self.manager.create(**fields)
+                result |= MergeResult.created(
+                    instance.__class__.__name__, instance.pk
+                )
+            case MergerState.ModelUpdate(instance, fields, force):
+                if fields:
+                    instance.save(
+                        update_fields=(
+                            *fields,
+                            *auto_now_fields(self.config.model),
+                        )
+                    )
+                if fields or force:
+                    result |= MergeResult.updated(
+                        instance.__class__.__name__, instance.pk
+                    )
 
         if self.config.registry.related:
-            return state.children(db_obj, result)
-        return state.complete(db_obj, result)
+            return state.children(instance, result)
+        return state.complete(instance, result)
 
     @override
     def children(
@@ -594,7 +658,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             # the parent stores the key.
             if isinstance(rm, OneToOneMerger) and rm.forward:
                 continue
-            result |= rm.merge(state.parent, state.scrape, state.params)
+            result |= rm.merge(
+                state.parent, getattr(self, rm._name), state.params
+            )
 
         return state.complete(state.parent, result)
 
