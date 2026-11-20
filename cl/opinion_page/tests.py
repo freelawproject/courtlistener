@@ -12,6 +12,7 @@ from hashlib import md5
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
@@ -101,6 +102,13 @@ from cl.opinion_page.views import (
     get_downloads_context,
     get_prev_next_volumes,
     view_recap_document,
+)
+from cl.opinion_page.volume_toc import (
+    last_marked_page,
+    parse_page,
+    parse_star_pages,
+    sequence_volume,
+    summarize_volume,
 )
 from cl.people_db.factories import (
     PartyFactory,
@@ -1033,6 +1041,352 @@ class ScotusDocumentFlagDisabledTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
+class VolumeSequencingTest(SimpleTestCase):
+    """Tests for the page-order sequencing behind a volume's listing."""
+
+    @staticmethod
+    def _cluster(
+        *cites: tuple[str, str, str], stars: list[int] | None = None
+    ) -> SimpleNamespace:
+        """Build a stand-in cluster whose citations are already prefetched.
+
+        Each cite is a (volume, reporter, page) triple. `stars` stands in for
+        the star-pagination pages found in the opinion's text.
+        """
+        citations = [
+            SimpleNamespace(volume=v, reporter=r, page=p) for v, r, p in cites
+        ]
+        prefetched = SimpleNamespace(all=lambda: citations)
+        return SimpleNamespace(citations=prefetched, stars=stars or [])
+
+    @staticmethod
+    def _sequence(clusters, reporter="U.S.", volume="1"):
+        """Sequence stand-in clusters, feeding their stars in as markers."""
+        return sequence_volume(
+            clusters, reporter, volume, markers=lambda c: c.stars
+        )
+
+    def test_parse_page_reads_leading_digits_only(self) -> None:
+        """Does page parsing survive the page values a TextField allows?"""
+        self.assertEqual(parse_page("4"), 4)
+        self.assertEqual(parse_page(" 7 "), 7)
+        # Pages like "4a" appear when a case is inserted into a volume.
+        self.assertEqual(parse_page("4a"), 4)
+        self.assertEqual(parse_page(12), 12)
+        # Front matter is numbered in roman numerals; neither is sortable.
+        self.assertIsNone(parse_page("iv"))
+        self.assertIsNone(parse_page("Appx. 4"))
+        self.assertIsNone(parse_page(""))
+        self.assertIsNone(parse_page(None))
+
+    def test_orders_by_page_not_lexically(self) -> None:
+        """Is page 9 listed before page 10, despite being a TextField?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "10")),
+            self._cluster(("1", "U.S.", "9")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        self.assertEqual([span.page for _, span in sequenced], [9, 10])
+
+    def test_spans_run_to_the_next_case(self) -> None:
+        """Does a case get credited the pages up to the next case's first?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "7")),
+            self._cluster(("1", "U.S.", "9")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        spans = [span for _, span in sequenced]
+        self.assertEqual(spans[0].last_page, 6)
+        self.assertEqual(spans[0].page_count, 6)
+        self.assertEqual(spans[0].label, "1–6")
+        self.assertEqual(spans[1].page_count, 2)
+        self.assertEqual(spans[1].label, "7–8")
+        # Nothing follows the last case, so its extent is unknown rather
+        # than guessed.
+        self.assertIsNone(spans[2].last_page)
+        self.assertIsNone(spans[2].page_count)
+        self.assertEqual(spans[2].label, "9–")
+
+    def test_single_page_case_has_no_range(self) -> None:
+        """Is a one-page case labeled as a page rather than a range?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "3")),
+            self._cluster(("1", "U.S.", "4")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        span = sequenced[0][1]
+        self.assertEqual(span.page_count, 1)
+        self.assertEqual(span.label, "3")
+
+    def test_cases_sharing_a_first_page_are_flagged(self) -> None:
+        """Are cases that begin on the same page marked as indeterminate?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "2")),
+            self._cluster(("1", "U.S.", "2")),
+            self._cluster(("1", "U.S.", "5")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        spans = [span for _, span in sequenced]
+        self.assertTrue(spans[0].shares_first_page)
+        self.assertEqual(spans[0].cases_on_page, 2)
+        self.assertTrue(spans[1].shares_first_page)
+        self.assertFalse(spans[2].shares_first_page)
+        self.assertEqual(spans[2].cases_on_page, 1)
+
+    def test_length_of_a_shared_page_is_under_one(self) -> None:
+        """Do cases packed into one page each report less than a page?
+
+        Three cases begin on page 1 and the next case begins on page 2, so
+        all three fit inside a single page. Reporting "1" for each would
+        claim three pages for one.
+        """
+        clusters = [
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "2")),
+        ]
+        spans = [s for _, s in sequence_volume(clusters, "U.S.", "1")]
+        self.assertEqual([s.length_label for s in spans[:3]], ["<1"] * 3)
+        self.assertEqual(spans[0].cases_on_page, 3)
+
+    def test_length_of_a_shared_run_is_a_bound(self) -> None:
+        """Is a shared run of pages reported as a bound, not a count?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "4")),
+            self._cluster(("1", "U.S.", "4")),
+            self._cluster(("1", "U.S.", "7")),
+        ]
+        spans = [s for _, s in sequence_volume(clusters, "U.S.", "1")]
+        # The pair occupies pages 4-6 between them; neither can claim all 3.
+        self.assertEqual(spans[0].page_count, 3)
+        self.assertEqual(spans[0].length_label, "≤3")
+        self.assertEqual(spans[1].length_label, "≤3")
+
+    def test_unshared_length_is_an_exact_count(self) -> None:
+        """Is an unshared case still reported as a plain number?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "7")),
+        ]
+        spans = [s for _, s in sequence_volume(clusters, "U.S.", "1")]
+        self.assertEqual(spans[0].length_label, "6")
+        # Nothing bounds the final case, so it reports no length at all.
+        self.assertEqual(spans[1].length_label, "")
+
+    def test_lengths_never_exceed_the_volume(self) -> None:
+        """Do the lengths down the column stay within the volume's pages?
+
+        This is the bug the bound exists to prevent: summing a per-case
+        figure over cases that share pages claimed more pages than the
+        volume has.
+        """
+        pages = ["1", "1", "1", "2", "5", "5", "9"]
+        clusters = [self._cluster(("1", "U.S.", p)) for p in pages]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        # Count each shared run once, the way the page's bounds now read.
+        runs = {
+            s.page: s.page_count
+            for _, s in sequenced
+            if s.page_count is not None
+        }
+        pages_seen = [s.page for _, s in sequenced if s.page is not None]
+        extent = max(pages_seen) - min(pages_seen)
+        self.assertEqual(sum(runs.values()), extent)
+
+    def test_ignores_pages_from_parallel_citations(self) -> None:
+        """Is the page read from the listed volume, not a parallel cite?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "50"), ("200", "F.2d", "1")),
+            self._cluster(("99", "L. Ed.", "3"), ("1", "U.S.", "20")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        self.assertEqual([span.page for _, span in sequenced], [20, 50])
+
+    def test_unpaged_cases_sort_last_and_keep_no_span(self) -> None:
+        """Are cases with no numeric page shown rather than dropped?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "iv")),
+            self._cluster(("1", "U.S.", "6")),
+        ]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        self.assertEqual([span.page for _, span in sequenced], [6, None])
+        self.assertEqual(sequenced[1][1].label, "")
+        self.assertFalse(sequenced[1][1].shares_first_page)
+
+    def test_spans_tile_the_volume_without_gaps(self) -> None:
+        """Do consecutive spans abut exactly, so a volume reads as complete?"""
+        pages = ["1", "6", "7", "20", "21", "100"]
+        clusters = [self._cluster(("1", "U.S.", p)) for p in pages]
+        sequenced = sequence_volume(clusters, "U.S.", "1")
+        bounded = [s for _, s in sequenced if s.last_page is not None]
+        for current, following in zip(bounded, bounded[1:], strict=False):
+            self.assertEqual(current.last_page + 1, following.page)
+
+    def test_summary_totals_the_volume(self) -> None:
+        """Does the summary describe the volume shown above the listing?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "9")),
+            self._cluster(("1", "U.S.", "xi")),
+        ]
+        summary = summarize_volume(sequence_volume(clusters, "U.S.", "1"))
+        self.assertEqual(summary.case_count, 4)
+        self.assertEqual(summary.first_page, 1)
+        self.assertEqual(summary.last_page, 9)
+        self.assertEqual(summary.page_extent, 9)
+        self.assertEqual(summary.shared_page_cases, 2)
+        self.assertEqual(summary.unpaged_cases, 1)
+
+    def test_parse_star_pages_reads_both_marker_styles(self) -> None:
+        """Are Harvard's page tags and the older *N convention both read?"""
+        harvard = '<p>text</p><page-number citation-index="1" label="7">x'
+        self.assertEqual(parse_star_pages(harvard), [7])
+        self.assertEqual(parse_star_pages("start *12 more *13 end"), [12, 13])
+        self.assertEqual(parse_star_pages(""), [])
+        self.assertEqual(parse_star_pages(None), [])
+        # A footnote asterisk carries no digits, so it isn't a page marker.
+        self.assertEqual(parse_star_pages("see note *"), [])
+        # Doubled asterisks are emphasis markup, not pagination.
+        self.assertEqual(parse_star_pages("**9 bold"), [])
+
+    def test_last_marked_page_ignores_markers_outside_the_case(self) -> None:
+        """Is another reporter's pagination kept from inflating the extent?"""
+        # Markers before the case's own first page belong to earlier matter.
+        self.assertEqual(last_marked_page([3, 11, 12], 10, 20), 12)
+        # Markers past the next case's first page are a parallel citation's.
+        self.assertEqual(last_marked_page([11, 4329], 10, 20), 11)
+        self.assertIsNone(last_marked_page([3, 4], 10, 20))
+        self.assertIsNone(last_marked_page([], 10, 20))
+        # With nothing following, there is no upper bound to apply.
+        self.assertEqual(last_marked_page([11, 44], 10, None), 44)
+
+    def test_gap_is_flagged_when_text_stops_short(self) -> None:
+        """Is a missing case caught when the text ends before the next one?
+
+        The case at page 706 is shown by its own text to end on page 709,
+        but the next case does not begin until 721. Those 11 pages are
+        exactly the anomaly this listing exists to surface.
+        """
+        clusters = [
+            self._cluster(("1", "U.S.", "706"), stars=[707, 708, 709]),
+            self._cluster(("1", "U.S.", "721"), stars=[722]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertEqual(spans[0].text_last_page, 709)
+        self.assertEqual(spans[0].text_page_count, 4)
+        self.assertTrue(spans[0].has_gap)
+        self.assertEqual(spans[0].gap_pages, 11)
+        # The length shown is the measured one, not the 15-page span.
+        self.assertEqual(spans[0].length_label, "4")
+        self.assertTrue(spans[0].length_is_measured)
+
+    def test_ending_on_the_next_cases_page_is_not_a_gap(self) -> None:
+        """Is sharing the boundary page treated as continuous?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1"), stars=[2, 3]),
+            self._cluster(("1", "U.S.", "3"), stars=[4]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertEqual(spans[0].text_last_page, 3)
+        self.assertEqual(spans[0].gap_pages, 0)
+        self.assertFalse(spans[0].has_gap)
+
+    def test_ending_just_before_the_next_case_is_not_a_gap(self) -> None:
+        """Is an exactly abutting case treated as continuous?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1"), stars=[2]),
+            self._cluster(("1", "U.S.", "3"), stars=[4]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertFalse(spans[0].has_gap)
+        self.assertEqual(spans[0].gap_pages, 0)
+
+    def test_unmarked_text_is_not_mistaken_for_a_gap(self) -> None:
+        """Does a case with no markers stay silent instead of guessing?
+
+        Most older opinions carry no star pagination. Treating that absence
+        as a zero-length opinion would flag the whole volume as missing.
+        """
+        clusters = [
+            self._cluster(("1", "U.S.", "1"), stars=[]),
+            self._cluster(("1", "U.S.", "40"), stars=[]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertIsNone(spans[0].text_last_page)
+        self.assertIsNone(spans[0].gap_pages)
+        self.assertFalse(spans[0].has_gap)
+        # Falls back to the derived span rather than claiming a measurement.
+        self.assertEqual(spans[0].length_label, "39")
+        self.assertFalse(spans[0].length_is_measured)
+
+    def test_no_markers_at_all_means_no_gap_detection(self) -> None:
+        """Without markers supplied, is gap detection simply off?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "1")),
+            self._cluster(("1", "U.S.", "40")),
+        ]
+        # Note: no markers callable passed at all.
+        spans = [s for _, s in sequence_volume(clusters, "U.S.", "1")]
+        self.assertIsNone(spans[0].text_last_page)
+        self.assertFalse(spans[0].has_gap)
+
+    def test_page_mate_reach_prevents_a_false_gap(self) -> None:
+        """Does a short case avoid flagging when a page-mate runs on?
+
+        Two cases begin on page 69. One stops at 70, the other reaches 71,
+        and the next case begins at 72. Nothing is missing, but judging the
+        short case on its own text would claim page 71 was.
+        """
+        clusters = [
+            self._cluster(("1", "U.S.", "69"), stars=[70]),
+            self._cluster(("1", "U.S.", "69"), stars=[70, 71]),
+            self._cluster(("1", "U.S.", "72"), stars=[73]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertEqual(spans[0].group_last_page, 71)
+        self.assertFalse(spans[0].has_gap)
+        self.assertFalse(spans[1].has_gap)
+
+    def test_whole_page_group_stopping_short_is_flagged(self) -> None:
+        """Is a gap still caught when every case on the page stops short?"""
+        clusters = [
+            self._cluster(("1", "U.S.", "69"), stars=[70]),
+            self._cluster(("1", "U.S.", "69"), stars=[70]),
+            self._cluster(("1", "U.S.", "80"), stars=[81]),
+        ]
+        spans = [s for _, s in self._sequence(clusters)]
+        self.assertTrue(spans[0].has_gap)
+        self.assertEqual(spans[0].gap_pages, 9)
+
+    def test_summary_counts_gaps_and_unchecked_cases(self) -> None:
+        """Does the summary report both the gaps and the blind spots?"""
+        clusters = [
+            # Ends at 3, next starts at 10: 6 pages unaccounted for.
+            self._cluster(("1", "U.S.", "1"), stars=[2, 3]),
+            # Ends at 11, next starts at 12: continuous.
+            self._cluster(("1", "U.S.", "10"), stars=[11]),
+            # No markers: cannot be checked.
+            self._cluster(("1", "U.S.", "12"), stars=[]),
+            # Last case: nothing follows it to measure against.
+            self._cluster(("1", "U.S.", "20"), stars=[21]),
+        ]
+        summary = summarize_volume(self._sequence(clusters))
+        self.assertEqual(summary.gap_count, 1)
+        self.assertEqual(summary.gap_pages, 6)
+        self.assertEqual(summary.unchecked_cases, 2)
+        self.assertEqual(summary.checked_cases, 2)
+
+    def test_empty_volume_summarizes_without_error(self) -> None:
+        """Does an empty volume summarize to empty rather than raising?"""
+        summary = summarize_volume(sequence_volume([], "U.S.", "1"))
+        self.assertEqual(summary.case_count, 0)
+        self.assertIsNone(summary.first_page)
+        self.assertIsNone(summary.page_extent)
+
+
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
 
@@ -1063,7 +1417,10 @@ class CitationRedirectorTest(TestCase):
             page="999",
         )
 
-        with self.assertNumQueries(5):
+        # Sequencing reads the whole volume in one select rather than having
+        # the paginator count and then slice it, so this is one query fewer
+        # than the count-plus-slice it replaced.
+        with self.assertNumQueries(4):
             response = self.client.get(
                 reverse(
                     "citation_redirector",
@@ -1084,6 +1441,81 @@ class CitationRedirectorTest(TestCase):
                 for case in cases
             ]
         self.assertTrue(display_data)
+
+    def test_volume_page_lists_cases_in_page_order(self) -> None:
+        """Is a volume listed in the order it's bound, not by date filed?
+
+        The two cases are created so that date order and page order disagree:
+        the later-filed case sits earlier in the volume.
+        """
+        first = CitationWithParentsFactory.create(
+            reporter="F.2d", volume="57", page="100"
+        )
+        first.cluster.date_filed = date(1935, 1, 1)
+        first.cluster.save(update_fields=["date_filed"])
+        second = CitationWithParentsFactory.create(
+            reporter="F.2d", volume="57", page="9"
+        )
+        second.cluster.date_filed = date(1936, 1, 1)
+        second.cluster.save(update_fields=["date_filed"])
+
+        url = reverse(
+            "citation_redirector",
+            kwargs={"reporter": "f2d", "volume": "57"},
+        )
+        response = self.client.get(url)
+        self.assertStatus(response, HTTPStatus.OK)
+        cases = list(response.context["cases"])
+        self.assertEqual(
+            [case.volume_span.page for case in cases],
+            [9, 100],
+            msg="The volume wasn't listed in page order.",
+        )
+        # The case on page 9 runs up to the one that starts on page 100.
+        self.assertEqual(cases[0].volume_span.page_count, 91)
+        self.assertEqual(cases[0].volume_span.label, "9–99")
+        # Nothing follows the last case, so its extent is left unknown.
+        self.assertIsNone(cases[1].volume_span.page_count)
+
+        summary = response.context["volume_summary"]
+        self.assertEqual(summary.case_count, 2)
+        self.assertEqual(summary.first_page, 9)
+        self.assertEqual(summary.last_page, 100)
+
+    def test_volume_page_keeps_date_ordering_available(self) -> None:
+        """Does ?order=date still list a volume the old way?
+
+        Spans describe the volume, not the listing, so they must survive a
+        change of display order.
+        """
+        early = CitationWithParentsFactory.create(
+            reporter="F.2d", volume="58", page="100"
+        )
+        early.cluster.date_filed = date(1935, 1, 1)
+        early.cluster.save(update_fields=["date_filed"])
+        late = CitationWithParentsFactory.create(
+            reporter="F.2d", volume="58", page="9"
+        )
+        late.cluster.date_filed = date(1936, 1, 1)
+        late.cluster.save(update_fields=["date_filed"])
+
+        url = reverse(
+            "citation_redirector",
+            kwargs={"reporter": "f2d", "volume": "58"},
+        )
+        response = self.client.get(url, {"order": "date"})
+        self.assertStatus(response, HTTPStatus.OK)
+        self.assertEqual(response.context["order"], "date")
+        cases = list(response.context["cases"])
+        self.assertEqual(
+            [case.volume_span.page for case in cases],
+            [100, 9],
+            msg="?order=date didn't fall back to date-filed ordering.",
+        )
+        # Page 9's span is still measured against page 100, not its neighbor
+        # in the date-ordered listing.
+        page_nine = next(c for c in cases if c.volume_span.page == 9)
+        self.assertEqual(page_nine.volume_span.page_count, 91)
 
     def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
