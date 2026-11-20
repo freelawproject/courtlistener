@@ -1,9 +1,6 @@
 {% extends "docket_alert_email_base.txt" %}
 {% load extras %}
 
-{% block docket_links %}{% autoescape off %}{% if docket.texas_docket_url %}
-View Docket on TAMES: {{ docket.texas_docket_url }}{% endif %}{% endautoescape %}{% endblock %}
-
 {% block rows %}
 {% autoescape off %}{% for de in new_des %}Date Filed: {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}
 {{ de.entry_type|wordwrap:80 }}{% if de.description %}

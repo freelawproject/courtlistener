@@ -8,9 +8,6 @@
 {% block preheader %}
       {% for de in new_des %}{% if forloop.first %}{{ de.entry_type }}{% endif %}{% endfor %}{% endblock %}
 
-{% block docket_links %}{% if docket.texas_docket_url %}
-      <a href="{{ docket.texas_docket_url }}">View Docket on TAMES</a><br>{% endif %}{% endblock %}
-
 {% block table_head %}
       <tr>
         <th>Date&nbsp;Filed</th>

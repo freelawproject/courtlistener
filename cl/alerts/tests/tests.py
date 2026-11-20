@@ -1376,10 +1376,20 @@ class DocketAlertTexasTest(TestCase):
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertNotIn("<script>alert(1)</script>", html)
         self.assertNotIn("Document<br>Number", html)
-        self.assertIn("View Docket on TAMES", html)
-        # Plain text isn't HTML, so its links keep a bare "&".
-        self.assertIn(self.docket.texas_docket_url, message.body)
         mock_webhooks.delay.assert_not_called()
+
+    def test_only_the_courtlistener_docket_link_is_offered(self) -> None:
+        """Does the email link the docket on CourtListener only, like the SCOTUS email, and not on TAMES?"""
+        TexasDocketEntryFactory(docket=self.docket)
+        send_alert_and_webhook(self.docket.pk, self.before)
+        message = mail.outbox[0]
+        for part in (message.body, message.alternatives[0][0]):
+            self.assertIn(
+                f"https://www.courtlistener.com{self.docket.get_absolute_url()}",
+                part,
+            )
+            self.assertNotIn("View Docket on TAMES", part)
+            self.assertNotIn("search.txcourts.gov/Case.aspx", part)
 
     def test_entries_without_documents_are_listed(self) -> None:
         """Most TAMES entries have no attachment: does the email still list them?"""
