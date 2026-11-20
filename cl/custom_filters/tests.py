@@ -8,6 +8,7 @@ from unittest import mock
 
 from django import forms
 from django.conf import settings
+from django.contrib.staticfiles.finders import find
 from django.http import HttpResponse
 from django.middleware.csp import ContentSecurityPolicyMiddleware, get_nonce
 from django.template import Context, TemplateSyntaxError
@@ -603,6 +604,68 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+    # Literal icon names passed to {% svg %}, to a component's icon prop or to
+    # <c-icon name>. Names built from variables can't be checked here.
+    TEMPLATE_ICON_PATTERNS = [
+        re.compile(r"""\{%\s*svg\s+["']([\w/-]+)["']"""),
+        re.compile(r"""\bicon=["']([\w/-]+)["']"""),
+        re.compile(r"""<c-icon\b[^>]*?\sname=["']([\w/-]+)["']"""),
+    ]
+    # <c-icon ... outline> also needs the name's _outline file.
+    OUTLINE_ICON_PATTERN = re.compile(
+        r"""<c-icon\b(?=[^>]*\s:?outline\b)[^>]*?\sname=["']([\w/-]+)["']"""
+    )
+    # Python files that set icon names for templates. Add any new one here.
+    ICON_PYTHON_FILES = ["opinion_page/utils.py"]
+    PYTHON_ICON_PATTERN = re.compile(
+        r"""["']icon["']\s*:\s*["']([\w/-]+)["']"""
+    )
+
+    def test_every_icon_name_in_use_has_a_file(self) -> None:
+        """Every icon name in use has a file.
+
+        A renamed or deleted icon file must not leave a template or view
+        pointing at a name that no longer exists, since the svg tag renders
+        nothing for it in production.
+        """
+        source_root = settings.INSTALL_ROOT / "cl"
+        used: dict[str, set[str]] = {}
+
+        def collect(path: Path, patterns: list[re.Pattern[str]]) -> None:
+            """Records every icon name the patterns find in the file."""
+            text = path.read_text(encoding="utf-8")
+            location = str(path.relative_to(source_root))
+            for pattern in patterns:
+                for name in pattern.findall(text):
+                    used.setdefault(name, set()).add(location)
+            for name in self.OUTLINE_ICON_PATTERN.findall(text):
+                used.setdefault(f"{name}_outline", set()).add(location)
+
+        # Only our own template directories; third-party apps have no icons.
+        template_dirs = [
+            directory
+            for directory in (
+                *get_app_template_dirs("templates"),
+                settings.TEMPLATE_ROOT,
+            )
+            if directory.is_relative_to(source_root)
+        ]
+        for template_dir in template_dirs:
+            for path in template_dir.rglob("*.html"):
+                collect(path, self.TEMPLATE_ICON_PATTERNS)
+        for relative_path in self.ICON_PYTHON_FILES:
+            collect(source_root / relative_path, [self.PYTHON_ICON_PATTERN])
+
+        self.assertTrue(
+            used, "No icon names found; the patterns may be stale."
+        )
+        for name, locations in sorted(used.items()):
+            with self.subTest(icon=name):
+                self.assertIsNotNone(
+                    find(f"svg/{name}.svg"),
+                    f"svg/{name}.svg is used in {sorted(locations)}",
+                )
 
 
 LOGGER = component_tags.logger.name
