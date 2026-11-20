@@ -406,6 +406,7 @@ recap_type_v4_api_keys.update(
             )
             else None
         ),
+        "capital_case": lambda x: None,
         "meta": [],
         "recap_documents": [],
     }
@@ -463,6 +464,9 @@ recap_document_v4_api_keys.update(
             .cited_opinions.all()
             .values_list("cited_opinion_id", flat=True)
         ),
+        "capital_case": lambda x: None,
+        "uid": lambda x: None,
+        "docket_entry_uid": lambda x: None,
         "meta": [],
     }
 )
