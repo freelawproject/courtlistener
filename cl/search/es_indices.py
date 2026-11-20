@@ -1,3 +1,5 @@
+"""Elasticsearch index definitions and settings."""
+
 from django.conf import settings
 from django_elasticsearch_dsl import Index
 

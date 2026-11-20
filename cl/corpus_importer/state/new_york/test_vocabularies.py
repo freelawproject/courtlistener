@@ -1,5 +1,4 @@
-"""Tests for the New York Court of Appeals (Court-PASS) scrape schema and the
-vocabulary mapping between Juriscraper and CourtListener.
+"""Tests for the New York Court of Appeals (Court-PASS) scrape schema and the vocabulary mapping between Juriscraper and CourtListener.
 
 Two failure modes are covered here, because the whole design turns on telling
 them apart:
@@ -90,16 +89,17 @@ class DocketNumberTest(SimpleTestCase):
                 self.assertEqual(make_docket_number_core(stated), expected)
 
     def test_finds_a_docket_number_in_surrounding_text(self) -> None:
-        """Court-PASS prints the number inside a longer caption. Is it still
-        found?"""
+        """Court-PASS prints the number inside a longer caption.
+
+        Is it still found?
+        """
         self.assertEqual(
             make_docket_number_core("Case No. APL-2024-00177 (Part 2)"),
             "apl202400177",
         )
 
     def test_picks_one_of_several_deterministically(self) -> None:
-        """A caption naming two numbers has to resolve the same way on every
-        scrape, or the docket moves between rows."""
+        """A caption naming two numbers has to resolve the same way on every scrape, or the docket moves between rows."""
         both = "APL-2024-00177 and APL-2023-00001"
         self.assertEqual(make_docket_number_core(both), "apl202300001")
         self.assertEqual(
@@ -111,9 +111,7 @@ class DocketNumberTest(SimpleTestCase):
         )
 
     def test_unusable_docket_number(self) -> None:
-        """A string holding no Court of Appeals number yields nothing, so the
-        merger can refuse the docket rather than write one it can never match
-        again."""
+        """A string holding no Court of Appeals number yields nothing, so the merger can refuse the docket rather than write one it can never match again."""
         for stated in ("Motion No. 12", "", "   ", "SC1983-2014", "garbage"):
             with self.subTest(stated=stated):
                 self.assertEqual(make_docket_number_core(stated), "")
@@ -123,8 +121,7 @@ class VocabularyMappingTest(SimpleTestCase):
     """Tests for the codes CourtListener stores for the schema's readings."""
 
     def test_mirrored_members(self) -> None:
-        """Is every member of every mirrored vocabulary stored under its own
-        published code?
+        """Is every member of every mirrored vocabulary stored under its own published code?
 
         Every member, rather than a sample: a mirror maps by name, so a code
         renumbered or a member renamed upstream would otherwise store the wrong
@@ -144,8 +141,7 @@ class VocabularyMappingTest(SimpleTestCase):
                     )
 
     def test_mirrors_define_no_member_juriscraper_dropped(self) -> None:
-        """The other direction: does every mirrored name still name a member
-        upstream?
+        """The other direction: does every mirrored name still name a member upstream?
 
         A member renamed or removed upstream leaves a mirror entry nothing maps
         onto, so the codes already stored under it stop meaning anything.
@@ -165,8 +161,7 @@ class VocabularyMappingTest(SimpleTestCase):
                 )
 
     def test_mirrored_reserved_readings(self) -> None:
-        """Both readings that name no member are stored under the code reserved
-        for them, in every mirror. Are they?"""
+        """Both readings that name no member are stored under the code reserved for them, in every mirror. Are they?"""
         for label, mirror, _ in _MIRRORS:
             with self.subTest(label):
                 self.assertEqual(
@@ -177,8 +172,7 @@ class VocabularyMappingTest(SimpleTestCase):
                 )
 
     def test_unmirrored_member_is_unassigned(self) -> None:
-        """A member Juriscraper has and CourtListener has not mirrored yet must
-        cost the field rather than raising, so the docket still merges."""
+        """A member Juriscraper has and CourtListener has not mirrored yet must cost the field rather than raising, so the docket still merges."""
         self.assertEqual(
             mirrored_code(
                 MirroredFilingRole,
@@ -188,9 +182,7 @@ class VocabularyMappingTest(SimpleTestCase):
         )
 
     def test_issue_codes(self) -> None:
-        """The issue vocabularies are too large to mirror, so their codes are
-        Juriscraper's own. Are those stored, with the reserved codes for the two
-        readings that name no member?"""
+        """The issue vocabularies are too large to mirror, so their codes are Juriscraper's own. Are those stored, with the reserved codes for the two readings that name no member?"""
         for label, member, expected in (
             ("category", IssueCategory.CRIMES, IssueCategory.CRIMES.code),
             (
@@ -233,8 +225,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
         self.assertEqual(entry.entry_doctype, FilingDocType.BRIEF)
 
     def test_entry_survives_uncovered_values(self) -> None:
-        """Does a filing stating a type, role and document type nobody has seen
-        still validate, with each of the three marked as needing a member?"""
+        """Does a filing stating a type, role and document type nobody has seen still validate, with each of the three marked as needing a member?"""
         entry = NYCoDocketEntry(
             docket_entry_id="e:appellant-brief:smith:1",
             entry_type=DocketEntryType.UNKNOWN,
@@ -255,9 +246,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
         )
 
     def test_filing_type_the_court_never_named(self) -> None:
-        """A filing the scraper reconstructed from a document has no FILINGS row
-        behind it, which is the `UNKNOWN` case rather than the `UNASSIGNED` one.
-        Does a raw string with nothing in it decide that?"""
+        """A filing the scraper reconstructed from a document has no FILINGS row behind it, which is the `UNKNOWN` case rather than the `UNASSIGNED` one. Does a raw string with nothing in it decide that?"""
         for label, raw in (
             ("no table row named it", ""),
             ("table row was blank", "   "),
@@ -274,8 +263,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
                 self.assertIs(entry.entry_filing_type, Unclassified.UNKNOWN)
 
     def test_entry_stating_no_role_or_doctype(self) -> None:
-        """A filing type implying no role and carrying no document states
-        nothing rather than something unreadable. Is that `UNKNOWN`?"""
+        """A filing type implying no role and carrying no document states nothing rather than something unreadable. Is that `UNKNOWN`?"""
         entry = NYCoDocketEntry(
             docket_entry_id="e:appellant-brief:smith:1",
             entry_type=DocketEntryType.UNKNOWN,
@@ -291,7 +279,9 @@ class ClassifiedVocabularyTest(SimpleTestCase):
 
     def test_file_survives_an_uncovered_doctype(self) -> None:
         """Roughly 6% of file names state a document type that cannot be read.
-        Does the file still validate?"""
+
+        Does the file still validate?
+        """
         file = NYCoAFile(
             file_name="SmithvJones-app-Smith-surbrf.pdf",
             doc_type="surbrf",
@@ -303,17 +293,14 @@ class ClassifiedVocabularyTest(SimpleTestCase):
         self.assertEqual(file.file_name, "SmithvJones-app-Smith-surbrf.pdf")
 
     def test_file_whose_name_states_nothing(self) -> None:
-        """A name that does not follow the Court's convention yields no role and
-        no document type at all. Is that `UNKNOWN` rather than a failed
-        reading?"""
+        """A name that does not follow the Court's convention yields no role and no document type at all. Is that `UNKNOWN` rather than a failed reading?"""
         file = NYCoAFile(file_name="SmithvJones-Webcast.asx")
 
         self.assertIs(file.doc_role, Unclassified.UNKNOWN)
         self.assertIs(file.doc_type, Unclassified.UNKNOWN)
 
     def test_issue_survives_an_uncovered_category(self) -> None:
-        """Does an issue in a category the vocabulary lacks still validate, with
-        the Court's own wording kept?"""
+        """Does an issue in a category the vocabulary lacks still validate, with the Court's own wording kept?"""
         issue = NYCoAIssue(
             category_raw="Cryptocurrency--Staking",
             category="Cryptocurrency",
@@ -325,17 +312,19 @@ class ClassifiedVocabularyTest(SimpleTestCase):
         self.assertEqual(issue.category_raw, "Cryptocurrency--Staking")
 
     def test_issue_stated_as_a_bare_category(self) -> None:
-        """The Court states roughly 13% of issues as a category alone. The
-        double dash it joins the two halves with is what separates that from a
-        subcategory it stated and the vocabulary lacks. Is it read that way?"""
+        """The Court states roughly 13% of issues as a category alone.
+
+        The double dash it joins the two halves with is what separates that
+        from a subcategory it stated and the vocabulary lacks. Is it read that
+        way?
+        """
         issue = NYCoAIssue(category_raw="Crimes", category="Crimes")
 
         self.assertEqual(issue.category, IssueCategory.CRIMES)
         self.assertIs(issue.subcategory, Unclassified.UNKNOWN)
 
     def test_members_pass_through_untouched(self) -> None:
-        """A model built in Python rather than parsed from a scrape hands the
-        vocabulary members themselves. Are they left alone?"""
+        """A model built in Python rather than parsed from a scrape hands the vocabulary members themselves. Are they left alone?"""
         issue = NYCoAIssue(
             category_raw="Crimes--Sentence",
             category=IssueCategory.CRIMES,

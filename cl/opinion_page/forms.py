@@ -1,3 +1,5 @@
+"""Forms for citation lookups, docket entry filtering, and court opinion uploads."""
+
 import logging
 from collections.abc import MutableMapping
 from datetime import datetime
@@ -12,7 +14,6 @@ from django.utils.encoding import force_bytes
 from django.utils.html import format_html, strip_tags
 from juriscraper.lib.string_utils import titlecase
 
-from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
@@ -37,8 +38,12 @@ from cl.search.models import (
     OriginatingCourtInformation,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class CitationRedirectorForm(forms.Form):
+    """Form for looking up a citation by reporter, with optional volume and page, or by text."""
+
     volume = forms.CharField(
         widget=forms.TextInput(
             attrs={"class": "form-control input-lg", "placeholder": "Volume"}
@@ -65,8 +70,7 @@ class CitationRedirectorForm(forms.Form):
 
 
 class DocketEntryFilterForm(forms.Form):
-    """Filters and sorts the entries shown on a docket page, bound to the
-    request's GET params."""
+    """Filters and sorts the entries shown on a docket page, bound to the request's GET params."""
 
     ASCENDING = "asc"
     DESCENDING = "desc"
@@ -124,6 +128,7 @@ class DocketEntryFilterForm(forms.Form):
         request: HttpRequest | None = None,
         **kwargs: Any,
     ) -> None:
+        """Build the form, keeping the request for the user's default ordering."""
         self.request = request
         super().__init__(*args, **kwargs)
 
@@ -142,6 +147,7 @@ class DocketEntryFilterForm(forms.Form):
         )
 
     def clean_order_by(self) -> str:
+        """Use the given order, or descending if unset and the user prefers it."""
         data = self.cleaned_data["order_by"]
         if data:
             return data
@@ -155,7 +161,7 @@ class DocketEntryFilterForm(forms.Form):
 
 
 class BaseCourtUploadForm(forms.Form):
-    """Base form to be used with court uploads
+    """Base form to be used with court uploads.
 
     Here we define the minimum required fields and some methods to add extra fields,
     in case of require something special those can be redefined on each court form.
@@ -210,15 +216,14 @@ class BaseCourtUploadForm(forms.Form):
     def __init__(
         self, *args: Any, pk: str | None = None, **kwargs: Any
     ) -> None:
+        """Build the form for the court with ID ``pk``."""
         self.pk = pk
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
     def clean(self) -> dict[str, Any] | None:
-        """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class:
-        these render with the `safe` filter wherever case metadata is shown).
-        """
+        """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class: these render with the `safe` filter wherever case metadata is shown)."""
         cleaned_data = super().clean()
         if cleaned_data is None:
             return None
@@ -228,10 +233,10 @@ class BaseCourtUploadForm(forms.Form):
         return cleaned_data
 
     def add_author_field(self, required: bool = False) -> None:
-        """Add author field to form
+        """Add author field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["lead_author"] = forms.ModelChoiceField(
             queryset=Person.objects.none(),
@@ -247,10 +252,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_author_str_field(self, required: bool = True) -> None:
-        """Add author str field to form
+        """Add author str field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["author_str"] = forms.CharField(
             label="Author String",
@@ -266,10 +271,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_judges_field(self, required: bool = True) -> None:
-        """Add judges field to form
+        """Add judges field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["judges"] = forms.CharField(
             label="Judges",
@@ -285,10 +290,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_panel_field(self, required: bool = True) -> None:
-        """Add panel field to form
+        """Add panel field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["panel"] = forms.ModelMultipleChoiceField(
             queryset=Person.objects.none(),
@@ -305,10 +310,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_argue_fields(self, required: bool = True) -> None:
-        """Add argued/reargued field to form
+        """Add argued/reargued field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["date_argued"] = forms.DateField(
             label="Argued Date",
@@ -336,10 +341,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_citation_fields(self, required: bool = True) -> None:
-        """Add citations fields to form
+        """Add citations fields to form.
 
-        :param required: fields are required or not
-        :return: None
+        Args:
+            required: fields are required or not
         """
         self.fields["cite_volume"] = forms.IntegerField(
             label="Cite Year",
@@ -365,10 +370,10 @@ class BaseCourtUploadForm(forms.Form):
         )
 
     def add_download_url(self, required: bool = False) -> None:
-        """Add download url field to form
+        """Add download url field to form.
 
-        :param required: field is required or not
-        :return: None
+        Args:
+            required: field is required or not
         """
         self.fields["download_url"] = forms.URLField(
             validators=[URLValidator()],
@@ -386,18 +391,18 @@ class BaseCourtUploadForm(forms.Form):
 
     @staticmethod
     def person_label(obj: Person) -> str:
-        """Get person full name
+        """Get person full name.
 
-        :param obj: Person object
-        :return: person full name
+        Args:
+            obj: Person object
+
+        Returns:
+            person full name
         """
         return obj.name_full
 
     def make_panel(self) -> None:
-        """Build panel from lead_author and panel field
-
-        :return: None
-        """
+        """Build panel from lead_author and panel field."""
         if not self.cleaned_data.get("panel") and self.cleaned_data.get(
             "lead_author"
         ):
@@ -407,9 +412,10 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data["panel"] = self.cleaned_data.get("panel", [])
 
     def get_judges_qs(self) -> QuerySet[Person]:
-        """Get judges from specific court
+        """Get judges from specific court.
 
-        :return: list of judges from specific court
+        Returns:
+            list of judges from specific court
         """
         return Person.objects.filter(
             positions__court_id=self.pk,
@@ -418,10 +424,7 @@ class BaseCourtUploadForm(forms.Form):
         ).order_by("name_first")
 
     def set_judges_qs(self) -> None:
-        """Set Person queryset for panel/judge fields
-
-        :return: None
-        """
+        """Set Person queryset for panel/judge fields."""
         judges_qs = self.get_judges_qs()
 
         for field_name in [
@@ -436,10 +439,7 @@ class BaseCourtUploadForm(forms.Form):
                 field.label_from_instance = self.person_label
 
     def validate_neutral_citation(self) -> None:
-        """Validate if we already have the neutral citation in the system
-
-        :return: None
-        """
+        """Validate if we already have the neutral citation in the system."""
         volume = self.cleaned_data.get("cite_volume")
         reporter = self.cleaned_data.get("cite_reporter")
         page = self.cleaned_data.get("cite_page")
@@ -463,14 +463,17 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
     def clean_pdf_upload(self) -> bytes:
-        """Check the upload is a PDF we don't already have
+        """Check the upload is a PDF we don't already have.
 
         The field's validators cover the file's extension and size, but the
         uploader picks the extension, so check the contents too before
         reading the file into memory.
 
-        :return: pdf data
-        :raises ValidationError: If the file isn't a PDF.
+        Returns:
+            pdf data
+
+        Raises:
+            ValidationError: If the file isn't a PDF.
         """
         pdf_file = self.cleaned_data["pdf_upload"]
         if not content_is_pdf(pdf_file):
@@ -494,10 +497,7 @@ class BaseCourtUploadForm(forms.Form):
         return pdf_data
 
     def make_item_dict(self) -> None:
-        """Make item dictionary for adding to our DB
-
-        :return: None
-        """
+        """Make item dictionary for adding to our DB."""
         lead_author = self.cleaned_data.get("lead_author")
 
         judges_list = [
@@ -534,9 +534,9 @@ class BaseCourtUploadForm(forms.Form):
     def save(self) -> OpinionCluster:
         """Save court decision data to db.
 
-        :return: Cluster
+        Returns:
+            Cluster
         """
-
         self.make_panel()
         self.make_item_dict()
 
@@ -558,7 +558,8 @@ class BaseCourtUploadForm(forms.Form):
 
         if not citations:
             logger.warning(
-                f"Citation not found for court id: {self.cleaned_data.get('court_str')} form"
+                "Citation not found for court id: %s form",
+                self.cleaned_data.get("court_str"),
             )
 
         save_everything(
@@ -580,7 +581,7 @@ class BaseCourtUploadForm(forms.Form):
 
         extract_opinion_content.delay(opinions[0].pk, ocr_available=True)
 
-        logging.info(
+        logger.info(
             "Successfully added object cluster: %s for %s",
             cluster.id,
             self.cleaned_data.get("court_str"),
@@ -590,9 +591,10 @@ class BaseCourtUploadForm(forms.Form):
 
 
 class MeCourtUploadForm(BaseCourtUploadForm):
-    """Form for Supreme Judicial Court of Maine (me) Upload Portal"""
+    """Form for Supreme Judicial Court of Maine (me) Upload Portal."""
 
     def get_judges_qs(self) -> QuerySet[Person]:
+        """Get the court's active chief, associate, and retired active justices, by seniority."""
         return (
             Person.objects.filter(
                 (
@@ -624,6 +626,7 @@ class MeCourtUploadForm(BaseCourtUploadForm):
         )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with citation, argument date, and panel fields."""
         super().__init__(*args, **kwargs)
 
         # Add required fields for specific court
@@ -660,16 +663,17 @@ class MeCourtUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form and validate the neutral citation."""
         super().clean()
         self.validate_neutral_citation()
         return self.cleaned_data
 
 
 class TennWorkCompClUploadForm(BaseCourtUploadForm):
-    """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl)
-    Upload Portal"""
+    """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl) Upload Portal."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author and citation fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -694,14 +698,14 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form and validate the neutral citation."""
         super().clean()
         self.validate_neutral_citation()
         return self.cleaned_data
 
 
 class TennWorkCompAppUploadForm(BaseCourtUploadForm):
-    """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp)
-    Upload Portal"""
+    """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp) Upload Portal."""
 
     second_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
@@ -717,6 +721,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, panelist, and citation fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
@@ -743,6 +748,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
         )
 
     def verify_unique_judges(self) -> None:
+        """Add an error to the author field if a judge was selected more than once."""
         judges = [
             self.cleaned_data["lead_author"],
             self.cleaned_data["second_judge"],
@@ -758,6 +764,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
             )
 
     def make_panel(self) -> None:
+        """Set the panel to the selected author and panelists."""
         self.cleaned_data["panel"] = list(
             filter(
                 None,
@@ -770,6 +777,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
         )
 
     def clean(self) -> dict[str, Any]:
+        """Clean the form, then check that the judges are unique and the neutral citation is valid."""
         super().clean()
         # Special validation for compartmental
         self.verify_unique_judges()
@@ -778,7 +786,7 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
 
 
 class MoCourtUploadForm(BaseCourtUploadForm):
-    """Form for Missouri Upload Portal
+    """Form for Missouri Upload Portal.
 
     Missouri Supreme Court [mo]
     Missouri Court of Appeals, Eastern District [moctapped]
@@ -798,6 +806,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, judges, author string, and download URL fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.add_judges_field(required=False)
@@ -820,7 +829,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
 
 
 class MissCourtUploadForm(BaseCourtUploadForm):
-    """Form for Mississippi Upload Portal
+    """Form for Mississippi Upload Portal.
 
     Mississippi Supreme Court [miss]
     Mississippi Court of Appeals [missctapp]
@@ -845,6 +854,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the form with author, judges, author string, and download URL fields."""
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()

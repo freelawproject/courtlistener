@@ -1,6 +1,9 @@
+"""Import an FJC Integrated Database tab-separated file."""
+
 import re
 import sys
 from datetime import date
+from pathlib import Path
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -24,6 +27,14 @@ from cl.search.models import Court
 def create_or_update_row(
     values: dict[str, str],
 ) -> FjcIntegratedDatabase | None:
+    """Create an IDB row from ``values``, or update the one it matches.
+
+    Rows are matched on district, docket number, origin, and filing date,
+    narrowed by defendant if that matches several rows.
+
+    Returns:
+        The created or updated row, or None if several rows still match.
+    """
     fjc_filters = [
         {
             "district": values["district"],
@@ -44,7 +55,7 @@ def create_or_update_row(
             fjc_row = FjcIntegratedDatabase.objects.create(**values)
             logger.info("Added row: %s", fjc_row)
             break
-        elif existing_row_count == 1:
+        if existing_row_count == 1:
             existing_rows.update(date_modified=now(), **values)
             fjc_row = existing_rows[0]
             logger.info(f"Updated row: {fjc_row}")
@@ -62,6 +73,8 @@ def create_or_update_row(
 
 
 class Command(VerboseCommand, CommandUtils):
+    """Import an FJC Integrated Database file into the database."""
+
     help = (
         "Import a tab-separated file as produced by FJC for their IDB. "
         "Do not check for duplicates."
@@ -69,6 +82,7 @@ class Command(VerboseCommand, CommandUtils):
     BAD_CHARS = re.compile("[\u0000\u001e]")
 
     def add_arguments(self, parser):
+        """Add the input file, file type, and start line options."""
         parser.add_argument(
             "--input-file",
             help="The IDB file to import",
@@ -90,6 +104,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty field data."""
         super().__init__(*args, **kwargs)
         self.field_mappings = {}
         self.int_fields = []
@@ -101,6 +116,11 @@ class Command(VerboseCommand, CommandUtils):
 
     @staticmethod
     def ensure_filetype_ok(filetype: int) -> None:
+        """Check that the file type is a known IDB dataset source.
+
+        Raises:
+            CommandError: If the file type isn't a dataset source.
+        """
         allowed_types = [d[0] for d in DATASET_SOURCES]
         if filetype not in allowed_types:
             raise CommandError(
@@ -127,14 +147,15 @@ class Command(VerboseCommand, CommandUtils):
         '''
         value = re.sub(r'"$', "", value)
         value = re.sub(r'^"', "", value)
-        value = re.sub(r'""', '"', value)
-        return value
+        return re.sub(r'""', '"', value)
 
     def make_csv_row_dict(self, line, col_headers):
-        """Because the PACER data is so nasty, we need our own CSV parser. I
-        guess this is how we learn, by doing things at lower and lower levels.
-        For that, I thank PACER. In any case, this little guy takes in a line of
-        text from a PACER file, and makes it into a nice dict of data.
+        """Because the PACER data is so nasty, we need our own CSV parser.
+
+        I guess this is how we learn, by doing things at lower and lower
+        levels. For that, I thank PACER. In any case, this little guy takes in
+        a line of text from a PACER file, and makes it into a nice dict of
+        data.
 
         Along the way, it:
          1. Removes bad characters, like null values, information separators,
@@ -172,13 +193,21 @@ class Command(VerboseCommand, CommandUtils):
                 row.append(value)
 
         # Convert to dict with column headers as keys.
-        row_dict = {}
-        for row_value, col_header in zip(row, col_headers):
-            row_dict[col_header] = row_value
-
-        return row_dict
+        return {
+            col_header: row_value
+            for row_value, col_header in zip(row, col_headers)
+        }
 
     def handle(self, *args, **options):
+        """Import each line of the file from the start line on.
+
+        Criminal 2017 rows not sourced from CM/ECF are skipped.
+
+        Raises:
+            CommandError: If the file or file type is invalid.
+            NotImplementedError: If the file type isn't a supported civil or
+                criminal dataset.
+        """
         super().handle(*args, **options)
 
         self.ensure_file_ok(options["input_file"])
@@ -187,8 +216,8 @@ class Command(VerboseCommand, CommandUtils):
         self.build_field_data()
 
         logger.info(f"Importing IDB file at: {options['input_file']}")
-        with open(
-            options["input_file"], encoding="cp1252", newline="\r\n"
+        with Path(options["input_file"]).open(
+            encoding="cp1252", newline="\r\n"
         ) as f:
             col_headers = f.readline().strip().split("\t")
             for i, line in enumerate(f):
@@ -216,15 +245,15 @@ class Command(VerboseCommand, CommandUtils):
                     raise NotImplementedError(
                         "This file type not implemented."
                     )
-                else:
-                    values = self.convert_to_cl_data_model(
-                        row, options["filetype"]
-                    )
+                values = self.convert_to_cl_data_model(
+                    row, options["filetype"]
+                )
                 create_or_update_row(values)
 
     def normalize_nulls(self, row):
-        """The IDB uses the value -8 to indicate a null value. Fix this
-        and normalize to either a blank entry ('') or None.
+        """The IDB uses the value -8 to indicate a null value.
+
+        Fix this and normalize to either a blank entry ('') or None.
         """
         for k, v in row.items():
             if v == "-8" or v == "" or v == "01/01/1900":
@@ -234,21 +263,21 @@ class Command(VerboseCommand, CommandUtils):
                     row[k] = ""
 
     def normalize_ints(self, row):
-        """Normalize any column that should be an integer"""
+        """Normalize any column that should be an integer."""
         for col in self.int_fields:
             if row[col] is None:
                 continue
             row[col] = int(row[col])
 
     def normalize_dates(self, row):
-        """Normalize any column that should be a date"""
+        """Normalize any column that should be a date."""
         for col in self.date_fields:
             if row[col] is None:
                 continue
             row[col] = parser.parse(row[col]).date()
 
     def normalize_booleans(self, row):
-        """Normalize boolean fields"""
+        """Normalize boolean fields."""
         for col in self.bool_fields:
             if row[col] is None:
                 continue
@@ -300,7 +329,7 @@ class Command(VerboseCommand, CommandUtils):
                 )
 
     def convert_to_cl_data_model(self, row, source):
-        """Convert the CSV dict with it's headers to our data model"""
+        """Convert the CSV dict with it's headers to our data model."""
         values = {"dataset_source": source}
         for k, v in row.items():
             if k in self.field_mappings:

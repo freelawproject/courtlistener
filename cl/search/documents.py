@@ -1,3 +1,5 @@
+"""Elasticsearch documents and percolators for CourtListener's search indices."""
+
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
@@ -50,7 +52,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     o_type_index_map,
 )
-from cl.search.es_docket_sources import SOURCE_BY_MODEL, SourceDocument
+from cl.search.es_docket_sources import SourceDocument, es_uid
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -74,10 +76,19 @@ from cl.search.models import (
 
 
 class PreparePercolatorQueryMixin:
+    """Mixin that prepares a percolator document's timestamp and query from an alert."""
+
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
     def prepare_percolator_query(self, instance):
+        """Build the percolator query from the alert's query string.
+
+        Returns:
+            The query as a dict, or None if the alert's query is invalid or
+            builds no query.
+        """
         from cl.alerts.utils import build_plain_percolator_query
 
         qd = QueryDict(instance.query.encode(), mutable=True)
@@ -100,6 +111,8 @@ class PreparePercolatorQueryMixin:
 
 @parenthetical_group_index.document
 class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
+    """Search document for a parenthetical group, with its opinion's cluster details."""
+
     author_id = fields.IntegerField(attr="opinion.author_id")
     caseName = fields.TextField(attr="opinion.cluster.case_name")
     citeCount = fields.IntegerField(attr="opinion.cluster.citation_count")
@@ -165,6 +178,7 @@ class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "author_id",
             "citation",
@@ -192,21 +206,22 @@ class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map the highlighted fields to functions that render them for CSV export."""
         hl_fields = ["representative_text", "docketNumber"]
-        transformations = {
-            key: lambda x: render_string_or_list(x) for key in hl_fields
-        }
-        return transformations
+        return {key: lambda x: render_string_or_list(x) for key in hl_fields}
 
     def prepare_citation(self, instance):
+        """List the opinion's cluster citations as strings."""
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 
     def prepare_cites(self, instance):
+        """List the IDs of the opinions the opinion cites."""
         return list(
             instance.opinion.opinions_cited.all().values_list("id", flat=True)
         )
 
     def prepare_lexisCite(self, instance):
+        """Get the cluster's first Lexis citation as a string, or None if it has none."""
         try:
             return str(
                 instance.opinion.cluster.citations.filter(type=Citation.LEXIS)[
@@ -217,6 +232,7 @@ class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
             pass
 
     def prepare_neutralCite(self, instance):
+        """Get the cluster's first neutral citation as a string, or None if it has none."""
         try:
             return str(
                 instance.opinion.cluster.citations.filter(
@@ -227,15 +243,19 @@ class ParentheticalGroupDocument(CSVSerializableDocumentMixin, Document):
             pass
 
     def prepare_panel_ids(self, instance):
+        """List the IDs of the cluster's panel."""
         return list(
             instance.opinion.cluster.panel.all().values_list("id", flat=True)
         )
 
     def prepare_status(self, instance):
+        """Get the cluster's precedential status."""
         return instance.opinion.cluster.precedential_status
 
 
 class AudioDocumentBase(Document):
+    """Fields shared by oral argument audio documents and percolators."""
+
     absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
@@ -378,12 +398,15 @@ class AudioDocumentBase(Document):
 
 @oral_arguments_index.document
 class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
+    """Search document for oral argument audio."""
+
     class Django:
         model = Audio
         ignore_signals = True
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "id",
             "court_id",
@@ -415,6 +438,11 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map fields to functions that render them for CSV export.
+
+        Highlighted fields are rendered as text, URLs and paths are made
+        absolute, and the source code is replaced with its name.
+        """
         transformations = {
             key: lambda x: render_string_or_list(x)
             for key in SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS.keys()
@@ -430,15 +458,24 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         return transformations
 
     def prepare_absolute_url(self, instance):
+        """Get the audio's absolute URL."""
         return instance.get_absolute_url()
 
     def prepare_caseName(self, instance):
+        """Get the audio's best case name."""
         return best_case_name(instance)
 
     def prepare_panel_ids(self, instance):
+        """List the IDs of the audio's panel."""
         return list(instance.panel.all().values_list("id", flat=True))
 
     def prepare_file_size_mp3(self, instance):
+        """Get the size of the audio's MP3 file.
+
+        Returns:
+            The size, or None if there is no MP3 file or it is missing from
+            storage.
+        """
         if instance.local_path_mp3:
             if not instance.local_path_mp3.storage.exists(
                 instance.local_path_mp3.name
@@ -449,8 +486,15 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
                 )
                 return None
             return deepgetattr(instance, "local_path_mp3.size", None)
+        return None
 
     def prepare_local_path(self, instance):
+        """Get the storage path of the audio's MP3 file.
+
+        Returns:
+            The path, or None if there is no MP3 file or it is missing from
+            storage.
+        """
         if instance.local_path_mp3:
             if not instance.local_path_mp3.storage.exists(
                 instance.local_path_mp3.name
@@ -461,35 +505,47 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
                 )
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
+        return None
 
     def prepare_judge(self, instance):
+        """Get the audio's judges, or an empty string if there are none."""
         if instance.judges:
             return instance.judges
         return ""
 
     def prepare_text(self, instance):
+        """Get the transcript if transcription is complete, otherwise an empty string."""
         if instance.stt_status == Audio.STT_COMPLETE:
             return instance.transcript
         return ""
 
     def prepare_dateArgued_text(self, instance):
+        """Format the docket's argument date as text, if it has one."""
         if instance.docket.date_argued:
             return instance.docket.date_argued.strftime("%-d %B %Y")
+        return None
 
     def prepare_dateReargued_text(self, instance):
+        """Format the docket's reargument date as text, if it has one."""
         if instance.docket.date_reargued:
             return instance.docket.date_reargued.strftime("%-d %B %Y")
+        return None
 
     def prepare_dateReargumentDenied_text(self, instance):
+        """Format the docket's reargument denial date as text, if it has one."""
         if instance.docket.date_reargument_denied:
             return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
+        return None
 
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
 
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
+    """Percolator document for oral argument search alerts."""
+
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
 
@@ -498,9 +554,15 @@ class AudioPercolator(AudioDocumentBase):
         ignore_signals = True
 
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
     def prepare_percolator_query(self, instance):
+        """Build the percolator query from the alert's query string, ignoring its ordering.
+
+        Returns:
+            The query as a dict, or None if the alert's query is invalid.
+        """
         qd = QueryDict(instance.query.encode(), mutable=True)
         if "order_by" in qd:
             # sorting key is not required in percolator queries. Adding it
@@ -522,31 +584,38 @@ class AudioPercolator(AudioDocumentBase):
 
 
 class ES_CHILD_ID:
-    """Returns an ID for its use in ES child documents"""
+    """Returns an ID for its use in ES child documents."""
 
     def __init__(self, instance_id: int):
+        """Store the ID of the child's instance."""
         self.instance_id = instance_id
 
     @property
     def POSITION(self) -> str:
+        """The ID of a position child document."""
         return f"po_{self.instance_id}"
 
     @property
     def RECAP(self) -> str:
+        """The ID of a RECAP document child document."""
         return f"rd_{self.instance_id}"
 
     @property
     def SCOTUS(self) -> str:
+        """The ID of a SCOTUS document child document."""
         # Own prefix because SCOTUSDocument's pk sequence is independent
         # from RECAPDocument's -- sharing one could collide on the same _id.
         return f"scotusd_{self.instance_id}"
 
     @property
     def OPINION(self) -> str:
+        """The ID of an opinion child document."""
         return f"o_{self.instance_id}"
 
 
 class PersonBaseDocument(Document):
+    """Fields shared by person documents and their position child documents."""
+
     id = fields.IntegerField(attr="pk")
     alias_ids = fields.ListField(
         fields.IntegerField(multi=True),
@@ -662,24 +731,31 @@ class PersonBaseDocument(Document):
         ignore_signals = True
 
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
     def prepare_name(self, instance):
+        """Get the person's full name."""
         return instance.name_full
 
     def prepare_religion(self, instance):
+        """Get the person's religion."""
         return instance.religion
 
     def prepare_gender(self, instance):
+        """Get the display name of the person's gender."""
         return instance.get_gender_display()
 
     def prepare_dob_city(self, instance):
+        """Get the person's city of birth."""
         return instance.dob_city
 
     def prepare_fjc_id(self, instance):
+        """Get the person's FJC ID as a string."""
         return str(instance.fjc_id)
 
     def prepare_political_affiliation(self, instance):
+        """List the display names of the person's political parties."""
         return [
             pa.get_political_party_display()
             for pa in instance.political_affiliations.all()
@@ -687,26 +763,33 @@ class PersonBaseDocument(Document):
         ]
 
     def prepare_dob_state(self, instance):
+        """Get the display name of the person's state of birth."""
         return instance.get_dob_state_display()
 
     def prepare_alias(self, instance):
+        """List the full names of the person's aliases."""
         return [r.name_full for r in instance.aliases.all()]
 
     def prepare_aba_rating(self, instance):
+        """List the display names of the person's ABA ratings."""
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
         ]
 
     def prepare_school(self, instance):
+        """List the names of the schools the person attended."""
         return [e.school.name for e in instance.educations.all()]
 
     def prepare_races(self, instance):
+        """List the display names of the person's races."""
         return [r.get_race_display() for r in instance.race.all()]
 
     def prepare_alias_ids(self, instance):
+        """List the IDs of the person's aliases."""
         return [alias.pk for alias in instance.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
+        """List the codes of the person's political parties."""
         return [
             pa.political_party
             for pa in instance.political_affiliations.all()
@@ -716,6 +799,8 @@ class PersonBaseDocument(Document):
 
 @people_db_index.document
 class PositionDocument(PersonBaseDocument):
+    """Search document for a judge's position, indexed as a child of the person."""
+
     court = fields.TextField(
         attr="court.short_name",
         analyzer="text_en_splitting_cl",
@@ -843,67 +928,90 @@ class PositionDocument(PersonBaseDocument):
         ignore_signals = True
 
     def prepare_appointer(self, instance):
+        """Get the appointer's reversed full name, if the position has an appointer."""
         if instance.appointer:
             return instance.appointer.person.name_full_reverse
+        return None
 
     def prepare_predecessor(self, instance):
+        """Get the predecessor's reversed full name, if the position has a predecessor."""
         if instance.predecessor:
             return instance.predecessor.name_full_reverse
+        return None
 
     def prepare_supervisor(self, instance):
+        """Get the supervisor's reversed full name, if the position has a supervisor."""
         if instance.supervisor:
             return instance.supervisor.name_full_reverse
+        return None
 
     def prepare_position_type(self, instance):
+        """Get the display name of the position type."""
         return instance.get_position_type_display()
 
     def prepare_judicial_committee_action(self, instance):
+        """Get the display name of the judicial committee action."""
         return instance.get_judicial_committee_action_display()
 
     def prepare_nomination_process(self, instance):
+        """Get the display name of the nomination process."""
         return instance.get_nomination_process_display()
 
     def prepare_selection_method(self, instance):
+        """Get the display name of how the person was selected."""
         return instance.get_how_selected_display()
 
     def prepare_termination_reason(self, instance):
+        """Get the display name of the termination reason."""
         return instance.get_termination_reason_display()
 
     def prepare_person_child(self, instance):
+        """Join the position to its person as a child document."""
         parent_id = getattr(instance.person, "pk", None)
         return {"name": "position", "parent": parent_id}
 
     def prepare_name(self, instance):
+        """Get the person's full name."""
         return instance.person.name_full
 
     def prepare_religion(self, instance):
+        """Get the person's religion."""
         return instance.person.religion
 
     def prepare_dob_city(self, instance):
+        """Get the person's city of birth."""
         return instance.person.dob_city
 
     def prepare_gender(self, instance):
+        """Get the display name of the person's gender."""
         return instance.person.get_gender_display()
 
     def prepare_fjc_id(self, instance):
+        """Get the person's FJC ID as a string."""
         return str(instance.person.fjc_id)
 
     def prepare_dob_state(self, instance):
+        """Get the display name of the person's state of birth."""
         return instance.person.get_dob_state_display()
 
     def prepare_id(self, instance):
+        """Get the person's ID."""
         return instance.person.pk
 
     def prepare_dob_state_id(self, instance):
+        """Get the code of the person's state of birth."""
         return instance.person.dob_state
 
     def prepare_dob(self, instance):
+        """Get the person's date of birth."""
         return instance.person.date_dob
 
     def prepare_dod(self, instance):
+        """Get the person's date of death."""
         return instance.person.date_dod
 
     def prepare_political_affiliation(self, instance):
+        """List the display names of the person's political parties."""
         return [
             pa.get_political_party_display()
             for pa in instance.person.political_affiliations.all()
@@ -911,9 +1019,11 @@ class PositionDocument(PersonBaseDocument):
         ]
 
     def prepare_alias(self, instance):
+        """List the full names of the person's aliases."""
         return [r.name_full for r in instance.person.aliases.all()]
 
     def prepare_aba_rating(self, instance):
+        """List the display names of the person's ABA ratings."""
         return [
             r.get_rating_display()
             for r in instance.person.aba_ratings.all()
@@ -921,15 +1031,19 @@ class PositionDocument(PersonBaseDocument):
         ]
 
     def prepare_school(self, instance):
+        """List the names of the schools the person attended."""
         return [e.school.name for e in instance.person.educations.all()]
 
     def prepare_races(self, instance):
+        """List the display names of the person's races."""
         return [r.get_race_display() for r in instance.person.race.all()]
 
     def prepare_alias_ids(self, instance):
+        """List the IDs of the person's aliases."""
         return [alias.pk for alias in instance.person.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
+        """List the codes of the person's political parties."""
         return [
             pa.political_party
             for pa in instance.person.political_affiliations.all()
@@ -939,6 +1053,8 @@ class PositionDocument(PersonBaseDocument):
 
 @people_db_index.document
 class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
+    """Search document for a person, the parent of their position documents."""
+
     name_reverse = fields.KeywordField()
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
@@ -946,6 +1062,7 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "id",
             "name",
@@ -976,6 +1093,11 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map fields to functions that render them for CSV export.
+
+        Highlighted and list fields are rendered as text, the URL is made
+        absolute, and coded values are replaced with their display names.
+        """
         list_fields = [
             "races",
             "aba_rating",
@@ -1010,17 +1132,22 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
         return transformations
 
     def prepare_name_reverse(self, instance):
+        """Get the person's reversed full name."""
         return instance.name_full_reverse
 
     def prepare_person_child(self, instance):
+        """Return ``person`` as the document's ``person_child`` join value."""
         return "person"
 
     def prepare_absolute_url(self, instance):
+        """Get the person's absolute URL."""
         return instance.get_absolute_url()
 
 
 # RECAP
 class RECAPBaseDocument(Document):
+    """Docket fields shared by docket documents and their child documents in the RECAP index."""
+
     docket_child = JoinField(relations={"docket": ["recap_document"]})
     timestamp = fields.DateField()
 
@@ -1194,10 +1321,13 @@ class RECAPBaseDocument(Document):
         ignore_signals = True
 
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
 
 class ESRECAPBaseDocument(DSLDocument):
+    """Fields of a document filed in a docket entry."""
+
     # id and docket_entry_id hold RECAP pks only. Other sources' pks would
     # collide with them, so those documents use uid and docket_entry_uid,
     # prefixed with their ESDocketSource.uid_namespace (e.g. "scotus_123").
@@ -1275,12 +1405,15 @@ class ESRECAPBaseDocument(DSLDocument):
 class ESRECAPDocument(
     CSVSerializableDocumentMixin, RECAPBaseDocument, ESRECAPBaseDocument
 ):
+    """Search document for a filed document, indexed as a child of its docket."""
+
     class Django:
         model = RECAPDocument
         ignore_signals = True
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "docket_entry_description",
             "docket_entry_number",
@@ -1298,6 +1431,11 @@ class ESRECAPDocument(
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map columns to functions that read them from a document for CSV export.
+
+        Highlighted fields are rendered as text, URLs and paths are made
+        absolute, and renamed columns read their source keys.
+        """
         transformations = {
             key: partial(
                 lambda key, val: render_string_or_list(
@@ -1345,17 +1483,21 @@ class ESRECAPDocument(
         return transformations
 
     def prepare_document_number(self, instance):
+        """Get the document number, or None if it is empty."""
         return instance.document_number or None
 
     def prepare_document_type(self, instance):
+        """Get the display name of the document type, or None for documents without one."""
         # SCOTUS documents have no document_type attribute, so no
         # get_document_type_display() either.
         get_display = getattr(instance, "get_document_type_display", None)
         return get_display() if get_display else None
 
     def prepare_filepath_local(self, instance):
+        """Get the name of the document's local file, if it has one."""
         if instance.filepath_local:
             return instance.filepath_local.name
+        return None
 
     def prepare_is_available(self, instance: SourceDocument) -> bool | None:
         """Index whether the document's file is available."""
@@ -1365,88 +1507,118 @@ class ESRECAPDocument(
         return instance.is_available
 
     def prepare_absolute_url(self, instance):
+        """Get the document's absolute URL."""
         return instance.get_absolute_url()
 
     def prepare_docket_child(self, instance):
+        """Join the document to its docket as a child document."""
         parent_id = getattr(instance.docket_entry.docket, "pk", None)
         return {"name": "recap_document", "parent": parent_id}
 
     def prepare_caseName(self, instance):
+        """Get the docket's best case name."""
         return best_case_name(instance.docket_entry.docket)
 
     def prepare_assignedTo(self, instance):
+        """Get the full name of the docket's assigned judge, falling back to the assigned-to string."""
         if instance.docket_entry.docket.assigned_to:
             return instance.docket_entry.docket.assigned_to.name_full
-        elif instance.docket_entry.docket.assigned_to_str:
+        if instance.docket_entry.docket.assigned_to_str:
             return instance.docket_entry.docket.assigned_to_str
+        return None
 
     def prepare_referredTo(self, instance):
+        """Get the full name of the docket's referred judge, falling back to the referred-to string."""
         if instance.docket_entry.docket.referred_to:
             return instance.docket_entry.docket.referred_to.name_full
-        elif instance.docket_entry.docket.referred_to_str:
+        if instance.docket_entry.docket.referred_to_str:
             return instance.docket_entry.docket.referred_to_str
+        return None
 
     def prepare_docket_id(self, instance):
+        """Get the docket's ID."""
         return instance.docket_entry.docket.pk
 
     def prepare_case_name_full(self, instance):
+        """Get the docket's full case name."""
         return instance.docket_entry.docket.case_name_full
 
     def prepare_docketNumber(self, instance):
+        """Get the docket number."""
         return instance.docket_entry.docket.docket_number
 
     def prepare_suitNature(self, instance):
+        """Get the docket's nature of suit."""
         return instance.docket_entry.docket.nature_of_suit
 
     def prepare_cause(self, instance):
+        """Get the docket's cause."""
         return instance.docket_entry.docket.cause
 
     def prepare_juryDemand(self, instance):
+        """Get the docket's jury demand."""
         return instance.docket_entry.docket.jury_demand
 
     def prepare_jurisdictionType(self, instance):
+        """Get the docket's jurisdiction type."""
         return instance.docket_entry.docket.jurisdiction_type
 
     def prepare_dateArgued(self, instance):
+        """Get the docket's argument date."""
         return instance.docket_entry.docket.date_argued
 
     def prepare_dateFiled(self, instance):
+        """Get the docket's filing date."""
         return instance.docket_entry.docket.date_filed
 
     def prepare_dateTerminated(self, instance):
+        """Get the docket's termination date."""
         return instance.docket_entry.docket.date_terminated
 
     def prepare_assigned_to_id(self, instance):
+        """Get the ID of the docket's assigned judge, if it has one."""
         if instance.docket_entry.docket.assigned_to:
             return instance.docket_entry.docket.assigned_to.pk
+        return None
 
     def prepare_referred_to_id(self, instance):
+        """Get the ID of the docket's referred judge, if it has one."""
         if instance.docket_entry.docket.referred_to:
             return instance.docket_entry.docket.referred_to.pk
+        return None
 
     def prepare_court(self, instance):
+        """Get the full name of the docket's court."""
         return instance.docket_entry.docket.court.full_name
 
     def prepare_court_id(self, instance):
+        """Get the ID of the docket's court."""
         return instance.docket_entry.docket.court.pk
 
     def prepare_court_citation_string(self, instance):
+        """Get the citation string of the docket's court."""
         return instance.docket_entry.docket.court.citation_string
 
     def prepare_chapter(self, instance):
+        """Get the docket's bankruptcy chapter, if it has bankruptcy information."""
         if hasattr(instance.docket_entry.docket, "bankruptcy_information"):
             return instance.docket_entry.docket.bankruptcy_information.chapter
+        return None
 
     def prepare_trustee_str(self, instance):
+        """Get the docket's bankruptcy trustee, if it has bankruptcy information."""
         if hasattr(instance.docket_entry.docket, "bankruptcy_information"):
             return (
                 instance.docket_entry.docket.bankruptcy_information.trustee_str
             )
+        return None
 
     def prepare_plain_text(self, instance):
+        """Get the document's plain text, HTML-escaped with null characters removed."""
         return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
+        """List the IDs of the opinions the document cites, or an empty list for documents with no ``cited_opinions`` relation."""
         # SCOTUSDocument has no cited_opinions relation yet -- citation
         # matching isn't built for SCOTUS content yet, but is planned.
         cited_opinions = getattr(instance, "cited_opinions", None)
@@ -1457,11 +1629,11 @@ class ESRECAPDocument(
         )
 
     def prepare_pacer_case_id(self, instance):
+        """Get the docket's PACER case ID."""
         return instance.docket_entry.docket.pacer_case_id
 
     def prepare_capital_case(self, instance: SourceDocument) -> bool | None:
-        """Return the SCOTUS docket's capital_case flag; empty for other
-        sources."""
+        """Return the SCOTUS docket's capital_case flag; empty for other sources."""
         if not isinstance(instance, SCOTUSDocument):
             return None
         scotus_metadata = getattr(
@@ -1470,38 +1642,29 @@ class ESRECAPDocument(
         return scotus_metadata.capital_case if scotus_metadata else None
 
     def prepare_id(self, instance: SourceDocument) -> int | None:
-        """Return the RECAPDocument pk; empty for other sources (see
-        prepare_uid)."""
+        """Return the RECAPDocument pk; empty for other sources (see prepare_uid)."""
         if not isinstance(instance, RECAPDocument):
             return None
         return instance.pk
 
     def prepare_docket_entry_id(self, instance: SourceDocument) -> int | None:
-        """Return the DocketEntry pk; empty for other sources (see
-        prepare_docket_entry_uid)."""
+        """Return the DocketEntry pk; empty for other sources (see prepare_docket_entry_uid)."""
         if not isinstance(instance, RECAPDocument):
             return None
         return instance.docket_entry_id
 
     def prepare_uid(self, instance: SourceDocument) -> str | None:
-        """Return the pk prefixed with the source's uid_namespace, e.g.
-        "scotus_123"; empty for sources without one, like RECAP."""
-        source = SOURCE_BY_MODEL.get(type(instance))
-        if not source or not source.uid_namespace:
-            return None
-        return f"{source.uid_namespace}_{instance.pk}"
+        """Return the pk prefixed with the source's uid_namespace, e.g. "scotus_123"; empty for sources without one, like RECAP."""
+        return es_uid(type(instance), instance.pk)
 
     def prepare_docket_entry_uid(self, instance: SourceDocument) -> str | None:
-        """Return the docket entry pk prefixed with the source's
-        uid_namespace, e.g. "scotus_321"; empty for sources without one,
-        like RECAP."""
-        source = SOURCE_BY_MODEL.get(type(instance))
-        if not source or not source.uid_namespace:
-            return None
-        return f"{source.uid_namespace}_{instance.docket_entry_id}"
+        """Return the docket entry pk prefixed with the source's uid_namespace, e.g. "scotus_321"; empty for sources without one, like RECAP."""
+        return es_uid(type(instance), instance.docket_entry_id)
 
 
 class DocketBaseDocument(DSLDocument):
+    """Docket fields that only docket parent documents have, including parties, attorneys, and firms."""
+
     docket_slug = fields.KeywordField(attr="slug", index=False)
     docket_absolute_url = fields.KeywordField(index=False)
     court_exact = fields.KeywordField(attr="court.pk", index=False)
@@ -1564,8 +1727,11 @@ class _DocketDocumentPartyDict(TypedDict):
 class DocketDocument(
     CSVSerializableDocumentMixin, DocketBaseDocument, RECAPBaseDocument
 ):
+    """Search document for a docket, the parent of its filed documents in the RECAP index."""
+
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "docket_id",
             "docket_entry_id",
@@ -1604,6 +1770,11 @@ class DocketDocument(
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map fields to functions that render them for CSV export.
+
+        Highlighted fields and party lists are rendered as text, and the docket
+        URL is made absolute.
+        """
         list_fields = ["party", "attorney", "firm"]
         hl_fields = list(SEARCH_RECAP_HL_FIELDS.keys())
         transformations = {
@@ -1617,43 +1788,58 @@ class DocketDocument(
         return transformations
 
     def prepare_caseName(self, instance):
+        """Get the docket's best case name."""
         return best_case_name(instance)
 
     def prepare_assignedTo(self, instance):
+        """Get the full name of the assigned judge, falling back to the assigned-to string."""
         if instance.assigned_to:
             return instance.assigned_to.name_full
-        elif instance.assigned_to_str:
+        if instance.assigned_to_str:
             return instance.assigned_to_str
+        return None
 
     def prepare_referredTo(self, instance):
+        """Get the full name of the referred judge, falling back to the referred-to string."""
         if instance.referred_to:
             return instance.referred_to.name_full
-        elif instance.referred_to_str:
+        if instance.referred_to_str:
             return instance.referred_to_str
+        return None
 
     def prepare_chapter(self, instance):
+        """Get the bankruptcy chapter, if the docket has bankruptcy information."""
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.chapter
+        return None
 
     def prepare_trustee_str(self, instance):
+        """Get the bankruptcy trustee, if the docket has bankruptcy information."""
         if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.trustee_str
+        return None
 
     def prepare_capital_case(self, instance: Docket) -> bool | None:
-        """Return the docket's SCOTUS capital_case flag; empty for dockets
-        without SCOTUS metadata."""
+        """Return the docket's SCOTUS capital_case flag; empty for dockets without SCOTUS metadata."""
         if instance.court_id != "scotus":
             return None
         scotus_metadata = getattr(instance, "scotus_metadata", None)
         return scotus_metadata.capital_case if scotus_metadata else None
 
     def prepare_docket_child(self, instance):
+        """Mark the document as a docket parent document."""
         return "docket"
 
     def prepare_docket_absolute_url(self, instance):
+        """Get the docket's absolute URL."""
         return instance.get_absolute_url()
 
     def prepare_parties(self, instance) -> _DocketDocumentPartyDict:
+        """Collect the IDs and names of the docket's parties, attorneys, and firms.
+
+        If the docket has no parties, party names are parsed from its case name
+        instead.
+        """
         parties = set()
         out: _DocketDocumentPartyDict = {
             "party_id": set(),
@@ -1707,6 +1893,7 @@ class DocketDocument(
         return out
 
     def prepare(self, instance):
+        """Prepare the document, adding the docket's parties, attorneys, and firms as lists."""
         data = super().prepare(instance)
         parties_prepared = self.prepare_parties(instance)
         data["party_id"] = list(parties_prepared["party_id"])
@@ -1719,11 +1906,18 @@ class DocketDocument(
 
 
 class DocketDocumentPlain(DocketDocument):
-    """This class is used for Docket document percolation. Here, we can
-    control whether to include parties based on
-    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+    """This class is used for Docket document percolation.
+
+    Here, we can control whether to include parties based on the
+    MAX_ATTORNEYS_TO_PERCOLATE setting.
+    """
 
     def prepare_parties(self, instance: Docket) -> _DocketDocumentPartyDict:
+        """Collect the docket's parties, attorneys, and firms.
+
+        Returns empty collections if the docket has more distinct roles than
+        ``MAX_ATTORNEYS_TO_PERCOLATE``.
+        """
         out = {
             "party_id": set(),
             "party": set(),
@@ -1741,6 +1935,8 @@ class DocketDocumentPlain(DocketDocument):
 
 # Opinions
 class OpinionBaseDocument(Document):
+    """Opinion cluster fields shared by cluster documents and their opinion child documents."""
+
     absolute_url = fields.KeywordField(index=False)
     cluster_id = fields.IntegerField(
         attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
@@ -1935,128 +2131,146 @@ class OpinionBaseDocument(Document):
         ignore_signals = True
 
     def prepare_absolute_url(self, instance):
+        """Get the cluster's absolute URL."""
         return instance.get_absolute_url()
 
     def prepare_docketNumber(self, instance):
+        """Get the docket number."""
         return instance.docket.docket_number
 
     def prepare_caseName(self, instance):
+        """Get the cluster's best case name."""
         return best_case_name(instance)
 
     def prepare_caseNameFull(self, instance):
+        """Get the cluster's full case name."""
         return instance.case_name_full
 
     def prepare_court_id(self, instance):
+        """Get the ID of the docket's court."""
         return instance.docket.court.pk
 
     def prepare_court(self, instance):
+        """Get the full name of the docket's court."""
         return instance.docket.court.full_name
 
     def prepare_court_citation_string(self, instance):
+        """Get the citation string of the docket's court."""
         return instance.docket.court.citation_string
 
     def prepare_court_jurisdiction(self, instance):
+        """Get the jurisdiction of the docket's court."""
         return instance.docket.court.jurisdiction
 
     def prepare_judge(self, instance):
+        """Get the cluster's judges."""
         return instance.judges
 
     def prepare_panel_names(self, instance):
+        """List the full names of the cluster's panel."""
         return [judge.name_full for judge in instance.panel.all()]
 
     def prepare_citation(self, instance):
+        """List the cluster's citations as strings."""
         return [str(cite) for cite in instance.citations.all()]
 
     def prepare_attorney(self, instance):
+        """Get the cluster's attorneys."""
         return instance.attorneys
 
     def prepare_suitNature(self, instance):
+        """Get the cluster's nature of suit."""
         return instance.nature_of_suit
 
     def prepare_status(self, instance):
+        """Get the cluster's precedential status."""
         return instance.precedential_status
 
     def prepare_procedural_history(self, instance):
+        """Get the cluster's procedural history."""
         return instance.procedural_history
 
     def prepare_posture(self, instance):
+        """Get the cluster's posture."""
         return instance.posture
 
     def prepare_syllabus(self, instance):
+        """Get the cluster's syllabus."""
         return instance.syllabus
 
     def prepare_sibling_ids(self, instance):
+        """List the IDs of the cluster's opinions."""
         return list(instance.sub_opinions.all().values_list("id", flat=True))
 
     def prepare_panel_ids(self, instance):
+        """List the IDs of the cluster's panel."""
         return list(instance.panel.all().values_list("id", flat=True))
 
     def prepare_dateFiled(self, instance):
+        """Get the cluster's filing date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.date_filed, str):
-            datetime_object = datetime.strptime(
-                instance.date_filed, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.date_filed, "%Y-%m-%d")
 
         return instance.date_filed
 
     def prepare_dateArgued(self, instance):
+        """Get the docket's argument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_argued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_argued, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.docket.date_argued, "%Y-%m-%d")
 
         return instance.docket.date_argued
 
     def prepare_dateReargued(self, instance):
+        """Get the docket's reargument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_reargued, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.docket.date_reargued, "%Y-%m-%d")
 
         return instance.docket.date_reargued
 
     def prepare_dateReargumentDenied(self, instance):
+        """Get the docket's reargument denial date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.docket.date_reargument_denied, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.docket.date_reargument_denied
 
     def prepare_neutralCite(self, instance):
+        """Get the cluster's first neutral citation as a string, or an empty string if it has none."""
         neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
         if neutral_citations.count():
             return str(neutral_citations[0])
         return ""
 
     def prepare_lexisCite(self, instance):
+        """Get the cluster's first Lexis citation as a string, or an empty string if it has none."""
         lexis_citations = instance.citations.filter(type=Citation.LEXIS)
         if lexis_citations.count():
             return str(lexis_citations[0])
         return ""
 
     def prepare_timestamp(self, instance):
+        """Use the current UTC time as the timestamp."""
         return datetime.utcnow()
 
 
 @opinion_index.document
 class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
+    """Search document for an opinion, indexed as a child of its cluster."""
+
     id = fields.IntegerField(
         attr="pk",
         fields={
@@ -2123,6 +2337,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "author_id",
             "type",
@@ -2139,6 +2354,11 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map fields to functions that render them for CSV export.
+
+        Highlighted fields are rendered as text, and the local path is made an
+        absolute URL.
+        """
         transformations = {
             key: lambda x: render_string_or_list(x)
             for key in SEARCH_OPINION_CHILD_HL_FIELDS.keys()
@@ -2150,22 +2370,29 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         return transformations
 
     def prepare_absolute_url(self, instance):
+        """Get the cluster's absolute URL."""
         return instance.cluster.get_absolute_url()
 
     def prepare_author_id(self, instance):
+        """Get the ID of the opinion's author, or None if it has none."""
         return getattr(instance.author, "pk", None)
 
     def prepare_type_text(self, instance):
+        """Get the display name of the opinion type."""
         return instance.get_type_display()
 
     def prepare_type(self, instance):
+        """Get the index value for the opinion type."""
         return o_type_index_map.get(instance.type)
 
     def prepare_local_path(self, instance):
+        """Get the name of the opinion's local file, if it has one."""
         if instance.local_path:
             return instance.local_path.name
+        return None
 
     def prepare_cites(self, instance):
+        """List the IDs of the opinions this opinion cites."""
         return list(
             instance.cited_opinions.all().values_list(
                 "cited_opinion_id", flat=True
@@ -2173,100 +2400,109 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         )
 
     def prepare_joined_by_ids(self, instance):
+        """List the IDs of the judges who joined the opinion."""
         return list(instance.joined_by.all().values_list("id", flat=True))
 
     def prepare_text(self, instance):
+        """Get the opinion's text from its first non-empty HTML or XML version, stripped of tags.
+
+        Falls back to the plain text, HTML-escaped. Null characters are removed
+        either way.
+        """
         if instance.html_columbia:
             return html_decode(
                 strip_tags(instance.html_columbia.translate(null_map))
             )
-        elif instance.html_lawbox:
+        if instance.html_lawbox:
             return html_decode(
                 strip_tags(instance.html_lawbox.translate(null_map))
             )
-        elif instance.xml_harvard:
+        if instance.xml_harvard:
             return html_decode(
                 strip_tags(instance.xml_harvard.translate(null_map))
             )
-        elif instance.xml_scan:
+        if instance.xml_scan:
             return html_decode(
                 strip_tags(instance.xml_scan.translate(null_map))
             )
-        elif instance.html_anon_2020:
+        if instance.html_anon_2020:
             return html_decode(
                 strip_tags(instance.html_anon_2020.translate(null_map))
             )
-        elif instance.html:
+        if instance.html:
             return html_decode(strip_tags(instance.html.translate(null_map)))
-        else:
-            return escape(instance.plain_text.translate(null_map))
+        return escape(instance.plain_text.translate(null_map))
 
     def prepare_cluster_id(self, instance):
+        """Get the cluster's ID."""
         return instance.cluster.pk
 
     def prepare_docket_id(self, instance):
+        """Get the docket's ID."""
         return instance.cluster.docket.pk
 
     def prepare_scdb_id(self, instance):
+        """Get the cluster's SCDB ID."""
         return instance.cluster.scdb_id
 
     def prepare_sibling_ids(self, instance):
+        """List the IDs of the opinions in the opinion's cluster."""
         return list(
             instance.cluster.sub_opinions.all().values_list("id", flat=True)
         )
 
     def prepare_panel_ids(self, instance):
+        """List the IDs of the cluster's panel."""
         return list(instance.cluster.panel.all().values_list("id", flat=True))
 
     def prepare_dateFiled(self, instance):
+        """Get the cluster's filing date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.date_filed is None:
-            return
+            return None
 
         if isinstance(instance.cluster.date_filed, str):
-            datetime_object = datetime.strptime(
-                instance.cluster.date_filed, "%Y-%m-%d"
-            )
-            return datetime_object
+            return datetime.strptime(instance.cluster.date_filed, "%Y-%m-%d")
 
         return instance.cluster.date_filed
 
     def prepare_dateArgued(self, instance):
+        """Get the docket's argument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_argued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_argued, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_argued, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_argued
 
     def prepare_dateReargued(self, instance):
+        """Get the docket's reargument date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_reargued is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargued, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_reargued, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_reargued
 
     def prepare_dateReargumentDenied(self, instance):
+        """Get the docket's reargument denial date, parsing it if it is a ``YYYY-MM-DD`` string."""
         if instance.cluster.docket.date_reargument_denied is None:
-            return
+            return None
 
         if isinstance(instance.cluster.docket.date_reargument_denied, str):
-            datetime_object = datetime.strptime(
+            return datetime.strptime(
                 instance.cluster.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return datetime_object
 
         return instance.cluster.docket.date_reargument_denied
 
     def prepare_neutralCite(self, instance):
+        """Get the cluster's first neutral citation as a string, or an empty string if it has none."""
         neutral_citations = instance.cluster.citations.filter(
             type=Citation.NEUTRAL
         )
@@ -2275,6 +2511,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         return ""
 
     def prepare_lexisCite(self, instance):
+        """Get the cluster's first Lexis citation as a string, or an empty string if it has none."""
         lexis_citations = instance.cluster.citations.filter(
             type=Citation.LEXIS
         )
@@ -2283,57 +2520,75 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         return ""
 
     def prepare_citeCount(self, instance):
+        """Get the cluster's citation count."""
         return instance.cluster.citation_count
 
     def prepare_docketNumber(self, instance):
+        """Get the docket number."""
         return instance.cluster.docket.docket_number
 
     def prepare_caseName(self, instance):
+        """Get the cluster's best case name."""
         return best_case_name(instance.cluster)
 
     def prepare_caseNameFull(self, instance):
+        """Get the cluster's full case name."""
         return instance.cluster.case_name_full
 
     def prepare_court_id(self, instance):
+        """Get the ID of the docket's court."""
         return instance.cluster.docket.court.pk
 
     def prepare_court(self, instance):
+        """Get the full name of the docket's court."""
         return instance.cluster.docket.court.full_name
 
     def prepare_court_citation_string(self, instance):
+        """Get the citation string of the docket's court."""
         return instance.cluster.docket.court.citation_string
 
     def prepare_court_jurisdiction(self, instance):
+        """Get the jurisdiction of the docket's court."""
         return instance.cluster.docket.court.jurisdiction
 
     def prepare_judge(self, instance):
+        """Get the cluster's judges."""
         return instance.cluster.judges
 
     def prepare_panel_names(self, instance):
+        """List the full names of the cluster's panel."""
         return [judge.name_full for judge in instance.cluster.panel.all()]
 
     def prepare_citation(self, instance):
+        """List the cluster's citations as strings."""
         return [str(cite) for cite in instance.cluster.citations.all()]
 
     def prepare_attorney(self, instance):
+        """Get the cluster's attorneys."""
         return instance.cluster.attorneys
 
     def prepare_suitNature(self, instance):
+        """Get the cluster's nature of suit."""
         return instance.cluster.nature_of_suit
 
     def prepare_status(self, instance):
+        """Get the cluster's precedential status."""
         return instance.cluster.precedential_status
 
     def prepare_procedural_history(self, instance):
+        """Get the cluster's procedural history."""
         return instance.cluster.procedural_history
 
     def prepare_posture(self, instance):
+        """Get the cluster's posture."""
         return instance.cluster.posture
 
     def prepare_syllabus(self, instance):
+        """Get the cluster's syllabus."""
         return instance.cluster.syllabus
 
     def prepare_cluster_child(self, instance):
+        """Join the opinion to its cluster as a child document."""
         parent_id = getattr(instance.cluster, "pk", None)
         return {"name": "opinion", "parent": parent_id}
 
@@ -2342,6 +2597,8 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 class OpinionClusterDocument(
     CSVSerializableDocumentMixin, OpinionBaseDocument
 ):
+    """Search document for an opinion cluster, the parent of its opinion documents."""
+
     court_exact = fields.KeywordField(attr="docket.court_id")
     non_participating_judge_ids = fields.ListField(
         fields.IntegerField(multi=True),
@@ -2360,6 +2617,7 @@ class OpinionClusterDocument(
 
     @classmethod
     def get_csv_headers(cls) -> list[str]:
+        """List the header names for a CSV export."""
         return [
             "id",
             "cluster_id",
@@ -2396,6 +2654,12 @@ class OpinionClusterDocument(
 
     @classmethod
     def get_csv_transformations(cls) -> dict[str, Callable[..., Any]]:
+        """Map fields to functions that render them for CSV export.
+
+        Highlighted and list fields are rendered as text, the URL is made
+        absolute, and the source and status are replaced with their display
+        names.
+        """
         list_fields = ["panel_names", "citation"]
         hl_fields = list(SEARCH_OPINION_HL_FIELDS.keys())
         transformations: dict[str, Callable[..., Any]] = {
@@ -2416,6 +2680,7 @@ class OpinionClusterDocument(
         return transformations
 
     def prepare_non_participating_judge_ids(self, instance):
+        """List the IDs of the cluster's non-participating judges."""
         return list(
             instance.non_participating_judges.all().values_list(
                 "id", flat=True
@@ -2423,10 +2688,13 @@ class OpinionClusterDocument(
         )
 
     def prepare_cluster_child(self, instance):
+        """Return ``opinion_cluster`` as the document's ``cluster_child`` join value."""
         return "opinion_cluster"
 
 
 class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
+    """Docket and filed document fields in the ``recap_sweep`` index."""
+
     class Index:
         name = "recap_sweep"
         settings = {
@@ -2437,6 +2705,8 @@ class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
 
 
 class ESRECAPSweepDocument(ESRECAPBaseDocument):
+    """Filed document fields in the ``recap_document_sweep`` index."""
+
     class Index:
         name = "recap_document_sweep"
         settings = {
@@ -2447,6 +2717,8 @@ class ESRECAPSweepDocument(ESRECAPBaseDocument):
 
 
 class ESRECAPDocumentPlain(ESRECAPDocument):
+    """Filed document with its docket's parties, attorneys, and firms, for percolation."""
+
     docket_absolute_url = fields.KeywordField(index=False)
 
     # Parties
@@ -2494,6 +2766,11 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
     )
 
     def prepare_parties(self, instance):
+        """Collect the IDs and names of the docket's parties, attorneys, and firms.
+
+        Returns empty collections if the docket has more roles than
+        ``MAX_ATTORNEYS_TO_PERCOLATE``.
+        """
         out = {
             "party_id": set(),
             "party": set(),
@@ -2538,9 +2815,11 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         return out
 
     def prepare_docket_absolute_url(self, instance):
+        """Get the docket's absolute URL."""
         return instance.docket_entry.docket.get_absolute_url()
 
     def prepare(self, instance):
+        """Prepare the document, adding the docket's parties, attorneys, and firms as lists."""
         data = super().prepare(instance)
         parties_prepared = self.prepare_parties(instance)
         data["party_id"] = list(parties_prepared["party_id"])
@@ -2555,6 +2834,8 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
 class RECAPPercolator(
     DocketDocument, ESRECAPDocument, PreparePercolatorQueryMixin
 ):
+    """Percolator document for RECAP search alerts, in the ``recap_percolator_index`` index."""
+
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
 
@@ -2570,7 +2851,7 @@ class RECAPPercolator(
 class OpinionPercolator(
     OpinionClusterDocument, OpinionDocument, PreparePercolatorQueryMixin
 ):
-    """Opinions Percolator index"""
+    """Opinions Percolator index."""
 
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
@@ -2585,11 +2866,10 @@ class OpinionPercolator(
 
 
 class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
-    """Document class for preparing Opinions to be percolated into the
-    OpinionPercolator index.
-    """
+    """Document class for preparing Opinions to be percolated into the OpinionPercolator index."""
 
     def prepare_non_participating_judge_ids(self, instance):
+        """List the IDs of the cluster's non-participating judges."""
         return list(
             instance.cluster.non_participating_judges.all().values_list(
                 "id", flat=True
@@ -2597,7 +2877,9 @@ class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
         )
 
     def prepare_source(self, instance):
+        """Get the cluster's source."""
         return instance.cluster.source
 
     def prepare_court_exact(self, instance):
+        """Get the ID of the docket's court."""
         return instance.cluster.docket.court_id

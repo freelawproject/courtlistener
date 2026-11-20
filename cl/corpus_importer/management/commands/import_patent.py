@@ -1,3 +1,5 @@
+"""Download patent dockets from TXWD and DED for a client."""
+
 import os
 import time
 
@@ -6,13 +8,14 @@ from celery import chain
 from django.conf import settings
 
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
     make_fjc_idb_lookup_params,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import SessionData, log_into_pacer
+from cl.lib.pacer_session import log_into_pacer
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -25,10 +28,9 @@ PATENT_TAGS = ["wdtx_ded_patent"]
 def get_dockets(options: dict) -> None:
     """Get Patent litigation from the past 10 years.
 
-    :param options: Options for scraping
-    :return: None
+    Args:
+        options: Options for scraping
     """
-
     start = options["skip_until"]
     stop = options["limit"]
     # Add code to simplify the logic for iterating.
@@ -40,10 +42,9 @@ def get_dockets(options: dict) -> None:
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = async_to_sync(log_into_pacer)(
+    session_data = async_to_sync(log_into_pacer)(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]
     START_DATE = "2012-01-01"
@@ -84,12 +85,12 @@ def get_dockets(options: dict) -> None:
                     court_id=item.district_id,
                     session_data=session_data,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                        "doc_num_end": "",  # No end doc num
-                    },
+                    **DocketReportQueryParams(
+                        show_parties_and_counsel=True,
+                        show_terminated_parties=True,
+                        show_list_of_member_cases=False,
+                        doc_num_end="",  # No end doc num
+                    ),
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -102,19 +103,22 @@ def get_dockets(options: dict) -> None:
                     session_data=session_data,
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
-                    **{
-                        "show_parties_and_counsel": True,
-                        "show_terminated_parties": True,
-                        "show_list_of_member_cases": False,
-                    },
+                    **DocketReportQueryParams(
+                        show_parties_and_counsel=True,
+                        show_terminated_parties=True,
+                        show_list_of_member_cases=False,
+                    ),
                 ).set(queue=q),
             ).apply_async()
 
 
 class Command(VerboseCommand):
+    """Download the patent dockets."""
+
     help = """Get all patent dockets since 2012 in TXWD and DED"""
 
     def add_arguments(self, parser):
+        """Add the queue, skip-until, and limit options."""
         parser.add_argument(
             "--queue",
             default="batch1",
@@ -135,6 +139,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Download the dockets with the client's PACER credentials.
+
+        Raises:
+            AssertionError: If FLP's PACER credentials are configured.
+        """
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if PACER_USERNAME == "mlissner.flp":
             raise AssertionError(

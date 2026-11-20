@@ -1,3 +1,5 @@
+"""Helpers for RECAP fetches, ACMS entries, subdocket documents, and bad redaction emails."""
+
 from typing import Any
 
 from django.conf import settings
@@ -19,8 +21,7 @@ from cl.search.models import Docket, DocketEntry, RECAPDocument
 def sort_acms_docket_entries(
     entries: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """
-    Sort ACMs docket entries to ensure consistent and predictable ordering.
+    """Sort ACMs docket entries to ensure consistent and predictable ordering.
 
     If all entries have a 'document_number', the list is sorted solely by that
     field. Otherwise, entries are sorted primarily by 'date_filed', then by the
@@ -53,11 +54,13 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     3. The top-level `court_id` (for PacerFetchQueue objects) or `court.pk`
        (for dictionaries).
 
-    :param fq: A PacerFetchQueue object or a dictionary representing a
-    PacerFetchQueue.
-    :return: The court ID as a string.
-    """
+    Args:
+        fq: A PacerFetchQueue object or a dictionary representing a
+            PacerFetchQueue.
 
+    Returns:
+        The court ID as a string.
+    """
     # Convert PacerFetchQueue to dictionary if necessary.  This allows us to
     # handle both types consistently.
     attrs = model_to_dict(fq) if isinstance(fq, PacerFetchQueue) else fq
@@ -89,14 +92,17 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
     return court_id
 
 
-def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
+def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet[RECAPDocument]:
+    """Return the main RECAPDocument queryset for a given court and pacer_doc_id.
+
+    Args:
+        court_id: The court ID to query.
+        pacer_doc_id: The pacer document ID.
+
+    Returns:
+        The main RECAPDocument queryset.
     """
-    Return the main RECAPDocument queryset for a given court and pacer_doc_id.
-    :param court_id: The court ID to query.
-    :param pacer_doc_id: The pacer document ID.
-    :return: The main RECAPDocument queryset.
-    """
-    main_rds_qs = (
+    return (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .filter(
             pacer_doc_id=pacer_doc_id,
@@ -110,7 +116,6 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
             "docket_entry__docket__court_id",
         )
     )
-    return main_rds_qs
 
 
 def find_subdocket_pdf_rds_from_data(
@@ -120,38 +125,38 @@ def find_subdocket_pdf_rds_from_data(
     pacer_case_ids: list[str],
     pdf_bytes: bytes,
 ) -> list[int]:
-    """Look for RECAP Documents that belong to subdockets and create
-     ProcessingQueue instances to handle the PDF replication.
+    """Look for RECAP Documents that belong to subdockets and create ProcessingQueue instances to handle the PDF replication.
 
-    :param user_id: The User ID.
-    :param court_id: The Court ID.
-    :param pacer_doc_id: The PACER document ID to look for subdockets.
-    :param pacer_case_ids: A list of PACER case IDs to exclude from the lookup.
-    :param pdf_bytes: The raw PDF bytes for the document to be replicated.
-    :return: A list of ProcessingQueue PKs.
+    Args:
+        user_id: The User ID.
+        court_id: The Court ID.
+        pacer_doc_id: The PACER document ID to look for subdockets.
+        pacer_case_ids: A list of PACER case IDs to exclude from the lookup.
+        pdf_bytes: The raw PDF bytes for the document to be replicated.
+
+    Returns:
+        A list of ProcessingQueue PKs.
     """
-
     sub_docket_main_rds = list(
         get_main_rds(court_id, pacer_doc_id)
         .exclude(docket_entry__docket__pacer_case_id__in=pacer_case_ids)
         .exclude(is_available=True)
     )
-    sub_docket_pqs = []
-    for main_rd in sub_docket_main_rds:
-        # Create PQs related to RD that require replication.
-        sub_docket_pqs.append(
-            ProcessingQueue(
-                uploader_id=user_id,
-                pacer_doc_id=main_rd.pacer_doc_id,
-                pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
-                document_number=main_rd.document_number,
-                attachment_number=main_rd.attachment_number,
-                court_id=court_id,
-                upload_type=UPLOAD_TYPE.PDF,
-                filepath_local=ContentFile(pdf_bytes, name="document.pdf"),
-                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
-            )
+    # Create PQs related to RD that require replication.
+    sub_docket_pqs = [
+        ProcessingQueue(
+            uploader_id=user_id,
+            pacer_doc_id=main_rd.pacer_doc_id,
+            pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
+            document_number=main_rd.document_number,
+            attachment_number=main_rd.attachment_number,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=ContentFile(pdf_bytes, name="document.pdf"),
+            source=PROCESSING_QUEUE_SOURCE.REPLICATION,
         )
+        for main_rd in sub_docket_main_rds
+    ]
 
     if not sub_docket_pqs:
         return []
@@ -168,16 +173,18 @@ def find_subdocket_atts_rds_from_data(
     pacer_case_ids: list[str],
     att_bytes: bytes,
 ) -> list[tuple[int, bool]]:
-    """Look for RECAP Documents that belong to subdockets and create
-     ProcessingQueue instances to handle the Attachment page replication.
+    """Look for RECAP Documents that belong to subdockets and create ProcessingQueue instances to handle the Attachment page replication.
 
-    :param user_id: The User ID.
-    :param court_id: The Court ID.
-    :param pacer_doc_id: The PACER document ID to look for subdockets.
-    :param pacer_case_ids: A list of PACER case IDs to exclude from the lookup.
-    :param att_bytes: The attachment page bytes for the document to be replicated.
-    :return: A two-tuple containing a list of ProcessingQueue pks to process,
-    and a boolean indicating whether the PQ belongs to subdocket replication.
+    Args:
+        user_id: The User ID.
+        court_id: The Court ID.
+        pacer_doc_id: The PACER document ID to look for subdockets.
+        pacer_case_ids: A list of PACER case IDs to exclude from the lookup.
+        att_bytes: The attachment page bytes for the document to be replicated.
+
+    Returns:
+        A two-tuple containing a list of ProcessingQueue pks to process,
+        and a boolean indicating whether the PQ belongs to subdocket replication.
     """
     # Logic to replicate the PDF sub-dockets matched by RECAPDocument
     sub_docket_main_rds = list(
@@ -186,22 +193,19 @@ def find_subdocket_atts_rds_from_data(
         )
     )
 
-    sub_docket_pqs = []
-    for main_rd in sub_docket_main_rds:
-        # Create PQs related to RD that require replication.
-        sub_docket_pqs.append(
-            ProcessingQueue(
-                uploader_id=user_id,
-                pacer_doc_id=main_rd.pacer_doc_id,
-                pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
-                court_id=court_id,
-                upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-                filepath_local=ContentFile(
-                    att_bytes, name="attachment_page.html"
-                ),
-                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
-            )
+    # Create PQs related to RD that require replication.
+    sub_docket_pqs = [
+        ProcessingQueue(
+            uploader_id=user_id,
+            pacer_doc_id=main_rd.pacer_doc_id,
+            pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=ContentFile(att_bytes, name="attachment_page.html"),
+            source=PROCESSING_QUEUE_SOURCE.REPLICATION,
         )
+        for main_rd in sub_docket_main_rds
+    ]
 
     if not sub_docket_pqs:
         return []
@@ -219,8 +223,9 @@ def send_bad_redaction_email(
 ) -> None:
     """Send email alert when bad redactions are detected.
 
-    :param rd: The RECAPDocument with bad redactions
-    :param redactions: Dict of page_num -> list of {text, bbox}
+    Args:
+        rd: The RECAPDocument with bad redactions
+        redactions: Dict of page_num -> list of {text, bbox}
     """
     template = loader.get_template("emails/bad_redaction_alert.txt")
 

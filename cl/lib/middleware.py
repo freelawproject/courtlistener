@@ -1,3 +1,5 @@
+"""Middleware for robots headers and serving new-design templates."""
+
 from collections.abc import Awaitable, Callable
 from inspect import iscoroutinefunction
 from typing import cast
@@ -24,7 +26,7 @@ WIP_PROPS = {
 
 
 class RobotsHeaderMiddleware:
-    """Adds x-robots-tag HTTP header to any request that has `private=True`
+    """Adds x-robots-tag HTTP header to any request that has `private=True`.
 
     There's some evidence and good logic to support the idea that using the
     x-robots-tag HTTP header uses less of a site's "crawl budget" than
@@ -46,6 +48,7 @@ class RobotsHeaderMiddleware:
             [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
         ],
     ):
+        """Wrap ``get_response``, running in async mode if it is a coroutine function."""
         self.get_response: Callable[
             [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
         ] = get_response
@@ -56,22 +59,22 @@ class RobotsHeaderMiddleware:
     def __call__(
         self, request: HttpRequest
     ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
+        """Pass the request through to the next handler."""
         if self.async_mode:
             return self.__acall__(request)
-        response = self.get_response(request)
-        return response
+        return self.get_response(request)
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
-        response = await cast(
+        return await cast(
             Awaitable[HttpResponseBase], self.get_response(request)
         )
-        return response
 
     def process_template_response(
         self,
         request: HttpRequest,
         response: TemplateResponse,
     ) -> TemplateResponse:
+        """Add a noindex ``X-Robots-Tag`` header when the context sets ``private``."""
         if getattr(response, "context_data", None) is None:
             return response
 
@@ -86,9 +89,7 @@ class RobotsHeaderMiddleware:
 
 
 class IncrementalNewTemplateMiddleware:
-    """
-    Checks waffle flag for new design and changes the old template
-    with the new one if it exists.
+    """Checks waffle flag for new design and changes the old template with the new one if it exists.
 
     To identify the new template we prepend "v2_" to the old template name.
     Note this means if the old template_name includes a dir, like
@@ -119,13 +120,14 @@ class IncrementalNewTemplateMiddleware:
     def __init__(
         self, get_response: Callable[[HttpRequest], HttpResponseBase]
     ):
+        """Wrap ``get_response``."""
         self.get_response: Callable[[HttpRequest], HttpResponseBase] = (
             get_response
         )
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
-        response = self.get_response(request)
-        return response
+        """Pass the request through to the next handler."""
+        return self.get_response(request)
 
     @staticmethod
     def template_exists(template_name: str) -> bool:
@@ -139,6 +141,7 @@ class IncrementalNewTemplateMiddleware:
     def process_template_response(
         self, request: HttpRequest, response: HttpResponseBase
     ) -> HttpResponseBase | TemplateResponse:
+        """Swap the response's template for its v2 or WIP version when it should be served."""
         if not isinstance(response, TemplateResponse) or response.is_rendered:
             return response
 

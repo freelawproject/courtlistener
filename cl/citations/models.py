@@ -1,3 +1,5 @@
+"""Models for citations from opinions and RECAP documents that couldn't be resolved."""
+
 import re
 from typing import Self
 
@@ -9,10 +11,7 @@ from cl.search.models import BaseCitation, Citation, Opinion, RECAPDocument
 
 
 class BaseUnmatchedCitation(BaseCitation):
-    """
-    Track citations found in a citing Opinion or RECAPDocument that
-    couldn't be resolved to a cluster
-    """
+    """Track citations found in a citing Opinion or RECAPDocument that couldn't be resolved to a cluster."""
 
     NO_CITATION = 1
     FOUND = 2
@@ -75,17 +74,18 @@ class BaseUnmatchedCitation(BaseCitation):
         eyecite_citation: FullCaseCitation,
         has_multiple_matches: bool,
     ) -> Self:
-        """
-        Create an unmatched citation instance using an eyecite
-        FullCaseCitation
+        """Create an unmatched citation instance using an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: a UnmatchedCitation object, without a `citing_opinion` or
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            a UnmatchedCitation object, without a `citing_opinion` or
             `citing_recapdocument`
         """
         cite_type_str = eyecite_citation.all_editions[0].reporter.cite_type
@@ -118,6 +118,8 @@ class BaseUnmatchedCitation(BaseCitation):
 
 
 class UnmatchedCitation(BaseUnmatchedCitation):
+    """A citation from an opinion that couldn't be matched."""
+
     citing_opinion: models.ForeignKey = models.ForeignKey(
         Opinion,
         help_text="The opinion citing this citation",
@@ -139,17 +141,20 @@ class UnmatchedCitation(BaseUnmatchedCitation):
         eyecite_citation: FullCaseCitation,
         citing_opinion: Opinion,
         has_multiple_matches: bool,
-    ) -> "UnmatchedCitation":
-        """Create an UnmatchedCitation from an eyecite FullCaseCitation
+    ) -> UnmatchedCitation:
+        """Create an UnmatchedCitation from an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param citing_opinion: the Opinion that cites this unresolved citation
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: an UnmatchedCitation object
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            citing_opinion: the Opinion that cites this unresolved citation
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            an UnmatchedCitation object
         """
         unmatched_citation = cls.create_from_eyecite_base(
             eyecite_citation, has_multiple_matches
@@ -159,6 +164,8 @@ class UnmatchedCitation(BaseUnmatchedCitation):
 
 
 class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
+    """A citation from a RECAP document that couldn't be matched."""
+
     citing_recapdocument: models.ForeignKey = models.ForeignKey(
         RECAPDocument,
         help_text="The RECAPDocument citing this unmatched citation",
@@ -190,19 +197,21 @@ class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
         eyecite_citation: FullCaseCitation,
         citing_recapdocument: RECAPDocument,
         has_multiple_matches: bool,
-    ) -> "UnmatchedCitationFromRECAPDocument":
-        """Create an UnmatchedCitationFromRECAPDocument from an eyecite
-        FullCaseCitation
+    ) -> UnmatchedCitationFromRECAPDocument:
+        """Create an UnmatchedCitationFromRECAPDocument from an eyecite FullCaseCitation.
 
         Saving is left to the caller
 
-        :param eyecite_citation: a FullCaseCitation as returned by
-            eyecite.get_citations
-        :param citing_recapdocument: the RECAPDocument that cites this
-            unresolved citation
-        :param has_multiple_matches: if the citation was resolved to
-            MULTIPLE_MATCHES_RESOURCE
-        :return: an UnmatchedCitationFromRECAPDocument object
+        Args:
+            eyecite_citation: a FullCaseCitation as returned by
+                eyecite.get_citations
+            citing_recapdocument: the RECAPDocument that cites this
+                unresolved citation
+            has_multiple_matches: if the citation was resolved to
+                MULTIPLE_MATCHES_RESOURCE
+
+        Returns:
+            an UnmatchedCitationFromRECAPDocument object
         """
         unmatched_citation = cls.create_from_eyecite_base(
             eyecite_citation, has_multiple_matches

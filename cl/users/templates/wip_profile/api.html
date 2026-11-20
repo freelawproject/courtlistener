@@ -1,0 +1,14 @@
+{% extends "new_base.html" %}
+
+{% block title %}{{ page_title }} &ndash; CourtListener.com{% endblock %}
+
+{% block content_wrapper %}
+  <div class="capped-width py-4 md:pt-6 md:pb-15">
+    <c-profile-section-shell
+      active_section="developer_tools"
+      :request="request"
+      :csrf_token="csrf_token"
+      only
+    />
+  </div>
+{% endblock %}

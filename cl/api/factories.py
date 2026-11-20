@@ -1,3 +1,5 @@
+"""Factories for API throttles, webhooks, and webhook events."""
+
 from django.utils.timezone import now
 from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
@@ -15,6 +17,8 @@ from cl.users.factories import UserFactory
 
 
 class APIThrottleFactory(DjangoModelFactory):
+    """Make a manual, unblocked API throttle for a new user."""
+
     class Meta:
         model = APIThrottle
 
@@ -27,6 +31,8 @@ class APIThrottleFactory(DjangoModelFactory):
 
 
 class WebhookFactory(DjangoModelFactory):
+    """Make a docket alert webhook for a new user."""
+
     class Meta:
         model = Webhook
 
@@ -37,6 +43,8 @@ class WebhookFactory(DjangoModelFactory):
 
 
 class WebhookEventFactory(DjangoModelFactory):
+    """Make a webhook event with a random status, without a webhook."""
+
     class Meta:
         model = WebhookEvent
 
@@ -47,6 +55,6 @@ class WebhookEventFactory(DjangoModelFactory):
 
 
 class WebhookEventWithParentsFactory(WebhookEventFactory):
-    """Make a WebhookEvent with a parent Webhook"""
+    """Make a WebhookEvent with a parent Webhook."""
 
     webhook = SubFactory(WebhookFactory)

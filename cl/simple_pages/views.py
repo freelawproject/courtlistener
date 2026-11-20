@@ -1,3 +1,5 @@
+"""Views for simple pages such as about, help, contact, and component demos."""
+
 import logging
 import re
 from datetime import date
@@ -33,15 +35,17 @@ logger = logging.getLogger(__name__)
 
 
 async def about(request: HttpRequest) -> HttpResponse:
-    """Loads the about page"""
+    """Loads the about page."""
     return TemplateResponse(request, "about.html", {"private": False})
 
 
 async def help_home(request: HttpRequest) -> HttpResponse:
+    """Render the help home page."""
     return TemplateResponse(request, "help/index.html", {"private": False})
 
 
 async def broken_email_help(request: HttpRequest) -> HttpResponse:
+    """Render the help page for broken email."""
     return TemplateResponse(
         request,
         "help/broken_email_help.html",
@@ -50,14 +54,17 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
 
 
 async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
-    """Get stats on the disclosure data
+    """Get stats on the disclosure data.
 
     Attempt the cache if possible.
 
-    :param bust_cache: If True, skip the cache and recompute fresh counts,
-        e.g. when a caller's own cache was just busted and needs this data
-        to actually be current rather than up to a week stale.
-    :return: A dict mapping item types to their counts.
+    Args:
+        bust_cache: If True, skip the cache and recompute fresh counts,
+            e.g. when a caller's own cache was just busted and needs this data
+            to actually be current rather than up to a week stale.
+
+    Returns:
+        A dict mapping item types to their counts.
     """
     coverage_key = "coverage-data.fd3"
     coverage_data = None if bust_cache else await cache.aget(coverage_key)
@@ -90,9 +97,7 @@ async def contact(
     template_data: dict[str, ContactForm | str | bool] | None = None,
     initial: dict[str, str] | None = None,
 ) -> HttpResponse:
-    """This is a fairly run-of-the-mill contact form, except that it can be
-    overridden in various ways so that its logic can be called from other
-    functions.
+    """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its logic can be called from other functions.
 
     We also use a field called phone_number in place of the subject field to
     defeat spam.
@@ -166,14 +171,18 @@ async def contact(
 
 
 async def contact_thanks(request: HttpRequest) -> HttpResponse:
+    """Render the page thanking the user for contacting us."""
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
+    """Respond with the Web of Trust site verification token."""
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
 async def components(request: HttpRequest) -> HttpResponse:
+    """Render a demo page of UI components with mock data."""
+
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
         PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT

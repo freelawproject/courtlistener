@@ -17,23 +17,24 @@ court_name_counter = itertools.count()
 
 class LegalProvider(BaseProvider):
     def random_id(self) -> str:
-        """Generate a random ID that can be used in a handful of places like:
+        """Generate a random ID that can be used in a handful of places, such as the following.
 
          - The PK of the court (because they use chars)
 
-        :return a str with random chars
+        Returns:
+            a str with random chars
         """
         return "".join(fake.random_letters(length=15)).lower()
 
     def court_name(self) -> str:
-        """
-        Generate court names like:
+        """Generate court names such as the following.
 
          - First circuit for the zoo
          - District court of albatross
          - Appeals court of eczema
 
-        :return: A court name
+        Returns:
+            A court name
         """
         first_word = random.choice(
             [
@@ -60,9 +61,7 @@ class LegalProvider(BaseProvider):
         return " ".join([first_word, mid_word, last_word])
 
     def federal_district_docket_number(self) -> str:
-        """Make a docket number like you'd see in a district court, of the
-        form, "2:13-cv-03239"
-        """
+        """Make a docket number like you'd see in a district court, of the form, "2:13-cv-03239"."""
         office = random.randint(1, 7)
         year = random.randint(0, 99)
         letters = random.choice(["cv", "bk", "cr", "ms"])
@@ -80,20 +79,20 @@ class LegalProvider(BaseProvider):
         return name_funcs[1]()
 
     def case_name(self, full: bool = False) -> str:
-        """Makes a clean case name like "O'Neil v. Jordan" """
+        """Makes a clean case name like "O'Neil v. Jordan"."""
         plaintiff = self._make_random_party(full)
         defendant = self._make_random_party(full)
         return titlecase(f"{plaintiff} v. {defendant}")
 
     def citation(self) -> str:
-        """Make or fetch a citation e.g. 345 Mass. 76
+        """Make or fetch a citation e.g. 345 Mass. 76.
 
         Grab a random reporter if it contains a typical full_cite pattern
         Exclude reporters that rely on regex patterns.
 
-        :return Citation as a string
+        Returns:
+            Citation as a string
         """
-
         # Filter to only vol-reporter-page reporters
         reporters = [
             edition
@@ -109,6 +108,7 @@ class LegalProvider(BaseProvider):
     def random_id_string(self) -> str:
         """Generate a random integer and convert to string.
 
-        :return: Random integer as string.
+        Returns:
+            Random integer as string.
         """
         return str(random.randint(100_000, 400_000))

@@ -48,8 +48,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 
 
 class FakeS3Client:
-    """Minimal stand-in for boto3's S3 client: objects are keys mapped to
-    ETags, and every copy is recorded for assertions."""
+    """Minimal stand-in for boto3's S3 client: objects are keys mapped to ETags, and every copy is recorded for assertions."""
 
     def __init__(self, objects: dict[str, str]) -> None:
         self.objects = dict(objects)
@@ -142,8 +141,7 @@ class RecapStylePathHelpersTest(SimpleTestCase):
         )
 
     def test_florida_local_date_uses_court_timezone(self) -> None:
-        """The UTC-to-local offset is 5 hours under standard time and 4 under
-        daylight saving time, so the day boundary moves with the season."""
+        """The UTC-to-local offset is 5 hours under standard time and 4 under daylight saving time, so the day boundary moves with the season."""
         cases = {
             "EST, last minute of the previous day": (
                 datetime(2024, 1, 2, 4, 59, tzinfo=UTC),
@@ -177,9 +175,7 @@ class RecapStylePathHelpersTest(SimpleTestCase):
         self.assertIsNone(florida_local_date(None))
 
     def test_build_new_key_per_spec(self) -> None:
-        """Each spec builds its key from the right row fields, with the
-        entry date (or the docket date for QP files) rendered as `undated`
-        when missing."""
+        """Each spec builds its key from the right row fields, with the entry date (or the docket date for QP files) rendered as `undated` when missing."""
         scotus_row = {
             "pk": 1,
             "filepath_local": "scotus/documents/gov.scotus.x.pdf",

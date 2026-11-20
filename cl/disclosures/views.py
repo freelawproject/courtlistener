@@ -1,3 +1,5 @@
+"""Views for searching and viewing financial disclosures."""
+
 import operator
 from functools import reduce
 
@@ -24,15 +26,17 @@ from cl.people_db.models import Person, Position
 
 
 def build_hit_count_annotation(search_terms: list[str]) -> Case:
-    """Build a SQL annotation that counts how many name fields match search
-    terms.
+    """Build a SQL annotation that counts how many name fields match search terms.
 
     For each name field (first, middle, last, suffix), adds 1 to hit_count if
     the lowercased field value exactly matches any search term. This scoring is
     done entirely in SQL for efficiency.
 
-    :param search_terms: List of lowercase search terms
-    :return: Sum of Case expressions that can be used as an annotation
+    Args:
+        search_terms: List of lowercase search terms
+
+    Returns:
+        Sum of Case expressions that can be used as an annotation
     """
     hit_cases = []
     for field in ["name_first", "name_last", "name_middle", "name_suffix"]:
@@ -51,7 +55,7 @@ def build_hit_count_annotation(search_terms: list[str]) -> Case:
 
 
 async def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
-    """The home page for financial disclosures
+    """The home page for financial disclosures.
 
     This page shows:
      - A brief introduction to financial disclosure reports
@@ -98,15 +102,16 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
 
     # Build search args - each term is matched against all four name fields
     # using istartswith for the initial filter
-    search_args = []
-    for term in search_terms:
+    search_args = [
+        Q(**{field: term})
+        for term in search_terms
         for field in (
             "name_first__istartswith",
             "name_last__istartswith",
             "name_middle__istartswith",
             "name_suffix__istartswith",
-        ):
-            search_args.append(Q(**{field: term}))
+        )
+    ]
 
     # Build hit count annotation for sorting (counts exact matches in SQL)
     hit_count_annotation = build_hit_count_annotation(search_terms)

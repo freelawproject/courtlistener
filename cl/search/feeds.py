@@ -1,3 +1,5 @@
+"""Atom feeds of search results and of each jurisdiction's opinions."""
+
 import logging
 from collections.abc import Callable
 from functools import wraps
@@ -16,7 +18,10 @@ from elasticsearch.dsl.utils import AttrDict
 from elasticsearch.exceptions import ApiError, TransportError
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import do_es_feed_query, get_docket_entry_pk
+from cl.lib.elasticsearch_utils import (
+    do_es_feed_query,
+    get_docket_entry_fragment,
+)
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.search_index_utils import null_map
 from cl.lib.search_utils import scotus_frontend_search_enabled
@@ -40,23 +45,23 @@ def get_item(item):
     """Normalize grouped and non-grouped results to return the item itself."""
     if "doclist" in item:
         return item["doclist"]["docs"][0]
-    else:
-        return item
+    return item
 
 
 def cleanup_control_chars(
     items: Response, document_text_key: str, jurisdiction: bool = False
 ) -> None:
-    """Clean up control characters from document texts for a proper XML
-    rendering.
+    """Clean up control characters from document texts for a proper XML rendering.
 
-    :param items: The ES Response containing the search results.
-    :param document_text_key: Key in the item dict to clean.
-    :param jurisdiction: A bool to indicate if the item is from a jurisdiction
-    feed.
-    :return: None. The function modify items in place.
+    Args:
+        items: The ES Response containing the search results.
+        document_text_key: Key in the item dict to clean.
+        jurisdiction: A bool to indicate if the item is from a jurisdiction
+            feed.
+
+    Returns:
+        None. The function modify items in place.
     """
-
     for item in items:
         if document_text_key == "text":
             # Opinions case.
@@ -81,8 +86,10 @@ def cleanup_control_chars(
 
 
 class SearchFeed(Feed):
-    """This feed returns the results of a search feed. It lacks a second
-    argument in the method b/c it gets its search query from a GET request.
+    """This feed returns the results of a search feed.
+
+    It lacks a second argument in the method b/c it gets its search query from
+    a GET request.
     """
 
     feed_type = Atom1Feed
@@ -94,11 +101,13 @@ class SearchFeed(Feed):
     feed_copyright = "Created for the public domain by Free Law Project"
 
     def get_object(self, request, get_string):
+        """Use the request as the feed's object."""
         return request
 
     def items(self, obj):
-        """Do a search query here. Return the first 20 results.
-        For Opinions SearchFeed returns clusters.
+        """Do a search query here.
+
+        Return the first 20 results. For Opinions SearchFeed returns clusters.
         For RECAP SearchFeed returns RECAPDocuments.
         """
         search_form = SearchForm(obj.GET)
@@ -139,60 +148,56 @@ class SearchFeed(Feed):
         return items
 
     def item_link(self, item: AttrDict[Any]) -> str:
-        """Return the item's own page, or, for a RECAP search document
-        without one, its entry on the docket page.
-        """
+        """Return the item's own page, or, for a RECAP search document without one, its entry on the docket page."""
         doc = get_item(item)
         if doc["absolute_url"]:
             return doc["absolute_url"]
         # RECAP and SCOTUS documents without a number have no page of their
-        # own, so link to their entry on the docket page, using the anchors
-        # that page renders. The slug is rebuilt the way Docket.save() does,
-        # since child documents don't store it.
+        # own, so link to their entry on the docket page. The slug is rebuilt
+        # the way Docket.save() does, since child documents don't store it.
         docket_url = reverse(
             "view_docket",
             args=[doc["docket_id"], slugify(trunc(doc["caseName"], 75))],
         )
-        if entry_number := getattr(doc, "entry_number", None):
-            return f"{docket_url}#entry-{entry_number}"
-        if docket_entry_pk := get_docket_entry_pk(doc):
-            return f"{docket_url}#minute-entry-{docket_entry_pk}"
-        return docket_url
+        return f"{docket_url}{get_docket_entry_fragment(doc)}"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        """Add the item's link to the description template's context, so
-        its "Original document" link gets the same fallback as item_link.
-        """
+        """Add the item's link to the description template's context, so its "Original document" link gets the same fallback as item_link."""
         context = super().get_context_data(**kwargs)
         context["item_link"] = self.item_link(kwargs["item"])
         return context
 
     def item_author_name(self, item):
+        """Use the item's court as its author."""
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
+        """Get the item's publication date.
+
+        RECAP items use their entry filing date: midnight Pacific Time on it
+        if it is timezone-aware, otherwise localized to the court's
+        timezone. Opinions use midnight Pacific Time on their filing date.
+        """
         try:
             # Get pub_date for RECAP
             entry_date = get_item(item)["entry_date_filed"]
             if not is_naive(entry_date):
                 # Handle non-naive dates
                 return midnight_pt(entry_date)
-            else:
-                return localize_naive_datetime_to_court_timezone(
-                    get_item(item)["court_id"], entry_date
-                )
+            return localize_naive_datetime_to_court_timezone(
+                get_item(item)["court_id"], entry_date
+            )
         except KeyError:
             # Get pub_date for Opinions
             return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
+        """Use the item's case name as its title."""
         return get_item(item)["caseName"]
 
 
 class JurisdictionFeed(Feed):
-    """When working on this feed, note that it is overridden in a number of
-    places, so changes here may have unintended consequences.
-    """
+    """When working on this feed, note that it is overridden in a number of places, so changes here may have unintended consequences."""
 
     feed_type = Atom1Feed
     link = "https://www.courtlistener.com/"
@@ -202,14 +207,18 @@ class JurisdictionFeed(Feed):
     description_template = "feeds/description_template.html"
 
     def title(self, obj):
+        """Title the feed as all opinions for the court."""
         return f"CourtListener.com: All opinions for the {obj.full_name}"
 
     def get_object(self, request, court):
+        """Get the court, or raise 404 if it doesn't exist."""
         return get_object_or_404(Court, pk=court)
 
     def items(self, obj):
-        """Do a search query here. Return the first 20 results
-        JurisdictionFeed return Opinions instead of Clusters.
+        """Do a search query here.
+
+        Return the first 20 results JurisdictionFeed return Opinions instead of
+        Clusters.
         """
         es_search_query = OpinionClusterDocument.search()
         cd = {
@@ -224,21 +233,27 @@ class JurisdictionFeed(Feed):
         return items
 
     def item_link(self, item):
+        """Link to the item's page."""
         return get_item(item)["absolute_url"]
 
     def item_author_name(self, item):
+        """Use the item's court as its author."""
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
+        """Use midnight Pacific Time on the item's filing date."""
         return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
+        """Use the item's case name as its title."""
         return get_item(item)["caseName"]
 
     def item_categories(self, item):
+        """Use the item's precedential status as its only category."""
         return [get_item(item)["status"]]
 
     def item_enclosure_url(self, item):
+        """Link to the item's file in storage, or None if that fails."""
         try:
             path = get_item(item)["local_path"]
             return f"https://storage.courtlistener.com/{path}"
@@ -246,6 +261,7 @@ class JurisdictionFeed(Feed):
             return None
 
     def item_enclosure_mime_type(self, item):
+        """Get the MIME type of the item's file, or None if that fails."""
         try:
             path = get_item(item)["local_path"]
             return lookup_mime_type(path)
@@ -257,13 +273,16 @@ class JurisdictionFeed(Feed):
 
 
 class AllJurisdictionsFeed(JurisdictionFeed):
+    """Feed of the 20 most recently filed opinions from any court."""
+
     title = "CourtListener.com: All Opinions (High Volume)"
 
     def get_object(self, request):
-        return None
+        """Use no object, since the feed covers every court."""
+        return
 
     def items(self, obj):
-        """Do a match all search query. Return the first 20 results"""
+        """Do a match all search query. Return the first 20 results."""
         es_search_query = OpinionClusterDocument.search()
         cd = {
             "order_by": "dateFiled desc",
@@ -279,15 +298,17 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 def search_feed_error_handler(view_func: Callable) -> Callable:
     """Wraps a Feed view function to handle search feed errors gracefully.
 
-    :param view_func: The Feed view to be wrapped.
-    :return: The wrapped view function that handles search feed errors.
+    Args:
+        view_func: The Feed view to be wrapped.
+
+    Returns:
+        The wrapped view function that handles search feed errors.
     """
 
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
         try:
-            response = view_func(request, *args, **kwargs)
-            return response
+            return view_func(request, *args, **kwargs)
         except (
             UnbalancedParenthesesQuery,
             UnbalancedQuotesQuery,

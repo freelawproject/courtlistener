@@ -1,3 +1,5 @@
+"""API views for the court index, wiki coverage data, result counts, and usage reporting."""
+
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -37,6 +39,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.selectors import get_total_estimate_count
 from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.views import get_coverage_data_fds
 from cl.stats.constants import StatMetric
@@ -44,12 +47,15 @@ from cl.stats.constants import StatMetric
 logger = logging.getLogger(__name__)
 
 
-async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
+async def get_cached_court_counts(
+    courts_queryset: QuerySet[Court],
+) -> dict[str, int]:
     """Fetch court counts from cache or ES if not available.
-    :return: A dict mapping court IDs to their respective counts of
-    opinions, or None if no counts are available.
-    """
 
+    Returns:
+        A dict mapping court IDs to their respective counts of
+        opinions, or None if no counts are available.
+    """
     cache_key = "court_counts_o"
     court_counts = cache.get(cache_key)
     if court_counts:
@@ -63,19 +69,18 @@ async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
         cache.set(
             cache_key,
             court_counts,
-            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
+            timeout=settings.QUERY_RESULTS_CACHE,
         )
     return court_counts or {}
 
 
-async def make_court_variable() -> QuerySet:
-    """
-    Create a list of court objects with an added attribute for the count of associated opinions.
+async def make_court_variable() -> QuerySet[Court]:
+    """Create a list of court objects with an added attribute for the count of associated opinions.
 
-    :return: A QuerySet of Court objects with an added `count` attribute reflecting
+    Returns:
+        A QuerySet of Court objects with an added `count` attribute reflecting
              the number of associated opinions.
     """
-
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
     courts_counts = await get_cached_court_counts(courts)
     # Add the count attribute to courts.
@@ -95,10 +100,13 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 async def fetch_first_last_date_filed(
     court_id: str,
 ) -> tuple[date | None, date | None]:
-    """Fetch first and last date for court
+    """Fetch first and last date for court.
 
-    :param court_id: Court object id
-    :return: First/last date filed, if any
+    Args:
+        court_id: Court object id
+
+    Returns:
+        First/last date filed, if any
     """
     query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
         "date_filed"
@@ -110,18 +118,20 @@ async def fetch_first_last_date_filed(
 
 
 async def get_result_count(request, version, day_count):
-    """Get the count of results for the past `day_count` number of days
+    """Get the count of results for the past `day_count` number of days.
 
     GET parameters will be a complete search string
 
-    :param request: The Django request object
-    :param version: The API version number (ignored for now, but there for
-    later)
-    :param day_count: The number of days to average across. More is slower.
-    :return: A JSON object with the number of hits during the last day_range
-    period.
-    """
+    Args:
+        request: The Django request object
+        version: The API version number (ignored for now, but there for
+            later)
+        day_count: The number of days to average across. More is slower.
 
+    Returns:
+        A JSON object with the number of hits during the last day_range
+        period.
+    """
     # This endpoint backs the create-alert modal on the search frontend, so
     # it counts SCOTUS for the same requests the search page shows it to.
     include_scotus = await sync_to_async(scotus_frontend_search_enabled)(
@@ -158,6 +168,7 @@ async def get_result_count(request, version, day_count):
 
 
 async def deprecated_api(request, v):
+    """Respond with 410 Gone and a message to upgrade to the newest API version."""
     return JsonResponse(
         {
             "meta": {
@@ -172,10 +183,7 @@ async def deprecated_api(request, v):
 
 
 def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
-    """
-    Parses a throttle rate string and returns a tuple containing the number of
-    citations allowed and the throttling duration in a format suitable for
-    templates.
+    """Parses a throttle rate string and returns a tuple containing the number of citations allowed and the throttling duration in a format suitable for templates.
 
     Args:
         rate (str): A string representing the throttle rate
@@ -199,13 +207,16 @@ async def make_rss_feed_markdown(
 ) -> str:
     """Render PACER courts grouped by jurisdiction as wiki-ready markdown.
 
-    :param courts: The courts to render.
-    :param jurisdictions: Jurisdictions to include, in display order. Courts
-        in other jurisdictions are omitted.
-    :param include_entry_types: If True, render a table showing each court's
-        RSS entry types; otherwise render court names in a two-column table
-        that reads top to bottom, then left to right.
-    :return: A markdown string with one section per jurisdiction.
+    Args:
+        courts: The courts to render.
+        jurisdictions: Jurisdictions to include, in display order. Courts
+            in other jurisdictions are omitted.
+        include_entry_types: If True, render a table showing each court's
+            RSS entry types; otherwise render court names in a two-column table
+            that reads top to bottom, then left to right.
+
+    Returns:
+        A markdown string with one section per jurisdiction.
     """
     jurisdiction_labels = {
         Court.FEDERAL_APPELLATE: "Appellate Courts",
@@ -242,10 +253,13 @@ async def make_rss_feed_markdown(
 async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
     """Render courts as a markdown list of links for the wiki.
 
-    :param courts: The courts to render.
-    :param url_name: The URL name to reverse for each court's link. It must
-        take a single "court" kwarg.
-    :return: A markdown bullet list linking each court.
+    Args:
+        courts: The courts to render.
+        url_name: The URL name to reverse for each court's link. It must
+            take a single "court" kwarg.
+
+    Returns:
+        A markdown bullet list linking each court.
     """
     lines = []
     async for court in courts:
@@ -271,12 +285,15 @@ async def get_or_build_wiki_json(
     fetches — otherwise a "fresh" rebuild here could still return
     data that's stale by as much as those inner caches' own TTLs.
 
-    :param request: The request. Only used to check for ?bust_cache + staff.
-    :param cache_key: The cache key this payload is stored under.
-    :param build_data: An async callable that computes a fresh payload. It
-        receives the bust_cache flag so it can propagate it to any caches
-        of its own.
-    :return: The cached or freshly-built payload as a JsonResponse.
+    Args:
+        request: The request. Only used to check for ?bust_cache + staff.
+        cache_key: The cache key this payload is stored under.
+        build_data: An async callable that computes a fresh payload. It
+            receives the bust_cache flag so it can propagate it to any caches
+            of its own.
+
+    Returns:
+        The cached or freshly-built payload as a JsonResponse.
     """
     bust_cache = (
         "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
@@ -311,15 +328,21 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     Kept separate from the view so get_or_build_wiki_json() can call it only
     when the cached payload is missing or busted.
 
-    :param bust_cache: Passed through to nested caches (e.g. financial
-        disclosure counts) so busting this endpoint's cache doesn't leave
-        stale data behind in those.
-    :return: The wiki-data payload.
+    Args:
+        bust_cache: Passed through to nested caches (e.g. financial
+            disclosure counts) so busting this endpoint's cache doesn't leave
+            stale data behind in those.
+
+    Returns:
+        The wiki-data payload.
     """
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).acount()
-    citation_count = await Citation.objects.acount()
+    # Do an estimate, since an exact count is too slow on this table
+    citation_count = await sync_to_async(get_total_estimate_count)(
+        Citation._meta.db_table
+    )
 
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
@@ -360,7 +383,7 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     }
     prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
-    data = {
+    return {
         "court_count": court_count,
         "citation_count": citation_count,
         "alerts_sent_count": alerts_sent_count,
@@ -405,7 +428,6 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
             ),
         },
     }
-    return data
 
 
 async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
@@ -431,11 +453,14 @@ async def build_wiki_coverage_data(bust_cache: bool = False) -> dict:
     Kept separate from the view so get_or_build_wiki_json() can call it only
     when the cached payload is missing or busted.
 
-    :param bust_cache: Passed through to get_coverage_data_fds() so busting
-        this endpoint's cache actually refreshes the financial disclosure
-        counts too, instead of leaving up to a week-old counts from that
-        function's own cache in place.
-    :return: The wiki-coverage-data payload.
+    Args:
+        bust_cache: Passed through to get_coverage_data_fds() so busting
+            this endpoint's cache actually refreshes the financial disclosure
+            counts too, instead of leaving up to a week-old counts from that
+            function's own cache in place.
+
+    Returns:
+        The wiki-coverage-data payload.
     """
     fd_data = await get_coverage_data_fds(bust_cache=bust_cache)
     judge_count = await Person.objects.all().acount()
@@ -512,6 +537,7 @@ class ApiUsageViewSet(ViewSet):
         return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
+        """Report the user's current throttle usage, recent usage, and membership."""
         # IsAuthenticated permission class rules out AnonymousUser at runtime.
         user = cast(User, request.user)
         return Response(
