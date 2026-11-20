@@ -197,9 +197,9 @@ class MergerSpecRegistry[Scrape, Params]:
         }
 
     def deferred_transform[M: Model](
-        self, scrape: Scrape, params: Params, database: M | None
+        self, scrape: Scrape, params: Params, database: M
     ) -> dict[str, Any]:
-        """Get every specification's transformed value, by field name."""
+        """Get the value of every specification that reads the database, by field name, given the object being merged into."""
         return {
             k: v(scrape, params, database)
             for k, v in self._deferred_transformers.items()
@@ -307,6 +307,10 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     The value computed for each declared spec is stored on the instance under
     the spec's name, unless the input failed validation.
+
+    A spec that reads the database has, until `update` runs, the value it
+    would have with nothing stored, so `lookup` and `resolve` can match on
+    what was scraped.
     """
 
     config: ClassVar[MergerConfig[Model]] = MergerConfig(Model)
@@ -443,29 +447,18 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     @final
     def populate_from_db(
-        self,
-        state: MergerState.Create[Scrape, Params, M]
-        | MergerState.Update[Scrape, Params, M],
-    ):
-        """Finish populating the merger's fields from an existing model on the update path or set them all to `None` on the create path.
+        self, state: MergerState.Update[Scrape, Params, M]
+    ) -> None:
+        """Compute the fields that read the database from the object being merged into, replacing any value read before it was found.
 
         Args:
-            state: The state the merger is in when running this method.
-            model: The model to populate from when updating or `None` when creating.
+            state: The update the merger is carrying out.
         """
-        match state:
-            case MergerState.Create(scrape, params):
-                vars(self).update(
-                    self.config.registry.deferred_transform(
-                        scrape, params, None
-                    )
-                )
-            case MergerState.Update(scrape, params, instance=instance):
-                vars(self).update(
-                    self.config.registry.deferred_transform(
-                        scrape, params, instance
-                    )
-                )
+        vars(self).update(
+            self.config.registry.deferred_transform(
+                state.scrape, state.params, state.instance
+            )
+        )
 
     @staticmethod
     def validator(scrape: Scrape) -> bool:
@@ -606,8 +599,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def create(
         self, state: MergerState.Create[Scrape, Params, M]
     ) -> MergerState.CreateOutput[Scrape, Params, M]:
-        self.populate_from_db(state)
-
         result = MergeResult.unnecessary()
         o2o_params: dict[str, Any] = {}
         for name, spec in self.config.registry.one_to_one.items():
