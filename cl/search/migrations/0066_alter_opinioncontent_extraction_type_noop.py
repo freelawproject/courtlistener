@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0064_scotus_related_names_noop'),
+        ('search', '0065_scotus_document_url_blank_noop'),
     ]
 
     operations = [
