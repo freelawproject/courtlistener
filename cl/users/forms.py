@@ -266,15 +266,20 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
 
         The bound instance is excluded so that claiming a stub account, where
         the form is bound to the stub that already holds the address, is not
-        mistaken for a duplicate.
+        mistaken for a duplicate. Other stubs holding the address don't count
+        either: nobody can sign in to a stub, so one is never a reason to
+        refuse a signup, and the view binds the form to a stub whenever one
+        exists.
 
         Args:
             value: The string to compare against the email column.
 
         Returns:
-            True if some other account already has that address.
+            True if some other, non-stub account already has that address.
         """
-        users = filter_by_email(User.objects.all(), value)
+        users = filter_by_email(
+            User.objects.exclude(profile__stub_account=True), value
+        )
         if self.instance.pk:
             users = users.exclude(pk=self.instance.pk)
         return users.exists()

@@ -226,7 +226,8 @@ class OpinionAlertsPercolatorTest(
 
         opinion_alert_id = opinion_alert.pk
         # Remove the alert.
-        opinion_alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_alert.delete()
         self.assertFalse(
             OpinionPercolator.exists(id=opinion_alert_id),
             msg=f"Alert id: {opinion_alert_id} was not indexed.",
@@ -248,7 +249,8 @@ class OpinionAlertsPercolatorTest(
 
         opinion_alert_filter_id = opinion_alert_filter.pk
         # Remove the alert.
-        opinion_alert_filter.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_alert_filter.delete()
         self.assertFalse(
             OpinionPercolator.exists(id=opinion_alert_filter_id),
             msg=f"Alert id: {opinion_alert_filter_id} was not indexed.",

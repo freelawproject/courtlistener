@@ -85,7 +85,9 @@ def convert_to_stub_account(user: User) -> User:
     user.first_name = "Deleted"
     user.last_name = ""
     user.is_active = False
-    user.username = md5(user.email)
+    # Emails aren't unique in auth_user, so use a pk to
+    # make it unique per row.
+    user.username = md5(f"{user.email}{user.pk}")
     user.set_unusable_password()
     user.save()
 
