@@ -539,7 +539,7 @@ class WikiDataRssFeedTests(TestCase):
                 cached = await caches["default"].aget(cache_key)
                 self.assertIn(marker_key, cached)
 
-    @patch("cl.api.utils.get_total_estimate_count", return_value=54321)
+    @patch("cl.search.selectors.get_total_estimate_count", return_value=54321)
     async def test_fd_counts_use_estimates(
         self, mock_estimate: MagicMock
     ) -> None:

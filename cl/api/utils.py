@@ -55,17 +55,6 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
-from cl.disclosures.models import (
-    Agreement,
-    Debt,
-    FinancialDisclosure,
-    Gift,
-    Investment,
-    NonInvestmentIncome,
-    Position,
-    Reimbursement,
-    SpouseIncome,
-)
 from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
@@ -76,7 +65,6 @@ from cl.lib.ratelimiter import (
     parse_rate,
 )
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
@@ -1922,6 +1910,21 @@ async def get_coverage_data_fds() -> dict[str, int]:
     Returns:
         A dict mapping item types to their estimated counts.
     """
+    # Imported here because cl.search.models imports this module (via
+    # cl.users.models), and both of these import cl.search.models.
+    from cl.disclosures.models import (
+        Agreement,
+        Debt,
+        FinancialDisclosure,
+        Gift,
+        Investment,
+        NonInvestmentIncome,
+        Position,
+        Reimbursement,
+        SpouseIncome,
+    )
+    from cl.search.selectors import get_total_estimate_count
+
     models: dict[str, type[Model]] = {
         "disclosures": FinancialDisclosure,
         "investments": Investment,
