@@ -42,7 +42,10 @@ from cl.favorites.models import (
     UserTag,
 )
 from cl.favorites.selectors import prayer_eligible
-from cl.favorites.tasks import check_prayer_pacer
+from cl.favorites.tasks import (
+    check_prayer_pacer,
+    refresh_lifetime_prayer_stats,
+)
 from cl.favorites.utils import (
     PrayerStats,
     compute_prayer_total_cost,
@@ -1444,6 +1447,35 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             stats = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(stats, cached_stats)
         await cache.aclear()
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    def test_lifetime_prayer_stats_refresh_skips_fresh_stats(self) -> None:
+        """Does a refresh that finds fresh stats skip the slow queries?
+
+        A backlogged queue can hold several refreshes for the same status.
+        Once the first has run, the rest must not redo its work.
+        """
+        # The locmem cache is shared by every test that overrides to it.
+        cache.clear()
+        cache.set(
+            lifetime_prayer_stats_cache_key(Prayer.WAITING),
+            {
+                "refresh_after": time.time() + 60,
+                "stats": asdict(PrayerStats(prayer_count=-1, total_cost="")),
+            },
+        )
+        with patch(
+            "cl.favorites.tasks.compute_lifetime_prayer_stats"
+        ) as mock_compute:
+            refresh_lifetime_prayer_stats(Prayer.WAITING)
+        mock_compute.assert_not_called()
+        cache.clear()
 
     @override_settings(
         CACHES={
