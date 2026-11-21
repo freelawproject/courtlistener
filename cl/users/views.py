@@ -480,8 +480,8 @@ def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Delete the user's account after they confirm their password.
 
-    Deletes the user's assets and converts the account to a stub as one
-    unit, then emails a deletion notice and logs the user out.
+    Emails a deletion notice, deletes the user's assets, converts the
+    account to a stub, and logs the user out.
     """
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
@@ -491,10 +491,8 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         if delete_form.is_valid():
             email: EmailType = emails["account_deleted"]
             # Build the notice now, while the user still has their real
-            # username, but send it only once the deletion has succeeded.
+            # username.
             body = email["body"] % request.user
-            # All or nothing: a failure while blanking the account must not
-            # leave it active with its assets already gone.
             with transaction.atomic():
                 delete_user_assets(request.user)
                 user = convert_to_stub_account(request.user)
