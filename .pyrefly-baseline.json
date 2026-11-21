@@ -3173,13 +3173,6 @@
       "severity": "error"
     },
     {
-      "column": 23,
-      "path": "cl/search/management/commands/cl_index_parent_and_child_docs.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `str` is not exhaustive",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/search/management/commands/clean_docket_number_raw.py",
       "name": "bad-argument-type",
@@ -3352,13 +3345,6 @@
       "path": "cl/search/management/commands/sweep_indexer.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/search/management/commands/sweep_indexer.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `str` is not exhaustive",
       "severity": "error"
     },
     {
