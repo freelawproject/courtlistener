@@ -1290,13 +1290,6 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/lib/search_utils.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `get_params.get(\"type\", SEARCH_TYPES.OPINION)` is not exhaustive",
-      "severity": "error"
-    },
-    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
