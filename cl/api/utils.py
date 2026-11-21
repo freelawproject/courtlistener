@@ -1913,7 +1913,7 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     return results[0] / results[1]
 
 
-def get_coverage_data_fds() -> dict[str, int]:
+async def get_coverage_data_fds() -> dict[str, int]:
     """Get estimated row counts for the financial disclosure tables.
 
     Uses Postgres's table estimates instead of COUNT(*), since exact counts
@@ -1934,7 +1934,7 @@ def get_coverage_data_fds() -> dict[str, int]:
         "debts": Debt,
     }
     return {
-        k: get_total_estimate_count(model._meta.db_table)
+        k: await sync_to_async(get_total_estimate_count)(model._meta.db_table)
         for k, model in models.items()
     }
 

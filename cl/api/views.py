@@ -337,7 +337,7 @@ async def build_wiki_data() -> dict:
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
-    fd_data = await sync_to_async(get_coverage_data_fds)()
+    fd_data = await get_coverage_data_fds()
     # Yesterday's alert total; start=1 skips today's still-filling bucket.
     alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
@@ -446,7 +446,7 @@ async def build_wiki_coverage_data() -> dict:
     Returns:
         The wiki-coverage-data payload.
     """
-    fd_data = await sync_to_async(get_coverage_data_fds)()
+    fd_data = await get_coverage_data_fds()
     judge_count = await Person.objects.all().acount()
 
     oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
