@@ -1024,13 +1024,6 @@
       "severity": "error"
     },
     {
-      "column": 11,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `str` is not exhaustive",
-      "severity": "error"
-    },
-    {
       "column": 12,
       "path": "cl/custom_filters/templatetags/component_tags.py",
       "name": "missing-attribute",
