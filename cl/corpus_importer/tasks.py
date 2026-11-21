@@ -4498,7 +4498,15 @@ def download_and_parse_scotus_docket(
             return None
 
     parser._parse_text(content)
-    return parser.data
+    data = parser.data
+    if not data:
+        logger.error(
+            "Unparsable SCOTUS Docket at bucket: %s s3_key: %s", bucket, s3_key
+        )
+        self.request.chain = None
+        return None
+
+    return data
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
