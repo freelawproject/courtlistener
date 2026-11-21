@@ -599,15 +599,17 @@ def register(request: HttpRequest) -> HttpResponse:
     )
     if request.user.is_anonymous:
         if request.method == "POST":
-            try:
-                # Use the same stripped address the form will clean, so a
-                # stub found here is the same account the form's duplicate
-                # check sees, and vice versa.
-                stub_account = filter_by_email(
+            # Use the same stripped address the form will clean, so a
+            # stub found here is the same account the form's duplicate
+            # check sees, and vice versa. Emails aren't unique, so more than
+            # one stub can hold the address; claim the most recent.
+            stub_account = (
+                filter_by_email(
                     User.objects.filter(profile__stub_account=True), email
-                ).get()
-            except User.DoesNotExist:
-                stub_account = False
+                )
+                .order_by("-date_joined")
+                .first()
+            )
 
             if stub_account:
                 form = UserCreationFormExtended(

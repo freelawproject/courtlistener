@@ -1,7 +1,7 @@
 import json
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
@@ -4740,6 +4740,34 @@ class RegisterViewTest(TestCase):
         self.assertEqual(
             await User.objects.filter(email="donor@example.com").acount(), 1
         )
+
+    def test_claims_the_most_recent_of_several_stubs(self) -> None:
+        """When more than one stub holds the address, does registering claim the most recent one and leave the others alone, rather than failing or treating the address as taken?"""
+        email = "donor@example.com"
+        older, newer = (
+            UserProfileWithParentsFactory(
+                stub_account=True,
+                user__email=email,
+                user__is_active=False,
+                user__date_joined=datetime(year, 1, 1, tzinfo=UTC),
+            )
+            for year in (2020, 2024)
+        )
+
+        response = self.client.post(
+            reverse("register"),
+            self.registration_data("donor", email),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        newer.refresh_from_db()
+        self.assertEqual(newer.user.username, "donor")
+        self.assertTrue(newer.user.is_active)
+        self.assertFalse(newer.stub_account)
+        older.refresh_from_db()
+        self.assertTrue(older.stub_account)
+        self.assertFalse(older.user.is_active)
 
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,
