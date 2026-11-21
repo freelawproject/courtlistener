@@ -90,15 +90,16 @@ def refresh_lifetime_prayer_stats(status: int) -> None:
     """Recompute the cached lifetime stats for prayers with a status.
 
     Queued by get_lifetime_prayer_stats() when its cached stats go stale, so
-    the slow queries run here instead of in a request.
-
-    Does nothing if the stats are already fresh. A backlogged queue can hold
-    several refreshes for the same status, one per refresh window, and only
-    the first of them to run needs to do the work.
+    the slow queries run here instead of in a request. Does nothing if the
+    stats are already fresh.
 
     Args:
         status: Prayer.WAITING or Prayer.GRANTED.
     """
+    # When the queue is backlogged, readers queue another refresh every time
+    # the refresh lock expires, so several can pile up for the same status.
+    # Only the first of them to run needs to do the work; the rest find its
+    # fresh stats here and skip the slow queries.
     entry = cache.get(lifetime_prayer_stats_cache_key(status))
     if entry is not None and time.time() < entry["refresh_after"]:
         return

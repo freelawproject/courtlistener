@@ -537,9 +537,10 @@ async def get_lifetime_prayer_stats(status: int) -> PrayerStats:
     Includes the number of prayers, distinct documents, distinct users, and
     the total cost.
 
-    The stats are served from the cache and can be up to about ten minutes
-    stale: once they're older than that, the next call queues a background
-    refresh and returns the cached stats meanwhile. Only when nothing is
+    The stats are served from the cache and can be up to
+    LIFETIME_PRAYER_STATS_REFRESH_SECONDS stale, or longer while the Celery
+    queue is backed up: once they're older than that, the next call queues a
+    background refresh and returns the cached stats meanwhile. Only when nothing is
     cached at all (e.g. after Redis is flushed) are they computed inline,
     which is slow.
 

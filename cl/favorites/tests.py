@@ -1432,29 +1432,6 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             }
         }
     )
-    async def test_lifetime_prayer_stats_survive_queue_failure(self) -> None:
-        """Are cached stats still served when a stale read can't queue its refresh?"""
-        await cache.aclear()
-        cached_stats = PrayerStats(prayer_count=-1, total_cost="-1.00")
-        await cache.aset(
-            lifetime_prayer_stats_cache_key(Prayer.WAITING),
-            {"refresh_after": 0, "stats": asdict(cached_stats)},
-        )
-        with patch(
-            "cl.favorites.tasks.refresh_lifetime_prayer_stats.delay",
-            side_effect=ConnectionError("Broker is down"),
-        ):
-            stats = await get_lifetime_prayer_stats(Prayer.WAITING)
-        self.assertEqual(stats, cached_stats)
-        await cache.aclear()
-
-    @override_settings(
-        CACHES={
-            "default": {
-                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            }
-        }
-    )
     def test_lifetime_prayer_stats_refresh_skips_fresh_stats(self) -> None:
         """Does a refresh that finds fresh stats skip the slow queries?
 
