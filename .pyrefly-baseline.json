@@ -1094,20 +1094,6 @@
       "severity": "error"
     },
     {
-      "column": 15,
-      "path": "cl/donate/api_views.py",
-      "name": "non-exhaustive-match-open-type",
-      "concise_description": "Match on `str` is not exhaustive",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/donate/api_views.py",
-      "name": "unbound-name",
-      "concise_description": "`trigger` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
