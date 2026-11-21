@@ -55,6 +55,17 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
+from cl.disclosures.models import (
+    Agreement,
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Position,
+    Reimbursement,
+    SpouseIncome,
+)
 from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
@@ -65,6 +76,7 @@ from cl.lib.ratelimiter import (
     parse_rate,
 )
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
@@ -1899,6 +1911,32 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     results = pipe.execute()
 
     return results[0] / results[1]
+
+
+def get_coverage_data_fds() -> dict[str, int]:
+    """Get estimated row counts for the financial disclosure tables.
+
+    Uses Postgres's table estimates instead of COUNT(*), since exact counts
+    of the bigger tables (e.g. investments) are too slow to run in a request.
+
+    Returns:
+        A dict mapping item types to their estimated counts.
+    """
+    models: dict[str, type[Model]] = {
+        "disclosures": FinancialDisclosure,
+        "investments": Investment,
+        "positions": Position,
+        "agreements": Agreement,
+        "non_investment_income": NonInvestmentIncome,
+        "spousal_income": SpouseIncome,
+        "reimbursements": Reimbursement,
+        "gifts": Gift,
+        "debts": Debt,
+    }
+    return {
+        k: get_total_estimate_count(model._meta.db_table)
+        for k, model in models.items()
+    }
 
 
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
