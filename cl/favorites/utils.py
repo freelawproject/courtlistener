@@ -1,5 +1,6 @@
 """Helpers for notes, prayers, and prayer statistics and emails."""
 
+import logging
 import time
 from dataclasses import asdict, dataclass
 
@@ -39,6 +40,8 @@ from cl.search.models import (
     RECAPDocument,
     SCOTUSDocument,
 )
+
+logger = logging.getLogger(__name__)
 
 # Models that can have a Note attached, mapped to the bucket label the
 # profile Notes page groups them under (cl.users.views.view_notes()).
@@ -551,7 +554,8 @@ async def get_lifetime_prayer_stats(status: int) -> PrayerStats:
         return await compute_lifetime_prayer_stats(status)
 
     # cache.aadd() only succeeds for the first caller, so stale reads queue
-    # one refresh at a time. The lock expires on its own if the task dies.
+    # one refresh per window. Nothing deletes the lock: it expires with the
+    # window, so a slow refresh can't release a newer one's lock.
     if time.time() > entry["refresh_after"] and await cache.aadd(
         lifetime_prayer_stats_lock_key(status),
         True,
@@ -560,7 +564,16 @@ async def get_lifetime_prayer_stats(status: int) -> PrayerStats:
         # Imported here because cl.favorites.tasks imports this module.
         from cl.favorites.tasks import refresh_lifetime_prayer_stats
 
-        await sync_to_async(refresh_lifetime_prayer_stats.delay)(status)
+        try:
+            await sync_to_async(refresh_lifetime_prayer_stats.delay)(status)
+        except Exception:
+            # Stale stats beat a failed page. The lock stays, so the next
+            # attempt waits for the window instead of hammering the broker.
+            logger.exception(
+                "Couldn't queue a refresh of lifetime prayer stats for "
+                "status %s.",
+                status,
+            )
     return PrayerStats(**entry["stats"])
 
 

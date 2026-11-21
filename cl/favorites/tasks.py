@@ -4,7 +4,6 @@ from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
@@ -20,7 +19,6 @@ from cl.search.models import RECAPDocument
 from .models import PrayerAvailability
 from .utils import (
     compute_lifetime_prayer_stats,
-    lifetime_prayer_stats_lock_key,
     prayer_unavailable,
 )
 
@@ -93,7 +91,4 @@ def refresh_lifetime_prayer_stats(status: int) -> None:
     Args:
         status: Prayer.WAITING or Prayer.GRANTED.
     """
-    try:
-        async_to_sync(compute_lifetime_prayer_stats)(status)
-    finally:
-        cache.delete(lifetime_prayer_stats_lock_key(status))
+    async_to_sync(compute_lifetime_prayer_stats)(status)

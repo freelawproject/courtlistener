@@ -55,7 +55,6 @@ from cl.favorites.utils import (
     get_user_prayer_history,
     get_user_prayers,
     lifetime_prayer_stats_cache_key,
-    lifetime_prayer_stats_lock_key,
     prayer_unavailable,
 )
 from cl.favorites.views import get_note
@@ -1420,6 +1419,31 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
                     stats = await get_lifetime_prayer_stats(Prayer.WAITING)
                     self.assertEqual(stats, cached_stats)
                 self.assertEqual(mock_delay.call_count, refresh_count)
+        # The locmem cache is shared by every test that overrides to it.
+        await cache.aclear()
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    async def test_lifetime_prayer_stats_survive_queue_failure(self) -> None:
+        """Are cached stats still served when a stale read can't queue its refresh?"""
+        await cache.aclear()
+        cached_stats = PrayerStats(prayer_count=-1, total_cost="-1.00")
+        await cache.aset(
+            lifetime_prayer_stats_cache_key(Prayer.WAITING),
+            {"refresh_after": 0, "stats": asdict(cached_stats)},
+        )
+        with patch(
+            "cl.favorites.tasks.refresh_lifetime_prayer_stats.delay",
+            side_effect=ConnectionError("Broker is down"),
+        ):
+            stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(stats, cached_stats)
+        await cache.aclear()
 
     @override_settings(
         CACHES={
@@ -1429,7 +1453,9 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         }
     )
     async def test_lifetime_prayer_stats_refresh_task(self) -> None:
-        """Does the queued refresh replace stale cached stats and release its lock?"""
+        """Does the queued refresh replace stale cached stats?"""
+        # The locmem cache is shared by every test that overrides to it.
+        await cache.aclear()
         await create_prayer(self.user, self.rd_2)
         await cache.aset(
             lifetime_prayer_stats_cache_key(Prayer.WAITING),
@@ -1445,9 +1471,7 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         self.assertEqual(stale.prayer_count, -1)
         fresh = await get_lifetime_prayer_stats(Prayer.WAITING)
         self.assertEqual(fresh.prayer_count, 1)
-        self.assertIsNone(
-            await cache.aget(lifetime_prayer_stats_lock_key(Prayer.WAITING))
-        )
+        await cache.aclear()
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""
