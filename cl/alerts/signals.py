@@ -71,31 +71,38 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
     sender=Alert,
     dispatch_uid="remove_alert_from_es_index",
 )
-def remove_alert_from_es_index(sender, instance=None, **kwargs):
+def remove_alert_from_es_index(sender, instance: Alert, **kwargs) -> None:
     """Receiver function that gets called after an Alert instance is deleted.
 
     This function removes Alert from the Percolator index and cleans up the
-    Redis sets that store its document hits.
+    Redis sets that store its document hits. Both are queued on commit, so a
+    deletion that is rolled back leaves the alert's search records in place.
     """
     # Clean up the Redis sets tracking document hits for this alert in a worker.
     # These are independent from Elasticsearch, so this runs even when ES is
     # disabled. instance.pk is still populated on the in-memory instance here.
-    remove_alert_hits_set_task.delay(instance.pk)
+    transaction.on_commit(
+        partial(remove_alert_hits_set_task.delay, instance.pk)
+    )
 
     if settings.ELASTICSEARCH_DISABLED:
         return
 
     match instance.alert_type:
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            # Check if the document exists before deleting it
-            remove_document_from_es_index.delay(
-                AudioPercolator.__name__, instance.pk, None
-            )
+            percolator = AudioPercolator
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            remove_document_from_es_index.delay(
-                RECAPPercolator.__name__, instance.pk, None
-            )
+            percolator = RECAPPercolator
         case SEARCH_TYPES.OPINION:
-            remove_document_from_es_index.delay(
-                OpinionPercolator.__name__, instance.pk, None
-            )
+            percolator = OpinionPercolator
+        case _:
+            return
+
+    transaction.on_commit(
+        partial(
+            remove_document_from_es_index.delay,
+            percolator.__name__,
+            instance.pk,
+            None,
+        )
+    )

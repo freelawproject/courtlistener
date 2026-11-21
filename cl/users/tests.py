@@ -48,7 +48,7 @@ from cl.alerts.factories import (
     DocketAlertFactory,
     DocketAlertWithParentsFactory,
 )
-from cl.alerts.models import DocketAlert, DocketAlertEvent
+from cl.alerts.models import Alert, DocketAlert, DocketAlertEvent
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -910,9 +910,10 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertFalse(profile.user.is_active)
 
     def test_failed_account_deletion_changes_nothing(self) -> None:
-        """Does a failure while converting the account to a stub leave the user's assets in place and send no deletion notice?"""
+        """Does a failure while converting the account to a stub leave the user's assets in place, queue no alert cleanup and send no deletion notice?"""
         profile = UserProfileWithParentsFactory()
         Token.objects.get_or_create(user=profile.user)
+        alert = AlertFactory(user=profile.user)
         self.assertTrue(
             self.client.login(
                 username=profile.user.username, password="password"
@@ -925,6 +926,9 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "cl.users.views.convert_to_stub_account",
                 side_effect=IntegrityError("username"),
             ),
+            patch(
+                "cl.alerts.signals.remove_alert_hits_set_task"
+            ) as cleanup_task,
             self.assertRaises(IntegrityError),
         ):
             self.client.post(
@@ -932,6 +936,10 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             )
 
         self.assertTrue(Token.objects.filter(user=profile.user).exists())
+        # The alert is back, so the jobs that drop its search records and
+        # hit sets must not have been queued.
+        self.assertTrue(Alert.objects.filter(pk=alert.pk).exists())
+        cleanup_task.delay.assert_not_called()
         self.assertEqual(len(mail.outbox), 0)
 
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:

@@ -1364,7 +1364,8 @@ class RECAPAlertsSweepIndexTest(
 
         self.assertIn("View Additional Results for this Case", txt_email)
 
-        alert_de.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de.delete()
 
     def test_cross_object_parties_alert_query(self, mock_prefix) -> None:
         """Test a cross object alert including parties can be properly triggered."""
@@ -1459,7 +1460,8 @@ class RECAPAlertsSweepIndexTest(
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
-        alert_de.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de.delete()
 
     def test_docket_only_parties_alert_query(self, mock_prefix) -> None:
         """Test a docket only alert including parties can be properly triggered."""
@@ -2629,7 +2631,8 @@ class RECAPAlertsSweepIndexTest(
         )
 
         docket.delete()
-        docket_only_alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert.delete()
         docket_2.delete()
 
     def test_sweep_index_skips_scotus(
@@ -3209,7 +3212,8 @@ class RECAPAlertsPercolatorTest(
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.
-        docket_only_alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert.delete()
         self.assertFalse(
             RECAPPercolator.exists(id=docket_only_alert_id),
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
@@ -3231,7 +3235,8 @@ class RECAPAlertsPercolatorTest(
 
         docket_only_alert_filter_id = docket_only_alert_filter.pk
         # Remove the alert.
-        docket_only_alert_filter.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert_filter.delete()
         self.assertFalse(
             RECAPPercolator.exists(id=docket_only_alert_filter_id),
             msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
@@ -4750,7 +4755,8 @@ class RECAPAlertsPercolatorTest(
 
         mail.outbox.clear()
         rd.delete()
-        alert_de.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de.delete()
 
         # Over limit: parties excluded, only non-party alert matches.
         with (
@@ -4792,7 +4798,8 @@ class RECAPAlertsPercolatorTest(
         self.assertNotIn(party_alert.name, html_content)
 
         rd.delete()
-        alert_de.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de.delete()
         docket.delete()
 
     def test_docket_parties_percolation_based_on_attorney_limit(
@@ -5255,7 +5262,8 @@ class RECAPAlertsPercolatorTest(
             msg="No new alert should be triggered for this case-only alert.",
         )
 
-        docket_only_alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_only_alert.delete()
         docket.delete()
         docket_2.delete()
 
