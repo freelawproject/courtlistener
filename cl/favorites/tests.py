@@ -1,3 +1,5 @@
+import time
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
@@ -42,6 +44,7 @@ from cl.favorites.models import (
 from cl.favorites.selectors import prayer_eligible
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
+    PrayerStats,
     compute_prayer_total_cost,
     create_prayer,
     delete_prayer,
@@ -51,6 +54,8 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
+    lifetime_prayer_stats_cache_key,
+    lifetime_prayer_stats_lock_key,
     prayer_unavailable,
 )
 from cl.favorites.views import get_note
@@ -1372,8 +1377,77 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.distinct_users, 2)
 
-        await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
-        await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
+        await cache.adelete(lifetime_prayer_stats_cache_key(Prayer.WAITING))
+        await cache.adelete(lifetime_prayer_stats_cache_key(Prayer.GRANTED))
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    async def test_lifetime_prayer_stats_served_from_cache(self) -> None:
+        """Are cached lifetime prayer stats served without a refresh while fresh, and with one queued refresh once stale?
+
+        Computing the stats is too slow for a request on production data, so
+        once anything is cached, requests must only ever read it.
+        """
+        cache_key = lifetime_prayer_stats_cache_key(Prayer.WAITING)
+        cached_stats = PrayerStats(
+            prayer_count=-1,
+            total_cost="-1.00",
+            distinct_count=-1,
+            distinct_users=-1,
+        )
+        delay_path = "cl.favorites.tasks.refresh_lifetime_prayer_stats.delay"
+
+        for label, refresh_after, refresh_count in (
+            ("fresh", time.time() + 60, 0),
+            ("stale", 0, 1),
+        ):
+            with self.subTest(label), patch(delay_path) as mock_delay:
+                await cache.aclear()
+                await cache.aset(
+                    cache_key,
+                    {
+                        "refresh_after": refresh_after,
+                        "stats": asdict(cached_stats),
+                    },
+                )
+                # Read twice: a pending refresh shouldn't be queued again.
+                for _ in range(2):
+                    stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+                    self.assertEqual(stats, cached_stats)
+                self.assertEqual(mock_delay.call_count, refresh_count)
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    async def test_lifetime_prayer_stats_refresh_task(self) -> None:
+        """Does the queued refresh replace stale cached stats and release its lock?"""
+        await create_prayer(self.user, self.rd_2)
+        await cache.aset(
+            lifetime_prayer_stats_cache_key(Prayer.WAITING),
+            {
+                "refresh_after": 0,
+                "stats": asdict(PrayerStats(prayer_count=-1, total_cost="")),
+            },
+        )
+
+        # Celery runs eagerly in tests, so the refresh finishes before the
+        # stale stats are returned.
+        stale = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(stale.prayer_count, -1)
+        fresh = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(fresh.prayer_count, 1)
+        self.assertIsNone(
+            await cache.aget(lifetime_prayer_stats_lock_key(Prayer.WAITING))
+        )
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""
