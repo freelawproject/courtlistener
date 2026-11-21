@@ -4482,7 +4482,7 @@ def download_and_parse_scotus_docket(
     logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
-        content = f.read().decode("utf-8")
+        content = cast(bytes, f.read()).decode("utf-8")
 
     ext = s3_key.rsplit(".", 1)[-1].lower()
     parser_map: dict[str, type] = {
