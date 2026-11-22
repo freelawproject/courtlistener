@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
@@ -329,6 +330,14 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {
+                    "label": "Last Updated",
+                    "value": "January 20, 2025, 3:42 p.m. PST",
+                    "tooltip_message": mark_safe(
+                        "This date is <strong>not</strong> the date of the "
+                        "latest filing in this case."
+                    ),
+                },
+                {
                     "label": "Questions Presented",
                     "value": "View",
                     "url": "https://www.supremecourt.gov/qp/24-001qp.pdf",
@@ -339,6 +348,9 @@ async def components(request: HttpRequest) -> HttpResponse:
                     "value": "N.D. Cal.",
                     "suffix_text": "3:24-cv-01234",
                     "suffix_url": "/docket/1/example/",
+                    "suffix_tooltip_message": (
+                        "Search for this docket number in the RECAP Archive."
+                    ),
                 },
                 {
                     "label": "Citation",
