@@ -79,9 +79,9 @@ class DynamicClientRegistrationView(APIView):
     per-IP rate limit bounds.
     """
 
-    authentication_classes: list[Any] = []
-    permission_classes: list[Any] = []
-    throttle_classes: list[Any] = []
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = []
 
     def handle_exception(self, exc: Exception) -> Response:
         """Respond to rate-limited requests with a 429 error, deferring other errors to DRF."""
@@ -189,9 +189,9 @@ class OAuthMetadataView(APIView):
     other host in ``ALLOWED_HOSTS``.
     """
 
-    authentication_classes: list[Any] = []
-    permission_classes: list[Any] = []
-    throttle_classes: list[Any] = []
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = []
 
     def get(self, request: Request) -> Response:
         """Return the server's OAuth metadata."""

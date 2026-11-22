@@ -98,7 +98,13 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    RECAPDocument,
+    SearchType,
+)
 from cl.stats.metrics import record_search_duration
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -2773,7 +2779,7 @@ def do_es_feed_query(
     rows: int = 20,
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
-) -> Response | list:
+) -> Response:
     """Execute an Elasticsearch query for feeds with optional micro-caching.
 
     Args:
@@ -2897,9 +2903,9 @@ def apply_custom_score_to_main_query(
         else False
     )
 
-    valid_decay_relevance_types: dict[str, dict[str, str | int | float]] = (
-        date_decay_relevance_types
-    )
+    valid_decay_relevance_types: dict[
+        SearchType, dict[str, str | int | float]
+    ] = date_decay_relevance_types
     main_order_by = cd.get("order_by", "")
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on
@@ -3741,9 +3747,9 @@ def do_es_alert_estimation_query(
     return estimation_query.count(), total_recap_case_only_estimation
 
 
-def do_es_sweep_alert_query(
+def do_es_sweep_alert_query[ChildSQ: SearchDSL[Any]](
     search_query: Search,
-    child_search_query: Search,
+    child_search_query: ChildSQ,
     cd: CleanData,
 ) -> tuple[Response | None, Response | None, Response | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
@@ -3981,7 +3987,7 @@ def get_court_opinions_counts(
     )
     try:
         response = search_query.execute()
-    except (TransportError, ConnectionError, RequestError):
+    except TransportError, ConnectionError, RequestError:
         return None
 
     buckets = response.aggregations.court_id.buckets

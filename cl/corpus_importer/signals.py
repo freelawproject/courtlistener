@@ -38,6 +38,10 @@ def update_latest_case_id_and_schedule_iquery_sweep(
     court_id: str
     incoming_pacer_case_id: int
     if docket is not None:
+        if docket.pacer_case_id is None:
+            raise ValueError(
+                "If a docket is provided, it must have a pacer_case_id"
+            )
         court_id = docket.court_id
         incoming_pacer_case_id = int(docket.pacer_case_id)
     elif court_pk is not None and fixed_case_id_sweep is not None:

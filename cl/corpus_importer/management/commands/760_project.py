@@ -119,7 +119,7 @@ class Command(VerboseCommand):
         "district_attachments",
     ]
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: argparse.ArgumentParser):
         """Add the queue, offset, limit, task, and CSV file options."""
         parser.add_argument(
             "--queue",
@@ -146,7 +146,7 @@ class Command(VerboseCommand):
             required=True,
             help="What task are we doing at this point?",
         )
-        parser.add_argument(
+        self._file_action = parser.add_argument(
             "--file",
             type=argparse.FileType("r"),
             help="Where is the CSV that has the information about what to "
@@ -164,7 +164,8 @@ class Command(VerboseCommand):
         if options["task"] in ["district", "appellate"]:
             if not options["file"]:
                 raise argparse.ArgumentError(
-                    "The 'file' argument is required for that action."
+                    self._file_action,
+                    "The 'file' argument is required for that action.",
                 )
             get_dockets(options)
         elif options["task"] == "district_attachments":

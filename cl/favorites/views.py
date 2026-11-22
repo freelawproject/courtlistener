@@ -2,6 +2,7 @@
 
 from asgiref.sync import sync_to_async
 from django.contrib import messages
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -62,7 +63,7 @@ def get_note(request: HttpRequest) -> Note | None:
     try:
         content_type = ContentType.objects.get_for_id(int(content_type_pk))
         object_id = int(raw_object_id)
-    except (ContentType.DoesNotExist, ValueError):
+    except ContentType.DoesNotExist, ValueError:
         return None
 
     model_class = content_type.model_class()
@@ -220,6 +221,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     user = await request.auser()
     existing_prayers = {}
     if user.is_authenticated:
+        assert isinstance(user, AbstractBaseUser)
         # Check prayer existence in bulk.
         existing_prayers = await get_existing_prayers_in_bulk(
             user, recap_documents

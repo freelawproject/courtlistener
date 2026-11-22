@@ -4,7 +4,7 @@
 import json
 import re
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, Unpack
 
 import internetarchive as ia
 import requests
@@ -162,6 +162,6 @@ class Command(VerboseCommand):
             "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options: Unpack[OptionsType]):
         """Download the requested volumes."""
         get_from_ia(options)

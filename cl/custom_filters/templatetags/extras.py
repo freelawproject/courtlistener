@@ -378,7 +378,7 @@ def format_date(date_str: str) -> str:
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         return date_filter(date_obj, "F jS, Y")
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return date_str
 
 
@@ -393,12 +393,15 @@ def parse_utc_date(datetime_object: str | datetime) -> datetime:
     Returns:
         A timezone-aware datetime object with UTC as the timezone.
     """
+    dt = (
+        parse_datetime(datetime_object)
+        if isinstance(datetime_object, str)
+        else datetime_object
+    )
+    if dt is None:
+        raise ValueError("Unable to parse datetime")
     return make_aware(
-        (
-            parse_datetime(datetime_object)
-            if isinstance(datetime_object, str)
-            else datetime_object
-        ),
+        dt,
         UTC,
     )
 
@@ -416,7 +419,7 @@ def datetime_in_utc(date_obj) -> str:
             date_obj.astimezone(UTC),
             "M. j, Y, h:i a T",
         )
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return date_obj
 
 
@@ -460,7 +463,7 @@ def humanize_number(value):
     """
     try:
         num = float(f"{value:.3g}")
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return value
 
     if num < 1_000:
@@ -495,7 +498,7 @@ def get_item(obj, key):
     """Get item using bracket notation. Works for dicts, forms, lists, etc."""
     try:
         return obj[key]
-    except (KeyError, TypeError, IndexError):
+    except KeyError, TypeError, IndexError:
         return ""
 
 

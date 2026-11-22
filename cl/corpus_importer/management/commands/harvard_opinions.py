@@ -7,7 +7,7 @@ import logging
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict, Unpack, cast
 
 import requests
 from bs4 import BeautifulSoup
@@ -232,6 +232,7 @@ class OptionsType(TypedDict):
     court_id: str | None
     location: str | None
     bankruptcy: bool
+    no_debug: bool
 
 
 def get_fix_list() -> list[str]:
@@ -770,7 +771,7 @@ class Command(VerboseCommand):
             help="Turn off debug logging",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options: Unpack[OptionsType]):
         """Parse the selected Harvard opinions."""
         if options["no_debug"]:
             logging.disable(logging.DEBUG)

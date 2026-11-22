@@ -2842,7 +2842,7 @@ class ESIndexingTasksUtils(TestCase):
             {
                 "es_doc": DocketDocument,
                 "instance": self.de.docket,
-                "expected_doc_id": self.de.docket.pk,
+                "expected_doc_id": str(self.de.docket.pk),
                 "expected_parent_id": None,
             },
         ]

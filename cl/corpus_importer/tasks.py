@@ -1941,7 +1941,7 @@ class DocketReportQueryParams(TypedDict):
 )
 def get_docket_by_pacer_case_id(
     self: Task,
-    data: TaskData,
+    data: _GDBPCIDTaskData,
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
@@ -1965,8 +1965,13 @@ def get_docket_by_pacer_case_id(
     return result
 
 
+class _GDBPCIDTaskData(TypedDict):
+    pacer_case_id: str
+    docket_pk: NotRequired[int]
+
+
 async def get_docket_by_pacer_case_id_base(
-    data: TaskData,
+    data: _GDBPCIDTaskData,
     court_id: str,
     session_data: SessionData,
     docket_pk: int | None = None,
@@ -2785,7 +2790,7 @@ async def update_rd_metadata(
     pacer_case_id: str,
     pacer_doc_id: str,
     document_number: str,
-    attachment_number: int,
+    attachment_number: int | None,
     omit_page_count: bool = False,
 ) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
@@ -2903,6 +2908,9 @@ def get_pacer_doc_by_rd(
         return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    assert pacer_case_id is not None, (
+        "pacer_case_id must be a string for this method"
+    )
     de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = async_to_sync(download_pacer_pdf_by_rd)(
         rd.pk,
@@ -3019,6 +3027,9 @@ def get_pacer_doc_by_rd_and_description(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
+    assert pacer_case_id is not None, (
+        "pacer_case_id must be a string for this method"
+    )
     r, r_msg = async_to_sync(download_pacer_pdf_by_rd)(
         rd.pk,
         pacer_case_id,

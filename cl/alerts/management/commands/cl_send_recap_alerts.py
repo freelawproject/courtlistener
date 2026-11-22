@@ -165,7 +165,7 @@ def retrieve_task_info(
 
 
 def index_daily_recap_documents(
-    r: Redis,
+    r: Redis[str],
     source_index_name: str,
     target_index: type[RECAPSweepDocument] | type[ESRECAPSweepDocument],
     query_date: datetime.datetime,
@@ -397,7 +397,8 @@ def index_daily_recap_documents(
             task_id,
         )
     else:
-        task_id = r.get("alert_sweep:task_id")
+        # pyrefly:ignore[bad-assignment] Guaranteed to exist by being in this branch
+        task_id: str = r.get("alert_sweep:task_id")
         logger.info(
             "Resuming re-index task for index %s with ID: %s",
             target_index._index._name,

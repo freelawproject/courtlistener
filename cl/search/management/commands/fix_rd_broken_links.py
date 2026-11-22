@@ -138,7 +138,7 @@ class Command(VerboseCommand):
         self.testing_mode = None
         self.queue = None
         self.chunk_size: int = 100
-        self.interval = None
+        self.interval: float
         self.ids = None
         self.docket_batch_size: int = 2_000
 

@@ -141,14 +141,17 @@ class Command(VerboseCommand, CommandUtils):
                     username=PACER_USERNAME, password=PACER_PASSWORD
                 )
 
+            if not (idb_data := d.idb_data):
+                continue
+
             throttle.maybe_wait()
             logger.info("Getting pacer_case_id for item %s", d)
-            params = make_fjc_idb_lookup_params(d.idb_data)
+            params = make_fjc_idb_lookup_params(idb_data)
             chain(
                 get_pacer_case_id_and_title.s(
                     pass_through=d.pk,
-                    docket_number=d.idb_data.docket_number,
-                    court_id=d.idb_data.district_id,
+                    docket_number=idb_data.docket_number,
+                    court_id=idb_data.district_id,
                     session_data=session,
                     **params,
                 ).set(queue=q),

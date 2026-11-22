@@ -304,6 +304,7 @@ def attempt_cluster_lookup(
         if cite_count > 1:
             new_docket_number = clean_docket_number(new_docket_number)
             for cite in cites:
+                assert isinstance(cite.cluster.docket.docket_number, str)
                 found_dn = clean_docket_number(
                     cite.cluster.docket.docket_number
                 )

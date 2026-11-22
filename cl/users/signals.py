@@ -192,7 +192,9 @@ def superuser_creation(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
-def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+def assign_recap_email(
+    sender, instance: UserProfile, created: bool, **kwargs
+) -> None:
     """Give each new profile a unique ``@recap.email`` address."""
     if created:
         instance.recap_email = generate_recap_email(instance)

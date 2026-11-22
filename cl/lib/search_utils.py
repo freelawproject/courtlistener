@@ -288,7 +288,9 @@ def scotus_frontend_search_enabled(request: HttpRequest) -> bool:
     return bool(flag_is_active(request, "scotus_docket_page"))
 
 
-def store_search_query(request: HttpRequest, search_results: dict) -> None:
+def store_search_query(
+    request: HttpRequest, search_results: ESSearchResult
+) -> None:
     """Saves an user's search query in a SearchQuery model.
 
     Args:

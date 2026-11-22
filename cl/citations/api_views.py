@@ -56,7 +56,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         Citations past ``MAX_CITATIONS_PER_REQUEST`` get a 429 status
         instead of being looked up.
         """
-        citations = []
+        citations: list[dict] = []
         data = self.validate_request_data(request)
         text = data.get("text", None)
         if text:
@@ -68,7 +68,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
             for idx, citation in enumerate(self.citation_list):
                 start_index, end_index = citation.span()
-                citation_data = {
+                citation_data: dict[str, str | list[str] | int] = {
                     "citation": citation.matched_text(),
                     "normalized_citations": [citation.corrected_citation()],
                     "start_index": start_index,

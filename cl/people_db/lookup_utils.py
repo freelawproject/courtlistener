@@ -565,7 +565,7 @@ async def lookup_judge_by_full_name(
 async def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
-    full_name: HumanName | str,
+    full_name: HumanName | str | None,
     court_id: str,
     event_date: date | None,
     require_living_judge: bool = True,

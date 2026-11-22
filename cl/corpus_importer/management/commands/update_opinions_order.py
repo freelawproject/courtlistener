@@ -8,7 +8,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, QuerySet
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.cluster_sources import ClusterSources
@@ -126,7 +126,9 @@ def generate_ngrams(words: list[str]) -> list[list[str]]:
     return [words[i : i + width] for i in range(len(words) - (width - 1))]
 
 
-def match_text(opinions: list[Any], xml_dir: str) -> list[list[Any]]:
+def match_text(
+    opinions: QuerySet[Opinion, tuple[int, str, str, str]], xml_dir: str
+) -> list[list[Any]]:
     """Identify a unique set of text in opinions to identify order of opinions.
 
     In a small subset of opinions, duplicate text or bad data fails and assign the

@@ -4,6 +4,7 @@ import logging
 import re
 from collections.abc import Callable
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self, assert_never
 from urllib.parse import quote
@@ -102,8 +103,16 @@ from cl.search.state.texas.models import TexasDocument as TexasDocument
 from cl.users.models import User
 
 if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
+    from pghistory.models import Event
+
     from cl.alerts.docket_alert_sources import DocketAlertSource
     from cl.opinion_page.docket_entry_sources import DocketEntrySource
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    DocketEvent: type[Event]
+    DocketEntryEvent: type[Event]
+    RECAPDocumentEvent: type[Event]
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -1233,7 +1242,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
         Courts without a known timezone default to US/Eastern.
         """
-        if self.time_filed:
+        if self.time_filed and self.date_filed:
             from cl.recap.constants import COURT_TIMEZONES
 
             local_timezone = pytz.timezone(
@@ -1430,10 +1439,11 @@ class RECAPDocument(
         )
         return str(Path(root) / bucket / filename)
 
-    def get_absolute_url(self) -> str:
+    def get_absolute_url(self) -> str | None:
         """Get the URL of the document's or attachment's page.
 
-        Documents without a document number get an empty string.
+        Documents without a document number get an empty string, and
+        documents with an unknown document type get None.
         """
         if not self.document_number:
             # Numberless entries don't get URLs
@@ -1536,7 +1546,7 @@ class RECAPDocument(
     @property
     def has_valid_pdf(self) -> bool:
         """Whether the document is available and has a local file."""
-        return self.is_available and self.filepath_local
+        return bool(self.is_available and self.filepath_local)
 
     @property
     def needs_extraction(self):
@@ -1562,7 +1572,7 @@ class RECAPDocument(
 
         The returned queryset is sorted by the depth field.
         """
-        return build_authorities_query(self.cited_opinions)
+        return build_authorities_query(self.cited_opinions.all())
 
     def save(
         self,
@@ -3243,7 +3253,7 @@ class OpinionQuerySet[M: Opinion](models.QuerySet[M]):
         source_fields = OPINION_TEXT_SOURCE_FIELDS
         # To populate best_text we get the first non-empty value
         # from the list of possible text sources:
-        coalesce_args = [
+        coalesce_args: list[NullIf | F] = [
             NullIf(F(field), Value("")) for field in source_fields
         ]
         # And we fall back to plain_text if all of the above are empty:
@@ -3472,7 +3482,7 @@ class Opinion(AbstractDateTimeModel):
         ]
 
     @property
-    def siblings(self) -> QuerySet:
+    def siblings(self) -> RelatedManager[Opinion]:
         """All opinions in the opinion's cluster, including this one."""
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
@@ -3892,7 +3902,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
-    def tag_object(self, thing: TaggableType) -> tuple[Tag, bool]:
+    def tag_object(self, thing: TaggableType) -> tuple[models.Model, bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones
@@ -3914,7 +3924,8 @@ class Tag(AbstractDateTimeModel):
                 wish to tag.
 
         Returns:
-            A tuple with the tag and whether a new item was created
+            A tuple with the tag's through-table row for ``thing`` and whether
+            it was created
         """
         match thing:
             case Docket():
@@ -3976,8 +3987,10 @@ class Tag(AbstractDateTimeModel):
 #
 #     class Meta:
 #         unique_together = ("upper_court", "lower_court")
-class SEARCH_TYPES:
-    """Search type codes, their names, and lists of types for alerts."""
+
+
+class SearchType(StrEnum):
+    """Search type codes."""
 
     OPINION = "o"
     RECAP = "r"
@@ -3986,6 +3999,18 @@ class SEARCH_TYPES:
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     PARENTHETICAL = "pa"
+
+
+class SEARCH_TYPES:
+    """Search type codes, their names, and lists of types for alerts."""
+
+    OPINION = SearchType.OPINION
+    RECAP = SearchType.RECAP
+    DOCKETS = SearchType.DOCKETS
+    RECAP_DOCUMENT = SearchType.RECAP_DOCUMENT
+    ORAL_ARGUMENT = SearchType.ORAL_ARGUMENT
+    PEOPLE = SearchType.PEOPLE
+    PARENTHETICAL = SearchType.PARENTHETICAL
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),

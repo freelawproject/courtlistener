@@ -404,16 +404,22 @@ class Command(VerboseCommand):
                 task_to_use = "index_parent_and_child_docs"
                 es_document = PersonDocument
             case SEARCH_TYPES.RECAP:
-                if update_from_event_tables and start_date and end_date:
+                if (
+                    start_date
+                    and end_date
                     # Get unique oldest events from history table.
-                    queryset = get_unique_oldest_history_rows(
-                        start_date,
-                        end_date,
-                        pk_offset,
-                        update_from_event_tables,
+                    and (
+                        events := get_unique_oldest_history_rows(
+                            start_date,
+                            end_date,
+                            pk_offset,
+                            update_from_event_tables,
+                        )
                     )
+                    is not None
+                ):
                     self.index_documents_from_event_table(
-                        queryset, SEARCH_TYPES.RECAP
+                        events, SEARCH_TYPES.RECAP
                     )
                     return
                 if document_type == "child":

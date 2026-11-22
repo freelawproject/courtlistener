@@ -1,8 +1,10 @@
 """Helpers for notes, prayers, and prayer statistics and emails."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from django.conf import settings
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
@@ -90,10 +92,10 @@ def repoint_notes(
     )
 
 
-def get_note_for_target(
+def get_note_for_target[U: AbstractBaseUser | AnonymousUser](
     model_class: type[models.Model],
     object_id: int | str,
-    user: AnonymousUser | User,
+    user: U,
 ) -> Note | None:
     """Return the given user's Note for a noted object, identified by its model class and pk, if any.
 
@@ -181,8 +183,8 @@ async def get_prayer_counts_in_bulk(
     }
 
 
-async def get_existing_prayers_in_bulk(
-    user: User, recap_documents: list[RECAPDocument]
+async def get_existing_prayers_in_bulk[U: AbstractBaseUser](
+    user: U, recap_documents: Iterable[RECAPDocument]
 ) -> dict[int, bool]:
     """Check if prayers exist for a user and a list of recap documents.
 
@@ -275,7 +277,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
 
 
 async def get_user_prayers(
-    user: User, status: str | None = None
+    user: User, status: int | None = None
 ) -> QuerySet[RECAPDocument]:
     """Get the documents a user prayed for, most recent prayer first.
 

@@ -21,7 +21,7 @@ from rest_framework.utils.urls import replace_query_param
 
 from cl.lib.elasticsearch_utils import get_cardinality_count
 from cl.search.api_utils import CursorESList
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SearchType
 from cl.search.types import ESCursor
 
 
@@ -159,7 +159,7 @@ class VersionBasedPagination(PageNumberPagination):
 
         try:
             page_number = int(page_number)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             msg = "Invalid page: That page number is not an integer"
             raise NotFound(msg)
 
@@ -267,31 +267,18 @@ class BigPagination(VersionBasedPagination):
 class ESCursorPagination(BasePagination):
     """Custom pagination class to handle ES cursor pagination, based in the ES search_after param."""
 
-    request = None
-    es_list_instance = None
-    results_count_exact = None
-    results_count_approximate = None
-    child_results_count = None
-    results_in_page = None
-    base_url = None
-    cursor = None
-    search_type = None
-    cursor_query_param = "cursor"
-    invalid_cursor_message = "Invalid cursor"
-    request_date = None
-    page_int = 0
-
-    def initialize_context_from_request(
-        self, request, search_type
-    ) -> datetime.date:
-        """Set up the paginator's state from the request and its cursor.
-
-        Returns:
-            The request date from the cursor, or today on the first page.
-        """
+    def __init__(self, request, search_type: SearchType) -> None:
+        """Set up the paginator's state from the request and its cursor."""
+        self.es_list_instance = None
+        self.results_count_exact = None
+        self.results_count_approximate = None
+        self.child_results_count = None
+        self.results_in_page = None
+        self.cursor_query_param: str = "cursor"
+        self.invalid_cursor_message: str = "Invalid cursor"
         self.base_url = request.build_absolute_uri()
         self.request = request
-        self.search_type = search_type
+        self.search_type: SearchType = search_type
         self.cursor = self.decode_cursor(request)
 
         # Set the request date from the cursor or provide an initial one if
@@ -303,15 +290,13 @@ class ESCursorPagination(BasePagination):
         )
         self.page_int = self.cursor.page_int if self.cursor else 1
 
-        return self.request_date
-
-    def paginate_queryset(
-        self, es_list_instance: CursorESList, request: Request, view=None
+    def paginate_es_list(
+        self, queryset: CursorESList, request: Request, view=None
     ) -> tuple[list[defaultdict], bool]:
         """Paginate the Elasticsearch query and retrieve the results.
 
         Args:
-            es_list_instance: Instance of CursorESList used to execute
+            queryset: Instance of CursorESList used to execute
                 and paginate the Elasticsearch query.
             request: The current DRF request object.
             view: The DRF view instance.
@@ -321,7 +306,7 @@ class ESCursorPagination(BasePagination):
             - A list of result items.
             - A boolean indicating whether the results came from cache.
         """
-        self.es_list_instance = es_list_instance
+        self.es_list_instance = queryset
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
@@ -338,7 +323,7 @@ class ESCursorPagination(BasePagination):
         self.child_results_count = child_cardinality_count
         return results, cached_response
 
-    def get_paginated_response(
+    def get_es_paginated_response(
         self, data: list[dict], cached_response: bool
     ) -> Response:
         """Generate a custom paginated response using the provided data.
@@ -358,7 +343,7 @@ class ESCursorPagination(BasePagination):
             "results": data,
         }
 
-        if self.search_type == SEARCH_TYPES.RECAP:
+        if self.search_type == SearchType.RECAP:
             # Include the document_count for the "r" search type.
             base_response["document_count"] = self.get_child_results_count()
         return Response(base_response)
@@ -416,7 +401,7 @@ class ESCursorPagination(BasePagination):
             search_type = tokens.get("t", [None])[0]
             request_date = tokens.get("d", [None])[0]
             page_int = int(tokens.get("p", [0])[0])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise NotFound(self.invalid_cursor_message)
 
         if search_type != self.search_type:
@@ -463,7 +448,10 @@ class ESCursorPagination(BasePagination):
         Returns:
             An integer representing the number of results matching the query.
         """
-        if self.results_count_approximate is None:
+        if (
+            self.results_count_approximate is None
+            or self.results_count_exact is None
+        ):
             raise RuntimeError(
                 "paginate_queryset must run before the response is built."
             )
