@@ -98,6 +98,8 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    AuthorityRow,
+    build_authority_rows,
     build_idb_rows,
     core_docket_data,
     es_cited_case_count,
@@ -616,13 +618,26 @@ async def docket_authorities(
     if not context["has_authorities"]:
         raise Http404("No authorities data for this docket at this time")
 
+    @sync_to_async
+    def paginate_authorities(page: str) -> tuple[Page, list[AuthorityRow]]:
+        # get_page clamps out-of-range and non-numeric pages, as the
+        # entries tab does.
+        authorities = Paginator(
+            docket.authority_opinions.distinct(), 100, orphans=10
+        ).get_page(page)
+        return authorities, build_authority_rows(docket, authorities)
+
+    authorities, authority_rows = await paginate_authorities(
+        request.GET.get("page", "1")
+    )
     return TemplateResponse(
         request,
         "docket_authorities.html",
         context
         | {
             "docket_entries": await docket.docket_entries.aexists(),
-            "authorities": docket.authority_opinions.distinct(),
+            "authorities": authorities,
+            "authority_rows": authority_rows,
         },
     )
 
