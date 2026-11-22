@@ -82,7 +82,7 @@ class BaseUnmatchedCitation(BaseCitation):
             eyecite_citation: a FullCaseCitation as returned by
                 eyecite.get_citations
             has_multiple_matches: if the citation was resolved to
-                MULTIPLE_MATCHES_RESOURCE
+                UnmatchedResource.MULTIPLE_MATCHES
 
         Returns:
             a UnmatchedCitation object, without a `citing_opinion` or
@@ -151,7 +151,7 @@ class UnmatchedCitation(BaseUnmatchedCitation):
                 eyecite.get_citations
             citing_opinion: the Opinion that cites this unresolved citation
             has_multiple_matches: if the citation was resolved to
-                MULTIPLE_MATCHES_RESOURCE
+                UnmatchedResource.MULTIPLE_MATCHES
 
         Returns:
             an UnmatchedCitation object
@@ -208,7 +208,7 @@ class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
             citing_recapdocument: the RECAPDocument that cites this
                 unresolved citation
             has_multiple_matches: if the citation was resolved to
-                MULTIPLE_MATCHES_RESOURCE
+                UnmatchedResource.MULTIPLE_MATCHES
 
         Returns:
             an UnmatchedCitationFromRECAPDocument object

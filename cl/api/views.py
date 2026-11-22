@@ -112,7 +112,7 @@ async def fetch_first_last_date_filed(
         "date_filed"
     )
     first, last = await query.afirst(), await query.alast()
-    if first:
+    if first and last:
         return first.date_filed, last.date_filed
     return None, None
 
@@ -141,7 +141,7 @@ async def get_result_count(request, version, day_count):
         estimation = await sync_to_async(get_alert_estimation_count)(
             request.GET.copy(), int(day_count), include_scotus=include_scotus
         )
-    except (ElasticServerError, ElasticBadRequestError):
+    except ElasticServerError, ElasticBadRequestError:
         # The query couldn't be run against Elasticsearch.
         return JsonResponse(
             {

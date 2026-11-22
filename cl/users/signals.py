@@ -203,7 +203,7 @@ def assign_recap_email(
 
 @receiver(post_save, sender=Webhook, dispatch_uid="webhook_created_or_updated")
 def webhook_created_or_updated(
-    sender, instance=None, created=False, update_fields=None, **kwargs
+    sender, instance: Webhook, created: bool, update_fields=None, **kwargs
 ) -> None:
     """Notify admins when a new webhook is created or updated.
 

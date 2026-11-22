@@ -33,7 +33,7 @@ class DupChecker(dict):
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
-        self.url_hash = None
+        self.url_hash: UrlHash | None = None
         self.dup_count = 0
         self.last_found_date = None
         super().__init__(*args, **kwargs)
@@ -49,7 +49,15 @@ class DupChecker(dict):
         self.last_found_date = None
 
     def update_site_hash(self, hash):
-        """Save ``hash`` as the current URL hash's SHA1."""
+        """Save ``hash`` as the current URL hash's SHA1.
+
+        Raises:
+            ValueError: If ``abort_by_url_hash`` hasn't loaded the URL hash yet.
+        """
+        if self.url_hash is None:
+            raise ValueError(
+                "abort_by_url_hash must run before update_site_hash."
+            )
         self.url_hash.sha1 = hash
         self.url_hash.save()
 

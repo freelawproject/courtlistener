@@ -68,8 +68,10 @@ def rerun_extract_from_text(
 
         logger.info("Processing opinion %s", opinion.id)
 
-        if changes.get("OriginatingCourtInformation"):
-            opinion.cluster.docket.originating_court_information.save()
+        if changes.get("OriginatingCourtInformation") and (
+            oci := opinion.cluster.docket.originating_court_information
+        ):
+            oci.save()
             logger.info(
                 "OriginatingCourtInformation created or updated with data %s",
                 changes["OriginatingCourtInformation"],

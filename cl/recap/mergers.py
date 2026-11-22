@@ -1479,8 +1479,7 @@ async def add_docket_entries(
             rd_qs = de.recap_documents.filter(
                 document_type=RECAPDocument.PACER_DOCUMENT
             )
-            if await rd_qs.aexists():
-                rd_pd = await rd_qs.afirst()
+            if rd_pd := await rd_qs.afirst():
                 if rd_pd.attachment_number is not None:
                     continue
                 if rd_pd.description != description:
@@ -1974,7 +1973,6 @@ def add_claim_history_entry(new_history, claim):
         db_history.pacer_dm_id = (
             new_history.get("pacer_dm_id") or db_history.pacer_dm_id
         )
-        db_history.pacer_seq_no = new_history.get("pacer_seq_no")
 
     else:
         db_history, _ = ClaimHistory.objects.get_or_create(
@@ -2254,7 +2252,7 @@ async def clean_duplicate_attachment_entries(
 class _MergeAttachmentPageParams(TypedDict):
     pacer_doc_id: str
     docket_entry__docket__court: Court
-    document_number: NotRequired[int | None]
+    document_number: NotRequired[int | str | None]
     docket_entry__docket__docket_number_core: NotRequired[str | None]
     description: NotRequired[str | None]
     docket_entry__docket__pacer_case_id: NotRequired[str]
@@ -2264,7 +2262,7 @@ async def merge_attachment_page_data(
     court: Court,
     pacer_case_id: str | None,
     pacer_doc_id: str,
-    document_number: int | None,
+    document_number: int | str | None,
     text: str | None,
     attachment_dicts: list[_MergeAttachmentDict],
     debug: bool = False,
@@ -2332,6 +2330,10 @@ async def merge_attachment_page_data(
                 .filter(**params)
                 .afirst()
             )
+            if main_rd is None:
+                raise RECAPDocument.DoesNotExist(
+                    "No main RECAP document for the ACMS attachment page."
+                )
         else:
             main_rd = await RECAPDocument.objects.select_related(
                 "docket_entry", "docket_entry__docket"
@@ -2579,9 +2581,6 @@ async def merge_attachment_page_data(
                 )
             except ValueError:
                 pass
-
-        if is_scotus:
-            rd.document_url = attachment["document_url"]
 
         await rd.asave()
 

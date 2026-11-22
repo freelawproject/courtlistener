@@ -1,5 +1,7 @@
 """Settings for django-pghistory tracking and its events admin."""
 
+from typing import TYPE_CHECKING, cast
+
 import pghistory
 from django.apps import apps
 from pghistory.admin.core import (
@@ -10,6 +12,10 @@ from pghistory.admin.core import (
     ObjFilter,
 )
 from pghistory.config import admin_model
+
+if TYPE_CHECKING:
+    # Models can't be imported while settings load.
+    from pghistory.models import EventsQuerySet
 
 
 class EventsAdminNoFilters(pghistory.admin.EventsAdmin):
@@ -42,9 +48,10 @@ class EventsAdminNoFilters(pghistory.admin.EventsAdmin):
         if "obj" in request.GET and ":" in request.GET.get("obj", ""):
             model_name, obj_id = request.GET["obj"].split(":")
             model_class = apps.get_model(model_name)
-            return admin_model().objects.tracks(
-                model_class.objects.get(id=obj_id)
-            )
+            # The admin model is pghistory's Events by default, whose manager
+            # comes from EventsQuerySet.
+            events = cast("EventsQuerySet", admin_model().objects)
+            return events.tracks(model_class.objects.get(id=obj_id))
 
         # By default it won't perform any query
         return admin_model().objects.none()

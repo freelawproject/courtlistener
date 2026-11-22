@@ -885,6 +885,8 @@ class Position(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
+        if self.person is None:
+            raise ValueError(f"Position {self.pk} has no person.")
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
     @property
@@ -954,6 +956,11 @@ class Position(AbstractDateTimeModel):
             else:
                 # If we don't know when the position ended, we use a ? if the
                 # person has died, or say Present if they're alive.
+                if self.person is None:
+                    raise ValueError(
+                        f"Position {self.pk} has no person, so it can't "
+                        "tell whether the position is current."
+                    )
                 if self.person.date_dod:
                     end_date = "?"
                 else:

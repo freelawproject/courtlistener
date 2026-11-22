@@ -257,7 +257,7 @@ def clone_opinion_cluster(
 
             if download_cluster_files and filepath_json_harvard:
                 try:
-                    ia_url = cluster_data.get("filepath_json_harvard").replace(
+                    ia_url = filepath_json_harvard.replace(
                         "/storage/harvard_corpus/",
                         "https://archive.org/download/",
                     )
@@ -269,9 +269,7 @@ def clone_opinion_cluster(
                     if req.status_code == 200:
                         print(f"Downloading {ia_url}")
                         json_harvard_content = json.dumps(req.json(), indent=4)
-                        path = pathlib.PurePath(
-                            cluster_data.get("filepath_json_harvard")
-                        )
+                        path = pathlib.PurePath(filepath_json_harvard)
                         json_path = str(
                             pathlib.PurePath(
                                 "harvard_corpus", path.parent.name, path.name
@@ -812,7 +810,7 @@ def clone_tag(session: Session, tag_ids: list) -> list:
 
         try:
             tag, created = Tag.objects.get_or_create(**tag_data)
-        except (IntegrityError, ValidationError):
+        except IntegrityError, ValidationError:
             tag = Tag.objects.filter(pk=tag_data["id"])[0]
 
         if tag:

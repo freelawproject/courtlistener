@@ -153,21 +153,18 @@ class CaseIDQuerySet(models.query.QuerySet):
 
     def filter(self, *args, **kwargs):
         """Filter as usual, also accepting a ``case_id`` keyword."""
-        clone = self._clone()
         case_id = kwargs.pop("case_id", None)
         if case_id:
             case_id_parts = case_id.split(";")
-            clone.query.add_q(
+            args = (
                 Q(
                     docket_number=case_id_parts[0],
                     district=case_id_parts[1],
                     division_code=case_id_parts[2],
-                )
+                ),
+                *args,
             )
-
-        # Add the rest of the args & kwargs
-        clone.query.add_q(Q(*args, **kwargs))
-        return clone
+        return super().filter(*args, **kwargs)
 
 
 class Docket(AbstractDateTimeModel):

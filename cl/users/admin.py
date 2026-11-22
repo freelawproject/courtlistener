@@ -10,6 +10,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Model, QuerySet
+from django.forms import ModelMultipleChoiceField
 from django.http import HttpRequest
 from rest_framework.authtoken.models import Token
 
@@ -77,9 +78,9 @@ class CustomUserChangeForm(UserChangeForm):
         super().__init__(*args, **kwargs)
         # Ensure user_permissions field uses an optimized queryset
         if "user_permissions" in self.fields:
-            self.fields[
-                "user_permissions"
-            ].queryset = Permission.objects.select_related("content_type")
+            cast(
+                ModelMultipleChoiceField, self.fields["user_permissions"]
+            ).queryset = Permission.objects.select_related("content_type")
 
 
 # Replace the normal User admin with our better one.
@@ -200,6 +201,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
                 level=messages.ERROR,
             )
 
+    @admin.display(description="API Calls Count")
     def api_calls_count(self, obj):
         """Display the user's total API usage, or 0 for an unsaved user."""
         if obj.id is None:
@@ -208,12 +210,15 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 
         return obj.profile.total_api_usage
 
-    api_calls_count.short_description = "API Calls Count"
-
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to related event admin pages filtered by user/profile."""
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
+        if user is None:
+            # Let Django's admin handle the missing user.
+            return super().change_view(
+                request, object_id, form_url, extra_context=extra_context
+            )
 
         custom_links: list[AdminLinkConfig] = [
             {
@@ -239,8 +244,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         ]
 
         links = generate_admin_links(custom_links)
-        if user is not None:
-            links.extend(self._get_neon_links(user.pk))
+        links.extend(self._get_neon_links(user.pk))
         extra_context["custom_links"] = links
 
         return super().change_view(

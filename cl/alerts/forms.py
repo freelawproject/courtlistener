@@ -1,5 +1,7 @@
 """Forms for creating search alerts and confirming docket alerts."""
 
+from typing import cast
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
@@ -68,9 +70,9 @@ class CreateAlertForm(ModelForm):
             self.fields["alert_type"].widget = HiddenInput()
             # Restore the original valid alert_type field choices, since
             # they were overridden for RECAP
-            self.fields[
-                "alert_type"
-            ].choices = SEARCH_TYPES.SUPPORTED_ALERT_TYPES
+            cast(
+                forms.ChoiceField, self.fields["alert_type"]
+            ).choices = SEARCH_TYPES.SUPPORTED_ALERT_TYPES
 
     def clean_rate(self):
         """Validate that the rate is within the user's alert quotas.

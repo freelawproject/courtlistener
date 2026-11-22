@@ -418,17 +418,18 @@ class GoogleGenAIBatchWrapper:
             The raw JSONL content of the result file as a string.
 
         Raises:
-            ValueError: If the job has not succeeded.
+            ValueError: If the job has not succeeded or has no result file.
         """
-        if job.state not in DOWNLOADABLE_JOB_STATES:
+        if (state := job.state) not in DOWNLOADABLE_JOB_STATES:
             raise ValueError(
-                f"Cannot download results for job in state {job.state.name}. "
+                f"Cannot download results for job in state "
+                f"{state.name if state else None}. "
                 f"Expected one of: {', '.join(s.name for s in DOWNLOADABLE_JOB_STATES)}."
             )
+        if not (dest := job.dest) or not dest.file_name:
+            raise ValueError(f"Job {job.name} has no result file.")
 
-        return self.client.files.download(file=job.dest.file_name).decode(
-            "utf-8"
-        )
+        return self.client.files.download(file=dest.file_name).decode("utf-8")
 
     def process_results(self, jsonl_content: str) -> list[ProcessedResult]:
         """Parses a raw JSONL result string and validates each line item.

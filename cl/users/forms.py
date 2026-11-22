@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Iterator
+from typing import Any, cast
 
 from disposable_email_domains import blocklist
 from django import forms
@@ -18,6 +19,7 @@ from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.forms import ModelForm
+from django.http import HttpRequest
 from django.urls import reverse
 from hcaptcha.fields import hCaptchaField
 from localflavor.us.forms import USStateField, USZipCodeField
@@ -102,14 +104,19 @@ class ProfileForm(ModelForm):
 class CleanEmailMixin:
     """Form mixin that rejects emails from blocked domains."""
 
-    def clean_email(self):
+    # Provided by the form this mixin is combined with.
+    cleaned_data: dict[str, Any]
+
+    def clean_email(self) -> str:
         """Validate that the email's domain isn't blocked.
 
         Raises:
             forms.ValidationError: If the domain is a disposable email
                 provider or in ``BLOCKED_DOMAINS``.
         """
-        email = self.cleaned_data.get("email")
+        # Django only calls clean_email once the email field itself is valid,
+        # so the key is always present.
+        email: str = self.cleaned_data["email"]
         user_part, domain_part = email.rsplit("@", 1)
         blocklist.update(settings.BLOCKED_DOMAINS)
         if domain_part in blocklist:
@@ -353,7 +360,7 @@ class PasswordConfirmForm(forms.Form):
         ),
     )
 
-    def __init__(self, request=None, *args, **kwargs):
+    def __init__(self, request: HttpRequest, *args, **kwargs):
         """Set the request attribute for use by the clean method."""
         self.request = request
         super().__init__(*args, **kwargs)
@@ -563,7 +570,7 @@ class CustomSetPasswordForm(SetPasswordForm):
 class WebhookForm(ModelForm):
     """Form for creating or updating a webhook."""
 
-    def __init__(self, update=None, request_user=None, *args, **kwargs):
+    def __init__(self, update: bool, request_user: User, *args, **kwargs):
         """Build the form, limiting the event type and version choices.
 
         When updating, only the webhook's current event type and version are
@@ -586,9 +593,13 @@ class WebhookForm(ModelForm):
                 for i in WebhookVersions.choices
                 if i[0] == self.instance.version
             ]
-            self.fields["event_type"].choices = instance_type
+            event_type_field = cast(
+                forms.ChoiceField, self.fields["event_type"]
+            )
+            version_field = cast(forms.ChoiceField, self.fields["version"])
+            event_type_field.choices = instance_type
             self.fields["event_type"].widget.attrs["readonly"] = True
-            self.fields["version"].choices = instance_version
+            version_field.choices = instance_version
             self.fields["version"].widget.attrs["readonly"] = True
 
         else:
@@ -605,7 +616,9 @@ class WebhookForm(ModelForm):
                 for w_version in WebhookVersions.choices
                 if f"{w_type[0]}_{w_version[0]}" not in used_version_types
             }
-            self.fields["event_type"].choices = available_type_choices
+            cast(
+                forms.ChoiceField, self.fields["event_type"]
+            ).choices = available_type_choices
 
     class Meta:
         model = Webhook

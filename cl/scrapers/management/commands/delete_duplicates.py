@@ -357,8 +357,7 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--cluster-sources",
-            choices=list(ClusterSources.parts_to_source_mapper.values())
-            + ["ALL"],
+            choices=[source for source, _ in ClusterSources.NAMES] + ["ALL"],
             default=[ClusterSources.COURT_WEBSITE],
             nargs="*",
             help="""`OpinionCluster.source` values to include when finding

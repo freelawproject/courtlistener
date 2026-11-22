@@ -5,11 +5,12 @@ import pickle
 import time
 from collections import defaultdict
 from collections.abc import Sequence
+from typing import cast
 
 from django.conf import settings
 from django.core.cache import cache
 from elasticsearch.dsl import MultiSearch, Q
-from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from rest_framework.exceptions import APIException, ParseError
@@ -416,7 +417,9 @@ class CursorESList:
         ) = self.perform_es_query()
         self.results = main_results
 
-        main_query_hits = self.results.hits.total.value
+        # Response.hits is annotated upstream as a plain list, but at runtime
+        # it is an AttrList that also exposes the hit `total`.
+        main_query_hits = cast(AttrList[Hit], main_results.hits).total.value
         results_dict = {
             "es_results_items": self.results,
             "main_query_hits": main_query_hits,
@@ -474,7 +477,7 @@ class CursorESList:
             # page to maintain consistency of the results on the page,
             # because the original order is inverse when paginating backwards.
             # Don’t reverse the cached response since it’s already in the expected order.
-            self.results.hits.reverse()
+            results.hits.reverse()
 
     def _get_search_after_key(
         self, index_position: int, cached_response: bool
@@ -547,11 +550,11 @@ class ResultObject:
         return self._data
 
 
-def limit_api_results_to_page(
-    results: list[defaultdict],
+def limit_api_results_to_page[T](
+    results: list[T],
     cursor: ESCursor | None,
     cached_response: bool = False,
-) -> list[defaultdict]:
+) -> list[T]:
     """In ES Cursor pagination, an additional document is returned in each query response to determine whether to display the next page or previous pages. Here we limit the API results to the number defined in settings for a single page, according to the navigation action being performed.
 
     Args:

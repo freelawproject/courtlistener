@@ -3,7 +3,7 @@
 import datetime
 from base64 import b64decode, b64encode
 from collections import defaultdict
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -58,15 +58,18 @@ class VersionBasedPagination(PageNumberPagination):
         self.cursor_paginator = CursorPagination()
         self.cursor_paginator.page_size = self.page_size
 
-    def do_v4_cursor_pagination(self):
+    def do_v4_cursor_pagination(self, request: Request):
         """Determine if v4 cursor pagination should be applied.
+
+        Args:
+            request: The request being paginated.
 
         Returns:
             A two tuple containing:
             - A boolean indicating if cursor pagination should be applied.
             - The requested ordering key if applicable.
         """
-        requested_ordering = self.request.query_params.get(
+        requested_ordering = request.query_params.get(
             "order_by", self.ordering
         )
         all_cursor_ordering_fields = self.generate_all_cursor_fields(
@@ -101,7 +104,7 @@ class VersionBasedPagination(PageNumberPagination):
             return []
 
         do_cursor_pagination, requested_ordering = (
-            self.do_v4_cursor_pagination()
+            self.do_v4_cursor_pagination(request)
         )
         if do_cursor_pagination:
             # Handle the queryset using CursorPagination
@@ -123,11 +126,13 @@ class VersionBasedPagination(PageNumberPagination):
         if self.is_count_request:
             return Response({"count": self.count})
 
-        do_cursor_pagination, _ = self.do_v4_cursor_pagination()
+        # Set by paginate_queryset, which DRF always calls first.
+        request = cast(Request, self.request)
+        do_cursor_pagination, _ = self.do_v4_cursor_pagination(request)
         if do_cursor_pagination:
             response = self.cursor_paginator.get_paginated_response(data)
             # Build and include the count URL:
-            count_url = self.request.build_absolute_uri()
+            count_url = request.build_absolute_uri()
             count_url = replace_query_param(count_url, "count", "on")
             response.data = {"count": count_url, **response.data}
             return response
@@ -267,9 +272,11 @@ class BigPagination(VersionBasedPagination):
 class ESCursorPagination(BasePagination):
     """Custom pagination class to handle ES cursor pagination, based in the ES search_after param."""
 
+    # Set by paginate_es_list before any other method reads it.
+    es_list_instance: CursorESList
+
     def __init__(self, request, search_type: SearchType) -> None:
         """Set up the paginator's state from the request and its cursor."""
-        self.es_list_instance = None
         self.results_count_exact = None
         self.results_count_approximate = None
         self.child_results_count = None

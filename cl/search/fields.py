@@ -55,7 +55,7 @@ class ParseFloorDateMixin:
                 try:
                     # strptime provides the floor by default
                     return datetime.date(*time.strptime(value, format)[:3])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     continue
 
         # Unable to parse the value as a date. Returning the original value.

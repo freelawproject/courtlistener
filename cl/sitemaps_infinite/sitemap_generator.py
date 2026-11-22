@@ -164,9 +164,8 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
             if (
                 not force_regenerate
-                and hasattr(
-                    cached_urls, "expiration_time"
-                )  # cached_urls is CacheableList
+                and isinstance(cached_urls, CacheableList)
+                and hasattr(cached_urls, "expiration_time")
                 and (cached_urls.expiration_time - tz_now()).total_seconds()
                 > short_cache_timeout
             ):

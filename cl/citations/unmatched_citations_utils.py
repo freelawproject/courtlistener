@@ -12,7 +12,7 @@ from cl.citations.models import (
     UnmatchedCitation,
     UnmatchedCitationFromRECAPDocument,
 )
-from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import SupportedCitationType
 from cl.search.models import Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -152,9 +152,7 @@ def store_unmatched_citations(
 def handle_unmatched_citations(
     citing_object: Opinion | RECAPDocument,
     unmatched_citations: Sequence[CitationBase],
-    citation_resolutions: dict[
-        MatchedResourceType, list[SupportedCitationType]
-    ],
+    citation_resolutions: dict[Opinion, list[SupportedCitationType]],
 ) -> None:
     """Store or update the status of valid UnmatchedCitations or UnmatchedCitationFromRECAPDocument objects.
 

@@ -74,6 +74,7 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
         raise self.retry(exc=response.status_code)
 
     disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
+    # pyrefly:ignore[missing-attribute] FileField's descriptor always returns a FieldFile, even when null=True
     disclosure.thumbnail.save(None, ContentFile(response.content))
 
 

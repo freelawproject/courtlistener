@@ -20,6 +20,7 @@ from cl.lib.file_validation import (
     content_is_pdf,
     validate_file_size,
 )
+from cl.lib.model_helpers import field_help_text
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Person
 from cl.scrapers.management.commands.cl_scrape_opinions import (
@@ -173,7 +174,7 @@ class BaseCourtUploadForm(forms.Form):
     case_title = forms.CharField(
         label="Case Title",
         required=True,
-        help_text=Docket.case_name_full.field.help_text,
+        help_text=field_help_text(Docket, "case_name_full"),
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
@@ -197,7 +198,7 @@ class BaseCourtUploadForm(forms.Form):
     publication_date = forms.DateField(
         label="Publication Date",
         required=True,
-        help_text=OpinionCluster.date_filed.field.help_text,
+        help_text=field_help_text(OpinionCluster, "date_filed"),
         widget=forms.TextInput(
             attrs={
                 "class": "form-control datepicker",
@@ -242,7 +243,7 @@ class BaseCourtUploadForm(forms.Form):
             queryset=Person.objects.none(),
             required=required,
             label="Lead Author",
-            help_text=Opinion.author.field.help_text,
+            help_text=field_help_text(Opinion, "author"),
             widget=forms.Select(
                 attrs={
                     "class": "form-control",
@@ -259,7 +260,7 @@ class BaseCourtUploadForm(forms.Form):
         """
         self.fields["author_str"] = forms.CharField(
             label="Author String",
-            help_text=Opinion.author_str.field.help_text,
+            help_text=field_help_text(Opinion, "author_str"),
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -279,7 +280,7 @@ class BaseCourtUploadForm(forms.Form):
         self.fields["judges"] = forms.CharField(
             label="Judges",
             required=required,
-            help_text=OpinionCluster.judges.field.help_text,
+            help_text=field_help_text(OpinionCluster, "judges"),
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
@@ -299,7 +300,7 @@ class BaseCourtUploadForm(forms.Form):
             queryset=Person.objects.none(),
             required=required,
             label="Panel",
-            help_text=OpinionCluster.panel.field.help_text,
+            help_text=field_help_text(OpinionCluster, "panel"),
             widget=forms.SelectMultiple(
                 attrs={
                     "class": "form-control input-lg",
@@ -317,7 +318,7 @@ class BaseCourtUploadForm(forms.Form):
         """
         self.fields["date_argued"] = forms.DateField(
             label="Argued Date",
-            help_text=Docket.date_argued.field.help_text,
+            help_text=field_help_text(Docket, "date_argued"),
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -329,7 +330,7 @@ class BaseCourtUploadForm(forms.Form):
         )
         self.fields["date_reargued"] = forms.DateField(
             label="Reargued Date",
-            help_text=Docket.date_reargued.field.help_text,
+            help_text=field_help_text(Docket, "date_reargued"),
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -378,7 +379,7 @@ class BaseCourtUploadForm(forms.Form):
         self.fields["download_url"] = forms.URLField(
             validators=[URLValidator()],
             label="Download URL",
-            help_text=Opinion.download_url.field.help_text,
+            help_text=field_help_text(Opinion, "download_url"),
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -448,8 +449,7 @@ class BaseCourtUploadForm(forms.Form):
             c = Citation.objects.filter(
                 volume=volume, reporter=reporter, page=page
             )
-            if c.exists():
-                cite = c.first()
+            if cite := c.first():
                 self.add_error(
                     "cite_page",
                     ValidationError(
@@ -796,7 +796,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
 
     disposition = forms.CharField(
         label="Disposition",
-        help_text=OpinionCluster.disposition.field.help_text,
+        help_text=field_help_text(OpinionCluster, "disposition"),
         required=False,
         widget=forms.Textarea(
             attrs={
@@ -837,7 +837,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
 
     disposition = forms.CharField(
         label="Disposition",
-        help_text=OpinionCluster.disposition.field.help_text,
+        help_text=field_help_text(OpinionCluster, "disposition"),
         required=False,
         widget=forms.Textarea(
             attrs={
@@ -848,7 +848,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
 
     summary = forms.CharField(
         label="Summary",
-        help_text=OpinionCluster.summary.field.help_text,
+        help_text=field_help_text(OpinionCluster, "summary"),
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control"}),
     )
