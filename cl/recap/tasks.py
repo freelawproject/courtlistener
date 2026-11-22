@@ -4179,28 +4179,31 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
-    if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
-        if scotus_email.data["data"] is None:
-            raise TypeError("SCOTUS email parsed data is unexpectedly none")
-        handling_result = fetch_and_archive_scotus_docket_followup(
-            scotus_email.court_id,
-            scotus_email.data["data"],
-            scotus_email.data["followup_url"],
-        )
-    else:
-        handling_result = async_to_sync(scotus_email.handle_email)()
+    match scotus_email.email_type:
+        case SCOTUSEmailType.DOCKET_ENTRY:
+            if scotus_email.data["data"] is None:
+                raise TypeError(
+                    "SCOTUS email parsed data is unexpectedly none"
+                )
+            handling_result = fetch_and_archive_scotus_docket_followup(
+                scotus_email.court_id,
+                scotus_email.data["data"],
+                scotus_email.data["followup_url"],
+            )
+        case SCOTUSEmailType.CONFIRMATION:
+            handling_result = async_to_sync(scotus_email.handle_email)()
+        case SCOTUSEmailType.INVALID:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "SCOTUS email format is invalid or not recognized.",
+                PROCESSING_STATUS.INVALID_CONTENT,
+                "status_message",
+            )
+            self.request.chain = None
+            return
+
     email_type = handling_result["email_type"]
     data = handling_result["data"]
-
-    if email_type == SCOTUSEmailType.INVALID.value:
-        async_to_sync(mark_pq_status)(
-            epq,
-            "SCOTUS email format is invalid or not recognized.",
-            PROCESSING_STATUS.INVALID_CONTENT,
-            "status_message",
-        )
-        self.request.chain = None
-        return
 
     if email_type == SCOTUSEmailType.CONFIRMATION.value:
         if data == SCOTUSConfirmationResult.Success.value:
