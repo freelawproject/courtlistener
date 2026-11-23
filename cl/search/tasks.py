@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict
 
 from botocore import exceptions as botocore_exception
 from celery import Task
