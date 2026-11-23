@@ -32,7 +32,7 @@ from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.lib.elasticsearch_utils import get_court_opinions_counts
-from cl.lib.search_utils import scotus_frontend_search_enabled
+from cl.lib.search_utils import frontend_search_sources
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.models import Person
 from cl.search.documents import (
@@ -133,13 +133,12 @@ async def get_result_count(request, version, day_count):
         period.
     """
     # This endpoint backs the create-alert modal on the search frontend, so
-    # it counts SCOTUS for the same requests the search page shows it to.
-    include_scotus = await sync_to_async(scotus_frontend_search_enabled)(
-        request
-    )
+    # it counts gated sources for the same requests the search page
+    # shows them to.
+    include_sources = await sync_to_async(frontend_search_sources)(request)
     try:
         estimation = await sync_to_async(get_alert_estimation_count)(
-            request.GET.copy(), int(day_count), include_scotus=include_scotus
+            request.GET.copy(), int(day_count), include_sources=include_sources
         )
     except (ElasticServerError, ElasticBadRequestError):
         # The query couldn't be run against Elasticsearch.

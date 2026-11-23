@@ -87,6 +87,7 @@ from cl.search.constants import (
     opinion_boosts_es,
     recap_boosts_es,
 )
+from cl.search.es_docket_sources import gated_court_ids
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
@@ -1377,33 +1378,32 @@ def get_match_all_query(
     return final_match_all_query
 
 
-def includes_scotus(cd: CleanData) -> bool:
-    """Whether a RECAP search should include SCOTUS content. False unless the caller sets cd["include_scotus"], which only the search frontend does, behind the scotus_docket_page flag. Temporary: remove once SCOTUS launches."""
-    return bool(cd.get("include_scotus"))
-
-
-def excludes_scotus(cd: CleanData) -> bool:
-    """True for a RECAP search (r, d, rd) that must leave SCOTUS content out of its results, see includes_scotus. Other search types never contain SCOTUS RECAP-style content."""
-    return not includes_scotus(cd) and cd["type"] in (
+def hidden_court_ids(cd: CleanData) -> list[str]:
+    """Return the courts a RECAP search (r, d, rd) must leave out: those of the gated sources, except the ones the caller lets cd["include_sources"] see, as the search frontend does behind each source's frontend_search_flag. Other search types never contain RECAP-style content from those sources."""
+    if cd["type"] not in (
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
-    )
+    ):
+        return []
+    return gated_court_ids(cd.get("include_sources", frozenset()))
 
 
-def exclude_scotus(query: Query | None) -> Query:
-    """Return query, or a match-everything query if it's None, without SCOTUS dockets and documents.
+def exclude_courts(query: Query | None, court_ids: list[str]) -> Query:
+    """Return query, or a match-everything query if it's None, without the dockets and documents of court_ids.
 
     A bool query gets the exclusion added to its own must_not rather than
     being wrapped, so code that reads its clauses (e.g. clean_count_query)
     still finds them.
     """
-    scotus = Q("term", **{"court_id.raw": "scotus"})
+    excluded = [
+        Q("term", **{"court_id.raw": court_id}) for court_id in court_ids
+    ]
     if isinstance(query, Bool):
         query = query._clone()
-        query.must_not = [*query.must_not, scotus]
+        query.must_not = [*query.must_not, *excluded]
         return query
-    return Q("bool", must=[query] if query else [], must_not=[scotus])
+    return Q("bool", must=[query] if query else [], must_not=excluded)
 
 
 def build_es_base_query(
@@ -1594,10 +1594,10 @@ def build_es_base_query(
         )
         boost_mode = "multiply" if string_query else "replace"
 
-    if excludes_scotus(cd):
-        main_query = exclude_scotus(cast(Query, main_query))
+    if court_ids := hidden_court_ids(cd):
+        main_query = exclude_courts(cast(Query, main_query), court_ids)
         if child_query:
-            child_query = exclude_scotus(child_query)
+            child_query = exclude_courts(child_query, court_ids)
 
     # Apply a custom function score to the main query, useful for cursor pagination
     # in the V4 API and for date decay relevance.
@@ -1668,10 +1668,10 @@ def build_child_docs_query(
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
-    if not child_docs_query and excludes_scotus(cd):
+    if not child_docs_query and (court_ids := hidden_court_ids(cd)):
         # Match all query case, where build_es_base_query had no child query
-        # to exclude SCOTUS from.
-        child_docs_query = exclude_scotus(None)
+        # to exclude the gated sources from.
+        child_docs_query = exclude_courts(None, court_ids)
     if not child_docs_query:
         # Match all query case.
         if not exclude_docs_for_empty_field:
