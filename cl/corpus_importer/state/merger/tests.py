@@ -1,6 +1,10 @@
+import logging
 import operator
+import uuid
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from datetime import UTC, datetime
+from itertools import permutations
 from types import SimpleNamespace
 from typing import Any, ClassVar, cast, override
 
@@ -38,11 +42,13 @@ from cl.corpus_importer.state.merger.match import (
     First,
     Key,
     Match,
+    MatchGroup,
     Narrow,
     Next,
 )
 from cl.corpus_importer.state.merger.pool import (
     Global,
+    Pool,
     Relatives,
     Siblings,
     sort_rows,
@@ -75,6 +81,8 @@ from cl.search.models import (
     OriginatingCourtInformation,
     TrialCourtData,
 )
+from cl.search.state.florida.factories import FloridaDocumentFactory
+from cl.search.state.florida.models import FloridaDocument
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
@@ -2302,3 +2310,939 @@ class MatchDeclarationTest(SimpleTestCase):
         self.assertEqual(
             term.scraped_value(cast(Any, SimpleNamespace()), state), 7
         )
+
+
+class MatchEntryMerger(Merger[dict[str, Any], Any, DocketEntry]):
+    """A docket entry with every field the match tests key on."""
+
+    config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+        model=DocketEntry, reads=("date_created",)
+    )
+
+    description: str = Scrape(dict)["description"]
+    entry_number: int | None = Scrape(dict)["number"]
+    pacer_sequence_number: int | None = Scrape(dict)["pacer"]
+    recap_sequence_number: str = Scrape(dict)["recap"]
+
+
+class UuidDocumentMerger(Merger[dict[str, str], Any, FloridaDocument]):
+    """A Florida document whose link UUID is scraped as text."""
+
+    config: ClassVar[MergerConfig[FloridaDocument]] = MergerConfig(
+        model=FloridaDocument
+    )
+
+    link_uuid: str = Scrape(dict)["uuid"]
+
+
+def entry_scrape(
+    description: str,
+    number: int | None = None,
+    pacer: int | None = None,
+    recap: str = "",
+) -> dict[str, Any]:
+    """The scrape of a docket entry for `MatchEntryMerger`."""
+    return {
+        "description": description,
+        "number": number,
+        "pacer": pacer,
+        "recap": recap,
+    }
+
+
+def lookup_state(merger: Merger) -> MergerState.Lookup[Any, Any, Any]:
+    """The state of a merger that has not started merging."""
+    return cast(MergerState.Lookup[Any, Any, Any], merger.state)
+
+
+def summarise(verdict: Any) -> tuple[str, Any]:
+    """The kind of a verdict, with the pk of the row an update merges into or the reason a failure gives."""
+    match verdict:
+        case MergerState.Update():
+            return ("update", verdict.instance.pk)
+        case MergerState.Failed():
+            return ("failed", verdict.reason)
+        case _:
+            return ("create", None)
+
+
+class MatchGroupTest(TestCase):
+    """How a sibling group's rows are assigned tier by tier."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory.create()
+
+    def entry(
+        self,
+        description: str,
+        number: int | None = None,
+        pacer: int | None = None,
+        recap: str = "",
+        docket: Docket | None = None,
+    ) -> DocketEntry:
+        """Store a docket entry on the test docket, or on `docket`."""
+        return DocketEntryFactory.create(
+            docket=docket or self.docket,
+            description=description,
+            entry_number=number,
+            pacer_sequence_number=pacer,
+            recap_sequence_number=recap,
+        )
+
+    def matcher_errors(self) -> Any:
+        """Capture the errors the matcher logs, which the test runner otherwise silences."""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+        return self.assertLogs(
+            "cl.corpus_importer.state.merger.match", "ERROR"
+        )
+
+    def pools(self) -> list[Pool]:
+        """The pools a docket's entries are matched in: read whole, and read by query."""
+        return [Siblings(), Relatives(docket=Ancestor(Docket))]
+
+    def group(
+        self,
+        match: Match,
+        scrapes: Sequence[dict[str, Any]],
+        pool: Pool,
+        docket: Docket | None = None,
+    ) -> tuple[MatchGroup[DocketEntry], list[MatchEntryMerger]]:
+        """A group of entry mergers over a docket's entries, one merger for each scrape."""
+        docket = docket or self.docket
+        bound = match.bind(MatchEntryMerger, pool)
+        reader = pool.reader(
+            MatchEntryMerger,
+            relation=docket.docket_entries.all(),
+            params=RelatedParams(None, parent=docket),
+            ordering=bound.tiers[0].ordering,
+        )
+        group = MatchGroup(MatchEntryMerger, bound, reader)
+        mergers = [MatchEntryMerger(s, params=None) for s in scrapes]
+        for merger in mergers:
+            group.join(merger, lookup_state(merger))
+        return group, mergers
+
+    def verdicts(
+        self,
+        group: MatchGroup[DocketEntry],
+        mergers: Sequence[MatchEntryMerger],
+    ) -> list[Any]:
+        """The verdict of each merger of a group."""
+        return [group.verdict(m, lookup_state(m)) for m in mergers]
+
+    def assertVerdicts(
+        self,
+        match: Match,
+        scrapes: Sequence[dict[str, Any]],
+        expected: Sequence[tuple[str, Any]],
+        pools: Sequence[Pool] | None = None,
+    ) -> None:
+        """Assert what each scrape's merger is told to do, in every pool.
+
+        Args:
+            match: The match the mergers are matched by.
+            scrapes: The scrape of each merger.
+            expected: One pair for each merger: `("update", row pk)`,
+                `("create", None)` or `("failed", text its reason contains)`.
+            pools: The pools to match in. Defaults to both kinds of pool.
+        """
+        for pool in pools or self.pools():
+            with self.subTest(type(pool).__name__):
+                group, mergers = self.group(match, scrapes, pool)
+                actual = [summarise(v) for v in self.verdicts(group, mergers)]
+                self.assertEqual(
+                    [kind for kind, _ in actual], [k for k, _ in expected]
+                )
+                for (kind, detail), (_, want) in zip(
+                    actual, expected, strict=True
+                ):
+                    if kind == "failed":
+                        self.assertIn(want, detail)
+                    else:
+                        self.assertEqual(detail, want)
+
+    def test_missing_next_then_create(self) -> None:
+        """Does a member matching no row create when every tier falls through?"""
+        self.entry("other", number=1)
+
+        self.assertVerdicts(
+            Match(Key("description"), Key("entry_number")),
+            [entry_scrape("absent", number=2)],
+            [("create", None)],
+        )
+
+    def test_missing_fail(self) -> None:
+        """Does `missing=Fail` fail the member with the tier's text and its key?"""
+        group, (merger,) = self.group(
+            Match(Key("description", missing=Fail("gone"))),
+            [entry_scrape("absent")],
+            Siblings(),
+        )
+
+        verdict = group.verdict(merger, lookup_state(merger))
+
+        self.assertIsInstance(verdict, MergerState.Failed)
+        failed = cast(MergerState.Failed, verdict)
+        self.assertEqual(
+            failed.reason, "MatchEntryMerger: gone (tier 1, key ('absent',))"
+        )
+        self.assertEqual(failed.result, MergeResult.failed("DocketEntry"))
+
+    def test_missing_fail_default_text(self) -> None:
+        """Does a bare `Fail` for `missing` say that no row matches?"""
+        self.assertVerdicts(
+            Match(Key("description", missing=Fail)),
+            [entry_scrape("absent")],
+            [("failed", "no DocketEntry matches (tier 1, key ('absent',))")],
+        )
+
+    def test_unique_candidate_is_claimed(self) -> None:
+        """Does a member with one candidate that nobody else has merge into it?"""
+        row = self.entry("only")
+        self.entry("other")
+
+        self.assertVerdicts(
+            Match(Key("description")),
+            [entry_scrape("only")],
+            [("update", row.pk)],
+        )
+
+    def test_ambiguous_default_text(self) -> None:
+        """Does a member with several candidates fail, counting rows and scraped items?"""
+        self.entry("twice")
+        self.entry("twice")
+
+        self.assertVerdicts(
+            Match(Key("description")),
+            [entry_scrape("twice")],
+            [
+                (
+                    "failed",
+                    "cannot pick one DocketEntry: 2 rows for 1 scraped items",
+                )
+            ],
+        )
+
+    def test_ambiguous_create(self) -> None:
+        """Does `ambiguous=Create` create instead of failing?"""
+        self.entry("twice")
+        self.entry("twice")
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=Create)),
+            [entry_scrape("twice")],
+            [("create", None)],
+        )
+
+    def test_first_takes_ordering(self) -> None:
+        """Does `First` take the first candidate in its ordering?"""
+        older = self.entry("twice", number=1)
+        newer = self.entry("twice", number=2)
+        for row, year in ((older, 2020), (newer, 2021)):
+            DocketEntry.objects.filter(pk=row.pk).update(
+                date_created=datetime(year, 1, 1, tzinfo=UTC)
+            )
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=First("-date_created"))),
+            [entry_scrape("twice")],
+            [("update", newer.pk)],
+        )
+
+    def test_first_collision_is_duplicate(self) -> None:
+        """Do members that `First` takes the same row fail as duplicates even though their keys differ?"""
+        self.entry("same")
+        lowered = Fn(operator.methodcaller("lower"))
+        match = Match(
+            Key(
+                lowered(Database(DocketEntry.description))
+                == lowered(Scrape(dict)["description"]),
+                ambiguous=First("pk"),
+            )
+        )
+
+        self.assertVerdicts(
+            match,
+            [entry_scrape("SAME"), entry_scrape("same")],
+            [("failed", "2 scraped items share a key")] * 2,
+        )
+
+    def test_first_collision_next_creates_on_last_tier(self) -> None:
+        """Do members `First` takes one row create when the last tier lets duplicates through?"""
+        self.entry("same")
+        lowered = Fn(operator.methodcaller("lower"))
+        match = Match(
+            Key(
+                lowered(Database(DocketEntry.description))
+                == lowered(Scrape(dict)["description"]),
+                ambiguous=First("pk"),
+                duplicate=Next,
+            )
+        )
+
+        self.assertVerdicts(
+            match,
+            [entry_scrape("SAME"), entry_scrape("same")],
+            [("create", None)] * 2,
+        )
+
+    def test_duplicate_fails_every_member(self) -> None:
+        """Do members with one key all fail, with a single log line?"""
+        self.entry("shared")
+        group, mergers = self.group(
+            Match(Key("description")),
+            [entry_scrape("shared"), entry_scrape("shared")],
+            Siblings(),
+        )
+
+        with self.matcher_errors() as logs:
+            verdicts = self.verdicts(group, mergers)
+
+        self.assertEqual(
+            [
+                (kind, "2 scraped items share a key" in detail)
+                for kind, detail in map(summarise, verdicts)
+            ],
+            [("failed", True)] * 2,
+        )
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(
+            logs.records[0].getMessage(),
+            "MatchEntryMerger: 2 scraped items share a key; the key needs "
+            "another term (tier 1, key ('shared',))",
+        )
+
+    def test_duplicate_next_last_tier_each_creates(self) -> None:
+        """Do members sharing a key that no row has each create on a loose last tier?"""
+        self.assertVerdicts(
+            Match(Key("description", duplicate=Next)),
+            [entry_scrape("shared"), entry_scrape("shared")],
+            [("create", None)] * 2,
+        )
+
+    def test_duplicate_next_last_tier_claims_remaining_row(self) -> None:
+        """Does a member sharing a key with one placed earlier claim the row left on a loose last tier?"""
+        first = self.entry("shared", number=1)
+        second = self.entry("shared", number=2)
+
+        self.assertVerdicts(
+            Match(
+                Key("entry_number"),
+                Key("description", duplicate=Next),
+            ),
+            [
+                entry_scrape("shared", number=1),
+                entry_scrape("shared", number=99),
+            ],
+            [("update", first.pk), ("update", second.pk)],
+        )
+
+    def test_duplicate_next_last_tier_ambiguous(self) -> None:
+        """Are members sharing a key and the same rows all ambiguous on a loose last tier?"""
+        self.entry("shared")
+        self.entry("shared")
+
+        self.assertVerdicts(
+            Match(Key("description", duplicate=Next)),
+            [entry_scrape("shared"), entry_scrape("shared")],
+            [
+                (
+                    "failed",
+                    "cannot pick one DocketEntry: 2 rows for 2 scraped items",
+                )
+            ]
+            * 2,
+        )
+
+    def test_duplicate_counts_members_assigned_earlier(self) -> None:
+        """Is a member a duplicate of one that an earlier tier already placed?"""
+        row = self.entry("shared", number=1)
+
+        self.assertVerdicts(
+            Match(Key("entry_number"), Key("description")),
+            [
+                entry_scrape("shared", number=1),
+                entry_scrape("shared", number=99),
+            ],
+            [("update", row.pk), ("failed", "2 scraped items share a key")],
+        )
+
+    def test_duplicate_next_sends_member_to_later_tier(self) -> None:
+        """Does `duplicate=Next` on an earlier tier leave the duplicates to the tiers after it?"""
+        first = self.entry("shared", number=1)
+        second = self.entry("shared", number=2)
+
+        self.assertVerdicts(
+            Match(
+                Key("description", duplicate=Next),
+                Key("entry_number"),
+            ),
+            [
+                entry_scrape("shared", number=1),
+                entry_scrape("shared", number=2),
+            ],
+            [("update", first.pk), ("update", second.pk)],
+        )
+
+    def test_tier_priority_across_group(self) -> None:
+        """Does a match in an earlier tier beat one in a later tier whatever the order of the members?"""
+        row = self.entry("d", number=1)
+        by_number = entry_scrape("a", number=1)
+        by_description = entry_scrape("d", number=2)
+        match = Match(Key("entry_number"), Key("description"))
+
+        for name, scrapes, expected in (
+            (
+                "number first",
+                [by_number, by_description],
+                [("update", row.pk), ("create", None)],
+            ),
+            (
+                "description first",
+                [by_description, by_number],
+                [("create", None), ("update", row.pk)],
+            ),
+        ):
+            with self.subTest(name):
+                self.assertVerdicts(match, scrapes, expected)
+
+    def test_failed_member_candidates_unavailable_later(self) -> None:
+        """Are the rows a failed member could have matched kept from the tiers after its failure?"""
+        self.entry("twice", number=1)
+        self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(Key("description"), Key("entry_number")),
+            [
+                entry_scrape("twice", number=7),
+                entry_scrape("other", number=1),
+            ],
+            [("failed", "2 rows for 1 scraped items"), ("create", None)],
+        )
+
+    def test_next_leaves_candidates_available(self) -> None:
+        """Are the rows of a member leaving by `Next` still offered to later tiers?"""
+        first = self.entry("twice", number=1)
+        self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(
+                Key("description", ambiguous=Next),
+                Key("entry_number"),
+            ),
+            [entry_scrape("twice", number=1)],
+            [("update", first.pk)],
+        )
+
+    def test_narrow_separates_rows(self) -> None:
+        """Does a `Narrow` pick the row equal on its terms?"""
+        self.entry("twice", number=1)
+        second = self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=Narrow("entry_number"))),
+            [entry_scrape("twice", number=2)],
+            [("update", second.pk)],
+        )
+
+    def test_narrow_missing_create(self) -> None:
+        """Does a `Narrow` that leaves no candidates apply its `missing` outcome?"""
+        self.entry("twice", number=1)
+        self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(
+                Key(
+                    "description",
+                    ambiguous=Narrow("entry_number", missing=Create),
+                )
+            ),
+            [entry_scrape("twice", number=3)],
+            [("create", None)],
+        )
+
+    def test_narrow_separates_members(self) -> None:
+        """Do members sharing a tier key but differing on a narrowed term each claim their row?"""
+        first = self.entry("twice", number=1)
+        second = self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=Narrow("entry_number"))),
+            [
+                entry_scrape("twice", number=2),
+                entry_scrape("twice", number=1),
+            ],
+            [("update", second.pk), ("update", first.pk)],
+        )
+
+    def test_narrow_failure_key_includes_narrowed_terms(self) -> None:
+        """Does the key of a failure after a `Narrow` carry the narrowed terms' values?"""
+        self.entry("twice", number=1)
+        self.entry("twice", number=1)
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=Narrow("entry_number"))),
+            [entry_scrape("twice", number=1)],
+            [("failed", "(tier 1, key ('twice', 1))")],
+        )
+
+    def test_duplicate_stops_contesting_rows_a_narrow_rules_out(self) -> None:
+        """Does a duplicate leave a row to another member once a `Narrow` term rules the row out for it?"""
+        self.entry("twice", number=1)
+        second = self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(Key("description", ambiguous=Narrow("entry_number"))),
+            [
+                entry_scrape("twice", number=1),
+                entry_scrape("twice", number=1),
+                entry_scrape("twice", number=2),
+            ],
+            [
+                ("failed", "2 scraped items share a key"),
+                ("failed", "2 scraped items share a key"),
+                ("update", second.pk),
+            ],
+        )
+
+    def test_duplicate_takes_only_the_rows_its_narrow_chain_leaves(
+        self,
+    ) -> None:
+        """Does a failed duplicate keep later tiers from the rows its `Narrow` left it, and no others?"""
+        self.entry("twice", number=1)
+        second = self.entry("twice", number=2)
+
+        self.assertVerdicts(
+            Match(
+                Key("description", ambiguous=Narrow("entry_number")),
+                Key("entry_number"),
+            ),
+            [
+                entry_scrape("twice", number=1),
+                entry_scrape("twice", number=1),
+                entry_scrape("other", number=2),
+            ],
+            [
+                ("failed", "2 scraped items share a key"),
+                ("failed", "2 scraped items share a key"),
+                ("update", second.pk),
+            ],
+        )
+
+    def test_nested_narrow_chain(self) -> None:
+        """Does each branch of a `Narrow` chained through two more reach its outcome?"""
+        by_number = Narrow("entry_number", missing=Create)
+        by_raw = Narrow(
+            "pacer_sequence_number", missing=Create, ambiguous=by_number
+        )
+        match = Match(
+            Key("recap_sequence_number", "description", ambiguous=by_raw)
+        )
+        cases: dict[
+            str,
+            tuple[
+                list[tuple[str, int, int]],
+                list[tuple[str, int, int]],
+                list[tuple[str, int | None]],
+            ],
+        ] = {
+            "one row": ([("a", 1, 1)], [("a", 9, 9)], [("update", 0)]),
+            "separated by raw type": (
+                [("b", 1, 1), ("b", 2, 1)],
+                [("b", 2, 1)],
+                [("update", 1)],
+            ),
+            "no raw type matches": (
+                [("c", 1, 1), ("c", 2, 1)],
+                [("c", 3, 1)],
+                [("create", None)],
+            ),
+            "separated by number": (
+                [("d", 1, 1), ("d", 1, 2), ("d", 2, 1)],
+                [("d", 1, 2)],
+                [("update", 1)],
+            ),
+            "no number matches": (
+                [("e", 1, 1), ("e", 1, 2)],
+                [("e", 1, 9)],
+                [("create", None)],
+            ),
+            "equal on every term to several rows": (
+                [("f", 1, 1), ("f", 1, 1)],
+                [("f", 1, 1)],
+                [("failed", None)],
+            ),
+            "members equal on every term": (
+                [("g", 1, 1)],
+                [("g", 1, 1), ("g", 1, 1)],
+                [("failed", None)] * 2,
+            ),
+        }
+        for name, (rows, scrapes, expected) in cases.items():
+            with self.subTest(name):
+                docket = DocketFactory.create()
+                stored = [
+                    self.entry(
+                        description,
+                        number=number,
+                        pacer=pacer,
+                        recap="r",
+                        docket=docket,
+                    )
+                    for description, pacer, number in rows
+                ]
+                for pool in self.pools():
+                    with self.subTest(type(pool).__name__):
+                        group, mergers = self.group(
+                            match,
+                            [
+                                entry_scrape(d, number=n, pacer=p, recap="r")
+                                for d, p, n in scrapes
+                            ],
+                            pool,
+                            docket,
+                        )
+                        actual = [
+                            summarise(v) for v in self.verdicts(group, mergers)
+                        ]
+                        self.assertEqual(
+                            [
+                                (
+                                    kind,
+                                    None
+                                    if index is None
+                                    else stored[index].pk,
+                                )
+                                for kind, index in expected
+                            ],
+                            [
+                                (kind, pk if kind == "update" else None)
+                                for kind, pk in actual
+                            ],
+                        )
+
+    def test_none_key_matches_null_row(self) -> None:
+        """Does a scraped `None` match the row with a null value, through a null query for a keyed pool?"""
+        row = self.entry("x", number=None)
+        self.entry("x", number=5)
+        match = Match(Key("entry_number"))
+
+        for pool in (Siblings(), Global()):
+            with self.subTest(type(pool).__name__):
+                group, mergers = self.group(
+                    match, [entry_scrape("x", number=None)], pool
+                )
+
+                with CaptureQueriesContext(connection) as queries:
+                    verdicts = self.verdicts(group, mergers)
+
+                self.assertEqual(
+                    [summarise(v) for v in verdicts], [("update", row.pk)]
+                )
+                if isinstance(pool, Relatives):
+                    self.assertTrue(
+                        any("IS NULL" in q["sql"] for q in queries)
+                    )
+
+    def test_scraped_text_matches_stored_uuid(self) -> None:
+        """Does a UUID scraped as text match the stored UUID?"""
+        link = uuid.uuid4()
+        row = FloridaDocumentFactory.create(link_uuid=link)
+        FloridaDocumentFactory.create(
+            docket_entry=row.docket_entry, link_uuid=uuid.uuid4()
+        )
+
+        group, (merger,) = self.uuid_group([str(link)])
+
+        self.assertEqual(
+            summarise(group.verdict(merger, lookup_state(merger))),
+            ("update", row.pk),
+        )
+
+    def test_rejected_scraped_value_fails_only_that_member(self) -> None:
+        """Does a scraped value its field rejects fail its member, and nobody else?"""
+        link = uuid.uuid4()
+        row = FloridaDocumentFactory.create(link_uuid=link)
+
+        group, mergers = self.uuid_group(["not-a-uuid", str(link)])
+
+        with self.matcher_errors() as logs:
+            verdicts = [group.verdict(m, lookup_state(m)) for m in mergers]
+
+        expected = (
+            "UuidDocumentMerger: link_uuid cannot hold scraped value "
+            "'not-a-uuid' (tier 1, key ())"
+        )
+        self.assertEqual(
+            [summarise(v) for v in verdicts],
+            [("failed", expected), ("update", row.pk)],
+        )
+        self.assertEqual([r.getMessage() for r in logs.records], [expected])
+
+    def uuid_group(
+        self, uuids: Sequence[str]
+    ) -> tuple[MatchGroup[FloridaDocument], list[UuidDocumentMerger]]:
+        """A group of Florida document mergers over every document, matching on link UUID."""
+        pool = Global()
+        bound = Match(Key("link_uuid")).bind(UuidDocumentMerger, pool)
+        group = MatchGroup(
+            UuidDocumentMerger,
+            bound,
+            pool.reader(
+                UuidDocumentMerger,
+                relation=None,
+                params=None,
+                ordering=bound.tiers[0].ordering,
+            ),
+        )
+        mergers = [
+            UuidDocumentMerger({"uuid": value}, params=None) for value in uuids
+        ]
+        for merger in mergers:
+            group.join(merger, lookup_state(merger))
+        return group, mergers
+
+    def test_joined_rows_collapse_by_pk(self) -> None:
+        """Is a stored party that a pool reads once for each of its roles one candidate, not an ambiguity?"""
+        docket = DocketFactory.create()
+        party = PartyFactory.create(name="Two Roles", docket=docket)
+        for role in ("Appellant", "Respondent"):
+            PartyTypeFactory.create(docket=docket, party=party, name=role)
+        bound = Match(Key("name")).bind(PartyPoolMerger, PARTY_POOL)
+        reader = PARTY_POOL.reader(
+            PartyPoolMerger,
+            relation=None,
+            params=RelatedParams(None, parent=docket),
+            ordering=bound.tiers[0].ordering,
+        )
+        self.assertEqual(
+            len(reader.rows(Q(name="Two Roles"), ("pk",))),
+            2,
+            "The pool reads one row for each of the party's roles.",
+        )
+        group = MatchGroup(PartyPoolMerger, bound, reader)
+        merger = PartyPoolMerger({"name": "Two Roles"}, params=None)
+        group.join(merger, lookup_state(merger))
+
+        verdict = group.verdict(merger, lookup_state(merger))
+
+        self.assertEqual(summarise(verdict), ("update", party.pk))
+
+    def test_relation_params_are_part_of_the_key(self) -> None:
+        """Do members whose relation params differ match the rows of their own parent, however alike their scrapes?"""
+        other = DocketFactory.create()
+        mine = self.entry("same")
+        theirs = self.entry("same", docket=other)
+        pool = Global()
+        bound = Match(Key("description")).bind(MatchEntryMerger, pool)
+        group = MatchGroup(
+            MatchEntryMerger,
+            bound,
+            pool.reader(
+                MatchEntryMerger,
+                relation=None,
+                params=None,
+                ordering=bound.tiers[0].ordering,
+            ),
+        )
+        mergers = [
+            MatchEntryMerger(
+                entry_scrape("same"),
+                params=RelatedParams(
+                    None, parent=docket, parent_name="docket"
+                ),
+            )
+            for docket in (self.docket, other)
+        ]
+        for merger in mergers:
+            group.join(merger, lookup_state(merger))
+
+        self.assertEqual(
+            [summarise(group.verdict(m, lookup_state(m))) for m in mergers],
+            [("update", mine.pk), ("update", theirs.pk)],
+        )
+
+    def test_keyed_query_count_is_fixed(self) -> None:
+        """Does a keyed pool cost one query per tier whatever the number of members?"""
+        match = Match(Key("description"), Key("entry_number"))
+        for count in (1, 10):
+            with self.subTest(count):
+                group, mergers = self.group(
+                    match,
+                    [
+                        entry_scrape(f"absent {n}", number=n)
+                        for n in range(count)
+                    ],
+                    Relatives(docket=Ancestor(Docket)),
+                )
+
+                with self.assertNumQueries(2):
+                    verdicts = self.verdicts(group, mergers)
+
+                self.assertEqual(
+                    {summarise(v) for v in verdicts}, {("create", None)}
+                )
+
+    def test_keyed_tier_without_unassigned_members_is_not_queried(
+        self,
+    ) -> None:
+        """Does a keyed pool go unread by tiers that every member has already left?"""
+        self.entry("found")
+        group, mergers = self.group(
+            Match(Key("description"), Key("entry_number")),
+            [entry_scrape("found")],
+            Relatives(docket=Ancestor(Docket)),
+        )
+
+        with self.assertNumQueries(1):
+            self.verdicts(group, mergers)
+
+    def test_whole_query_count_is_fixed(self) -> None:
+        """Does a whole pool cost one query whatever the number of members and tiers?"""
+        match = Match(
+            Key("description"),
+            Key("entry_number", ambiguous=First("-date_created")),
+            Key("pacer_sequence_number"),
+        )
+        for count in (1, 10):
+            with self.subTest(count):
+                group, mergers = self.group(
+                    match,
+                    [
+                        entry_scrape(f"absent {n}", number=n, pacer=n)
+                        for n in range(count)
+                    ],
+                    Siblings(),
+                )
+
+                with self.assertNumQueries(1):
+                    verdicts = self.verdicts(group, mergers)
+
+                self.assertEqual(
+                    {summarise(v) for v in verdicts}, {("create", None)}
+                )
+
+    def test_result_ignores_member_order(self) -> None:
+        """Does every order of the members give each scrape the same verdict?"""
+        first = self.entry("d", number=1)
+        second = self.entry("d", number=2)
+        scrapes = [
+            entry_scrape("z", number=1),
+            entry_scrape("d", number=3),
+            entry_scrape("e", number=4),
+        ]
+        match = Match(
+            Key("entry_number"), Key("description", ambiguous=First("pk"))
+        )
+        expected = {
+            1: ("update", first.pk),
+            3: ("update", second.pk),
+            4: ("create", None),
+        }
+
+        for order in permutations(scrapes):
+            with self.subTest([s["number"] for s in order]):
+                group, mergers = self.group(match, order, Siblings())
+                actual = {
+                    s["number"]: summarise(v)
+                    for s, v in zip(
+                        order, self.verdicts(group, mergers), strict=True
+                    )
+                }
+                self.assertEqual(actual, expected)
+
+    def test_reader_rows_are_not_mutated(self) -> None:
+        """Does matching leave the rows a whole reader hands out as they were?"""
+        for description in ("a", "b", "c"):
+            self.entry(description, number=1)
+        pool = Siblings()
+        bound = Match(
+            Key("description", ambiguous=Narrow("entry_number")),
+            Key("entry_number", ambiguous=First("-pk")),
+        ).bind(MatchEntryMerger, pool)
+        reader = pool.reader(
+            MatchEntryMerger,
+            relation=self.docket.docket_entries.all(),
+            params=None,
+            ordering=bound.tiers[0].ordering,
+        )
+        before = list(reader.rows(Q(), bound.tiers[0].ordering))
+        group = MatchGroup(MatchEntryMerger, bound, reader)
+        mergers = [
+            MatchEntryMerger(entry_scrape(d, number=1), params=None)
+            for d in ("a", "b", "c", "d")
+        ]
+        for merger in mergers:
+            group.join(merger, lookup_state(merger))
+
+        self.verdicts(group, mergers)
+
+        self.assertEqual(
+            list(reader.rows(Q(), bound.tiers[0].ordering)), before
+        )
+
+    def test_prune_delegates_to_the_reader(self) -> None:
+        """Does the group delete the relation's rows that were not kept?"""
+        kept = self.entry("kept")
+        self.entry("stale")
+        relation = self.docket.docket_entries.all()
+        group, _ = self.group(Match(Key("description")), [], Siblings())
+
+        group.prune(relation, {kept.pk})
+
+        self.assertEqual(
+            list(self.docket.docket_entries.values_list("pk", flat=True)),
+            [kept.pk],
+        )
+
+    def test_build_reads_the_pool_in_the_first_tiers_order(self) -> None:
+        """Does a built group's reader order rows by the first tier's ordering, ending in pk?"""
+        older = self.entry("twice", number=1)
+        newer = self.entry("twice", number=2)
+        for row, year in ((older, 2020), (newer, 2021)):
+            DocketEntry.objects.filter(pk=row.pk).update(
+                date_created=datetime(year, 1, 1, tzinfo=UTC)
+            )
+        pool = Relatives(docket=Ancestor(Docket))
+        bound = Match(
+            Key("description", ambiguous=First("-date_created"))
+        ).bind(MatchEntryMerger, pool)
+        merger = type(
+            "BuiltEntryMerger", (MatchEntryMerger,), {"_bound_match": bound}
+        )
+
+        group = MatchGroup.build(
+            merger,
+            pool,
+            relation=None,
+            params=RelatedParams(None, parent=self.docket),
+        )
+        member = merger(entry_scrape("twice"), params=None)
+        group.join(member, lookup_state(member))
+
+        self.assertEqual(
+            summarise(group.verdict(member, lookup_state(member))),
+            ("update", newer.pk),
+        )
+
+    def test_build_rejects_a_match_the_pool_cannot_query(self) -> None:
+        """Does building a group refuse a match with a tier the keyed pool would read whole?"""
+        pool = Global()
+        bound = Match(
+            Key(
+                Fn(operator.methodcaller("lower"))(
+                    Database(DocketEntry.description)
+                )
+                == Scrape(dict)["description"]
+            )
+        ).bind(MatchEntryMerger, pool)
+        merger = type(
+            "UnqueryableEntryMerger",
+            (MatchEntryMerger,),
+            {"_bound_match": bound},
+        )
+
+        with self.assertRaises(TypeError):
+            MatchGroup.build(merger, pool, relation=None, params=None)

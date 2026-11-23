@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+import operator
 import typing
+from collections import Counter, defaultdict
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
+from functools import reduce
 from typing import Any, cast
 
-from django.db.models import Field, Model
+from django.core.exceptions import ValidationError
+from django.db.models import Field, Model, Q, QuerySet
 from typing_extensions import Sentinel
 
+from cl.corpus_importer.state.utils import MergeResult
+
 from . import state as MergerState
-from .parameters import Create
-from .pool import Ordering, Pool, Relatives
+from .parameters import Create, Update
+from .pool import Ordering, Pool, PoolReader, Relatives
 from .specifications import (
     AttributeMerger,
     Comparison,
@@ -21,6 +29,8 @@ from .specifications import (
 
 if typing.TYPE_CHECKING:
     from .base import Merger
+
+logger = logging.getLogger(__name__)
 
 Next = Sentinel("Next")
 """Fall through to the next tier. After the last tier, a merger that matched nothing creates and one that is a duplicate is judged by its candidates."""
@@ -194,6 +204,26 @@ class BoundTerm:
         """
         return self.stored.transform(None, None, row)
 
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        """Evaluate the scraped side for a merger, before the stored field converts it.
+
+        Args:
+            merger: The merger being matched; the shorthand reads the value it
+                computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit
+                term is evaluated against.
+
+        Returns:
+            The scraped value as the merger has it.
+        """
+        if self.attribute is not None:
+            return getattr(merger, self.attribute)
+        return cast(AttributeMerger, self.scraped).transform(
+            state.scrape, state.params, None
+        )
+
     def scraped_value(
         self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
     ) -> Any:
@@ -213,12 +243,7 @@ class BoundTerm:
             django.core.exceptions.ValidationError: If the stored field
                 rejects the scraped value.
         """
-        if self.attribute is not None:
-            value = getattr(merger, self.attribute)
-        else:
-            value = cast(AttributeMerger, self.scraped).transform(
-                state.scrape, state.params, None
-            )
+        value = self.scraped_raw(merger, state)
         if self.field is None:
             return value
         return self.field.to_python(value)
@@ -566,3 +591,519 @@ class Match:
                 )
             ),
         )
+
+
+class _Rejected(Exception):
+    """A scraped value that the stored field it is compared with cannot hold; its message says which."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Failure:
+    """How a member's lookup ended in failure.
+
+    :ivar text: The reason, as given to the failed state and the log.
+    """
+
+    text: str
+
+
+type Resolution[M: Model] = Update[M] | Create | _Failure
+"""How a member's lookup ended: the row it merges into, a new row, or a failure."""
+
+
+@dataclass(frozen=True, slots=True)
+class _TierKey:
+    """What a member is told apart by in one tier.
+
+    :ivar relations: The primary keys of the member's relation params, in
+        sorted param-name order.
+    :ivar values: The scraped values of the tier's key terms.
+    :ivar chain: The scraped values of the terms of every `Narrow` the tier
+        chains through.
+    """
+
+    relations: tuple[Any, ...]
+    values: tuple[Any, ...]
+    chain: tuple[Any, ...]
+
+    @property
+    def key(self) -> tuple[Any, ...]:
+        """The values stored rows must equal to be the member's candidates."""
+        return (*self.relations, *self.values)
+
+    @property
+    def duplicate(self) -> tuple[Any, ...]:
+        """The values that members share when nothing in the tier can tell them apart."""
+        return (*self.key, *self.chain)
+
+
+@dataclass(eq=False)
+class _Member[M: Model]:
+    """A merger in a group and how its lookup is going.
+
+    :ivar merger: The merger.
+    :ivar state: The merger's state, which its scrape and params are read from.
+    :ivar keys: The member's `_TierKey` for each tier. Empty until the group is
+        assigned.
+    :ivar resolution: How the member's lookup ended, or `None` while it is
+        still looking.
+    """
+
+    merger: Merger[Any, Any, M]
+    state: MergerState.Lookup[Any, Any, M]
+    keys: tuple[_TierKey, ...] = ()
+    resolution: Resolution[M] | None = None
+
+
+@dataclass(eq=False)
+class _Entry[M: Model]:
+    """A member's progress through one tier.
+
+    :ivar member: The member.
+    :ivar key: The member's key in the tier.
+    :ivar candidates: The available rows still matching the member, in the
+        order the pool handed them out. A pool that reads one row for each
+        join may list a primary key more than once.
+    :ivar last: The candidates before the last filter that emptied them, or
+        the current ones while there are some.
+    :ivar depth: How many terms of the tier's `Narrow` chain have filtered the
+        candidates.
+    :ivar outcome: What the tier decided for the member so far.
+    """
+
+    member: _Member[M]
+    key: _TierKey
+    candidates: list[M]
+    last: list[M]
+    depth: int = 0
+    outcome: Resolution[M] | Next | None = None
+
+    @property
+    def shown_key(self) -> tuple[Any, ...]:
+        """The values the member has been told apart by so far, as a failure reports them."""
+        return (*self.key.key, *self.key.chain[: self.depth])
+
+    @property
+    def pks(self) -> list[Any]:
+        """The primary keys of the candidates, each once, in order."""
+        return list(dict.fromkeys(row.pk for row in self.candidates))
+
+    def narrow(self, terms: Sequence[BoundTerm]) -> None:
+        """Keep the candidates equal to the member on the next terms of its `Narrow` chain.
+
+        Args:
+            terms: The terms of the `Narrow` being applied, which must be the
+                ones following those already applied.
+        """
+        values = self.key.chain[self.depth : self.depth + len(terms)]
+        self.depth += len(terms)
+        self.candidates = [
+            row
+            for row in self.candidates
+            if all(
+                term.stored_value(row) == value
+                for term, value in zip(terms, values, strict=True)
+            )
+        ]
+        if self.candidates:
+            self.last = self.candidates
+
+
+class MatchGroup[M: Model]:
+    """Assigns the stored rows of a pool to the mergers of a sibling group, tier by tier.
+
+    Every merger of the group has to be joined before any asks for its
+    verdict: the first verdict assigns every joined merger, so that a tier is
+    a priority across the group and the result does not depend on the order
+    the mergers were created in. Rows created while the group merges are not
+    seen.
+    """
+
+    def __init__(
+        self,
+        merger: type[Merger[Any, Any, M]],
+        match: BoundMatch,
+        reader: PoolReader[M],
+    ) -> None:
+        """Start a group.
+
+        Args:
+            merger: The class of the group's mergers.
+            match: The match the group is assigned by.
+            reader: The reader of the pool the group's rows come from, built
+                for the first tier's ordering.
+        """
+        self._merger: type[Merger[Any, Any, M]] = merger
+        self._match: BoundMatch = match
+        self._reader: PoolReader[M] = reader
+        self._members: dict[int, _Member[M]] = {}
+        self._relation_names: list[str] = []
+        self._relation_attnames: list[str] = []
+        self._unavailable: set[Any] = set()
+        self._assigned: bool = False
+
+    @classmethod
+    def build(
+        cls,
+        merger: type[Merger[Any, Any, M]],
+        pool: Pool,
+        *,
+        relation: QuerySet[M] | None,
+        params: Any,
+    ) -> MatchGroup[M]:
+        """Start the group of a merger's siblings.
+
+        Args:
+            merger: The class of the group's mergers.
+            pool: The pool the merger's rows are read from.
+            relation: What the parent holds in the group's relation, if the
+                group is a relation of another merger.
+            params: The params the group's mergers were created with.
+
+        Returns:
+            The group, with no members.
+
+        Raises:
+            TypeError: If the merger's match cannot be matched in the pool.
+        """
+        match = merger._bound_match
+        if errors := match.check_pool(pool):
+            raise TypeError(
+                f"{merger.__name__} cannot be matched in {type(pool).__name__}: "
+                + "; ".join(str(error) for error in errors)
+            )
+        reader = pool.reader(
+            merger,
+            relation=relation,
+            params=params,
+            ordering=match.tiers[0].ordering,
+        )
+        return cls(merger, match, reader)
+
+    def join(
+        self, merger: Merger[Any, Any, M], state: MergerState.Lookup
+    ) -> None:
+        """Make a merger a member of the group.
+
+        Args:
+            merger: A merger of the group's class with its values computed.
+                Mergers that fail validation or are not looking for their row
+                are not members.
+            state: The merger's state.
+        """
+        self._members[id(merger)] = _Member(merger, state)
+
+    def verdict(
+        self, merger: Merger[Any, Any, M], state: MergerState.Lookup
+    ) -> (
+        MergerState.Create[Any, Any, M]
+        | MergerState.Update[Any, Any, M]
+        | MergerState.Failed[Any, Any, M]
+    ):
+        """Say what a member's lookup comes to.
+
+        The first call assigns every joined member.
+
+        Args:
+            merger: A member of the group.
+            state: The merger's state.
+
+        Returns:
+            The state the merger moves to: creating a row, updating the row it
+            was assigned, or failed.
+        """
+        if not self._assigned:
+            self._assign()
+        resolution = self._members[id(merger)].resolution
+        if isinstance(resolution, Update):
+            return state.update(resolution.instance)
+        if isinstance(resolution, _Failure):
+            return state.failed(
+                resolution.text,
+                MergeResult.failed(self._merger.config.model.__name__),
+            )
+        return state.create()
+
+    def prune(self, relation: QuerySet[M], keep: Collection[Any]) -> None:
+        """Delete the rows of a parent's relation that were not kept.
+
+        Args:
+            relation: The parent's rows in the relation being replaced.
+            keep: The primary keys of the rows to keep.
+        """
+        self._reader.prune(relation, keep)
+
+    def _assign(self) -> None:
+        """Assign every member, tier by tier."""
+        self._assigned = True
+        if not self._members:
+            return
+        first = next(iter(self._members.values()))
+        self._relation_names = sorted(first.state.relation_params)
+        model = self._merger.config.model
+        self._relation_attnames = [
+            cast(Field, model._meta.get_field(name)).attname
+            for name in self._relation_names
+        ]
+        live = [m for m in self._members.values() if self._evaluate(m)]
+        tiers = self._match.tiers
+        for position, tier in enumerate(tiers):
+            self._run_tier(tier, live, final=position == len(tiers) - 1)
+        for member in live:
+            if member.resolution is None:
+                member.resolution = Create
+
+    def _evaluate(self, member: _Member[M]) -> bool:
+        """Compute a member's key in every tier, failing the member if a stored field rejects one of its values.
+
+        Returns:
+            Whether the member can be matched.
+        """
+        relations = tuple(
+            member.state.relation_params[name].pk
+            for name in self._relation_names
+        )
+        try:
+            member.keys = tuple(
+                _TierKey(
+                    relations,
+                    tuple(self._scraped(member, t) for t in tier.terms),
+                    tuple(self._scraped(member, t) for t in tier.chain_terms),
+                )
+                for tier in self._match.tiers
+            )
+        except _Rejected as rejected:
+            text = f"{self._merger.__name__}: {rejected} (tier 1, key ())"
+            logger.error("%s", text)
+            member.resolution = _Failure(text)
+            return False
+        return True
+
+    def _scraped(self, member: _Member[M], term: BoundTerm) -> Any:
+        """A member's scraped value for a term.
+
+        Raises:
+            _Rejected: If the term's stored field cannot hold the value.
+        """
+        try:
+            return term.scraped_value(member.merger, member.state)
+        except ValidationError:
+            raise _Rejected(
+                f"{cast(Field, term.field).name} cannot hold scraped value "
+                f"{term.scraped_raw(member.merger, member.state)!r}"
+            ) from None
+
+    def _run_tier(
+        self, tier: BoundTier, members: list[_Member[M]], *, final: bool
+    ) -> None:
+        """Assign the members still looking from the rows a tier matches them with.
+
+        Args:
+            tier: The tier.
+            members: Every member that can be matched, assigned or not.
+            final: Whether the tier is the last one.
+        """
+        position = tier.index - 1
+        looking = [m for m in members if m.resolution is None]
+        if not looking:
+            return
+        rows = self._reader.rows(self._where(tier, looking), tier.ordering)
+        index: dict[tuple[Any, ...], list[M]] = defaultdict(list)
+        for row in rows:
+            if row.pk not in self._unavailable:
+                index[self._row_key(row, tier)].append(row)
+        entries = []
+        for member in looking:
+            key = member.keys[position]
+            candidates = index.get(key.key, [])
+            entries.append(_Entry(member, key, candidates, candidates))
+        # A member that an earlier tier assigned still shares its key.
+        sharing = Counter(m.keys[position].duplicate for m in members)
+        # On a last tier that lets duplicates through, they are judged by their
+        # candidates like any other member.
+        checks_duplicates = not (final and tier.duplicate is Next)
+        duplicates: list[_Entry[M]] = []
+        deciding: list[_Entry[M]] = []
+        for entry in entries:
+            if checks_duplicates and sharing[entry.key.duplicate] > 1:
+                duplicates.append(entry)
+            else:
+                deciding.append(entry)
+        self._settle(tier, tier, deciding, duplicates)
+        sets: dict[tuple[Any, ...], list[_Entry[M]]] = defaultdict(list)
+        for entry in duplicates:
+            sets[entry.key.duplicate].append(entry)
+        for shared, group in sets.items():
+            self._duplicate(tier, group, sharing[shared])
+        self._collide(tier, entries)
+        self._close(entries)
+
+    def _where(self, tier: BoundTier, members: list[_Member[M]]) -> Q:
+        """The filter that finds every row a tier could match the members with.
+
+        Returns:
+            One alternative for each distinct key: the member's relation params
+            and the values of its terms comparing a stored field directly,
+            null as a null check.
+        """
+        position = tier.index - 1
+        alternatives: dict[tuple[Any, ...], Q] = {}
+        for member in members:
+            key = member.keys[position]
+            if key.key in alternatives:
+                continue
+            terms = [
+                Q(**{f"{term.field.name}__isnull": True})
+                if value is None
+                else Q(**{term.field.name: value})
+                for term, value in zip(tier.terms, key.values, strict=True)
+                if term.field is not None
+            ]
+            alternatives[key.key] = Q(**member.state.relation_params) & reduce(
+                operator.and_, terms, Q()
+            )
+        return reduce(operator.or_, alternatives.values())
+
+    def _row_key(self, row: M, tier: BoundTier) -> tuple[Any, ...]:
+        """The values of a stored row that members are matched on in a tier."""
+        return (
+            *(getattr(row, attname) for attname in self._relation_attnames),
+            *(term.stored_value(row) for term in tier.terms),
+        )
+
+    def _settle(
+        self,
+        tier: BoundTier,
+        stage: BoundTier | BoundNarrow,
+        entries: list[_Entry[M]],
+        bystanders: list[_Entry[M]],
+    ) -> None:
+        """Decide what a tier or one of its `Narrow`s does with each entry, and carry on through the `Narrow`s it chains to.
+
+        Args:
+            tier: The tier being assigned.
+            stage: The tier itself, or a `Narrow` its `ambiguous` outcome
+                chains to, whose outcomes decide the entries.
+            entries: The entries that `stage` decides.
+            bystanders: Entries that are not decided here but still hold the
+                rows they match, so that they contest them: duplicates, which
+                the chain narrows along with the entries.
+        """
+        if not entries and not bystanders:
+            return
+        holders: dict[Any, list[_Entry[M]]] = defaultdict(list)
+        for entry in (*entries, *bystanders):
+            for pk in entry.pks:
+                holders[pk].append(entry)
+        model = self._merger.config.model.__name__
+        narrowing: list[_Entry[M]] = []
+        for entry in entries:
+            pks = entry.pks
+            if not pks:
+                self._decide(tier, entry, stage.missing, f"no {model} matches")
+            elif len(pks) == 1 and len(holders[pks[0]]) == 1:
+                entry.outcome = Update(entry.candidates[0])
+            else:
+                match stage.ambiguous:
+                    case BoundNarrow():
+                        narrowing.append(entry)
+                    case First():
+                        entry.outcome = Update(entry.candidates[0])
+                    case outcome:
+                        rivals = {id(h) for pk in pks for h in holders[pk]}
+                        self._decide(
+                            tier,
+                            entry,
+                            outcome,
+                            f"cannot pick one {model}: {len(pks)} rows for "
+                            f"{len(rivals)} scraped items",
+                        )
+        if not isinstance(narrow := stage.ambiguous, BoundNarrow):
+            return
+        for entry in (*narrowing, *bystanders):
+            entry.narrow(narrow.terms)
+        self._settle(tier, narrow, narrowing, bystanders)
+
+    def _decide(
+        self, tier: BoundTier, entry: _Entry[M], outcome: Outcome, default: str
+    ) -> None:
+        """Apply an outcome that ends an entry's tier without taking a row.
+
+        Args:
+            tier: The tier being assigned.
+            entry: The entry the outcome is for.
+            outcome: The outcome declared.
+            default: The reason a `Fail` without a message gives.
+        """
+        if isinstance(outcome, Fail):
+            message = default if outcome.message is None else outcome.message
+            self._fail(tier, [entry], message)
+            return
+        entry.outcome = outcome
+
+    def _duplicate(
+        self, tier: BoundTier, group: list[_Entry[M]], count: int
+    ) -> None:
+        """Apply a tier's `duplicate` outcome to entries that it cannot tell apart.
+
+        Args:
+            tier: The tier being assigned.
+            group: The entries sharing a key, or picking one row.
+            count: How many scraped items share the key.
+        """
+        outcome = tier.duplicate
+        if not isinstance(outcome, Fail):
+            for entry in group:
+                entry.outcome = outcome
+            return
+        default = (
+            f"{count} scraped items share a key; the key needs another term"
+        )
+        message = default if outcome.message is None else outcome.message
+        self._fail(tier, group, message)
+
+    def _fail(
+        self, tier: BoundTier, group: list[_Entry[M]], message: str
+    ) -> None:
+        """Fail entries with a reason, logging each distinct reason once.
+
+        Args:
+            tier: The tier being assigned.
+            group: The entries to fail. Those sharing a key share the reason,
+                and so its log line.
+            message: What the reason says before the tier and key.
+        """
+        texts = [
+            f"{self._merger.__name__}: {message} "
+            f"(tier {tier.index}, key {entry.shown_key})"
+            for entry in group
+        ]
+        for entry, text in zip(group, texts, strict=True):
+            entry.outcome = _Failure(text)
+        for text in dict.fromkeys(texts):
+            logger.error("%s", text)
+
+    def _collide(self, tier: BoundTier, entries: list[_Entry[M]]) -> None:
+        """Apply the tier's `duplicate` outcome to entries that took the same row."""
+        claims: dict[Any, list[_Entry[M]]] = defaultdict(list)
+        for entry in entries:
+            if isinstance(entry.outcome, Update):
+                claims[entry.outcome.instance.pk].append(entry)
+        for group in claims.values():
+            if len(group) > 1:
+                self._duplicate(tier, group, len(group))
+
+    def _close(self, entries: list[_Entry[M]]) -> None:
+        """Record the tier's outcomes on its members and take rows out of reach of later tiers.
+
+        A claimed row is taken, and so are the candidates a failed member last
+        had. Those of a member that falls through stay.
+        """
+        for entry in entries:
+            outcome = entry.outcome
+            if isinstance(outcome, Update):
+                self._unavailable.add(outcome.instance.pk)
+            elif isinstance(outcome, _Failure):
+                self._unavailable.update(row.pk for row in entry.last)
+            if outcome is not None and outcome is not Next:
+                entry.member.resolution = outcome
