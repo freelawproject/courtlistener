@@ -6,6 +6,6 @@
 {{ line|wordwrap:80 }}{% endfor %}{% for doc in de.texasdocument_set.all %}
 {{ doc.description|default:"Document" }}{% if doc.filepath_local %}
 Download from RECAP: {{ doc.filepath_local.url }}{% elif doc.url|http_url %}
-Download from TAMES: {{ doc.url|http_url }}{% endif %}{% endfor %}
+Download from RECAP with TAMES fallback: https://www.courtlistener.com{{ doc.get_absolute_url }}?redirect_to_download=True{% endif %}{% endfor %}
 
 {% endfor %}{% endautoescape %}{% endblock %}
