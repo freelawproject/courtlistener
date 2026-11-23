@@ -30,7 +30,8 @@ from graphlib import CycleError, TopologicalSorter
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
-from .lookup import Duplicate, KeyLookup, NaturalKey, SiblingLookup
+from .lookup import NaturalKey
+from .match import BoundMatch, Key, Match, MatchGroup
 from .parameters import (
     Create,
     Existing,
@@ -38,6 +39,7 @@ from .parameters import (
     RelatedParams,
     ThroughParameters,
 )
+from .pool import Global, Pool
 from .specifications import (
     AttributeMerger,
     ManyToManyMerger,
@@ -225,14 +227,15 @@ class MergerConfig[M: Model]:
     """Class-level settings determining a merger's behavior.
 
     :ivar model: The model the merger applies to.
-    :ivar key: A natural key to use for looking up objects in the DB; used in
-        the default `lookup` implementation.
+    :ivar key: A natural key a merger that overrides `lookup` can look objects
+        up by; a merger that does not declares a `Match` instead.
     :ivar reads: Additionaly model fields to load. Useful for situations like
         preventing extra queries from custom `save` methods that inspect fields.
     :ivar registry: The specs declared on the merger. Filled in when the
         merger class is created, so it should not be passed.
     :ivar fields: The model fields loaded of an object read to be merged
-        into; every other field is deferred.
+        into; every other field is deferred. Filled in when the merger class
+        is created, so it should not be passed.
     """
 
     model: Final[type[M]]
@@ -242,32 +245,6 @@ class MergerConfig[M: Model]:
         default_factory=MergerSpecRegistry
     )
     fields: tuple[str, ...] = field(init=False, default=())
-
-    def __post_init__(self) -> None:
-        """Work out which fields to load from the specs, key and reads.
-
-        The base merger's placeholder config, for `Model` itself, loads
-        nothing.
-        """
-        if self.model is Model:
-            return
-        self.fields = tuple(
-            {
-                *self.registry.attr,
-                *self.key,
-                *self.reads,
-                *(
-                    f
-                    for m in self.registry.all().values()
-                    for f in m._db_fields
-                ),
-                *(
-                    f.attname
-                    for f in self.model._meta.concrete_fields
-                    if f.is_relation
-                ),
-            }
-        )
 
     def loading[QModel: Model](
         self, objects: QuerySet[QModel]
@@ -286,13 +263,26 @@ class MergerConfig[M: Model]:
 
     @classmethod
     def inherit(
-        cls, parent: type[Merger], registry: MergerSpecRegistry
+        cls,
+        parent: type[Merger],
+        registry: MergerSpecRegistry,
+        columns: frozenset[str],
     ) -> MergerConfig:
         """Build a config for a subclass of ``parent`` using ``registry``.
 
         The subclass reads every field read by any of its mergers in the MRO.
+
+        Args:
+            parent: The merger class the config is for, or its base.
+            registry: The specs declared on the merger.
+            columns: The model fields the merger's match reads from stored
+                rows, which are loaded with the fields its specs use.
+
+        Returns:
+            The config, with the fields to load worked out from the specs, key,
+            reads and match columns.
         """
-        return MergerConfig(
+        config = MergerConfig(
             parent.config.model,
             parent.config.key,
             reads=tuple(
@@ -305,6 +295,21 @@ class MergerConfig[M: Model]:
             ),
             registry=registry,
         )
+        config.fields = tuple(
+            {
+                *registry.attr,
+                *config.key,
+                *config.reads,
+                *columns,
+                *(f for m in registry.all().values() for f in m._db_fields),
+                *(
+                    f.attname
+                    for f in config.model._meta.concrete_fields
+                    if f.is_relation
+                ),
+            }
+        )
+        return config
 
 
 class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
@@ -320,6 +325,15 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
     config: ClassVar[MergerConfig[Model]] = MergerConfig(Model)
     """Configurable information determining merger behavior."""
+
+    pool: ClassVar[Pool | None] = None
+    """Which stored rows the merger can match. Without one, the merger is matched in the pool of the relation it is merged through, or in `Global` when it has no parent."""
+
+    match: ClassVar[Match] = Match(Key())
+    """How the merger picks the stored row it merges into. The default `Key()` has no terms of its own, so it only separates rows by the merger's relation params."""
+
+    _bound_match: ClassVar[BoundMatch]
+    """`match` checked against this merger class. Set when the class is created."""
 
     def __init_subclass__(cls, abstract: bool = False) -> None:
         """Initialize a merger subclass.
@@ -344,7 +358,20 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
 
         errors = registry.validate(cls)
 
-        cls.config = MergerConfig.inherit(cls, registry)
+        # Binding the match reads the merger's model and specs from its config,
+        # so a config is in place first and then completed with the columns
+        # the match reads.
+        cls.config = MergerConfig.inherit(cls, registry, frozenset())
+        try:
+            cls._bound_match = cls.match.bind(cls, cls.pool)
+        except ExceptionGroup as problems:
+            errors.extend(problems.exceptions)
+        else:
+            if cls.pool is not None:
+                errors.extend(cls.pool_errors(cls.pool))
+            cls.config = MergerConfig.inherit(
+                cls, registry, cls._bound_match.columns
+            )
 
         if errors:
             raise TypeError(
@@ -414,7 +441,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         params: Params,
         existing: Existing[M] = Lookup,
         manager: Manager[M] | None = None,
-        siblings: SiblingLookup[M] | None = None,
+        group: MatchGroup[M] | None = None,
     ):
         """Create an object to track the merge operation on the specified data.
 
@@ -422,13 +449,15 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             scrape: The scraped data to transform.
             params: Parameters passed to the merger.
             existing: Whether to look the object up, create it, or merge into a known one.
-            manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
-            siblings: The lookup shared with the mergers created alongside
+            manager: The manager to use for creation of objects. Defaults to the model's default manager.
+            group: The match group shared with the mergers created alongside
                 this one, all of which must be created before any is merged.
+                A merger that looks its object up joins it. Without one, the
+                merger builds a group of its own when it first looks.
 
         Attributes:
-            manager: The manager to use for lookups and creation of objects.
-            siblings: The lookup that finds the object to merge into.
+            manager: The manager to use for creation of objects.
+            group: The match group that finds the object to merge into.
         """
         super().__init__(self.initial_state(scrape, params, existing))
 
@@ -444,11 +473,9 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             manager = cast(Manager[M], self.config.model._default_manager)
         self.manager: Manager[M] = manager
 
-        if siblings is None:
-            siblings = KeyLookup(type(self))
-        self.siblings: SiblingLookup[M] = siblings
-        if isinstance(self.state, MergerState.Lookup):
-            siblings.claim(self.natural_key(self.state), self)
+        self.group: MatchGroup[M] | None = group
+        if group is not None and isinstance(self.state, MergerState.Lookup):
+            group.join(self, self.state)
 
     @final
     def populate_from_db(
@@ -504,22 +531,48 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         """The objects matching this merger's natural key."""
         return self.stored.filter(**self.natural_key(state).filters)
 
+    @classmethod
+    def pool_errors(cls, pool: Pool) -> list[Exception]:
+        """Check this merger's match against the pool its rows are read from.
+
+        Args:
+            pool: The pool the merger is matched in.
+
+        Returns:
+            One error for each tier that cannot be queried in `pool`. A merger
+            that overrides `lookup` never matches by its `match`, so it has
+            none.
+        """
+        if cls.lookup is not Merger.lookup:
+            return []
+        return cls._bound_match.check_pool(pool)
+
     @override
     def lookup(
         self, state: MergerState.Lookup[Scrape, Params, M]
     ) -> MergerState.LookupOutput[Scrape, Params, M]:
-        candidates = self.siblings.candidates(self.natural_key(state), self)
-        if candidates is Duplicate:
-            model_name = self.config.model.__name__
-            logger.error(
-                "Multiple scraped instances with same natural key for model %s",
-                model_name,
+        """Find the object to merge into by this merger's `match` in its `pool`.
+
+        A merger created without a group has no siblings, so it is matched on
+        its own in a group built here, in the merger's declared pool or
+        `Global`.
+
+        Returns:
+            The state the merger moves to: creating a row, updating the row
+            it matched, or failed.
+
+        Raises:
+            TypeError: If the match cannot be queried in the pool.
+        """
+        if self.group is None:
+            self.group = MatchGroup.build(
+                type(self),
+                type(self).pool or Global(),
+                relation=None,
+                params=state.params,
             )
-            return state.failed(
-                "Multiple scraped instances with same natural key",
-                MergeResult.failed(model_name),
-            )
-        return state.resolve(candidates)
+            self.group.join(self, state)
+        return self.group.verdict(self, state)
 
     @override
     def resolve(

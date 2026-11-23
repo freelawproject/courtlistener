@@ -37,15 +37,18 @@ from .base import (
     MergerConfig,
     MergerSpecRegistry,
 )
-from .lookup import KeyLookup, NaturalKey
+from .lookup import NaturalKey
+from .match import Key, Match, MatchGroup
 from .parameters import (
     Create,
     RelatedParams,
     ThroughParameters,
     Update,
 )
+from .pool import Global
 from .specifications import (
     Constant,
+    Database,
     ManyToManyRelation,
     OneToManyRelation,
     OneToOneRelation,
@@ -129,8 +132,9 @@ class EntryMerger(
     Merger[dict[str, Any], RelatedParams[DocketParams], DocketEntry]
 ):
     config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
-        model=DocketEntry, key=("entry_number",)
+        model=DocketEntry
     )
+    match: ClassVar[Match] = Match(Key("entry_number"))
 
     entry_number: int = ScrapeProxy(dict[str, Any])["entry_number"]
     description: str = ScrapeProxy(dict[str, Any])["description"]
@@ -167,9 +171,8 @@ class OriginMerger(
 
 
 class PartyMerger(Merger[dict[str, Any], RelatedParams[DocketParams], Party]):
-    config: ClassVar[MergerConfig[Party]] = MergerConfig(
-        model=Party, key=("name",)
-    )
+    config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+    match: ClassVar[Match] = Match(Key("name"))
 
     name: str = ScrapeProxy(dict[str, Any])["name"]
 
@@ -177,20 +180,19 @@ class PartyMerger(Merger[dict[str, Any], RelatedParams[DocketParams], Party]):
 class PartyTypeMerger(
     Merger[dict[str, Any], ThroughParameters[DocketParams], PartyType]
 ):
-    config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
-        model=PartyType, key=("name",)
-    )
+    config: ClassVar[MergerConfig[PartyType]] = MergerConfig(model=PartyType)
+    match: ClassVar[Match] = Match(Key("name"))
 
     name: str = ScrapeProxy(dict[str, Any])["type"]
 
 
 class DocketMerger(Merger[dict[str, Any], DocketParams, Docket]):
-    config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-        model=Docket,
-        key=(
-            "court_id",
+    config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+    match: ClassVar[Match] = Match(
+        Key(
+            Database(Docket.court_id) == Params(DocketParams).court_id,
             "docket_number",
-        ),
+        )
     )
 
     court_id: str = Params(DocketParams).court_id
@@ -598,9 +600,11 @@ class MergeDBBench:
             DocketMerger(scrape, params=params).merge()
 
         def run():
-            siblings = KeyLookup(DocketMerger)
+            group = MatchGroup.build(
+                DocketMerger, Global(), relation=None, params=params
+            )
             mergers = [
-                DocketMerger(scrape, params=params, siblings=siblings)
+                DocketMerger(scrape, params=params, group=group)
                 for scrape in scrapes
             ]
             for merger in mergers:

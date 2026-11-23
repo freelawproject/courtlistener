@@ -55,7 +55,9 @@ from cl.corpus_importer.state.merger import (
     Constant,
     Database,
     Fn,
+    Key,
     ManyStrategy,
+    Match,
     Merger,
     MergerConfig,
     MergerState,
@@ -336,8 +338,9 @@ class FloridaDocketEntryMerger(
     """
 
     config: ClassVar[MergerConfig[FloridaDocketEntry]] = MergerConfig(
-        model=FloridaDocketEntry, key=("docket_entry_uuid",)
+        model=FloridaDocketEntry
     )
+    match: ClassVar[Match] = Match(Key("docket_entry_uuid"))
 
     # Florida's CL field is a DateTimeField, so override the base's
     # date-only mapping with the scrape's full timestamp. Annotated as the

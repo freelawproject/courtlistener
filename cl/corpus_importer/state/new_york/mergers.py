@@ -39,7 +39,9 @@ from cl.corpus_importer.state.merger import (
     Constant,
     Database,
     Fn,
+    Key,
     ManyStrategy,
+    Match,
     Merger,
     MergerConfig,
     MergerState,
@@ -208,8 +210,9 @@ class NYCoADocumentMerger[ParamType](
     """
 
     config: ClassVar[MergerConfig[NYCoADocument]] = MergerConfig(
-        model=NYCoADocument, key=("file_name",)
+        model=NYCoADocument
     )
+    match: ClassVar[Match] = Match(Key("file_name"))
 
     file_name: str = Scrape(NYCoAFile).file_name
     content_type: str = Scrape(NYCoAFile).content_type
@@ -387,8 +390,9 @@ class NYCoADocketEntryMerger[ParamType](
     """
 
     config: ClassVar[MergerConfig[NYCoADocketEntry]] = MergerConfig(
-        model=NYCoADocketEntry, key=("docket_entry_id",)
+        model=NYCoADocketEntry
     )
+    match: ClassVar[Match] = Match(Key("docket_entry_id"))
 
     # Court-PASS only dates the filings its FILINGS table lists.
     date_filed: date | None = Scrape(NYCoDocketEntry).date_filed

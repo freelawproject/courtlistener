@@ -41,7 +41,6 @@ from model_utils.tracker import DescriptorWrapper
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
-from .lookup import KeyLookup, RelationLookup
 from .parameters import (
     Create,
     RelatedParams,
@@ -54,6 +53,7 @@ if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
 
     from .base import Merger
+    from .pool import Pool
 
 logger = logging.getLogger(__name__)
 
@@ -831,19 +831,67 @@ class RelatedMerger[
                         # type: ignore[union-attr]
                     )
                 )
+        errors += self._pool_errors(self.merger, self.pool)
         return errors
 
     @property
+    def _default_pool(self) -> Pool:
+        """The pool the related merger is matched in when it declares none: what the parent holds in the relation."""
+        from .pool import Siblings
+
+        return Siblings()
+
+    @property
+    def pool(self) -> Pool:
+        """The pool the related merger's rows are matched in: the one it declares, or the default for this kind of relation."""
+        return self.merger.pool or self._default_pool
+
+    def _pool_errors(
+        self, merger: type[Merger[Any, Any, Any]], pool: Pool
+    ) -> list[Exception]:
+        """Check a merger that declares no pool against the one this relation gives it.
+
+        Args:
+            merger: The merger of the relation's related objects or through rows.
+            pool: The pool the relation gives the merger.
+
+        Returns:
+            One error for each tier of the merger's match that cannot be
+            queried in `pool`. A merger that declares its own pool was checked
+            against it when its class was created.
+        """
+        if merger.pool is not None:
+            return []
+        return [
+            ValueError(
+                f"{self._name}: {merger.__name__} cannot be matched in "
+                f"{type(pool).__name__}: {error}"
+            )
+            for error in merger.pool_errors(pool)
+        ]
+
+    @property
     def prefetch(self) -> list[Prefetch]:
-        """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for."""
+        """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for.
+
+        A relation is only prefetched when its merger is matched among what the
+        parent holds in it, as a `Siblings` pool does. Every other pool reads
+        rows the relation does not hold.
+        """
+        from .pool import Siblings
+
+        if not isinstance(pool := self.pool, Siblings):
+            return []
         return [
             Prefetch(
                 self._name,
-                self.merger.config.loading(
+                pool.query(
+                    self.merger,
                     cast(
                         QuerySet[RM],
                         self.merger.config.model._default_manager.all(),
-                    )
+                    ),
+                    self.merger._bound_match.tiers[0].ordering,
                 ),
             )
         ]
@@ -1023,6 +1071,8 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        from .match import MatchGroup
+
         if parent is None:
             logger.error("Parent not provided for N to many merging")
             return MergeResult.failed(self.merger.config.model.__name__)
@@ -1036,13 +1086,18 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        children = RelationLookup(self.merger, related_manager.all())
+        children = MatchGroup.build(
+            self.merger,
+            self.pool,
+            relation=related_manager.all(),
+            params=related_params,
+        )
         child_mergers = [
             self.merger(
                 child,
                 params=related_params,
                 manager=related_manager,
-                siblings=children,
+                group=children,
             )
             for child in transformed
         ]
@@ -1055,14 +1110,9 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         match self.strategy:
             case ManyStrategy.REPLACE:
                 if len(related_objects) == len(child_mergers):
-                    to_keep = {r.pk for r in related_objects}
-                    if stale := {o.pk for o in children.existing()} - to_keep:
-                        # Not through `related_manager`: what a parent was
-                        # loaded with is missing fields, which the deletion
-                        # signals are entitled to.
-                        _ = self.merger.config.model._default_manager.filter(
-                            pk__in=stale
-                        ).delete()
+                    children.prune(
+                        related_manager.all(), {r.pk for r in related_objects}
+                    )
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
             # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
@@ -1185,17 +1235,32 @@ class ManyToManyMerger[
                     )
                 )
 
+            errors += self._pool_errors(self.through, self.through_pool)
+
         return errors
 
     @property
     @override
-    def prefetch(self) -> list[Prefetch]:
-        """The `prefetch_related` lookups loading the related objects, of which there are none with a through merger."""
-        if self.through is not None:
-            # The related objects are looked up among every object of their
-            # model rather than among those the parent already holds.
-            return []
-        return super().prefetch
+    def _default_pool(self) -> Pool:
+        """The pool the related merger is matched in when it declares none.
+
+        With a through merger the related objects are not tied to the parent
+        by the relation alone, so they are matched among every object of their
+        model; without one they are what the parent holds in the relation.
+        """
+        from .pool import Global
+
+        if self.through is None:
+            return super()._default_pool
+        return Global()
+
+    @property
+    def through_pool(self) -> Pool:
+        """The pool the through merger's rows are matched in: the one it declares, or what the parent holds in the through model."""
+        from .pool import Siblings
+
+        declared = None if self.through is None else self.through.pool
+        return declared or Siblings()
 
     def merge(
         self,
@@ -1204,6 +1269,8 @@ class ManyToManyMerger[
         params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        from .match import MatchGroup
+
         if parent is None:
             logger.error("%s: No parent model specified", self._name)
             return MergeResult.failed(self.merger.config.model.__name__)
@@ -1222,9 +1289,14 @@ class ManyToManyMerger[
 
         # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
         # this case
-        children = KeyLookup(self.merger)
+        children = MatchGroup.build(
+            self.merger,
+            self.pool,
+            relation=related_manager.all(),
+            params=related_params,
+        )
         child_mergers = [
-            self.merger(child, params=related_params, siblings=children)
+            self.merger(child, params=related_params, group=children)
             for child in transformed
         ]
         merged_children: list[tuple[Transform, RM]] = []
@@ -1249,19 +1321,22 @@ class ManyToManyMerger[
         all_children_merged = len(merged_children) == len(child_mergers)
         if self.strategy is ManyStrategy.REPLACE and all_children_merged:
             # Delete everything we didn't update or create along with associated objects
-            _ = related_manager.exclude(pk__in=children_to_keep).delete()
+            children.prune(related_manager.all(), children_to_keep)
 
         # Only through objects belonging to this parent are matched or
         # pruned; other parents' relationships are out of scope for this
         # merge.
-        throughs = RelationLookup(
-            self.through,
-            cast(
-                QuerySet[ThruM],
-                self.through.config.model._default_manager.filter(
-                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
-                ),
+        through_relation = cast(
+            QuerySet[ThruM],
+            self.through.config.model._default_manager.filter(
+                **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
             ),
+        )
+        throughs = MatchGroup.build(
+            self.through,
+            self.through_pool,
+            relation=through_relation,
+            params=related_params,
         )
         through_mergers = [
             self.through(
@@ -1274,7 +1349,7 @@ class ManyToManyMerger[
                     target=child,
                     target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
                 ),
-                siblings=throughs,
+                group=throughs,
             )
             for child_scrape, child in merged_children
         ]
@@ -1292,11 +1367,7 @@ class ManyToManyMerger[
             and all_children_merged
             and len(through_objects) == len(through_mergers)
         ):
-            to_keep = {t.pk for t in through_objects}
-            if stale := {t.pk for t in throughs.existing()} - to_keep:
-                _ = self.through.config.model._default_manager.filter(
-                    pk__in=stale
-                ).delete()
+            throughs.prune(through_relation, {t.pk for t in through_objects})
 
         return result
 

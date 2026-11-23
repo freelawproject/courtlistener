@@ -764,10 +764,11 @@ class MatchGroup[M: Model]:
             The group, with no members.
 
         Raises:
-            TypeError: If the merger's match cannot be matched in the pool.
+            TypeError: If the merger matches by its `match` and that cannot be
+                matched in the pool.
         """
         match = merger._bound_match
-        if errors := match.check_pool(pool):
+        if errors := merger.pool_errors(pool):
             raise TypeError(
                 f"{merger.__name__} cannot be matched in {type(pool).__name__}: "
                 + "; ".join(str(error) for error in errors)

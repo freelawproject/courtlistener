@@ -180,9 +180,8 @@ DOCKET_SAVE_READS = (
 class SluggedPersonMerger(Merger[dict[str, str], RelatedParams[None], Person]):
     """A person found by their slug."""
 
-    config: ClassVar[MergerConfig[Person]] = MergerConfig(
-        model=Person, key=("slug",)
-    )
+    config: ClassVar[MergerConfig[Person]] = MergerConfig(model=Person)
+    match: ClassVar[Match] = Match(Key("slug"))
 
     name_first: str = Scrape(dict)["first"]
     name_last: str = Scrape(dict)["last"]
@@ -192,9 +191,8 @@ class SluggedPersonMerger(Merger[dict[str, str], RelatedParams[None], Person]):
 class NamedPartyMerger(Merger[dict[str, str], RelatedParams[None], Party]):
     """A party found by its name."""
 
-    config: ClassVar[MergerConfig[Party]] = MergerConfig(
-        model=Party, key=("name",)
-    )
+    config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+    match: ClassVar[Match] = Match(Key("name"))
 
     name: str = Scrape(dict)["name"]
 
@@ -733,8 +731,9 @@ class BaseMergerTest(TestCase):
             Merger[dict[str, str], RelatedParams[None], DocketEntry]
         ):
             config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
-                model=DocketEntry, key=("description",)
+                model=DocketEntry
             )
+            match: ClassVar[Match] = Match(Key("description"))
 
             description: str = Scrape(dict)["df"]
 
@@ -840,8 +839,9 @@ class KeyedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
     """A docket entry found by its description among its docket's entries."""
 
     config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
-        model=DocketEntry, key=("description",)
+        model=DocketEntry
     )
+    match: ClassVar[Match] = Match(Key("description"))
 
     description: str = Scrape(dict)["description"]
 
@@ -849,9 +849,8 @@ class KeyedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
 class KeyedDocketMerger(Merger[dict[str, Any], Any, Docket]):
     """A docket found by its docket number, with its entries."""
 
-    config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-        model=Docket, key=("docket_number",)
-    )
+    config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+    match: ClassVar[Match] = Match(Key("docket_number"))
 
     docket_number: str = Scrape(dict)["docket_number"]
     source: int = Constant(DocketSources.SCRAPER)
@@ -864,9 +863,8 @@ class KeyedDocketMerger(Merger[dict[str, Any], Any, Docket]):
 class KeyedCourtMerger(Merger[dict[str, Any], None, Court]):
     """A court found by its ID, with its dockets."""
 
-    config: ClassVar[MergerConfig[Court]] = MergerConfig(
-        model=Court, key=("id",)
-    )
+    config: ClassVar[MergerConfig[Court]] = MergerConfig(model=Court)
+    match: ClassVar[Match] = Match(Key("id"))
 
     id: str = Scrape(dict)["id"]
     dockets: list[Docket] = OneToManyRelation(
@@ -956,19 +954,19 @@ class SiblingLookupTest(TestCase):
         )
 
     def test_duplicate_natural_keys_fail_once(self) -> None:
-        """Is a scrape repeating a natural key reported as a single failure, with the last duplicate merged and no row pruned?"""
+        """Does a scrape repeating a natural key fail every member sharing it, one failure each, with nothing created and no row pruned?"""
         docket = self.dockets[0]
         result = KeyedDocketMerger(
             self.scrape(docket, "Third", "Third"), params=None
         ).merge()
 
-        self.assertEqual(result.failures, {"DocketEntry": [None]})
-        self.assertEqual(len(result.creates["DocketEntry"]), 1)
+        self.assertEqual(result.failures, {"DocketEntry": [None, None]})
+        self.assertNotIn("DocketEntry", result.creates)
         self.assertEqual(
             sorted(
                 docket.docket_entries.values_list("description", flat=True)
             ),
-            ["First", "Second", "Third"],
+            ["First", "Second"],
         )
 
 
@@ -1127,7 +1125,7 @@ class LoadedFieldsTest(TestCase):
 
         class TestMerger(KeyedDocketMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",), reads=("case_name",)
+                model=Docket, reads=("case_name",)
             )
 
         docket = self.merged(TestMerger(self.scrape, params=None))
@@ -1140,12 +1138,12 @@ class LoadedFieldsTest(TestCase):
 
         class ParentMerger(KeyedDocketMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",), reads=("case_name",)
+                model=Docket, reads=("case_name",)
             )
 
         class ChildMerger(ParentMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",), reads=("slug",)
+                model=Docket, reads=("slug",)
             )
 
         docket = self.merged(ChildMerger(self.scrape, params=None))
@@ -1228,9 +1226,7 @@ class MergerConfigInheritanceTest(SimpleTestCase):
             case_name: str = Constant("")
 
         class TestMerger(BaseTestMerger):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",)
-            )
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
             docket_number: str = Constant("")
 
@@ -1238,15 +1234,13 @@ class MergerConfigInheritanceTest(SimpleTestCase):
             set(TestMerger.config.registry.attr),
             {"case_name", "docket_number"},
         )
-        self.assertEqual(TestMerger.config.key, ("docket_number",))
 
     def test_undeclared_config_inherits_base_config(self) -> None:
-        """Does a subclass that doesn't declare a config inherit its base's model and key?"""
+        """Does a subclass that doesn't declare a config inherit its base's model and match?"""
 
         class BaseTestMerger(Merger[dict[str, str], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",)
-            )
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+            match: ClassVar[Match] = Match(Key("docket_number"))
 
             docket_number: str = Constant("")
 
@@ -1254,7 +1248,7 @@ class MergerConfigInheritanceTest(SimpleTestCase):
             case_name: str = Constant("")
 
         self.assertIs(TestMerger.config.model, Docket)
-        self.assertEqual(TestMerger.config.key, ("docket_number",))
+        self.assertIs(TestMerger.match, BaseTestMerger.match)
         self.assertEqual(
             set(TestMerger.config.registry.attr),
             {"case_name", "docket_number"},
@@ -1366,8 +1360,9 @@ class DatabaseSpecTest(TestCase):
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",), reads=DOCKET_SAVE_READS
+                model=Docket, reads=DOCKET_SAVE_READS
             )
+            match: ClassVar[Match] = Match(Key("docket_number"))
 
             court_id: str = Constant(court.pk)
             source: int = Constant(DocketSources.SCRAPER)
@@ -2042,8 +2037,9 @@ class NumberedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
     """A docket entry whose number is scraped as text."""
 
     config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
-        model=DocketEntry, key=("entry_number",)
+        model=DocketEntry
     )
+    match: ClassVar[Match] = Match(Key("entry_number"))
 
     entry_number: str = Scrape(dict)["number"]
 
@@ -3247,11 +3243,15 @@ class MatchGroupTest(TestCase):
                 date_created=datetime(year, 1, 1, tzinfo=UTC)
             )
         pool = Relatives(docket=Ancestor(Docket))
-        bound = Match(
-            Key("description", ambiguous=First("-date_created"))
-        ).bind(MatchEntryMerger, pool)
         merger = type(
-            "BuiltEntryMerger", (MatchEntryMerger,), {"_bound_match": bound}
+            "BuiltEntryMerger",
+            (MatchEntryMerger,),
+            {
+                "pool": pool,
+                "match": Match(
+                    Key("description", ambiguous=First("-date_created"))
+                ),
+            },
         )
 
         group = MatchGroup.build(
@@ -3270,20 +3270,416 @@ class MatchGroupTest(TestCase):
 
     def test_build_rejects_a_match_the_pool_cannot_query(self) -> None:
         """Does building a group refuse a match with a tier the keyed pool would read whole?"""
-        pool = Global()
-        bound = Match(
-            Key(
-                Fn(operator.methodcaller("lower"))(
-                    Database(DocketEntry.description)
-                )
-                == Scrape(dict)["description"]
-            )
-        ).bind(MatchEntryMerger, pool)
         merger = type(
             "UnqueryableEntryMerger",
             (MatchEntryMerger,),
-            {"_bound_match": bound},
+            {
+                "match": Match(
+                    Key(
+                        Fn(operator.methodcaller("lower"))(
+                            Database(DocketEntry.description)
+                        )
+                        == Scrape(dict)["description"]
+                    )
+                )
+            },
         )
 
         with self.assertRaises(TypeError):
-            MatchGroup.build(merger, pool, relation=None, params=None)
+            MatchGroup.build(merger, Global(), relation=None, params=None)
+
+    def test_build_accepts_the_match_of_a_merger_that_overrides_lookup(
+        self,
+    ) -> None:
+        """Does building a group leave the match of a merger that overrides `lookup` unchecked, since the merger never matches by it?"""
+
+        class OverridingEntryMerger(MatchEntryMerger):
+            match = Match(
+                Key(
+                    Fn(operator.methodcaller("lower"))(
+                        Database(DocketEntry.description)
+                    )
+                    == Scrape(dict)["description"]
+                )
+            )
+
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[Any, Any, DocketEntry]
+            ) -> MergerState.LookupOutput[Any, Any, DocketEntry]:
+                return state.create()
+
+        MatchGroup.build(
+            OverridingEntryMerger, Global(), relation=None, params=None
+        )
+
+
+class MatchDeclarationWiringTest(SimpleTestCase):
+    """How a merger's declared pool and match are bound when its class is defined."""
+
+    def test_declared_pool_and_match_are_inherited_independently(self) -> None:
+        """Does a subclass that overrides only its match keep its base's pool, and one that overrides only its pool keep its base's match?"""
+
+        class BaseEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            pool = Relatives(docket=Ancestor(Docket))
+            match = Match(Key("description"))
+
+            description: str = Scrape(dict)["description"]
+
+        class OrderedEntryMerger(BaseEntryMerger):
+            match = Match(Key("description", ambiguous=First("-pk")))
+
+        class SiblingEntryMerger(BaseEntryMerger):
+            pool = Siblings()
+
+        self.assertIs(OrderedEntryMerger.pool, BaseEntryMerger.pool)
+        self.assertIsNot(OrderedEntryMerger.match, BaseEntryMerger.match)
+        self.assertEqual(
+            OrderedEntryMerger._bound_match.tiers[0].ordering, ("-pk",)
+        )
+        self.assertIs(SiblingEntryMerger.match, BaseEntryMerger.match)
+        self.assertIsNot(SiblingEntryMerger.pool, BaseEntryMerger.pool)
+        self.assertEqual(
+            BaseEntryMerger._bound_match.tiers[0].ordering, ("pk",)
+        )
+
+    def test_invalid_match_fails_class_definition(self) -> None:
+        """Is a match naming a field its merger does not compute refused when the merger is defined, naming the problem?"""
+        with self.assertRaisesRegex(TypeError, "nope"):
+
+            class BadEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+                config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                    model=DocketEntry
+                )
+
+                match = Match(Key("nope"))
+
+    def test_keyed_declared_pool_without_bare_term_fails_class_definition(
+        self,
+    ) -> None:
+        """Is a merger declaring a keyed pool refused when one of its tiers has no term comparing a stored field directly?"""
+        with self.assertRaisesRegex(TypeError, "keyed pool needs a term"):
+
+            class TermlessEntryMerger(
+                Merger[dict[str, str], Any, DocketEntry]
+            ):
+                config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                    model=DocketEntry
+                )
+
+                pool = Global()
+
+    def test_keyed_declared_pool_is_not_checked_when_lookup_is_overridden(
+        self,
+    ) -> None:
+        """Is a merger that overrides `lookup` left unchecked against the pool it declares, since it never matches by its match?"""
+
+        class OverridingEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            pool = Global()
+
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[Any, Any, DocketEntry]
+            ) -> MergerState.LookupOutput[Any, Any, DocketEntry]:
+                return state.create()
+
+    def test_keyed_default_pool_without_bare_term_fails_relation_validation(
+        self,
+    ) -> None:
+        """Is a many-to-many with a through merger refused when its related merger, which defaults to a keyed pool, has a tier with no term comparing a stored field directly?"""
+
+        class LowerNamePartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+
+            match = Match(
+                Key(
+                    Fn(operator.methodcaller("lower"))(Database(Party.name))
+                    == Scrape(dict)["name"]
+                )
+            )
+
+            name: str = Scrape(dict)["name"]
+
+        class SiblingNamePartyMerger(LowerNamePartyMerger):
+            pool = Siblings()
+
+        class TypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
+            config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
+                model=PartyType
+            )
+
+            name: str = Scrape(dict)["type"]
+
+        with self.assertRaisesRegex(
+            TypeError, "parties: LowerNamePartyMerger.*keyed pool needs a term"
+        ):
+
+            class ThroughDocketMerger(Merger[dict[str, Any], None, Docket]):
+                config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                    model=Docket
+                )
+
+                parties: list[Party] = ManyToManyRelation(
+                    LowerNamePartyMerger,
+                    Scrape(dict)["parties"],
+                    TypeMerger,
+                )
+
+        with self.subTest("a declared pool is accepted"):
+
+            class SiblingThroughDocketMerger(
+                Merger[dict[str, Any], None, Docket]
+            ):
+                config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                    model=Docket
+                )
+
+                parties: list[Party] = ManyToManyRelation(
+                    SiblingNamePartyMerger,
+                    Scrape(dict)["parties"],
+                    TypeMerger,
+                )
+
+        with self.subTest("no through merger reads the relation whole"):
+
+            class PlainDocketMerger(Merger[dict[str, Any], None, Docket]):
+                config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                    model=Docket
+                )
+
+                parties: list[Party] = ManyToManyRelation(
+                    LowerNamePartyMerger, Scrape(dict)["parties"]
+                )
+
+    def test_config_fields_include_match_columns(self) -> None:
+        """Does a field a match orders by get loaded although no spec uses it?"""
+
+        class OrderedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            match = Match(Key("description", ambiguous=First("date_created")))
+
+            description: str = Scrape(dict)["description"]
+
+        class PlainEntryMerger(OrderedEntryMerger):
+            match = Match(Key("description"))
+
+        self.assertIn("date_created", OrderedEntryMerger.config.fields)
+        self.assertNotIn("date_created", PlainEntryMerger.config.fields)
+
+    def test_prefetch_follows_pool(self) -> None:
+        """Is a one-to-many relation prefetched only when its merger reads the parent's relation, as a siblings pool does?"""
+
+        class SiblingEntryMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            match = Match(Key("description"))
+
+            description: str = Scrape(dict)["description"]
+
+        class RelativeEntryMerger(SiblingEntryMerger):
+            pool = Relatives(docket=Ancestor(Docket))
+
+        for child, prefetched in (
+            (SiblingEntryMerger, True),
+            (RelativeEntryMerger, False),
+        ):
+            with self.subTest(child.__name__):
+
+                class TestMerger(Merger[dict[str, Any], None, Docket]):
+                    config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                        model=Docket
+                    )
+
+                    docket_entries: list[DocketEntry] = OneToManyRelation(
+                        child, Scrape(dict)["entries"]
+                    )
+
+                spec = TestMerger.config.registry.one_to_many["docket_entries"]
+                self.assertEqual(
+                    [p.prefetch_to for p in spec.prefetch],
+                    ["docket_entries"] if prefetched else [],
+                )
+
+
+class MatchWiringTest(TestCase):
+    """How mergers match their children through the pool and match they declare."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory.create()
+
+    def test_prefetch_carries_pool_annotations(self) -> None:
+        """Are the rows prefetched for a siblings pool annotated as the pool says, so a term reading the annotation works on them?"""
+        DocketEntryFactory.create(docket=self.docket, description="Labelled")
+
+        class LabelledEntryMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            pool = Siblings().annotate(label=F("description"))
+            match = Match(Key("description"))
+
+            description: str = Scrape(dict)["description"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            docket_entries: list[DocketEntry] = OneToManyRelation(
+                LabelledEntryMerger, Scrape(dict)["entries"]
+            )
+
+        docket = Docket.objects.prefetch_related(
+            *TestMerger.config.registry.prefetch
+        ).get(pk=self.docket.pk)
+
+        with self.assertNumQueries(0):
+            [entry] = docket.docket_entries.all()
+        self.assertEqual(cast(Any, entry).label, "Labelled")
+
+    def test_root_with_keyed_pool_and_no_term_fails_at_lookup(self) -> None:
+        """Does a root whose default match has no term comparing a stored field refuse to merge, while one that overrides `lookup` merges?"""
+
+        class RootPartyMerger(Merger[dict[str, str], None, Party]):
+            config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+
+            name: str = Scrape(dict)["name"]
+
+        class CreatingPartyMerger(RootPartyMerger):
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[Any, Any, Party]
+            ) -> MergerState.LookupOutput[Any, Any, Party]:
+                return state.create()
+
+        with self.assertRaisesRegex(TypeError, "cannot be matched in Global"):
+            RootPartyMerger({"name": "Rootless"}, params=None).merge()
+        self.assertFalse(Party.objects.filter(name="Rootless").exists())
+
+        result = CreatingPartyMerger({"name": "Rooted"}, params=None).merge()
+        self.assertTrue(result.success, result.failures)
+        self.assertTrue(Party.objects.filter(name="Rooted").exists())
+
+    def test_replace_prune_by_exclusion_for_keyed_pool(self) -> None:
+        """Does REPLACE delete a relation's unkept rows by exclusion, without reading them, when the children are matched in a keyed pool?"""
+        keep = DocketEntryFactory.create(
+            docket=self.docket, description="Keep globally"
+        )
+        stale = DocketEntryFactory.create(
+            docket=self.docket, description="Stale globally"
+        )
+
+        class GlobalEntryMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            pool = Global()
+            match = Match(Key("description"))
+
+            description: str = Scrape(dict)["description"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            docket_entries: list[DocketEntry] = OneToManyRelation(
+                GlobalEntryMerger, Scrape(dict)["entries"]
+            )
+
+        with CaptureQueriesContext(connection) as queries:
+            result = TestMerger(
+                {"entries": [{"description": "Keep globally"}]},
+                params=None,
+                existing=Update(self.docket),
+            ).merge()
+
+        self.assertTrue(result.success, result.failures)
+        self.assertEqual(
+            list(self.docket.docket_entries.values_list("pk", flat=True)),
+            [keep.pk],
+        )
+        self.assertFalse(DocketEntry.objects.filter(pk=stale.pk).exists())
+        # One `SELECT` of the entries finds the kept row by its key; the only
+        # other is the deletion collecting the rows to delete, which names the
+        # kept rows it excludes.
+        selects = [
+            q["sql"]
+            for q in queries
+            if q["sql"].startswith('SELECT "search_docketentry"."id"')
+        ]
+        self.assertEqual(len(selects), 2, selects)
+        self.assertIn("NOT", selects[1])
+
+    def test_group_without_lookup_members_reads_nothing(self) -> None:
+        """Does a relation whose children are all invalid run no pool query and prune nothing, whichever pool its merger has?"""
+        stale = DocketEntryFactory.create(
+            docket=self.docket, description="Stale"
+        )
+
+        class SiblingEntryMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+                model=DocketEntry
+            )
+
+            match = Match(Key("description"))
+
+            description: str = Scrape(dict)["description"]
+
+            @staticmethod
+            def validator(scrape: dict[str, str]) -> bool:
+                return False
+
+        class GlobalEntryMerger(SiblingEntryMerger):
+            pool = Global()
+
+        for child in (SiblingEntryMerger, GlobalEntryMerger):
+            with self.subTest(child.__name__):
+
+                class TestMerger(Merger[dict[str, Any], None, Docket]):
+                    config: ClassVar[MergerConfig[Docket]] = MergerConfig(
+                        model=Docket
+                    )
+
+                    docket_entries: list[DocketEntry] = OneToManyRelation(
+                        child, Scrape(dict)["entries"]
+                    )
+
+                merger = TestMerger(
+                    {"entries": [{"description": "A"}, {"description": "B"}]},
+                    params=None,
+                    existing=Update(self.docket),
+                )
+                with self.assertNumQueries(0):
+                    result = merger.merge()
+
+                self.assertEqual(
+                    result.failures, {"DocketEntry": [None, None]}
+                )
+                self.assertTrue(
+                    DocketEntry.objects.filter(pk=stale.pk).exists()
+                )
