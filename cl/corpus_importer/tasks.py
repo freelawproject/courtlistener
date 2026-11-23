@@ -3091,6 +3091,13 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         "docket_entry__docket"
     ).aget(pk=rd_pk)
     d = rd.docket_entry.docket
+    if not d.pacer_case_id:
+        logger.error(
+            "Docket %s has no pacer_case_id; can't get pacer_doc_id for rd %s",
+            d.pk,
+            rd_pk,
+        )
+        return
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
