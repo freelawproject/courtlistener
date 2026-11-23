@@ -1,0 +1,46 @@
+{% load svg_tags component_tags %}
+{% require_script "js/alpine/components/toast.js" %}
+
+<c-vars title variant="" description="" icon="" />
+
+{# The root is box-less so a closed toast takes no space wherever the page puts it. The panel stays in the DOM, with its chrome and controls hidden until open, so htmx binds any hx-* control in the slot at page load. #}
+<div x-data="toast" class="contents" x-on:toast-opened.window="onToastOpened" x-on:keydown.escape.window="close" {{ attrs }}>
+  {{ trigger }}
+  <div x-ref="region" class="fixed inset-x-4 bottom-4 z-50 flex justify-center pointer-events-none">
+    <div
+      x-bind:class="panelClass"
+      class="flex w-full max-w-2xl items-center gap-4 rounded-lg text-sm"
+    >
+      {% if icon or variant == "warning" or variant == "success" or variant == "info" %}
+        <span x-show="isOpen" x-cloak class="shrink-0 text-greyscale-100">
+          {% if icon %}
+            {% svg icon class="size-5" aria_hidden="true" %}
+          {% elif variant == "warning" %}
+            {% svg "triangle_exclamation" class="size-5" aria_hidden="true" %}
+          {% elif variant == "success" %}
+            {% svg "circle_check" class="size-5" aria_hidden="true" %}
+          {% elif variant == "info" %}
+            {% svg "info" class="size-5" aria_hidden="true" %}
+          {% endif %}
+        </span>
+      {% endif %}
+      {# Always rendered and empty while closed: screen readers only announce content added to a live region that already exists. Only the message lives here, so the buttons are not read as part of it. #}
+      <div x-ref="live" role="status" aria-live="polite" aria-atomic="true" class="flex-1 min-w-0"></div>
+      {% if slot.strip %}<div x-show="isOpen" x-cloak class="flex shrink-0 items-center gap-2">{{ slot }}</div>{% endif %}
+      <c-button
+        x-show="isOpen"
+        x-cloak
+        class="shrink-0 rounded-full p-1.5 text-greyscale-400 outline-none hover:bg-greyscale-800 hover:text-greyscale-100 focus-visible:ring-4 focus-visible:ring-greyscale-600"
+        x-on:click="close"
+        aria-label="Close"
+      >
+        {% svg "cross" class="size-5" aria_hidden="true" %}
+      </c-button>
+    </div>
+  </div>
+  {# Copied into the live region on open. #}
+  <template x-ref="message">
+    <p class="font-medium text-greyscale-100">{{ title }}</p>
+    {% if description %}<p class="text-greyscale-400">{{ description }}</p>{% endif %}
+  </template>
+</div>
