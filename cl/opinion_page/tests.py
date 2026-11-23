@@ -90,6 +90,7 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     build_case_transfer_metadata,
+    build_citation_string,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -2226,6 +2227,120 @@ class TexasDocumentModelTest(TestCase):
                 self.assertEqual(document.is_available, available)
                 self.assertEqual(document.file_extension, extension)
                 self.assertEqual(document.has_valid_pdf, valid_pdf)
+
+
+class TexasDocumentLookupTest(TestCase):
+    """Does the Texas source find a document page's document by media_id, and name and cite it without numbers?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a Texas docket with one document, and a second docket of the same court."""
+        cls.court = CourtFactory(id="tex", jurisdiction="S")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            case_name="Smith v. Texas",
+            docket_number="26-0999",
+        )
+        cls.entry = TexasDocketEntryFactory(
+            docket=cls.docket,
+            date_filed=date(2026, 10, 1),
+            sequence_number="2026-10-01.001",
+        )
+        cls.document = TexasDocumentFactory(
+            docket_entry=cls.entry, description="Brief"
+        )
+        cls.document.refresh_from_db()
+        cls.other_docket = DocketFactory(court=cls.court)
+
+    def lookup(self, docket_id: int, doc_num: str) -> list[TexasDocument]:
+        """Return the rows the document page would read for this URL."""
+        return list(
+            docket_entry_sources.TEXAS.documents_for_docket_and_number(
+                docket_id, doc_num
+            ).order_by("pk")
+        )
+
+    def test_finds_the_document_by_its_canonical_media_id(self) -> None:
+        """Is the document found by its media_id, with no attachment number, as the page's main document route expects?"""
+        rows = self.lookup(self.docket.pk, str(self.document.media_id))
+        self.assertEqual(rows, [self.document])
+        self.assertIsNone(rows[0].attachment_number)
+
+    def test_other_spellings_and_dockets_find_nothing(self) -> None:
+        """Do a malformed UUID, other spellings of the right one and the right one on another docket all find nothing, so the page answers 404?"""
+        media_id = str(self.document.media_id)
+        cases = {
+            "not a uuid": (self.docket.pk, "1"),
+            "uppercase": (self.docket.pk, media_id.upper()),
+            "no hyphens": (self.docket.pk, media_id.replace("-", "")),
+            "braces": (self.docket.pk, f"{{{media_id}}}"),
+            "other docket": (self.other_docket.pk, media_id),
+        }
+        for name, (docket_id, doc_num) in cases.items():
+            with self.subTest(case=name):
+                self.assertEqual(self.lookup(docket_id, doc_num), [])
+
+    def test_a_media_id_shared_by_two_entries_returns_both_by_pk(
+        self,
+    ) -> None:
+        """When two entries of a docket hold the same media_id, are both rows returned oldest first, so the page shows the first one?"""
+        duplicate = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=self.docket, sequence_number="2026-10-02.001"
+            ),
+            media_id=self.document.media_id,
+        )
+        self.assertEqual(
+            self.lookup(self.docket.pk, str(self.document.media_id)),
+            [self.document, duplicate],
+        )
+
+    def test_title_refers_to_the_document_without_a_number(self) -> None:
+        """Does the page title call it "Document" rather than a number TAMES doesn't have?"""
+        self.assertEqual(
+            make_rd_title(self.document, docket_entry_sources.TEXAS),
+            "Brief &ndash; Document in Smith v. Texas "
+            f"({self.court.citation_string}, 26-0999)",
+        )
+
+    def test_format_label_follows_the_stored_file(self) -> None:
+        """Is the format named after the stored file, and "File" when there's none?"""
+        cases = [
+            ("texas/brief.pdf", "PDF"),
+            ("texas/argument.mp3", "MP3"),
+            ("", "File"),
+        ]
+        for path, expected in cases:
+            with self.subTest(path=path):
+                self.assertEqual(
+                    docket_entry_sources.TEXAS.document_format_label(
+                        TexasDocument(filepath_local=path)
+                    ),
+                    expected,
+                )
+
+    def test_citation_has_a_date_but_no_entry_number(self) -> None:
+        """Is a Texas entry cited with its filing date and no ECF number, while RECAP entries keep theirs?"""
+        recap_entry = DocketEntryFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Doe v. Roe",
+                docket_number="1:26-cv-1",
+            ),
+            date_filed=date(2026, 10, 1),
+            entry_number=7,
+        )
+        court = self.court.citation_string
+        cases = [
+            (self.entry, f"Smith v. Texas, 26-0999, ({court} Oct 01, 2026)"),
+            (
+                recap_entry,
+                f"Doe v. Roe, 1:26-cv-1, ({court} Oct 01, 2026) ECF No. 7",
+            ),
+        ]
+        for entry, expected in cases:
+            with self.subTest(entry=type(entry).__name__):
+                self.assertEqual(build_citation_string(entry), expected)
 
 
 class TexasEntryDisplayTextTest(SimpleTestCase):

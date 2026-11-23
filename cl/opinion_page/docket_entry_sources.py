@@ -7,9 +7,9 @@ unrelated docket *data* sources in ``cl.search.docket_sources``
 (``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
 """
 
+import uuid
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
 from django.db.models import (
@@ -814,16 +814,25 @@ def _texas_document_display_description(document: TexasDocument) -> str:
     return conditional_escape(document.description)
 
 
-def _texas_document_download_label(document: TexasDocument) -> str:
-    """Return the download button's label, named after the stored file's format.
+def _texas_document_format_label(document: TexasDocument) -> str:
+    """Return the stored file's format, like "PDF" or "MP3", or "File" when there's no file.
 
     TAMES serves PDFs but also HTML, WordPerfect and MP3 files, which are
-    stored as they came, so "Download PDF" would be wrong for those.
+    stored as they came, so "PDF" would be wrong for those.
     """
-    extension = PurePosixPath(document.filepath_local.name).suffix
-    if not extension:
-        return "Download File"
-    return f"Download {extension.lstrip('.').upper()}"
+    if not document.file_extension:
+        return "File"
+    return document.file_extension.lstrip(".").upper()
+
+
+def _texas_document_download_label(document: TexasDocument) -> str:
+    """Return the download button's label, named after the stored file's format."""
+    return f"Download {_texas_document_format_label(document)}"
+
+
+def _texas_document_reference(document: TexasDocument) -> str:
+    """Return "Document": TAMES numbers neither documents nor attachments, so the page title can't refer to one by number."""
+    return "Document"
 
 
 # The fifteen Texas Courts of Appeals: every TAMES court but the two courts
@@ -944,23 +953,37 @@ def _texas_main_docs_prefetch() -> Prefetch:
 def _texas_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet[TexasDocument]:
-    """Return no documents: Texas documents have no document number, so they have no detail page to look up.
+    """Return the docket's documents whose media_id is doc_num, which is how Texas document pages are keyed.
 
     The detail page reads attachment_number from the rows, which
-    TexasDocument doesn't have, so the empty queryset still provides it and
-    the page answers 404 instead of failing.
+    TexasDocument doesn't have, so it's annotated as None: every Texas
+    document is served at the main document URL.
+
+    doc_num MUST be a UUID in its canonical form, lowercase with hyphens, as
+    get_absolute_url writes it. Anything else returns no documents, so the
+    page answers 404: a malformed UUID would make the query raise, and other
+    spellings of a valid one would serve the same page at several URLs.
+
+    media_id is only unique per entry, so in the rare case two entries of a
+    docket share one, both rows are returned and the page shows the first
+    by pk.
     """
-    return TexasDocument.objects.none().annotate(
+    documents = TexasDocument.objects.annotate(
         attachment_number=Value(None, output_field=IntegerField())
+    )
+    try:
+        media_id = uuid.UUID(doc_num)
+    except ValueError:
+        return documents.none()
+    if str(media_id) != doc_num:
+        return documents.none()
+    return documents.filter(
+        docket_entry__docket_id=docket_id, media_id=media_id
     )
 
 
 async def _get_texas_document_for_render(pk: int) -> TexasDocument:
-    """Fetch a single TexasDocument with the docket/court relation already loaded.
-
-    Texas documents have no detail page yet, so the docket page never calls
-    this; the source still needs it to fill the DocketEntrySource contract.
-    """
+    """Fetch a single TexasDocument for its detail page, with the docket/court relation already loaded."""
     return await TexasDocument.objects.select_related(
         "docket_entry__docket__court"
     ).aget(pk=pk)
@@ -1063,6 +1086,8 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
     document_download_label=_texas_document_download_label,
+    document_format_label=_texas_document_format_label,
+    document_reference=_texas_document_reference,
     metadata_sections=_texas_metadata_sections,
 )
 
