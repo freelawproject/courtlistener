@@ -11,7 +11,10 @@ from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils import timezone
 
+from cl.lib.types import TabItem
+from cl.lib.utils import resolve_active_tab
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
 from cl.opinion_page.forms_v2 import DocketEntryFilterForm
@@ -132,6 +135,20 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 async def components(request: HttpRequest) -> HttpResponse:
     """Render a demo page of UI components with mock data."""
+    if (
+        request.headers.get("HX-Request")
+        and request.GET.get("toast") == "server"
+    ):
+        # The library's server-rendered toast demo: a toast rendered with
+        # request-time content, swapped out of band into the page's
+        # placeholder and opened by HX-Trigger-After-Settle, once Alpine has
+        # bound the swapped markup.
+        return TemplateResponse(
+            request,
+            "includes/components/toast_demo.html",
+            {"rendered_at": timezone.localtime().strftime("%H:%M:%S")},
+            headers={"HX-Trigger-After-Settle": "toast-demo-server-ready"},
+        )
 
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
@@ -313,6 +330,27 @@ async def components(request: HttpRequest) -> HttpResponse:
     demo_disabled_filter_form = DocketEntryFilterForm(initial={"entry_gte": 5})
     demo_disabled_filter_form.fields["entry_gte"].disabled = True
 
+    demo_panel_tabs: list[TabItem] = [
+        {"key": "first", "label": "First tab"},
+        {"key": "second", "label": "Second tab"},
+        {"key": "third", "label": "Third tab"},
+    ]
+    components_url = reverse("components")
+    demo_link_tabs: list[TabItem] = [
+        {
+            "key": "search",
+            "label": "Search Alerts",
+            "icon": "magnifier",
+            "url": f"{components_url}?link_tab=search#tabbed-cards",
+        },
+        {
+            "key": "docket",
+            "label": "Docket Alerts",
+            "icon": "file_text",
+            "url": f"{components_url}?link_tab=docket#tabbed-cards",
+        },
+    ]
+
     return TemplateResponse(
         request,
         "components.html",
@@ -326,6 +364,14 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_filter_form": DocketEntryFilterForm(),
             "demo_invalid_filter_form": demo_invalid_filter_form,
             "demo_disabled_filter_form": demo_disabled_filter_form,
+            "demo_panel_tabs": demo_panel_tabs,
+            "demo_panel_active_tab": resolve_active_tab(
+                demo_panel_tabs, request.GET.get("tab")
+            ),
+            "demo_link_tabs": demo_link_tabs,
+            "demo_link_active_tab": resolve_active_tab(
+                demo_link_tabs, request.GET.get("link_tab")
+            ),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {

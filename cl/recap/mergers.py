@@ -17,7 +17,13 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
+from juriscraper.pacer import (
+    ACMSDocketReport,
+    AppellateAttachmentPage,
+    AppellateDocketReport,
+    AttachmentPage,
+    DocketReport,
+)
 from waffle import switch_is_active
 
 from cl.alerts.utils import (
@@ -477,7 +483,10 @@ def add_attorney(atty, p, d):
     return a.pk
 
 
-def update_case_names(d, new_case_name):
+def update_case_names(
+    d: Docket,
+    new_case_name: str,
+) -> Docket:
     """Update the case name fields if applicable.
 
     This is a more complex than you'd think at first, and has resulted in at
@@ -595,7 +604,10 @@ async def update_docket_metadata(
     return d
 
 
-async def update_docket_appellate_metadata(d, docket_data):
+async def update_docket_appellate_metadata(
+    d: Docket,
+    docket_data: dict,
+) -> tuple[Docket, OriginatingCourtInformation | None]:
     """Update the metadata specific to appellate cases."""
     if not any(
         [
@@ -992,7 +1004,10 @@ def resolve_rd_in_memory(
 
 
 @sync_to_async
-def add_create_docket_entry_transaction(d, docket_entry):
+def add_create_docket_entry_transaction(
+    d: Docket,
+    docket_entry: dict,
+) -> tuple[DocketEntry, bool] | None:
     """Get or create a docket's entry for parsed entry data, with the docket locked.
 
     Entries are matched by entry number and, when given, PACER sequence
@@ -1801,7 +1816,7 @@ def normalize_scotus_parties(
 @transaction.atomic
 # Retry on transaction deadlocks; see #814.
 @retry(OperationalError, tries=2, delay=1, backoff=1, logger=logger)
-def add_parties_and_attorneys(d, parties):
+def add_parties_and_attorneys(d: Docket, parties: list[dict]) -> None:
     """Add parties and attorneys from the docket data to the docket.
 
     Args:
@@ -1985,7 +2000,9 @@ def add_claim_history_entry(new_history, claim):
 
 
 @transaction.atomic
-def add_claims_to_docket(d, new_claims, tag_names: list[str] | None = None):
+def add_claims_to_docket(
+    d: Docket, new_claims: list[dict], tag_names: list[str] | None = None
+) -> None:
     """Add claims data to the docket.
 
     Args:
@@ -2102,13 +2119,13 @@ async def add_tags_to_objs(
 
 @transaction.atomic
 def merge_pacer_docket_into_cl_docket(
-    d,
-    pacer_case_id,
-    docket_data,
-    report,
-    appellate=False,
+    d: Docket,
+    pacer_case_id: str | None,
+    docket_data: dict,
+    report: DocketReport | AppellateDocketReport | ACMSDocketReport,
+    appellate: bool = False,
     tag_names: list[str] | None = None,
-):
+) -> tuple[list[RECAPDocument], bool]:
     """Merge a parsed PACER docket report into a docket.
 
     Updates the docket's metadata, saves the report's raw content, merges
