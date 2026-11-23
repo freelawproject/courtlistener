@@ -1386,7 +1386,7 @@ def hidden_court_ids(cd: CleanData) -> list[str]:
         SEARCH_TYPES.RECAP_DOCUMENT,
     ):
         return []
-    return gated_court_ids(cd.get("include_sources", frozenset()))
+    return gated_court_ids(cd.get("include_sources", ()))
 
 
 def exclude_courts(query: Query | None, court_ids: list[str]) -> Query:

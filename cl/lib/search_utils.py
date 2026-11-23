@@ -278,18 +278,20 @@ async def add_depth_counts(
         return None
 
 
-def frontend_search_sources(request: HttpRequest) -> frozenset[str]:
+def frontend_search_sources(request: HttpRequest) -> tuple[str, ...]:
     """Return the names of the gated sources whose frontend_search_flag is on for this request, which the search frontend (search page, RSS search feed and the create-alert estimate) may show.
 
     Each source's flag is the same as its docket pages', since results link
     to them. The search APIs don't use it: they include sources with their
-    own flags.
+    own flags. Sorted, so it's stable in cache keys.
     """
-    return frozenset(
-        source.name
-        for source in ALL_ES_SOURCES
-        if source.frontend_search_flag
-        and flag_is_active(request, source.frontend_search_flag)
+    return tuple(
+        sorted(
+            source.name
+            for source in ALL_ES_SOURCES
+            if source.frontend_search_flag
+            and flag_is_active(request, source.frontend_search_flag)
+        )
     )
 
 
@@ -724,7 +726,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
-    include_sources: frozenset[str] = frozenset(),
+    include_sources: tuple[str, ...] = (),
 ) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display.
 
@@ -828,7 +830,7 @@ def do_es_search(
             cleaned_params["page"] = page
             # Part of the micro-cache key, so results cached for one set of
             # sources are never served to another.
-            cleaned_params["include_sources"] = sorted(include_sources)
+            cleaned_params["include_sources"] = include_sources
             # Use a smaller page size for semantic results so the longer
             # chunk previews are less overwhelming to scan.
             if has_semantic_params(cd):

@@ -1074,7 +1074,7 @@ def check_alert_limits(
 def get_alert_estimation_count(
     query_data: QueryDict,
     day_count: int,
-    include_sources: frozenset[str] = frozenset(),
+    include_sources: tuple[str, ...] = (),
 ) -> tuple[int, int] | None:
     """Estimate the number of alert hits a query would have produced over the last ``day_count`` days.
 

@@ -6972,15 +6972,15 @@ class RECAPSearchCourtsTest(TestCase):
     def test_recap_search_courts_add_source_courts(self) -> None:
         """SCOTUS joins the PACER courts in the search list only when the search can include it, courts that are neither PACER nor claimed by a source stay out, and all_pacer_courts(), used by PACER scrapers and uploads, keeps excluding SCOTUS."""
         search_ids = set(
-            recap_search_courts(
-                included_sources=frozenset({"scotus"})
-            ).values_list("pk", flat=True)
+            recap_search_courts(included_sources=("scotus",)).values_list(
+                "pk", flat=True
+            )
         )
         self.assertLessEqual({"scotus", "ca1", "cand"}, search_ids)
         self.assertNotIn("ohio", search_ids)
         self.assertNotIn(
             "scotus",
-            recap_search_courts(included_sources=frozenset()).values_list(
+            recap_search_courts(included_sources=()).values_list(
                 "pk", flat=True
             ),
         )
@@ -7014,7 +7014,7 @@ class GatedSourceSearchTest(TestCase):
             court_ids=frozenset({"tex"}),
             frontend_search_flag="texas_docket_page",
         )
-        sources = (RECAP_ES_SOURCE, SCOTUS_ES_SOURCE, texas)
+        sources = (RECAP_ES_SOURCE, texas, SCOTUS_ES_SOURCE)
         for target in (
             "cl.search.es_docket_sources.ALL_ES_SOURCES",
             "cl.lib.search_utils.ALL_ES_SOURCES",
@@ -7026,13 +7026,13 @@ class GatedSourceSearchTest(TestCase):
     def test_hidden_court_ids_follow_the_included_sources(self) -> None:
         """Does a RECAP search hide the courts of every gated source it doesn't include, and other search types none?"""
         cases = [
-            (SEARCH_TYPES.RECAP, frozenset(), ["scotus", "tex"]),
-            (SEARCH_TYPES.RECAP, frozenset({"scotus"}), ["tex"]),
-            (SEARCH_TYPES.DOCKETS, frozenset({"scotus", "texas"}), []),
-            (SEARCH_TYPES.OPINION, frozenset(), []),
+            (SEARCH_TYPES.RECAP, (), ["scotus", "tex"]),
+            (SEARCH_TYPES.RECAP, ("scotus",), ["tex"]),
+            (SEARCH_TYPES.DOCKETS, ("scotus", "texas"), []),
+            (SEARCH_TYPES.OPINION, (), []),
         ]
         for search_type, included, hidden in cases:
-            with self.subTest(type=search_type, included=sorted(included)):
+            with self.subTest(type=search_type, included=included):
                 cd = {"type": search_type, "include_sources": included}
                 self.assertEqual(hidden_court_ids(cd), hidden)
 
@@ -7053,9 +7053,9 @@ class GatedSourceSearchTest(TestCase):
     def test_court_picker_offers_only_included_sources(self) -> None:
         """Does the court picker offer SCOTUS when the request includes it, but not the courts of another gated source?"""
         court_ids = set(
-            recap_search_courts(
-                included_sources=frozenset({"scotus"})
-            ).values_list("pk", flat=True)
+            recap_search_courts(included_sources=("scotus",)).values_list(
+                "pk", flat=True
+            )
         )
         self.assertLessEqual({"ca1", "scotus"}, court_ids)
         self.assertNotIn("tex", court_ids)
@@ -7065,7 +7065,14 @@ class GatedSourceSearchTest(TestCase):
     def test_frontend_search_sources_follow_each_flag(self) -> None:
         """Does the search frontend include a source only when that source's own frontend_search_flag is on?"""
         request = RequestFactory().get("/")
-        self.assertEqual(frontend_search_sources(request), {"scotus"})
+        self.assertEqual(frontend_search_sources(request), ("scotus",))
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_flag("texas_docket_page", active=True)
+    def test_frontend_search_sources_are_sorted(self) -> None:
+        """Are the included sources sorted by name, so cache keys don't depend on the order of ALL_ES_SOURCES?"""
+        request = RequestFactory().get("/")
+        self.assertEqual(frontend_search_sources(request), ("scotus", "texas"))
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")

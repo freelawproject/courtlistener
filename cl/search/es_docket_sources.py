@@ -2,7 +2,7 @@
 
 Used by cl.lib.es_signal_processor and the ES indexing tasks in
 cl.search.tasks. Each source's court_ids also feed the RECAP search court
-picker.
+picker and, with its frontend_search_flag, the RECAP search gate.
 """
 
 from collections.abc import Callable
@@ -240,7 +240,7 @@ def es_uid(model: type[models.Model], pk: int) -> str | None:
     return f"{source.uid_namespace}_{pk}"
 
 
-def gated_court_ids(included_sources: frozenset[str]) -> list[str]:
+def gated_court_ids(included_sources: tuple[str, ...]) -> list[str]:
     """Return the courts RECAP searches must leave out: those of the gated sources (with a frontend_search_flag) other than included_sources.
 
     :param included_sources: Names of the gated sources the request may see
@@ -254,7 +254,9 @@ def gated_court_ids(included_sources: frozenset[str]) -> list[str]:
     )
 
 
-def recap_search_courts(included_sources: frozenset[str]) -> QuerySet[Court]:
+def recap_search_courts(
+    included_sources: tuple[str, ...],
+) -> QuerySet[Court]:
     """Return the courts offered in the RECAP search court picker: the PACER courts plus the ones every other registered source adds. Use it only for search; PACER-specific code (scrapers, uploads) must keep using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
 
     :param included_sources: Names of the gated sources the search can
@@ -266,12 +268,12 @@ def recap_search_courts(included_sources: frozenset[str]) -> QuerySet[Court]:
     pacer_courts = cast(
         FederalCourtsQuerySet, Court.federal_courts
     ).all_pacer_courts()
-    hidden_court_ids = gated_court_ids(included_sources)
+    gated_ids = gated_court_ids(included_sources)
     source_court_ids = [
         court_id
         for source in ALL_ES_SOURCES
         for court_id in source.court_ids
-        if court_id not in hidden_court_ids
+        if court_id not in gated_ids
     ]
     if not source_court_ids:
         return pacer_courts
