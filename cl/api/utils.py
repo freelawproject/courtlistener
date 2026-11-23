@@ -1773,7 +1773,7 @@ def invert_user_logs(
     for k, v in out.items():
         try:
             user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
+        except User.DoesNotExist, ValueError:
             user_keyed_out[k] = v
         else:
             user_keyed_out[user.username] = v
@@ -1899,6 +1899,47 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     results = pipe.execute()
 
     return results[0] / results[1]
+
+
+async def get_coverage_data_fds() -> dict[str, int]:
+    """Get estimated row counts for the financial disclosure tables.
+
+    Uses Postgres's table estimates instead of COUNT(*), since exact counts
+    of the bigger tables (e.g. investments) are too slow to run in a request.
+
+    Returns:
+        A dict mapping item types to their estimated counts.
+    """
+    # Imported here because cl.search.models imports this module (via
+    # cl.users.models), and both of these import cl.search.models.
+    from cl.disclosures.models import (
+        Agreement,
+        Debt,
+        FinancialDisclosure,
+        Gift,
+        Investment,
+        NonInvestmentIncome,
+        Position,
+        Reimbursement,
+        SpouseIncome,
+    )
+    from cl.search.selectors import get_total_estimate_count
+
+    models: dict[str, type[Model]] = {
+        "disclosures": FinancialDisclosure,
+        "investments": Investment,
+        "positions": Position,
+        "agreements": Agreement,
+        "non_investment_income": NonInvestmentIncome,
+        "spousal_income": SpouseIncome,
+        "reimbursements": Reimbursement,
+        "gifts": Gift,
+        "debts": Debt,
+    }
+    return {
+        k: await sync_to_async(get_total_estimate_count)(model._meta.db_table)
+        for k, model in models.items()
+    }
 
 
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
@@ -2458,9 +2499,9 @@ class RetrieveFilteredFieldsMixin:
             # with them.
             field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
-            for name in field_names:
-                if should_defer(name, items):
-                    child_names.append(name)
+            child_names.extend(
+                name for name in field_names if should_defer(name, items)
+            )
 
             if child_names:
                 nested_defer_map[parent] = (nested_model, child_names)

@@ -342,7 +342,10 @@ class Command(VerboseCommand):
         items: Iterable,
         count: int,
         app_label: str,
-        task_to_use: str,
+        task_to_use: Literal[
+            "index_parent_and_child_docs",
+            "index_parent_or_child_docs_in_es",
+        ],
         task_params: tuple[
             Literal["parent", "child"], str, type[ESDocumentType]
         ],

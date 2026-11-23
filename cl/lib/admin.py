@@ -83,20 +83,16 @@ def generate_admin_links(
     - model_class: The Django model class for which the admin URL will be built.
     - query_params: Query parameters to append to the URL (e.g. {"docket": 123}).
     """
-    generated_links: list[AdminLink] = []
-
-    for link in links:
-        generated_links.append(
-            {
-                "href": build_admin_url(
-                    link["model_class"],
-                    query_params=link["query_params"],
-                ),
-                "label": link["label"],
-            }
-        )
-
-    return generated_links
+    return [
+        {
+            "href": build_admin_url(
+                link["model_class"],
+                query_params=link["query_params"],
+            ),
+            "label": link["label"],
+        }
+        for link in links
+    ]
 
 
 class IndexedPkSearchMixin:

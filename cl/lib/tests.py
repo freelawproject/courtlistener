@@ -99,11 +99,13 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.types import TabItem
 from cl.lib.utils import (
     check_for_proximity_tokens,
     check_unbalanced_parenthesis,
     check_unbalanced_quotes,
     glob_files,
+    resolve_active_tab,
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
 )
@@ -3425,3 +3427,25 @@ class TestGlobFiles(SimpleTestCase):
                 self.matches("**/*.json", recursive=True),
                 {"a.json", "sub/b.json", "sub/deep/c.json"},
             )
+
+
+class ResolveActiveTabTest(SimpleTestCase):
+    """Tests for resolve_active_tab."""
+
+    tabs: list[TabItem] = [
+        {"key": "search", "label": "Search Alerts", "icon": "search"},
+        {"key": "docket", "label": "Docket Alerts", "icon": "bell"},
+    ]
+
+    def test_resolves_requested_or_first_tab(self) -> None:
+        """A known key is kept; an unknown or missing one opens the first."""
+        cases = [
+            ("docket", "docket"),
+            ("unknown", "search"),
+            (None, "search"),
+        ]
+        for requested, expected in cases:
+            with self.subTest(requested=requested):
+                self.assertEqual(
+                    resolve_active_tab(self.tabs, requested), expected
+                )

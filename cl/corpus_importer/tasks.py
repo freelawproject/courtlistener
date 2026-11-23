@@ -22,6 +22,7 @@ from typing import (
     IO,
     Any,
     Literal,
+    Never,
     NotRequired,
     TypedDict,
     TypeIs,
@@ -1998,7 +1999,7 @@ async def get_docket_by_pacer_case_id_base(
         return None
 
     # Attempt a light docket look up, we'll do better after fetching more data
-    pacer_case_id = data.get("pacer_case_id")
+    pacer_case_id = data["pacer_case_id"]
     docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = await Docket.objects.aget(pk=docket_pk)
@@ -4481,22 +4482,31 @@ def download_and_parse_scotus_docket(
     logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
-        content = f.read().decode("utf-8")
+        content = cast(bytes, f.read()).decode("utf-8")
 
     ext = s3_key.rsplit(".", 1)[-1].lower()
-    parser_map: dict[str, type] = {
-        "json": SCOTUSDocketReport,
-        "html": SCOTUSDocketReportHTML,
-        "htm": SCOTUSDocketReportHTM,
-    }
-    if not (parser_cls := parser_map.get(ext)):
-        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+    match ext:
+        case "json":
+            parser = SCOTUSDocketReport()
+        case "html":
+            parser = SCOTUSDocketReportHTML()
+        case "htm":
+            parser = SCOTUSDocketReportHTM()
+        case _:
+            logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+            self.request.chain = None
+            return None
+
+    parser._parse_text(content)
+    data = parser.data
+    if not data:
+        logger.error(
+            "Unparsable SCOTUS Docket at bucket: %s s3_key: %s", bucket, s3_key
+        )
         self.request.chain = None
         return None
 
-    parser = parser_cls()
-    parser._parse_text(content)
-    return parser.data
+    return data
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
@@ -5019,7 +5029,7 @@ def is_texas_supreme_docket(
 # TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
 # function should be replaced by a simple `is None` check.
 def is_texas_docket(
-    d: dict[str, None]
+    d: dict[Never, Never]
     | TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
