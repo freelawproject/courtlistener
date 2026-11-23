@@ -19,6 +19,7 @@ from cl.custom_filters.templatetags.svg_tags import svg
 from cl.lib.middleware import WIP_PROPS
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.lib.types import TabItem
+from cl.search.forms import CorpusSearchForm
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -1308,6 +1309,67 @@ class MenuButtonItemTest(SimpleTestCase):
                     fromstring(html).xpath("//path/@d"),
                     fromstring(svg(expected_file)).xpath("//path/@d"),
                 )
+
+
+class HeaderCurrentPageIconTest(SimpleTestCase):
+    """The header menu entry for the current page shows its filled icon."""
+
+    # Menu entries with a filled and an outline icon, by the URL they link to.
+    ENTRIES = {
+        "profile_alerts": "bell",
+        "profile_notes": "bookmark",
+        "tag_list": "tag",
+        "view_settings": "avatar",
+    }
+
+    def render_header(self, path: str, user: User) -> HtmlElement:
+        """Renders the header for a signed-in user on the given path."""
+        request = RequestFactory().get(path)
+        request.user = user
+        request.resolver_match = resolve(path)
+        compiled = CottonCompiler().process(
+            '<c-header :request="request" :search_form="search_form" csrf_token="token" only />'
+        )
+        html = (
+            engines["django"]
+            .from_string(compiled)
+            .render({"request": request, "search_form": CorpusSearchForm()})
+        )
+        return fromstring(html)
+
+    def entry_icon(self, header: HtmlElement, href: str) -> list[str]:
+        """Returns the path data of the icon in the menu entry linking to href."""
+        return header.xpath(f'//a[@href="{href}"]//path/@d')
+
+    def test_current_page_entry_is_filled(self) -> None:
+        """Only the entry for the page being viewed is filled.
+
+        Another user's tag list doesn't count as the current user's Tags page.
+        """
+        user = User(username="jane")
+        own_tags = reverse("tag_list", kwargs={"username": "jane"})
+        other_tags = reverse("tag_list", kwargs={"username": "someone"})
+        cases = [
+            (reverse("profile_search_alerts"), "profile_alerts"),
+            (reverse("profile_docket_alerts"), "profile_alerts"),
+            (reverse("profile_notes"), "profile_notes"),
+            (own_tags, "tag_list"),
+            (other_tags, None),
+            (reverse("view_settings"), "view_settings"),
+            (reverse("show_results"), None),
+        ]
+        for path, current in cases:
+            header = self.render_header(path, user)
+            for url_name, icon in self.ENTRIES.items():
+                href = (
+                    own_tags if url_name == "tag_list" else reverse(url_name)
+                )
+                expected = icon if url_name == current else f"{icon}_outline"
+                with self.subTest(path=path, entry=url_name):
+                    self.assertEqual(
+                        self.entry_icon(header, href),
+                        fromstring(svg(expected)).xpath("//path/@d"),
+                    )
 
 
 class ToastComponentTest(SimpleTestCase):

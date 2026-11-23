@@ -157,10 +157,11 @@
           </span>
         </c-slot>
         <c-slot name="menu_content">
+          {% with url_name=request.resolver_match.url_name %}
           <c-menu-button.item
             href="{% url 'profile_alerts' %}"
             icon="bell"
-            icon_outline
+            icon_outline="{% if url_name == 'profile_search_alerts' or url_name == 'profile_docket_alerts' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -170,7 +171,7 @@
           <c-menu-button.item
             href="{% url 'profile_notes' %}"
             icon="bookmark"
-            icon_outline
+            icon_outline="{% if url_name == 'profile_notes' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -180,7 +181,7 @@
           <c-menu-button.item
             href="{% url 'tag_list' username=request.user.username %}"
             icon="tag"
-            icon_outline
+            icon_outline="{% if url_name == 'tag_list' and request.resolver_match.kwargs.username == request.user.username %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -218,7 +219,7 @@
           <c-menu-button.item
             href="{% url 'view_settings' %}"
             icon="avatar"
-            icon_outline
+            icon_outline="{% if url_name == 'view_settings' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -238,6 +239,7 @@
               </button>
             </form>
           </li>
+          {% endwith %}
         </c-slot>
       </c-menu-button>
     {% else %}
