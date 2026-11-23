@@ -27,21 +27,27 @@ def svg(name, **kwargs):
     - Passing class= here will inject it into every element that already has a class, so
       only use the class argument when no nested tags include their own class attributes,
       otherwise style the SVG’s parent container.
+
+    A missing file raises FileNotFoundError in development and tests, so a
+    renamed or deleted icon breaks the page, and any test that renders it,
+    where someone will notice. In production the tag renders nothing instead,
+    so one missing icon can't take a page down.
     """
     relative_path = f"svg/{name}.svg"
     absolute_path = find(relative_path)
 
     if not absolute_path:
-        if settings.DEBUG:
-            return f"SVG '{name}' not found at '{relative_path}'"
+        if settings.DEVELOPMENT or settings.TESTING:
+            raise FileNotFoundError(
+                f"SVG '{name}' not found at '{relative_path}'"
+            )
         return ""
 
     try:
         svg_content = Path(absolute_path).read_text(encoding="utf-8")
-
     except FileNotFoundError:
-        if settings.DEBUG:
-            return f"SVG '{name}' file found but couldn't be opened at '{absolute_path}'"
+        if settings.DEVELOPMENT or settings.TESTING:
+            raise
         return ""
 
     css_class = kwargs.pop("class", None)
