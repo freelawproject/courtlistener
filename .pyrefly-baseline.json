@@ -506,6 +506,13 @@
       "severity": "error"
     },
     {
+      "column": 11,
+      "path": "cl/api/utils.py",
+      "name": "non-exhaustive-match-open-type",
+      "concise_description": "Match on `int` is not exhaustive",
+      "severity": "error"
+    },
+    {
       "column": 18,
       "path": "cl/api/utils.py",
       "name": "missing-attribute",
@@ -1094,13 +1101,6 @@
       "severity": "error"
     },
     {
-      "column": 16,
-      "path": "cl/donate/api_views.py",
-      "name": "unbound-name",
-      "concise_description": "`trigger` may be uninitialized",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/donate/api_views.py",
       "name": "missing-attribute",
@@ -1273,6 +1273,13 @@
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "severity": "error"
+    },
+    {
+      "column": 11,
+      "path": "cl/lib/es_signal_processor.py",
+      "name": "non-exhaustive-match-open-type",
+      "concise_description": "Match on `Model` is not exhaustive",
       "severity": "error"
     },
     {
@@ -3702,13 +3709,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Literal['']` is not assignable to parameter `meta` with type `ApiResponseMeta` in function `elastic_transport._exceptions.ApiError.__init__`",
-      "severity": "error"
-    },
-    {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, Any] | dict[Unknown, Unknown]` is not assignable to parameter `object` with type `_CiteCountUpdateDict` in function `list.append`",
       "severity": "error"
     },
     {
