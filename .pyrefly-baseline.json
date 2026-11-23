@@ -2298,10 +2298,10 @@
       "severity": "error"
     },
     {
-      "column": 45,
+      "column": 53,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, str] | dict[str, Any] | str` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
+      "concise_description": "Argument `Docket` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
       "severity": "error"
     },
     {
@@ -3702,20 +3702,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[dict[Unknown, Unknown]]` is not assignable to parameter `object` with type `dict[Unknown, Unknown]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
       "severity": "error"
     },
     {
