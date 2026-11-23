@@ -471,6 +471,13 @@
       "severity": "error"
     },
     {
+      "column": 11,
+      "path": "cl/api/utils.py",
+      "name": "non-exhaustive-match-open-type",
+      "concise_description": "Match on `int` is not exhaustive",
+      "severity": "error"
+    },
+    {
       "column": 18,
       "path": "cl/api/utils.py",
       "name": "missing-attribute",
@@ -961,6 +968,13 @@
       "severity": "error"
     },
     {
+      "column": 12,
+      "path": "cl/corpus_importer/tasks.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Docket` is not assignable to declared return type `dict[str, Any] | None`",
+      "severity": "error"
+    },
+    {
       "column": 23,
       "path": "cl/corpus_importer/utils.py",
       "name": "missing-attribute",
@@ -1049,13 +1063,6 @@
       "path": "cl/donate/api_views.py",
       "name": "bad-return",
       "concise_description": "Returned type `User | None` is not assignable to declared return type `User`",
-      "severity": "error"
-    },
-    {
-      "column": 16,
-      "path": "cl/donate/api_views.py",
-      "name": "unbound-name",
-      "concise_description": "`trigger` may be uninitialized",
       "severity": "error"
     },
     {
@@ -1231,6 +1238,13 @@
       "path": "cl/lib/es_signal_processor.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Model` is not assignable to parameter `instance` with type `Audio | Citation | Docket | DocketEntry | Education | Opinion | OpinionCluster | Parenthetical | ParentheticalGroup | Person | Position | RECAPDocument | SCOTUSDocument` in function `cl.lib.indexing_utils.compose_app_label`",
+      "severity": "error"
+    },
+    {
+      "column": 11,
+      "path": "cl/lib/es_signal_processor.py",
+      "name": "non-exhaustive-match-open-type",
+      "concise_description": "Match on `Model` is not exhaustive",
       "severity": "error"
     },
     {
@@ -1738,6 +1752,20 @@
       "severity": "error"
     },
     {
+      "column": 9,
+      "path": "cl/recap/mergers.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `court_id` with type `str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "cl/recap/mergers.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `court_id` with type `str` in function `cl.people_db.lookup_utils.lookup_judge_by_full_name_and_set_attr`",
+      "severity": "error"
+    },
+    {
       "column": 12,
       "path": "cl/recap/mergers.py",
       "name": "bad-return",
@@ -1812,6 +1840,20 @@
       "path": "cl/recap/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `ClaimHistory` has no attribute `pacer_seq_no`",
+      "severity": "error"
+    },
+    {
+      "column": 22,
+      "path": "cl/recap/mergers.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int`",
+      "severity": "error"
+    },
+    {
+      "column": 34,
+      "path": "cl/recap/mergers.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date`",
       "severity": "error"
     },
     {
@@ -2053,10 +2095,24 @@
       "severity": "error"
     },
     {
+      "column": 62,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
+      "severity": "error"
+    },
+    {
       "column": 49,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `court_id` with type `int` in function `cl.recap.mergers.process_orphan_documents`",
+      "severity": "error"
+    },
+    {
+      "column": 62,
+      "path": "cl/recap/tasks.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `date | None` is not assignable to parameter `docket_date` with type `date` in function `cl.recap.mergers.process_orphan_documents`",
       "severity": "error"
     },
     {
@@ -2256,10 +2312,10 @@
       "severity": "error"
     },
     {
-      "column": 45,
+      "column": 53,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, str] | dict[str, Any] | str` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
+      "concise_description": "Argument `Docket` is not assignable to parameter `report_data` with type `dict[str, Any]` in function `cl.corpus_importer.tasks.merge_scotus_docket`",
       "severity": "error"
     },
     {
@@ -3621,13 +3677,6 @@
       "severity": "error"
     },
     {
-      "column": 36,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `dict[str, Any] | dict[Unknown, Unknown]` is not assignable to parameter `object` with type `_CiteCountUpdateDict` in function `list.append`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
@@ -3660,20 +3709,6 @@
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `list[dict[Unknown, Unknown]]` is not assignable to parameter `object` with type `dict[Unknown, Unknown]` in function `list.append`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `AbstractBaseUser | AnonymousUser` has no attribute `membership`",
       "severity": "error"
     },
     {

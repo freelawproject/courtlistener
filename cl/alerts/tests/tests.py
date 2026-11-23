@@ -27,7 +27,6 @@ from waffle.testutils import override_switch
 if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse
 
-from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.docket_alert_sources import (
     RECAP_ALERT_SOURCE,
     SCOTUS_ALERT_SOURCE,
@@ -80,6 +79,7 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
+from cl.donate.utils import LEGACY_MEMBERSHIP_HELP_URL
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
 from cl.lib.decorators import clear_tiered_cache
@@ -146,6 +146,7 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         cls.user_member_tier_1.user.save()
         NeonMembership.objects.create(
             level=NeonMembershipLevel.TIER_1,
+            neon_id="12345",
             user=cls.user_member_tier_1.user,
             termination_date=cls.membership_termination_date,
             payment_status=MembershipPaymentStatus.SUCCEEDED,
