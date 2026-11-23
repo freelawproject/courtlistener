@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import Any, ClassVar, cast, override
 
 from django.db import connection, transaction
-from django.db.models import Model, QuerySet
+from django.db.models import F, Model, Q, QuerySet
 from django.db.models.signals import post_delete
 from django.test.utils import CaptureQueriesContext
 from juriscraper.state.docket import Document as ScrapeDocument
@@ -31,6 +31,12 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     Update,
 )
+from cl.corpus_importer.state.merger.pool import (
+    Global,
+    Relatives,
+    Siblings,
+    sort_rows,
+)
 from cl.corpus_importer.state.merger.specifications import (
     Ancestor,
     Annotation,
@@ -40,7 +46,11 @@ from cl.corpus_importer.state.merger.specifications import (
     Source,
 )
 from cl.corpus_importer.state.utils import MergeResult
-from cl.people_db.factories import PersonFactory
+from cl.people_db.factories import (
+    PartyFactory,
+    PartyTypeFactory,
+    PersonFactory,
+)
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import (
@@ -1712,3 +1722,299 @@ class CoalesceSpecTest(SimpleTestCase):
                 self.assertEqual(
                     spec.transform({"a": "Scraped"}, None, docket), expected
                 )
+
+
+NS = SimpleNamespace
+
+
+class PartyPoolMerger(Merger[dict[str, str], Any, Party]):
+    """A party, for tests of the pools that read parties."""
+
+    config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+
+    name: str = Scrape(dict)["name"]
+
+
+PARTY_POOL = Relatives(party_types__docket=Ancestor(Docket)).annotate(
+    role=F("party_types__name")
+)
+"""The parties on an ancestor docket, each with its role on that docket."""
+
+
+class PoolTest(TestCase):
+    """Which rows a pool puts in scope, and how its readers hand them out."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket_a = DocketFactory.create()
+        cls.docket_b = DocketFactory.create()
+        cls.entries = [
+            DocketEntryFactory.create(
+                docket=cls.docket_a, description=description
+            )
+            for description in ("First", "Second", "Third")
+        ]
+        DocketEntryFactory.create(docket=cls.docket_b, description="Other")
+        cls.party = PartyFactory.create(
+            name="Shared Party", docket=cls.docket_a
+        )
+        PartyTypeFactory.create(
+            docket=cls.docket_a, party=cls.party, name="Appellant"
+        )
+        PartyTypeFactory.create(
+            docket=cls.docket_b, party=cls.party, name="Respondent"
+        )
+
+    def siblings_reader(self, relation: QuerySet[DocketEntry]) -> Any:
+        """A reader over a docket's entries, as its parent's relation."""
+        return Siblings().reader(
+            KeyedEntryMerger,
+            relation=relation,
+            params=None,
+            ordering=("pk",),
+        )
+
+    def keyed_reader(self) -> Any:
+        """A reader over the entries of the first docket, one query per call."""
+        return Relatives(docket=Ancestor(Docket)).reader(
+            KeyedEntryMerger,
+            relation=None,
+            params=RelatedParams(None, parent=self.docket_a),
+            ordering=("pk",),
+        )
+
+    def test_filter_values_are_restricted(self) -> None:
+        """Is a filter value that reads a scrape, the database or nothing but a plain value rejected?"""
+        cases: dict[str, Any] = {
+            "plain": 1,
+            "scrape": Scrape(dict)["d"],
+            "database": Database(Docket.case_name),
+            "scrape and ancestor": Fn(_raise)(
+                Scrape(dict)["d"], Ancestor(Docket)
+            ),
+        }
+        for name, value in cases.items():
+            with self.subTest(name), self.assertRaises(TypeError):
+                Relatives(docket=value)
+
+    def test_filter_values_may_read_params_ancestors_and_constants(
+        self,
+    ) -> None:
+        """Is a filter value built from params, ancestors and constants accepted?"""
+        pool = Relatives(
+            docket=Ancestor(Docket),
+            court=Params(SimpleNamespace).court,
+            source=Constant(DocketSources.SCRAPER),
+            number=Fn(_raise)(Ancestor(Docket), Constant(1)),
+        )
+
+        self.assertEqual(
+            set(pool.filters), {"docket", "court", "source", "number"}
+        )
+
+    def test_annotate_rejects_non_expressions(self) -> None:
+        """Is an annotation that is not a Django query expression rejected?"""
+        for name, value in {
+            "string": "party_types__name",
+            "merger expression": Scrape(dict)["role"],
+        }.items():
+            with self.subTest(name), self.assertRaises(TypeError):
+                Relatives().annotate(role=value)  # type: ignore[arg-type]
+
+    def test_annotate_returns_new_pool(self) -> None:
+        """Does annotating leave the pool it was called on unchanged?"""
+        base = Relatives(party_types__docket=Ancestor(Docket))
+        annotated = base.annotate(role=F("party_types__name"))
+
+        self.assertEqual(base.annotations, {})
+        self.assertEqual(set(annotated.annotations), {"role"})
+        self.assertEqual(set(annotated.filters), {"party_types__docket"})
+        self.assertIsInstance(annotated, Relatives)
+
+    def test_annotation_reuses_filter_join(self) -> None:
+        """Does a party on two dockets get only this docket's role?"""
+        reader = PARTY_POOL.reader(
+            PartyPoolMerger,
+            relation=None,
+            params=RelatedParams(None, parent=self.docket_a),
+            ordering=("pk",),
+        )
+
+        rows: Sequence[Any] = reader.rows(Q(name=self.party.name), ("pk",))
+
+        self.assertEqual([r.role for r in rows], ["Appellant"])
+
+    def test_query_loads_annotates_and_orders(self) -> None:
+        """Does a pool query load only the merger's fields, carry the annotations and sort as asked?"""
+        query = PARTY_POOL.query(
+            PartyPoolMerger,
+            Party.objects.filter(party_types__docket=self.docket_b),
+            ("-pk",),
+        )
+
+        self.assertEqual(
+            list(query.values_list("role", flat=True)), ["Respondent"]
+        )
+        self.assertEqual(
+            query.query.order_by,
+            ("-pk",),
+        )
+        self.assertEqual(
+            query.query.deferred_loading[0],
+            frozenset(PartyPoolMerger.config.fields),
+        )
+
+    def test_relatives_are_bounded_by_filters(self) -> None:
+        """Does a relatives pool read only the rows its filters allow?"""
+        rows = self.keyed_reader().rows(Q(), ("pk",))
+
+        self.assertEqual(
+            [r.description for r in rows], ["First", "Second", "Third"]
+        )
+
+    def test_global_pool_reads_the_default_manager(self) -> None:
+        """Does a global pool read rows of every parent?"""
+        reader = Global().reader(
+            KeyedEntryMerger, relation=None, params=None, ordering=("pk",)
+        )
+
+        self.assertEqual(
+            [
+                r.description
+                for r in reader.rows(Q(description="Other"), ("pk",))
+            ],
+            ["Other"],
+        )
+        self.assertEqual(
+            {r.pk for r in reader.rows(Q(), ("pk",))},
+            set(DocketEntry.objects.values_list("pk", flat=True)),
+        )
+
+    def test_whole_reader_reads_once(self) -> None:
+        """Does a whole reader answer every call from one query?"""
+        reader = self.siblings_reader(self.docket_a.docket_entries.all())
+
+        with self.assertNumQueries(1):
+            reader.rows(Q(), ("pk",))
+            reader.rows(Q(), ("-pk",))
+
+    def test_whole_reader_ignores_where_and_sorts_in_memory(self) -> None:
+        """Does a whole reader return every row, in the order asked for?"""
+        reader = self.siblings_reader(self.docket_a.docket_entries.all())
+
+        self.assertEqual(
+            [r.pk for r in reader.rows(Q(description="First"), ("-pk",))],
+            [e.pk for e in reversed(self.entries)],
+        )
+
+    def test_prefetched_relation_is_not_read_again(self) -> None:
+        """Does a whole reader use a prefetched relation as it is?"""
+        docket = Docket.objects.prefetch_related("docket_entries").get(
+            pk=self.docket_a.pk
+        )
+        reader = self.siblings_reader(docket.docket_entries.all())
+
+        with self.assertNumQueries(0):
+            rows = reader.rows(Q(), ("pk",))
+
+        self.assertEqual(len(rows), len(self.entries))
+
+    def test_keyed_reader_queries_per_call(self) -> None:
+        """Does a keyed reader run one query per call, filtered by where?"""
+        reader = self.keyed_reader()
+
+        with self.assertNumQueries(2):
+            first = reader.rows(Q(description="First"), ("pk",))
+            second = reader.rows(Q(description="Second"), ("-pk",))
+
+        self.assertEqual([r.description for r in first], ["First"])
+        self.assertEqual([r.description for r in second], ["Second"])
+
+    def test_sort_rows_puts_nulls_last(self) -> None:
+        """Do nulls sort after every value whichever the direction?"""
+        rows = [NS(d=None, pk=1), NS(d=2, pk=2), NS(d=1, pk=3)]
+
+        self.assertEqual(
+            [r.pk for r in sort_rows(rows, ("d", "pk"))], [3, 2, 1]
+        )
+        self.assertEqual(
+            [r.pk for r in sort_rows(rows, ("-d", "pk"))], [2, 3, 1]
+        )
+
+    def test_sort_rows_breaks_ties_by_later_fields(self) -> None:
+        """Are ties on one field broken by the next, each with its own direction?"""
+        rows = [NS(a=1, pk=1), NS(a=2, pk=2), NS(a=1, pk=3)]
+
+        self.assertEqual(
+            [r.pk for r in sort_rows(rows, ("a", "-pk"))], [3, 1, 2]
+        )
+
+    def test_siblings_without_relation_is_rejected(self) -> None:
+        """Does a siblings pool refuse to read when there is no parent relation?"""
+        with self.assertRaises(TypeError):
+            Siblings().reader(
+                KeyedEntryMerger,
+                relation=None,
+                params=None,
+                ordering=("pk",),
+            )
+
+    def test_whole_prune_deletes_unkept_read_rows(self) -> None:
+        """Does pruning a whole reader delete the rows it read that are not kept?"""
+        relation = self.docket_a.docket_entries.all()
+        reader = self.siblings_reader(relation)
+        reader.rows(Q(), ("pk",))
+        kept = self.entries[0]
+
+        reader.prune(relation, {kept.pk})
+
+        self.assertEqual(
+            list(self.docket_a.docket_entries.values_list("pk", flat=True)),
+            [kept.pk],
+        )
+        self.assertEqual(
+            self.docket_b.docket_entries.count(),
+            1,
+            "Rows outside the pool are out of scope.",
+        )
+
+    def test_whole_prune_reads_when_rows_never_ran(self) -> None:
+        """Does pruning a whole reader that has not read yet still delete exactly the unkept rows?"""
+        relation = self.docket_a.docket_entries.all()
+        reader = self.siblings_reader(relation)
+        kept = self.entries[1]
+
+        reader.prune(relation, {kept.pk})
+
+        self.assertEqual(
+            list(self.docket_a.docket_entries.values_list("pk", flat=True)),
+            [kept.pk],
+        )
+
+    def test_keyed_prune_excludes_without_reading(self) -> None:
+        """Does pruning a keyed reader delete by exclusion without reading the pool first?"""
+        relation = self.docket_a.docket_entries.all()
+        reader = self.keyed_reader()
+        kept = self.entries[2]
+
+        with CaptureQueriesContext(connection) as queries:
+            reader.prune(relation, {kept.pk})
+
+        self.assertEqual(
+            list(self.docket_a.docket_entries.values_list("pk", flat=True)),
+            [kept.pk],
+        )
+        # Django's `QuerySet.delete()` issues all of these; a read of the
+        # pool would be one more `SELECT` from the entries table.
+        # `QuerySet.delete()` collects the rows to delete (one `SELECT` of the
+        # entries, one for each relation cascading from them) and then updates
+        # and deletes: 7 queries here. The single `SELECT` of the entries is
+        # the collector's, so the pool's read never happens.
+        self.assertEqual(len(queries), 7)
+        self.assertEqual(
+            sum(
+                q["sql"].startswith('SELECT "search_docketentry"."id"')
+                for q in queries
+            ),
+            1,
+        )
