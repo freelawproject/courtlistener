@@ -4,7 +4,7 @@ Keep this module importable before Django setup: spawn/forkserver workers
 import it when unpickling the parser functions submitted to their pools.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from juriscraper.pacer import (
     ACMSAttachmentPage,
@@ -53,10 +53,15 @@ def parse_appellate_text(court_id: str, text: str) -> dict[str, Any]:
 
 
 def parse_acms_attachment_json(court_id: str, json: str) -> dict[str, Any]:
-    """Parse ACMS attachment JSON into structured data."""
+    """Parse ACMS attachment JSON into structured data.
+
+    Returns an empty dict if the JSON could not be parsed.
+    """
     report = ACMSAttachmentPage(court_id)
     report._parse_text(json)
-    return report.data
+    # juriscraper types this as a TypedDict or an empty dict. Callers treat
+    # it as a plain dict (checking emptiness, then indexing), so cast it.
+    return cast(dict[str, Any], report.data)
 
 
 def parse_acms_json(court_id: str, json: str) -> dict[str, Any]:

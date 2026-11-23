@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load static svg_tags %}
+{% load static svg_tags component_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
@@ -20,7 +20,7 @@
         {'href': '#expansion', 'text': 'Expansion panel'},
         {'href': '#navigation-menu', 'text': 'Navigation menu'},
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
-        {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
+        {'href': '#tabbed-cards', 'text': 'Tabs'},
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#flex-table', 'text': 'Flex table'},
         {'href': '#dialog', 'text': 'Dialog'},
@@ -31,6 +31,8 @@
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#banner', 'text': 'Banner'},
+        {'href': '#tooltip', 'text': 'Tooltip'},
+        {'href': '#toast', 'text': 'Toast'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#profile-section-shell', 'text': 'Profile section shell'},
@@ -659,66 +661,92 @@ Sample code here.
     </c-expansion-panel>
   </c-layout-with-navigation.section>
 
-  {# TABBED CARDS #}
+  {# TABS #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tabbed-cards">
-    <h2 class="mt-6 mb-3">Tabbed cards</h2>
-    <p>The tabbed component is composed of two elements: the <code>c-tabs</code> element and the <code>c-tabs.tab</code> element.
-    Include a <code>c-tabs.tab</code> element for each tab in the <code>c-tabs</code> slot.
-    </p>
+    <h2 class="mt-6 mb-3">Tabs</h2>
+    <p>Switches between related views. The mode comes from the <code>tabs</code> list: when its entries have a <code>url</code>, each tab is a link to its own page and loads without a full reload; when none do, each tab shows a <code>c-tabs.panel</code> on the same page. Below <code>md</code>, the tabs become a dropdown.</p>
 
-    <h4 class="mt-3">Demo</h4>
-    <c-tabs class="my-4" title="My tabs">
-      <c-tabs.tab name="First tab">
-        First tab panel content
-      </c-tabs.tab>
-      <c-tabs.tab name="Second tab">
-        Second tab panel content
-      </c-tabs.tab>
-      <c-tabs.tab name="Third tab">
-        Third tab panel content
-      </c-tabs.tab>
+    <h4 class="mt-3">Demo — Link tabs</h4>
+    <c-tabs class="my-4" label="Alert types" :tabs="demo_link_tabs" :active_tab="demo_link_active_tab">
+      <div class="p-4">{% if demo_link_active_tab == "docket" %}Docket alerts page content.{% else %}Search alerts page content.{% endif %}</div>
     </c-tabs>
+
+    <h4 class="mt-3">Demo — Panel tabs</h4>
+    <c-tabs class="my-4" label="My tabs" :tabs="demo_panel_tabs" :active_tab="demo_panel_active_tab">
+      <c-tabs.panel key="first" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
+        <div class="p-4">First tab panel content.</div>
+      </c-tabs.panel>
+      <c-tabs.panel key="second" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
+        <div class="p-4">Second tab panel content.</div>
+      </c-tabs.panel>
+      <c-tabs.panel key="third" tabs_label="My tabs" :active_tab="demo_panel_active_tab">
+        <div class="p-4">Third tab panel content.</div>
+      </c-tabs.panel>
+    </c-tabs>
+
+    <h4 class="mt-3">Notes</h4>
+    <ul class="list-disc pl-4">
+      <li>Build the <code>tabs</code> list in the view, as a list of <code>TabItem</code> from <code>cl/lib/types.py</code>. Mixing entries with and without a <code>url</code> isn't supported.</li>
+      <li>Panel tabs: give each <code>c-tabs.panel</code> the <code>key</code> of its tab and the component's <code>label</code> as <code>tabs_label</code>. Pass <code>active_tab</code> from <code>resolve_active_tab</code>, so the right panel renders from the start and <code>?tab=</code> survives a reload.</li>
+    </ul>
 
     <c-library.list title="Props" only>
       <c-library.item only>
-        <c-slot name="label"><code>c-tabs</code>: <code>title</code></c-slot>
-        <c-slot name="description">
-          Component title used for accessibility.
-        </c-slot>
+        <c-slot name="label"><code>c-tabs</code>: <code>label</code></c-slot>
+        <c-slot name="description">Accessible name for the tabs and the dropdown. Also builds the component's ids, it must be unique.</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>c-tabs.tab</code>: <code>name</code></c-slot>
-        <c-slot name="description">
-          Tab label displayed in selector.
-        </c-slot>
+        <c-slot name="label"><code>c-tabs</code>: <code>tabs</code></c-slot>
+        <c-slot name="description">List of <code>TabItem</code>: <code>key</code> (unique id), <code>label</code>, and optionally <code>url</code> (link tabs), <code>icon</code> (link tabs) and <code>count</code> (chip on panel tabs, in brackets in the dropdown).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code>: <code>active_tab</code></c-slot>
+        <c-slot name="description">Key of the current tab. Link tabs: the page's own tab. Panel tabs: falls back to the first tab, but pass it to avoid an empty panel until Alpine starts.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs</code>: <code>class</code></c-slot>
+        <c-slot name="description">Extra classes for the component's root, such as margins.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>key</code></c-slot>
+        <c-slot name="description">Key of the tab that shows this panel.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>tabs_label</code></c-slot>
+        <c-slot name="description">The component's <code>label</code>, so the panel builds the same ids as its tab.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-tabs.panel</code>: <code>active_tab</code></c-slot>
+        <c-slot name="description">Same value as the component's, so inactive panels are hidden on the server.</c-slot>
       </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
       <c-library.item only>
         <c-slot name="label"><code>c-tabs</code> default</c-slot>
-        <c-slot name="description">
-          Add as many <code>c-tabs.tab</code> elements as needed.
-        </c-slot>
+        <c-slot name="description">Link tabs: the current page's content. Panel tabs: one <code>c-tabs.panel</code> per tab.</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>c-tabs.tab</code> default</c-slot>
-        <c-slot name="description">Content displayed when this tab is active.</c-slot>
+        <c-slot name="label"><code>c-tabs.panel</code> default</c-slot>
+        <c-slot name="description">Content shown while its tab is selected.</c-slot>
       </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-tabs title="My tabs"&gt;
-  &lt;c-tabs.tab name="First tab"&gt;
-    First tab panel content
-  &lt;/c-tabs.tab&gt;
-  &lt;c-tabs.tab name="Second tab"&gt;
-    Second tab panel content
-  &lt;/c-tabs.tab&gt;
-  &lt;c-tabs.tab name="Third tab"&gt;
-    Third tab panel content
-  &lt;/c-tabs.tab&gt;
+{% templatetag opencomment %} Link tabs {% templatetag closecomment %}
+&lt;c-tabs label="Alert types" :tabs="tabs" :active_tab="active_tab"&gt;
+  ...this page's content...
+&lt;/c-tabs&gt;
+
+{% templatetag opencomment %} Panel tabs {% templatetag closecomment %}
+&lt;c-tabs label="Notes" :tabs="tabs" :active_tab="active_tab"&gt;
+  &lt;c-tabs.panel key="dockets" tabs_label="Notes" :active_tab="active_tab"&gt;
+    ...
+  &lt;/c-tabs.panel&gt;
+  &lt;c-tabs.panel key="opinions" tabs_label="Notes" :active_tab="active_tab"&gt;
+    ...
+  &lt;/c-tabs.panel&gt;
 &lt;/c-tabs&gt;
       </c-code>
     </c-expansion-panel>
@@ -1643,6 +1671,215 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# TOOLTIP #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="tooltip">
+    <h2 class="mt-6 mb-3">Tooltip</h2>
+    <p>A help (?) button that explains the item next to it. Hovering over the button shows the message; clicking it, tapping it, or pressing Enter or Space pins the message open until the button is pressed again, Escape is pressed, focus leaves the button, or the user clicks elsewhere. The component always renders its own button: attaching a tooltip to any other element is not supported yet.</p>
+
+    <h4 class="mt-3">Demo — Dark (default)</h4>
+    <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
+      <c-tooltip label="the top arrow" message="Top" position="top" has_arrow />
+      <c-tooltip label="the top-start arrow" message="Top start" position="top-start" has_arrow />
+      <c-tooltip label="the top-end arrow" message="Top end" position="top-end" has_arrow />
+      <c-tooltip label="the bottom arrow" message="Bottom" has_arrow />
+      <c-tooltip label="the left arrow" message="Left" position="left" has_arrow />
+      <c-tooltip label="the right arrow" message="Right" position="right" has_arrow />
+      <c-tooltip label="the tooltip without an arrow" message="No arrow" />
+      <c-tooltip label="the tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." />
+    </div>
+
+    <h4 class="mt-3">Demo — Light</h4>
+    <div class="flex flex-wrap items-center justify-between gap-x-16 gap-y-24 my-4 rounded-lg border border-greyscale-200 px-4 py-16">
+      <c-tooltip variant="light" label="the light top arrow" message="Top" position="top" has_arrow />
+      <c-tooltip variant="light" label="the light top-start arrow" message="Top start" position="top-start" has_arrow />
+      <c-tooltip variant="light" label="the light top-end arrow" message="Top end" position="top-end" has_arrow />
+      <c-tooltip variant="light" label="the light bottom arrow" message="Bottom" has_arrow />
+      <c-tooltip variant="light" label="the light left arrow" message="Left" position="left" has_arrow />
+      <c-tooltip variant="light" label="the light right arrow" message="Right" position="right" has_arrow />
+      <c-tooltip variant="light" label="the light tooltip without an arrow" message="No arrow" />
+      <c-tooltip variant="light" label="the light tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="description">What the tooltip explains, e.g. <code>Last Updated</code>. The button is announced as "More about {label}": an icon-only button has no name of its own, and "Help" alone wouldn't tell screen reader users which item it explains.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>message</code></c-slot>
+        <c-slot name="description">The text the tooltip shows, in medium weight and above the description when there is one. Text with emphasis only, such as a <code>&lt;strong&gt;</code> in a <code>mark_safe</code> string from the view: no links, buttons or other interactive content. Screen readers announce the tooltip as a status message, so a control inside it wouldn't be announced as one.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>description</code></c-slot>
+        <c-slot name="description">Supporting text shown below the message, for Figma's "Supporting text" variant. Setting it also switches the bubble to the roomier padding that variant uses.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Figma's light or dark theme. Use <code>light</code> for the light theme; leave it out for the dark one, which is the default.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>position</code></c-slot>
+        <c-slot name="description">Where the tooltip opens relative to the button: <code>top</code>, <code>bottom</code>, <code>left</code> or <code>right</code>, optionally with <code>-start</code> or <code>-end</code>. Default: <code>bottom</code>. It's passed to <code>x-anchor</code>, which flips the tooltip to the opposite side when there isn't room; the arrow follows wherever it lands. <code>left</code> and <code>right</code> are only for messages of a word or two, for longer messages please use <code>top</code> or <code>bottom</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>has_arrow</code></c-slot>
+        <c-slot name="description">Adds an arrow pointing at the button. Leave it out for Figma's "Arrow = None" variant.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon</code></c-slot>
+        <c-slot name="description">Name of the SVG shown in the button. Default: <code>circle_question_mark_outline</code>, the help icon from Figma.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Dark (default) --&gt;
+&lt;c-tooltip label="the top arrow" message="Top" position="top" has_arrow /&gt;
+&lt;c-tooltip label="the top-start arrow" message="Top start" position="top-start" has_arrow /&gt;
+&lt;c-tooltip label="the top-end arrow" message="Top end" position="top-end" has_arrow /&gt;
+&lt;c-tooltip label="the bottom arrow" message="Bottom" has_arrow /&gt;
+&lt;c-tooltip label="the left arrow" message="Left" position="left" has_arrow /&gt;
+&lt;c-tooltip label="the right arrow" message="Right" position="right" has_arrow /&gt;
+&lt;c-tooltip label="the tooltip without an arrow" message="No arrow" /&gt;
+&lt;c-tooltip label="the tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." /&gt;
+
+&lt;!-- Light --&gt;
+&lt;c-tooltip variant="light" label="the light top arrow" message="Top" position="top" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light top-start arrow" message="Top start" position="top-start" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light top-end arrow" message="Top end" position="top-end" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light bottom arrow" message="Bottom" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light left arrow" message="Left" position="left" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light right arrow" message="Right" position="right" has_arrow /&gt;
+&lt;c-tooltip variant="light" label="the light tooltip without an arrow" message="No arrow" /&gt;
+&lt;c-tooltip variant="light" label="the light tooltip with a description" message="With a description" position="top" has_arrow description="Tooltips describe or identify an element. They help the user understand its meaning or function." /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# TOAST #}
+  {% require_script "js/third_party/htmx" defer=True %}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="toast">
+    <h2 class="mt-6 mb-3">Toast</h2>
+    <p>A persistent notification at the bottom of the viewport, announced politely by a <code>role="status"</code> live region. It renders closed and opens when a control in its <code>trigger</code> slot calls <code>open</code>, or when the window event named in its <code>x-on</code> listener fires, from a page script or an htmx response. The user closes it with the button or with <kbd>Escape</kbd>, from anywhere on the page; only one toast is open at a time: opening another closes it.</p>
+    <h4 class="mt-3">Accessibility</h4>
+    <p>A toast announces its plain-text <code>title</code> and <code>description</code> and never takes focus. The default slot allows any content, commonly one <code>c-button</code> for a related action, rarely more. These elements are not announced but are reachable with <kbd>Tab</kbd> or by navigating. An action may call <code>close</code>.</p>
+    <p><span class="font-bold">Avoid</span>: <code>role</code>, <code>aria-live</code> or <code>class</code> on the <code>&lt;c-toast&gt;</code> tag; attributes land on the root, so a role there makes the buttons part of the announcement, and the class is dropped; wrapping the toast in <code>x-if</code> or a hidden ancestor; a live region must be <a class="links-external" href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Guides/Live_regions" target="_blank" rel="noopener noreferrer">in the initial markup</a>.</p>
+    <h4 class="mt-3">With htmx</h4>
+    <p>A view names the outcome in an <code>HX-Trigger</code> header, or a failed request fires <code>htmx:response-error</code> or <code>htmx:send-error</code>; the toast listens for that event, scoped to its own trigger or page-wide with <code>.window</code>. For request-time content, the view renders the toast in a partial swapped in out of band and opened with <code>HX-Trigger-After-Settle</code>. The Code samples show each case.</p>
+    <h3 class="mt-3">Demo</h3>
+
+    <h4 class="mt-3">Variants</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Each button is its toast's <code>trigger</code> slot.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-toast title="Link copied">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Plain</c-button></c-slot>
+      </c-toast>
+      <c-toast variant="info" title="A new version of this page is available" description="Reload to see it.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Info</c-button></c-slot>
+      </c-toast>
+      <c-toast variant="success" title="Docket blocked" description="Search engines will no longer index this docket.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Success</c-button></c-slot>
+        <c-button variant="outline" size="sm">Undo</c-button>
+      </c-toast>
+      <c-toast variant="warning" title="Something went wrong" description="Please try again.">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Warning</c-button></c-slot>
+      </c-toast>
+    </div>
+
+    <h4 class="mt-3">Custom icon</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-toast title="Alert created" description="You will get an email when this docket changes." icon="bell">
+        <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Custom icon</c-button></c-slot>
+      </c-toast>
+    </div>
+
+    <h4 class="mt-3">Rendered by the server</h4>
+    <p class="text-sm text-greyscale-600 mb-2">An htmx request; the response is a partial with the current time, swapped over the placeholder below.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" hx-get="{% url 'components' %}?toast=server" hx-swap="none">Server-rendered</c-button>
+    </div>
+    <div id="toast-demo-server" class="contents"></div>
+
+    <h4 class="mt-3">Opened by a failed request</h4>
+    <p class="text-sm text-greyscale-600 mb-2">The trigger's htmx request goes to a URL that returns 404; the listener has no <code>.window</code>, so only this toast's own request opens it. htmx also logs the failure to the console.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error="open" x-on:htmx:send-error="open">
+        <c-slot name="trigger"><c-button variant="primary" hx-get="{% url 'components' %}missing/" hx-swap="none">Failing request</c-button></c-slot>
+      </c-toast>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>title</code></c-slot>
+        <c-slot name="description">Main text of the toast.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>description</code></c-slot>
+        <c-slot name="description">Secondary text shown under the title.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Preset that adds the matching icon before the title. Options: <code>info</code>, <code>success</code>, <code>warning</code>. When omitted, no icon is shown.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon</code></c-slot>
+        <c-slot name="description">Name of an svg icon shown before the title instead of the variant's.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>trigger</code></c-slot>
+        <c-slot name="description">A control rendered in place that opens the toast with <code>x-on:click="open"</code>. Omit it when an event opens the toast.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Other elements such as action <code>c-button</code>s, shown before the close button.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Variants: each opened by its trigger slot --&gt;
+&lt;c-toast title="Link copied"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Plain&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+&lt;c-toast variant="success" title="Docket blocked" description="Search engines will no longer index this docket."&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Success&lt;/c-button&gt;&lt;/c-slot&gt;
+  &lt;c-button variant="outline" size="sm"&gt;Undo&lt;/c-button&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Custom icon --&gt;
+&lt;c-toast title="Alert created" description="You will get an email when this docket changes." icon="bell"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="primary" x-on:click="open"&gt;Custom icon&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Rendered by the server: the page requires the toast script and keeps a box-less placeholder;
+     the view returns the partial with HX-Trigger-After-Settle: docket-block-toast-ready --&gt;
+{% templatetag openblock %} require_script "js/alpine/components/toast.js" {% templatetag closeblock %}
+&lt;c-button variant="primary" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
+&lt;div id="docket-block-toast" class="contents"&gt;&lt;/div&gt;
+{% templatetag opencomment %} v2_includes/docket_block/toast.html {% templatetag closecomment %}
+&lt;c-toast id="docket-block-toast" hx-swap-oob="true" variant="success" title="Blocked {% templatetag openvariable %} blocked {% templatetag closevariable %} of {% templatetag openvariable %} total {% templatetag closevariable %} dockets" x-on:docket-block-toast-ready.window="open" /&gt;
+
+&lt;!-- Opened by a failed request: only this toast's own request --&gt;
+&lt;c-toast variant="warning" title="Could not block this docket" description="Please try again." x-on:htmx:response-error="open" x-on:htmx:send-error="open"&gt;
+  &lt;c-slot name="trigger"&gt;&lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;&lt;/c-slot&gt;
+&lt;/c-toast&gt;
+
+&lt;!-- Not in the demo: one generic error toast for any failed request on the page --&gt;
+&lt;c-toast variant="warning" title="Something went wrong" description="Please try again." x-on:htmx:response-error.window="open" x-on:htmx:send-error.window="open" /&gt;
+
+&lt;!-- Not in the demo: opened from the page's script, e.g. this.$dispatch('action-not-allowed') in a method of its Alpine component --&gt;
+&lt;c-toast variant="warning" title="This action is not allowed" x-on:action-not-allowed.window="open" /&gt;
+
+&lt;!-- Not in the demo: the view answers the request with the header HX-Trigger: docket-blocked --&gt;
+&lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
+&lt;c-toast variant="success" title="Docket blocked" x-on:docket-blocked.window="open" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
   {# PROFILE SECTION SHELL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="profile-section-shell">
     <h2 class="mt-6 mb-3">Profile section shell</h2>
@@ -1691,7 +1928,7 @@ Sample code here.
   {# DOCKET PAGE SHELL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-page">
     <h2 class="mt-6 mb-3">Docket page</h2>
-    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. Each docket tab template uses this component and passes its content via the default slot.</p>
+    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. Each docket tab template uses this component and passes its content via the default slot. The tab content is a section whose <code>&lt;h2&gt;</code> is the active tab's name (visually hidden unless a single-tab docket is viewed on a phone), so the slot's own headings start at <code>&lt;h3&gt;</code>.</p>
 
     <c-library.list title="Props" only>
       <c-library.item only>
