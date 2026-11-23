@@ -231,6 +231,8 @@ To hide an "install RECAP" call to action from users who have the extension, mar
 - Use `<c-icon>` instead when callers would otherwise repeat size classes or color overrides, or when the icon switches between its filled and outline variants with state. A plain one-off icon can keep using `{% svg %}`
 - Icons live in `cl/assets/static-global/svg/`
 - Name an icon's filled form plainly (`bell.svg`) and its outline form with an `_outline` suffix (`bell_outline.svg`). An icon with only one form keeps the plain name, however it is drawn. `<c-icon outline>` relies on this to find the outline file
+- Pick the outline form with the variant prop (`<c-icon name="bell" outline>`, `<c-menu-button.item icon="bell" icon_outline>`), not by passing an `_outline` name
+- An icon name that points to a missing file raises an error in development and tests, so any page or test that renders it fails. In production the icon renders nothing
 - Icon files MUST use `currentColor` for fills and strokes, so the icon takes the CSS `color` of the icon or its parent, set by any class or style (e.g. `text-greyscale-400`). `fill-*` and `stroke-*` classes don't work, because each path sets its own fill or stroke. Logos in `logos/` and multi-color artwork such as `avatar_placeholder.svg` are the exception
 - New templates MUST NOT use Font Awesome classes
 
