@@ -33,6 +33,7 @@
         {'href': '#banner', 'text': 'Banner'},
         {'href': '#tooltip', 'text': 'Tooltip'},
         {'href': '#toast', 'text': 'Toast'},
+        {'href': '#combobox', 'text': 'Combobox'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#profile-section-shell', 'text': 'Profile section shell'},
@@ -1875,6 +1876,148 @@ Sample code here.
 &lt;!-- Not in the demo: the view answers the request with the header HX-Trigger: docket-blocked --&gt;
 &lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
 &lt;c-toast variant="success" title="Docket blocked" x-on:docket-blocked.window="open" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# COMBOBOX #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="combobox">
+    <h2 class="mt-6 mb-3">Combobox</h2>
+    <p>A field that opens a list of options and selects one of them, or any number with <code>multiple</code>. Typing in the field filters the list unless <code>searchable</code> is turned off. Implements the <a class="links-external" href="https://www.w3.org/WAI/ARIA/apg/patterns/combobox/" target="_blank" rel="noopener noreferrer">ARIA combobox pattern</a> on top of the <a class="links-external" href="https://alpinejs.dev/component/headless-combobox/docs" target="_blank" rel="noopener noreferrer">Alpine UI combobox</a>.</p>
+    <p class="mt-2">The single selection shows as the field's text, and emptying the text clears it. Multiple selections show as chips, each with a button that removes it.</p>
+    <p class="mt-2">The component keeps the selection in the browser and saves nothing. It reports each change with an event dispatched from its root, which bubbles; listen with <code>x-on:</code> on the component tag or on an ancestor.</p>
+    <p class="mt-2">For a plain choice inside a Django form, prefer a native <code>&lt;select&gt;</code> with the <code>Select</code> widget from <code>cl.lib.widgets</code>.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <c-combobox
+        label="Court"
+        placeholder="Search courts"
+        :options="[
+          {'value': 'scotus', 'label': 'Supreme Court'},
+          {'value': 'ca1', 'label': 'First Circuit'},
+          {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
+          {'value': 'ca9', 'label': 'Ninth Circuit'},
+          {'value': 'cafc', 'label': 'Federal Circuit'},
+        ]"
+      />
+      <c-combobox
+        label="Courts"
+        placeholder="Search courts"
+        multiple
+        :options="[
+          {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
+          {'value': 'ca1', 'label': 'First Circuit'},
+          {'value': 'ca2', 'label': 'Second Circuit'},
+          {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
+          {'value': 'cafc', 'label': 'Federal Circuit'},
+        ]"
+      />
+      <c-combobox
+        label="Status"
+        placeholder="Choose an option"
+        :searchable="False"
+        :options="[
+          {'value': 'published', 'label': 'Published'},
+          {'value': 'unpublished', 'label': 'Unpublished'},
+          {'value': 'errata', 'label': 'Errata'},
+        ]"
+      />
+      <c-combobox
+        label="Tags"
+        placeholder="Search or create tags"
+        multiple
+        creatable
+        create_label="Create tag:"
+        :options="[
+          {'value': 1, 'label': 'appeals'},
+          {'value': 2, 'label': 'bankruptcy', 'selected': True},
+          {'value': 3, 'label': 'patents'},
+        ]"
+      />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="description">Visible label of the field. It names the input and the list of options.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>options</code></c-slot>
+        <c-slot name="description">List of dictionaries with a unique <code>value</code> and a <code>label</code>. An optional <code>selected</code> marks the options selected on load; without <code>multiple</code>, only the first one counts. The options are listed in the order given.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>placeholder</code></c-slot>
+        <c-slot name="description">Text shown in the field while it is empty.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>multiple</code></c-slot>
+        <c-slot name="description">Selects any number of options and keeps the list open after each choice. Without it, choosing an option replaces the selection and closes the list.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>searchable</code></c-slot>
+        <c-slot name="description">Whether typing in the field filters the list. Defaults to <code>True</code>. Pass <code>:searchable="False"</code> for short lists: the field then only opens the list, and letter keys jump to the first option starting with them. Without search, <code>creatable</code> has no effect and the single selection cannot be cleared.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>creatable</code></c-slot>
+        <c-slot name="description">Offers an option, listed after the matches, that creates the typed text when it equals no option's label, ignoring case, and no option's value.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>create_label</code></c-slot>
+        <c-slot name="description">Text shown before the typed text in the create option. Defaults to <code>Create:</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes for the root.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p class="p-2.5">None.</p>
+    </c-library.list>
+
+    <c-library.list title="Events" only>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-add</code></c-slot>
+        <c-slot name="description">An option was selected. <code>detail.option</code> holds its <code>value</code> and <code>label</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-remove</code></c-slot>
+        <c-slot name="description">An option was deselected: from the list, from its chip, by emptying the field, or because another option replaced it as the single selection, in which case it follows that option's <code>combobox-add</code>. <code>detail.option</code> holds its <code>value</code> and <code>label</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-create</code></c-slot>
+        <c-slot name="description">The create option was chosen. <code>detail.label</code> holds the typed text. Unless a listener calls <code>preventDefault()</code>, the text becomes a new selected option whose value is its label, and <code>combobox-add</code> follows.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Single selection, filtered by typing --&gt;
+&lt;c-combobox
+  label="Court"
+  placeholder="Search courts"
+  :options="[
+    {'value': 'scotus', 'label': 'Supreme Court'},
+    {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
+  ]"
+/&gt;
+
+&lt;!-- Single selection without typing --&gt;
+&lt;c-combobox label="Status" placeholder="Choose an option" :searchable="False" :options="status_options" /&gt;
+
+&lt;!-- Multiple selection with the create option; the listeners are methods of an Alpine component on an ancestor --&gt;
+&lt;c-combobox
+  label="Tags"
+  placeholder="Search or create tags"
+  multiple
+  creatable
+  create_label="Create tag:"
+  :options="tag_options"
+  x-on:combobox-add="attachTag"
+  x-on:combobox-remove="detachTag"
+  x-on:combobox-create="createTag"
+/&gt;
       </c-code>
     </c-expansion-panel>
   </section>
