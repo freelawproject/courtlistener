@@ -8,23 +8,13 @@ from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
 
-from cl.disclosures.models import (
-    Agreement,
-    Debt,
-    FinancialDisclosure,
-    Gift,
-    Investment,
-    NonInvestmentIncome,
-    Position,
-    Reimbursement,
-    SpouseIncome,
-)
+from cl.lib.types import TabItem
+from cl.lib.utils import resolve_active_tab
 from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import attach_display_fields
 from cl.opinion_page.forms_v2 import DocketEntryFilterForm
@@ -52,44 +42,6 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
         "help/broken_email_help.html",
         {"private": True},
     )
-
-
-async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
-    """Get stats on the disclosure data.
-
-    Attempt the cache if possible.
-
-    Args:
-        bust_cache: If True, skip the cache and recompute fresh counts,
-            e.g. when a caller's own cache was just busted and needs this data
-            to actually be current rather than up to a week stale.
-
-    Returns:
-        A dict mapping item types to their counts.
-    """
-    coverage_key = "coverage-data.fd3"
-    coverage_data = None if bust_cache else await cache.aget(coverage_key)
-    if coverage_data is None:
-        models = {
-            "disclosures": FinancialDisclosure,
-            "investments": Investment,
-            "positions": Position,
-            "agreements": Agreement,
-            "non_investment_income": NonInvestmentIncome,
-            "spousal_income": SpouseIncome,
-            "reimbursements": Reimbursement,
-            "gifts": Gift,
-            "debts": Debt,
-        }
-        coverage_data = {
-            k: await model.objects.all().acount()
-            for k, model in models.items()
-        }
-        coverage_data["private"] = False
-        one_week_minutes = 60 * 60 * 24 * 7
-        await cache.aset(coverage_key, coverage_data, one_week_minutes)
-
-    return coverage_data
 
 
 async def contact(
@@ -378,6 +330,27 @@ async def components(request: HttpRequest) -> HttpResponse:
     demo_disabled_filter_form = DocketEntryFilterForm(initial={"entry_gte": 5})
     demo_disabled_filter_form.fields["entry_gte"].disabled = True
 
+    demo_panel_tabs: list[TabItem] = [
+        {"key": "first", "label": "First tab"},
+        {"key": "second", "label": "Second tab"},
+        {"key": "third", "label": "Third tab"},
+    ]
+    components_url = reverse("components")
+    demo_link_tabs: list[TabItem] = [
+        {
+            "key": "search",
+            "label": "Search Alerts",
+            "icon": "magnifier",
+            "url": f"{components_url}?link_tab=search#tabbed-cards",
+        },
+        {
+            "key": "docket",
+            "label": "Docket Alerts",
+            "icon": "file_text",
+            "url": f"{components_url}?link_tab=docket#tabbed-cards",
+        },
+    ]
+
     return TemplateResponse(
         request,
         "components.html",
@@ -391,6 +364,14 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_filter_form": DocketEntryFilterForm(),
             "demo_invalid_filter_form": demo_invalid_filter_form,
             "demo_disabled_filter_form": demo_disabled_filter_form,
+            "demo_panel_tabs": demo_panel_tabs,
+            "demo_panel_active_tab": resolve_active_tab(
+                demo_panel_tabs, request.GET.get("tab")
+            ),
+            "demo_link_tabs": demo_link_tabs,
+            "demo_link_active_tab": resolve_active_tab(
+                demo_link_tabs, request.GET.get("link_tab")
+            ),
             "demo_metadata_items": [
                 {"label": "Date Filed", "value": "January 14, 2025"},
                 {
