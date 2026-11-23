@@ -2091,7 +2091,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`Any | None` is not assignable to attribute `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -2217,7 +2217,7 @@
       "column": 13,
       "path": "cl/recap/tasks.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | Unknown` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `pacer_case_id` with type `str`",
       "severity": "error"
     },
     {
@@ -2749,21 +2749,21 @@
       "column": 36,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `headers`",
+      "concise_description": "Object of class `NoneType` has no attribute `headers`",
       "severity": "error"
     },
     {
       "column": 41,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `content`",
+      "concise_description": "Object of type `HTTPResponse | Response | None` has no attribute `content`",
       "severity": "error"
     },
     {
       "column": 19,
       "path": "cl/scrapers/utils.py",
       "name": "missing-attribute",
-      "concise_description": "Object of type `AsyncClient | dict[Unknown, Unknown] | dict[str, str] | None` has no attribute `content`",
+      "concise_description": "Object of type `HTTPResponse | Response | None` has no attribute `content`",
       "severity": "error"
     },
     {
