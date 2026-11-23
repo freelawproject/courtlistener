@@ -23,6 +23,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cl.oauth.validators import CourtListenerOAuth2Validator
+
 # What the metadata advertises. Client-credentials, password, and
 # device-code grants are intentionally left out: MCP clients are
 # confidential or public user-agent apps using authorization-code + PKCE.
@@ -78,10 +80,14 @@ class OAuthMetadataView(APIView):
         """Return the server's OAuth metadata."""
         base = request.build_absolute_uri("/").rstrip("/")
         oidc_enabled = settings.OAUTH2_PROVIDER.get("OIDC_ENABLED")
+        # The clients that still discover us here are the ones registered
+        # through the retired DCR endpoint, so advertise only the scopes
+        # they may request. OIDC discovery still lists every scope.
         scopes_supported = [
             scope
             for scope in settings.OAUTH2_PROVIDER["SCOPES"]
-            if oidc_enabled or scope not in settings.OIDC_SCOPES
+            if scope in CourtListenerOAuth2Validator.DCR_SCOPES
+            and (oidc_enabled or scope not in settings.OIDC_SCOPES)
         ]
         return Response(
             {

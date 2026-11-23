@@ -73,18 +73,21 @@ class OAuthMetadataTest(APITestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.client.post(path).status_code, 404)
 
-    def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(self):
+    def test_scopes_supported_excludes_oidc_scopes_when_oidc_disabled(
+        self,
+    ) -> None:
+        """Without OIDC, only ``api`` is advertised."""
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": False}):
             resp = self.client.get(self.url)
-        self.assertEqual(resp.json()["scopes_supported"], ["api", "wiki"])
+        self.assertEqual(resp.json()["scopes_supported"], ["api"])
 
-    def test_scopes_supported_lists_every_scope_when_oidc_enabled(self):
+    def test_scopes_supported_lists_only_dcr_scopes_when_oidc_enabled(
+        self,
+    ) -> None:
+        """Only the scopes legacy DCR apps may request are advertised."""
         with patch.dict(settings.OAUTH2_PROVIDER, {"OIDC_ENABLED": True}):
             resp = self.client.get(self.url)
-        self.assertEqual(
-            resp.json()["scopes_supported"],
-            ["api", "wiki", "openid", "email", "profile"],
-        )
+        self.assertEqual(resp.json()["scopes_supported"], ["api", "openid"])
 
 
 class ApplicationRedirectUriPolicyTest(TestCase):
@@ -506,6 +509,70 @@ class OIDCClaimsTest(APITestCase):
         for scope in ("api", "wiki", "openid", "email", "profile"):
             with self.subTest(scope=scope):
                 self.assertIn(scope, body["scopes_supported"])
+
+
+@override_settings(
+    OAUTH2_PROVIDER={**settings.OAUTH2_PROVIDER, "OIDC_ENABLED": True}
+)
+class DCRScopeRestrictionTest(TestCase):
+    """Dynamically registered apps may request only ``api`` and ``openid``.
+
+    Anyone can register an app through DCR under any name, so the identity
+    and wiki scopes are reserved for applications we create by hand.
+    """
+
+    REDIRECT_URI = "https://client.example.com/callback"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.dcr_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+            registration_source=Application.RegistrationSource.DCR,
+        )
+        cls.manual_app = ApplicationFactory(
+            client_type=Application.CLIENT_PUBLIC,
+            redirect_uris=cls.REDIRECT_URI,
+        )
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def _authorize(self, application, scope: str):
+        """GET the consent screen for *application* requesting *scope*."""
+        return self.client.get(
+            reverse("oauth2_provider:authorize"),
+            {
+                "response_type": "code",
+                "client_id": application.client_id,
+                "redirect_uri": self.REDIRECT_URI,
+                "scope": scope,
+                "state": "xyz",
+                "code_challenge": s256_challenge("a" * 64),
+                "code_challenge_method": "S256",
+            },
+        )
+
+    def test_dcr_app_may_request_api_and_openid(self) -> None:
+        """A DCR app may still request ``api`` and ``openid``."""
+        r = self._authorize(self.dcr_app, "api openid")
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_dcr_app_is_refused_other_scopes(self) -> None:
+        """A DCR app asking for identity or wiki scopes gets ``invalid_scope``."""
+        for scope in ("api wiki", "openid email", "openid profile", "wiki"):
+            with self.subTest(scope=scope):
+                r = self._authorize(self.dcr_app, scope)
+                self.assertEqual(r.status_code, 302)
+                self.assertTrue(r["Location"].startswith(self.REDIRECT_URI))
+                self.assertIn("error=invalid_scope", r["Location"])
+
+    def test_manual_app_may_request_every_scope(self) -> None:
+        """A hand-made app may request every scope."""
+        r = self._authorize(self.manual_app, "openid api wiki email profile")
+        self.assertEqual(r.status_code, 200, r.content)
 
 
 class IntrospectionSubTest(APITestCase):
