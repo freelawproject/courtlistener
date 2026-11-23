@@ -953,7 +953,7 @@ def run_checks(
 
         try:
             raw_lines = abs_path.read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         lines = _blank_code_blocks(raw_lines)
 
@@ -1023,7 +1023,7 @@ def run_checks(
             continue
         try:
             lines = abs_legacy.read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         for line_no, msg in check_sync_notice(lines):
             findings.append(
@@ -1054,22 +1054,22 @@ def run_checks(
         abs_legacy = repo_root / legacy_path
         try:
             content = abs_legacy.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         if "use_new_design waffle flag" not in content:
             continue
-        for counterpart in counterparts:
-            findings.append(
-                Finding(
-                    legacy_path,
-                    1,
-                    "check_v2_counterpart_updated",
-                    WARN,
-                    f"Legacy template with sync notice was modified but "
-                    f"its counterpart ({counterpart}) was not — ensure "
-                    f"both templates stay in sync",
-                )
+        findings.extend(
+            Finding(
+                legacy_path,
+                1,
+                "check_v2_counterpart_updated",
+                WARN,
+                f"Legacy template with sync notice was modified but "
+                f"its counterpart ({counterpart}) was not — ensure "
+                f"both templates stay in sync",
             )
+            for counterpart in counterparts
+        )
 
     # Deletion check: IncrementalNewTemplateMiddleware serves a v2_ template
     # to everyone once its legacy counterpart is gone, so deleting the legacy
