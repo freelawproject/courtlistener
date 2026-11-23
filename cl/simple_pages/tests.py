@@ -1143,18 +1143,12 @@ class IconComponentTest(CottonComponentMixin, SimpleTestCase):
         self.assertEqual(icon.get("class").split(), ["shrink-0", "size-3"])
 
 
-class ToastComponentTest(SimpleTestCase):
+class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
     """The c-toast component renders its optional parts only when given."""
-
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
 
     def test_title_alone_renders_only_the_close_icon(self) -> None:
         """Without a variant, icon or description, the only svg is the close button's."""
-        html = self.render('<c-toast title="Link copied" />')
+        html = self.render_component('<c-toast title="Link copied" />')
         self.assertIn("Link copied", html)
         self.assertEqual(html.count("<svg"), 1)
 
@@ -1172,7 +1166,7 @@ class ToastComponentTest(SimpleTestCase):
         }
         for variant, icon in variant_icons.items():
             with self.subTest(variant=variant):
-                html = self.render(
+                html = self.render_component(
                     f'<c-toast variant="{variant}" title="Docket blocked"'
                     ' description="No longer indexed" />'
                 )
@@ -1182,12 +1176,14 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_unknown_variant_renders_no_icon(self) -> None:
         """A variant outside the presets renders neither an icon nor its slot."""
-        html = self.render('<c-toast variant="error" title="Oops" />')
+        html = self.render_component(
+            '<c-toast variant="error" title="Oops" />'
+        )
         self.assertEqual(html.count("<svg"), 1)
 
     def test_icon_prop_replaces_the_variant_icon(self) -> None:
         """A named icon renders instead of the variant's, as the only icon."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast variant="success" title="Alert created" icon="bell" />'
         )
         self.assertIn(self.icon("bell"), html)
@@ -1195,31 +1191,32 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_trigger_slot_renders_inside_the_root(self) -> None:
         """A trigger slot renders; a toast opened by an event has none."""
-        with_trigger = self.render(
+        with_trigger = self.render_component(
             '<c-toast title="Saved"><c-slot name="trigger">'
             '<button x-on:click="open">Show</button></c-slot></c-toast>'
         )
         self.assertIn('x-on:click="open"', with_trigger)
         self.assertNotIn(
-            'x-on:click="open"', self.render('<c-toast title="Saved" />')
+            'x-on:click="open"',
+            self.render_component('<c-toast title="Saved" />'),
         )
 
     def test_action_container_renders_only_with_content(self) -> None:
         """A trigger slot written on its own lines leaves no empty action box."""
-        with_trigger = self.render(
+        with_trigger = self.render_component(
             '<c-toast title="Saved">\n'
             '  <c-slot name="trigger"><button x-on:click="open">Show</button></c-slot>\n'
             "</c-toast>"
         )
         self.assertNotIn("shrink-0 items-center gap-2", with_trigger)
-        with_action = self.render(
+        with_action = self.render_component(
             '<c-toast title="Saved"><button>Undo</button></c-toast>'
         )
         self.assertIn("shrink-0 items-center gap-2", with_action)
 
     def test_live_region_renders_empty_and_polite(self) -> None:
         """The message column is an empty polite live region at render time."""
-        html = self.render('<c-toast title="Docket blocked" />')
+        html = self.render_component('<c-toast title="Docket blocked" />')
         region = re.search(r'<div[^>]*x-ref="live"[^>]*></div>', html)
         self.assertIsNotNone(region)
         for attribute in (
@@ -1231,7 +1228,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_message_waits_in_a_template(self) -> None:
         """The title and description render inside a template, not in the live region."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Docket blocked" description="No longer indexed" />'
         )
         template = re.search(r"<template[^>]*>(.*?)</template>", html, re.S)
@@ -1241,7 +1238,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_controls_are_hidden_until_open(self) -> None:
         """The action container and the Close button render under an x-show gate."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Docket blocked"><button>Undo</button></c-toast>'
         )
         close_button = re.search(r'<button[^>]*aria-label="Close"[^>]*>', html)
@@ -1255,7 +1252,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_undeclared_attributes_land_on_the_root(self) -> None:
         """A listener passed to the component opens the toast from an event."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Saved" x-on:docket-blocked.window="open" />'
         )
         self.assertIn('x-on:docket-blocked.window="open"', html)
