@@ -14,7 +14,8 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from enum import Enum
+from dataclasses import dataclass
+from enum import Enum, Flag, auto
 from typing import (
     Any,
     cast,
@@ -61,6 +62,22 @@ type Transformer[Scrape, Params, Database: Model, Transformed] = Callable[
 ]
 
 
+class Source(Flag):
+    """The kinds of input an expression reads when it is evaluated.
+
+    Flags combine with `|`, so an expression built from several inputs reports
+    all of them. An expression reading nothing at all is `Source.NONE`.
+    """
+
+    NONE = 0
+    SCRAPE = auto()
+    PARAMS = auto()
+    ANCESTOR = auto()
+    DATABASE = auto()
+    ANNOTATION = auto()
+    CONSTANT = auto()
+
+
 class MergerSpecification[Scrape, Params, Output](ABC):
     """Base for a merger class attribute that declares how one model field is merged.
 
@@ -68,12 +85,13 @@ class MergerSpecification[Scrape, Params, Output](ABC):
     the attribute's name, which must be a field of the merger's model.
     """
 
-    __slots__ = ("_name", "_uses_scrape", "_db_fields")
+    __slots__ = ("_name", "_sources", "_annotations", "_db_fields")
 
     def __init__(self, /) -> None:
         """Build a specification; its name is set when it is assigned on a merger."""
         self._name: str = ""
-        self._uses_scrape: bool = False
+        self._sources: Source = Source.NONE
+        self._annotations: tuple[str, ...] = ()
         self._db_fields: tuple[str, ...] = ()
 
     def _depend_on(self, *sources: Any) -> None:
@@ -84,8 +102,14 @@ class MergerSpecification[Scrape, Params, Output](ABC):
                 those that are specifications contribute anything.
         """
         specs = [s for s in sources if isinstance(s, MergerSpecification)]
-        self._uses_scrape = self._uses_scrape or any(
-            s._uses_scrape for s in specs
+        for s in specs:
+            self._sources |= s._sources
+        self._annotations = tuple(
+            dict.fromkeys(
+                itertools.chain(
+                    self._annotations, *(s._annotations for s in specs)
+                )
+            )
         )
         self._db_fields = tuple(
             dict.fromkeys(
@@ -229,6 +253,31 @@ class AttributeMerger[Scrape, Params, Transform](
         """
         return _CallProxy(self, args, kwargs)
 
+    # `==` between expressions declares a term instead of testing equality, so
+    # the result is not a bool.
+    # pyrefly: ignore[bad-override]
+    def __eq__(self, other: object) -> Comparison:
+        """Build a comparison of this expression with another one.
+
+        The result is meant to be declared in a `Key`; it has no truth value.
+        Only `==` is overloaded, so `!=` is not a comparison.
+
+        Args:
+            other: The expression to compare with.
+
+        Returns:
+            The comparison of this expression (left) with `other` (right), or
+            `NotImplemented` when `other` is not an expression, leaving Python
+            to fall back to its default equality.
+        """
+        if not isinstance(other, AttributeMerger):
+            return NotImplemented
+        return Comparison(self, other)
+
+    # Defining `__eq__` removes the inherited hash; expressions are hashed and
+    # compared by identity wherever they are collected.
+    __hash__ = object.__hash__
+
     @override
     @final
     def transform[M: Model](
@@ -247,6 +296,29 @@ class AttributeMerger[Scrape, Params, Transform](
         return self._transform(scrape, params, database)
 
 
+@dataclass(frozen=True, slots=True)
+class Comparison:
+    """A term declaring that two expressions must evaluate to equal values.
+
+    Built by `==` between two expressions. It only describes the term: it has
+    no truth value, so it fails loudly if used in an `if` or `assert` instead
+    of being declared in a `Key`.
+    """
+
+    left: AttributeMerger
+    right: AttributeMerger
+
+    def __bool__(self) -> bool:
+        """Refuse to be used as a condition.
+
+        Raises:
+            TypeError: Always.
+        """
+        raise TypeError(
+            "A merger term has no truth value; declare it in a Key"
+        )
+
+
 class _AncestorProxy[M: Model](AttributeMerger):
     """Expression evaluating to the nearest ancestor of a given model type."""
 
@@ -257,6 +329,7 @@ class _AncestorProxy[M: Model](AttributeMerger):
             model: The model class of the ancestor to look up.
         """
         super().__init__()
+        self._sources = Source.ANCESTOR
         self._transform = functools.partial(_ancestor, model)
 
 
@@ -298,6 +371,7 @@ class _ConstantProxy(AttributeMerger):
                 merge, so it should not be mutated.
         """
         super().__init__()
+        self._sources = Source.CONSTANT
         self._transform = lambda s, p, m: value
         self._value = value
 
@@ -308,7 +382,7 @@ class _ScrapeProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the scrape."""
         super().__init__()
-        self._uses_scrape = True
+        self._sources = Source.SCRAPE
         self._transform = lambda s, p, m: s
 
 
@@ -318,6 +392,7 @@ class _ParamsProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the params."""
         super().__init__()
+        self._sources = Source.PARAMS
         self._transform = lambda s, p, m: p
 
 
@@ -343,6 +418,7 @@ class _DatabaseProxy(AttributeMerger):
         # fetching the related row.
         getter = operator.attrgetter(field.attname)
         self._field: Field = field
+        self._sources = Source.DATABASE
         self._transform = lambda s, p, m: getter(m) if m is not None else None
         self._db_fields = (*self._db_fields, field.name)
 
@@ -366,6 +442,26 @@ class _DatabaseProxy(AttributeMerger):
             )
 
         return errors
+
+
+class _AnnotationProxy(AttributeMerger):
+    """Expression evaluating to a value a pool annotated onto the matched row."""
+
+    __slots__ = ()
+
+    def __init__(self, key: str) -> None:
+        """Create an expression reading a pool annotation.
+
+        Args:
+            key: The keyword the annotation was given in the pool's `annotate`.
+        """
+        super().__init__()
+        # An annotation is not a column, so it adds nothing to `_db_fields`,
+        # which feeds the columns a pool loads.
+        self._sources = Source.ANNOTATION
+        self._annotations = (key,)
+        getter = operator.attrgetter(key)
+        self._transform = lambda s, p, m: getter(m)
 
 
 class _AttrProxy(AttributeMerger):
@@ -598,6 +694,23 @@ def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]]) -> GT | None:
     """
     # pyrefly: ignore[bad-return,bad-argument-type]
     return _DatabaseProxy(field)
+
+
+def Annotation(key: str) -> Any:
+    """Start an expression from a value a pool annotated onto each row.
+
+    For example, `Annotation("role")` reads what `annotate(role=...)` put on
+    the row. The annotation is not a column, so nothing is loaded for it.
+
+    Args:
+        key: The keyword the annotation was given in the pool's `annotate`.
+
+    Returns:
+        An expression typed `Any`, since the annotation's type is the pool's
+        to know. It has no value until the merge runs, so it is only
+        meaningful as (part of) a merger term.
+    """
+    return _AnnotationProxy(key)
 
 
 def Ancestor[M: Model](model: type[M]) -> M:

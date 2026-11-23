@@ -1,5 +1,6 @@
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import Any, ClassVar, cast, override
 
 from django.db import connection, transaction
@@ -30,7 +31,14 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     Update,
 )
-from cl.corpus_importer.state.merger.specifications import Coalesce, Database
+from cl.corpus_importer.state.merger.specifications import (
+    Ancestor,
+    Annotation,
+    Coalesce,
+    Comparison,
+    Database,
+    Source,
+)
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
@@ -1556,7 +1564,7 @@ class SpecAccessTrackingTest(SimpleTestCase):
         ]
         for name, spec, uses_scrape, db_fields in cases:
             with self.subTest(name):
-                self.assertEqual(spec._uses_scrape, uses_scrape)
+                self.assertEqual(Source.SCRAPE in spec._sources, uses_scrape)
                 self.assertEqual(set(spec._db_fields), db_fields)
 
     def test_item_keyed_by_expression_on_scrape(self) -> None:
@@ -1572,6 +1580,77 @@ class SpecAccessTrackingTest(SimpleTestCase):
         self.assertEqual(
             spec.transform({}, None, Docket(case_name="Stored")), "STORED"
         )
+
+
+class ExpressionSourceTest(SimpleTestCase):
+    """What expressions record about their sources, and how `==` builds terms."""
+
+    def test_sources_are_tracked(self) -> None:
+        """Does every kind of expression report which inputs it reads?"""
+        cases: list[tuple[str, Any, Source]] = [
+            ("scrape", Scrape(dict)["a"], Source.SCRAPE),
+            ("params", Params(SimpleNamespace).x, Source.PARAMS),
+            ("ancestor", Ancestor(Docket).pk, Source.ANCESTOR),
+            ("database", Database(Docket.case_name), Source.DATABASE),
+            ("annotation", Annotation("role"), Source.ANNOTATION),
+            (
+                "fn over database",
+                Fn(_prefer_stored)(Database(Docket.case_name), ""),
+                Source.CONSTANT | Source.DATABASE,
+            ),
+        ]
+        for name, spec, sources in cases:
+            with self.subTest(name):
+                self.assertEqual(spec._sources, sources)
+
+    def test_annotations_are_propagated_without_duplicates(self) -> None:
+        """Are the annotation keys an expression reads collected once each, in order?"""
+        spec: Any = Fn(_prefer_stored)(Annotation("role"), Annotation("role"))
+        other: Any = Fn(_prefer_stored)(spec, Annotation("kind"))
+
+        self.assertEqual(spec._annotations, ("role",))
+        self.assertEqual(other._annotations, ("role", "kind"))
+        self.assertEqual(other._sources, Source.CONSTANT | Source.ANNOTATION)
+
+    def test_annotation_reads_attribute_and_loads_no_column(self) -> None:
+        """Does an annotation read the attribute off the stored row without adding a column to load?"""
+        spec = Annotation("role")
+
+        self.assertEqual(
+            spec.transform(None, None, SimpleNamespace(role="Appellant")),
+            "Appellant",
+        )
+        self.assertEqual(spec._db_fields, ())
+        self.assertEqual(spec._annotations, ("role",))
+
+    def test_eq_builds_comparison(self) -> None:
+        """Does `==` between expressions build a comparison of the two sides?"""
+        left, right = Database(Docket.case_name), Scrape(dict)["n"]
+        term = left == right
+
+        self.assertIsInstance(term, Comparison)
+        self.assertIs(term.left, left)
+        self.assertIs(term.right, right)
+
+    def test_comparison_has_no_truth_value(self) -> None:
+        """Does using a comparison as a condition fail instead of silently succeeding?"""
+        with self.assertRaises(TypeError):
+            bool(Database(Docket.case_name) == Scrape(dict)["n"])
+
+    def test_eq_with_plain_value_is_not_a_comparison(self) -> None:
+        """Is `==` with something other than an expression left to Python?"""
+        self.assertNotIsInstance(
+            Database(Docket.case_name) == None,  # noqa: E711
+            Comparison,
+        )
+
+    def test_specs_hash_and_compare_by_identity_in_containers(self) -> None:
+        """Do containers tell two equal-looking expressions apart?"""
+        a, b = Scrape(dict)["a"], Scrape(dict)["a"]
+
+        self.assertEqual(len({a, b}), 2)
+        self.assertIn(a, {a: 1})
+        self.assertEqual(len(dict.fromkeys([a, b])), 2)
 
 
 def _raise(*_: Any) -> Any:
