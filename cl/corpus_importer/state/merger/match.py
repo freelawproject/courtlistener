@@ -43,8 +43,10 @@ class Fail:
     message: str | None = None
 
 
-type Term = str | Comparison
-"""A field name, as shorthand for comparing that stored field with the merger's computed value of it, or an `==` between two expressions."""
+type Term = str | Comparison | bool
+"""A field name, as shorthand for comparing that stored field with the merger's computed value of it, or an `==` between two expressions.
+
+Expressions are typed as the value they evaluate to, so a type checker sees `==` between them as a `bool`. A `bool` is accepted statically for that reason only: `Match.bind` rejects any term that is not a field name or a `Comparison`."""
 
 type Outcome = Next | Create | Fail
 """What can end a tier's `missing` and `ambiguous` outcomes without a further choice."""
@@ -350,7 +352,7 @@ class _Binder:
         while isinstance(first, BoundNarrow):
             first = first.ambiguous
         ordering = first.ordering if isinstance(first, First) else ()
-        if "pk" not in ordering:
+        if not {"pk", "-pk"} & set(ordering):
             ordering = (*ordering, "pk")
         return BoundTier(
             index=index,

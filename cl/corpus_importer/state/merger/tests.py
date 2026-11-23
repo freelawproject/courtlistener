@@ -2074,7 +2074,7 @@ class MatchDeclarationTest(SimpleTestCase):
             "both sides read row": (
                 Match(
                     Key(
-                        cast(Any, Database(DocketEntry.description))
+                        Database(DocketEntry.description)
                         == Database(DocketEntry.description)
                     )
                 ),
@@ -2094,7 +2094,7 @@ class MatchDeclarationTest(SimpleTestCase):
                 ),
                 "description__lower",
             ),
-            "non-term": (Match(Key(cast(Any, False))), "False"),
+            "non-term": (Match(Key(False)), "False"),
             "invalid term in a narrow": (
                 Match(Key("description", ambiguous=Narrow("nope"))),
                 "nope",
@@ -2136,6 +2136,13 @@ class MatchDeclarationTest(SimpleTestCase):
             KeyedEntryMerger, None
         )
         self.assertEqual(bound.tiers[0].ordering, ("pk",))
+
+    def test_ordering_naming_descending_pk_is_unchanged(self) -> None:
+        """Is no ascending `pk` appended when the ordering names `-pk`?"""
+        bound = Match(Key("description", ambiguous=First("-pk"))).bind(
+            KeyedEntryMerger, None
+        )
+        self.assertEqual(bound.tiers[0].ordering, ("-pk",))
 
     def test_tier_ordering_is_that_of_the_first_a_narrow_chain_ends_in(
         self,
@@ -2246,7 +2253,7 @@ class MatchDeclarationTest(SimpleTestCase):
         bound = Match(
             Key(),
             Key("description"),
-            Key(cast(Any, Constant(1)) == Database(DocketEntry.entry_number)),
+            Key(Constant(1) == Database(DocketEntry.entry_number)),
         ).bind(KeyedEntryMerger, None)
         self.assertEqual(len(bound.check_pool(Global())), 1)
 
