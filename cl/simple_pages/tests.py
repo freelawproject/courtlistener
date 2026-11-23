@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Iterator
 from http import HTTPStatus
@@ -1399,6 +1400,68 @@ class ToastComponentTest(SimpleTestCase):
             '<c-toast title="Saved" x-on:docket-blocked.window="open" />'
         )
         self.assertIn('x-on:docket-blocked.window="open"', html)
+
+
+class ComboboxComponentTest(SimpleTestCase):
+    """The c-combobox component embeds its options and renders what each of its flags asks for."""
+
+    options = [
+        {"value": 1, "label": "appeals", "selected": True},
+        {"value": 2, "label": "<b>bankruptcy</b>", "selected": False},
+    ]
+
+    def render(self, source: str) -> HtmlElement:
+        """Compiles a Cotton snippet, renders it and returns the component's root."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        html = template.render(
+            {"request": RequestFactory().get("/"), "options": self.options}
+        )
+        return fromstring(html).xpath("//*[@x-data='combobox']")[0]
+
+    def test_options_are_embedded_as_json(self) -> None:
+        """The root holds the options as a JSON script that parses back to the list given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        script = root.xpath("./script[@type='application/json']")[0]
+        self.assertEqual(json.loads(script.text), self.options)
+
+    def test_creatable_renders_the_create_option(self) -> None:
+        """A creatable combobox offers an option that creates the typed text."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" creatable />'
+        )
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 1)
+
+    def test_without_creatable_no_create_option_is_rendered(self) -> None:
+        """A combobox that isn't creatable only offers the options given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
+
+    def test_single_select_is_the_default(self) -> None:
+        """Without the flag, the root doesn't ask the plugin for multiple selection."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.get("multiple"))
+
+    def test_multiple_enables_multi_select(self) -> None:
+        """The flag reaches the root, where the plugin reads it."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" multiple />'
+        )
+        self.assertIsNotNone(root.get("multiple"))
+
+    def test_searchable_is_the_default(self) -> None:
+        """Without the prop, the input takes text to filter the options."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.xpath(".//input")[0].get("x-on:beforeinput"))
+
+    def test_not_searchable_blocks_typing(self) -> None:
+        """A combobox with search turned off rejects text entered in its input."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" :searchable="False" />'
+        )
+        self.assertEqual(
+            root.xpath(".//input")[0].get("x-on:beforeinput"), "blockTyping"
+        )
 
 
 class ComponentsToastDemoTest(TestCase):
