@@ -3091,6 +3091,9 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         "docket_entry__docket"
     ).aget(pk=rd_pk)
     d = rd.docket_entry.docket
+    # Type-only narrowing: this task has always assumed the docket has a
+    # pacer_case_id, so don't add a runtime check here.
+    pacer_case_id = cast(str, d.pacer_case_id)
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
@@ -3101,10 +3104,10 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         async with s:
             if rd.document_type == rd.ATTACHMENT:
                 await report.query(
-                    d.pacer_case_id, rd.document_number, rd.attachment_number
+                    pacer_case_id, rd.document_number, rd.attachment_number
                 )
             else:
-                await report.query(d.pacer_case_id, rd.document_number)
+                await report.query(pacer_case_id, rd.document_number)
     except HTTPError as exc:
         raise CourtQueryError(f"Unable to get PDF for {rd}") from exc
     try:
