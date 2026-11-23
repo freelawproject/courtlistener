@@ -287,6 +287,34 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "<opinion><p>Text</p></opinion></casebody>",
                 "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
             ),
+            (
+                # The heading of the syllabus is left out, not its page
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<heading><page-number label="2">*2</page-number>'
+                "<em>Syllabus by the Court</em></heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<heading>Appeal from the Circuit Court</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n'
+                "<heading>Appeal from the Circuit Court</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # A heading with other words before the syllabus is kept
+                "<casebody><heading>On Motion for Rehearing</heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>On Motion for Rehearing</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # So is a "Syllabus" heading with no syllabus after it
+                "<casebody><heading>Syllabus</heading><court>A Court</court>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>Syllabus</heading>\n"
+                "<court>A Court</court>\n</headmatter>",
+            ),
             ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
             ("<court>No casebody</court>", ""),
         ]
