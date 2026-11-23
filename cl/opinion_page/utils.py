@@ -712,7 +712,7 @@ def build_docket_tabs(
             "label": "Docket Entries",
             "url": docket.get_absolute_url(),
             "key": "entries",
-            "icon": "file_text",
+            "icon": "square_checklist",
         }
     ]
 
@@ -744,7 +744,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "idb",
-                "icon": "circle_question_mark",
+                "icon": "circle_info",
             }
         )
 
