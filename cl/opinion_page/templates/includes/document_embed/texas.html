@@ -1,0 +1,13 @@
+{# TAMES also serves HTML, WordPerfect and MP3 files. Only PDFs go in the PDF viewer, MP3s get an audio player, and the rest can only be downloaded. #}
+{% if rd.has_valid_pdf %}
+  {% include "includes/document_embed/recap.html" %}
+{% elif rd.file_extension == ".mp3" %}
+  <audio controls preload="none" src="{{ rd.filepath_local.url }}" style="width: 100%;">
+    {% include "includes/document_download_button/index.html" %}
+  </audio>
+{% else %}
+  <div class="alert alert-info">
+    <p>This {{ rd.format_label }} file can't be shown in your browser.</p>
+    {% include "includes/document_download_button/index.html" %}
+  </div>
+{% endif %}

@@ -1110,6 +1110,172 @@ class ScotusDocumentFlagDisabledTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_document_page_waffle")
+@override_flag("texas_docket_page", active=True)
+class ViewTexasDocumentTest(TestCase):
+    """Does view_recap_document render TexasDocument records, keyed by media_id, with each kind of file TAMES serves?"""
+
+    TAMES_URL = "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a Texas docket whose entry has a stored PDF, MP3 and WordPerfect file, plus a document we don't have yet."""
+        cls.court = CourtFactory(id="tex", jurisdiction="S")
+        cls.docket = DocketFactory(
+            court=cls.court, source=Docket.SCRAPER, docket_number="26-0999"
+        )
+        cls.entry = TexasDocketEntryFactory(
+            docket=cls.docket,
+            entry_type="Brief filed",
+            description="",
+            disposition="Granted",
+            remarks="<script>alert(1)</script>",
+            date_filed=date(2026, 10, 1),
+            sequence_number="2026-10-01.001",
+        )
+        cls.pdf, cls.mp3, cls.wpd, cls.missing = (
+            TexasDocumentFactory(
+                docket_entry=cls.entry,
+                description=description,
+                filepath_local=path,
+                url=cls.TAMES_URL,
+            )
+            for description, path in (
+                ("Brief", "texas/brief.pdf"),
+                ("Oral argument", "texas/argument.mp3"),
+                ("Order", "texas/order.wpd"),
+                ("Response", ""),
+            )
+        )
+
+    def get(self, document: TexasDocument, params: str = "") -> HttpResponse:
+        """Request a document's page, with an optional query string."""
+        return self.client.get(f"{document.get_absolute_url()}{params}")
+
+    def test_pdf_document_renders_on_its_page(self) -> None:
+        """Is a stored PDF shown in the viewer, with its entry's text escaped, a TAMES download option, and none of RECAP's search or PACER parts?"""
+        r = self.get(self.pdf)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIs(r.context["docket_source"], docket_entry_sources.TEXAS)
+        self.assertEqual(r.context["rd"], self.pdf)
+        self.assertNotIn("#None", r.context["title"])
+        self.assertContains(r, 'type="application/pdf"')
+        self.assertContains(r, "Download PDF")
+        self.assertContains(r, f'href="{self.TAMES_URL}"')
+        self.assertContains(r, "From TAMES")
+        self.assertContains(r, "Brief filed<br>Disposition: Granted")
+        self.assertContains(r, "&lt;script&gt;alert(1)&lt;/script&gt;")
+        self.assertNotContains(r, "<script>alert(1)</script>")
+        self.assertContains(
+            r,
+            f"{self.docket.get_absolute_url()}#minute-entry-{self.entry.pk}",
+        )
+        self.assertContains(r, "Oct 01, 2026")
+        self.assertNotContains(r, "Search this PDF")
+        self.assertNotContains(r, "Document #")
+        self.assertNotContains(r, "pray_and_pay.js")
+
+    def test_mp3_gets_an_audio_player(self) -> None:
+        """Is a stored MP3 played in an audio player and downloaded as an MP3, never put in the PDF viewer?"""
+        r = self.get(self.mp3)
+        self.assertContains(r, "<audio")
+        self.assertContains(r, "Download MP3")
+        self.assertNotContains(r, 'type="application/pdf"')
+
+    def test_other_files_can_only_be_downloaded(self) -> None:
+        """Can a WordPerfect file, which browsers can't show, only be downloaded?"""
+        r = self.get(self.wpd)
+        self.assertContains(r, "This WPD file can't be shown in your browser")
+        self.assertContains(r, "Download WPD")
+        self.assertNotContains(r, 'type="application/pdf"')
+        self.assertNotContains(r, "<audio")
+
+    def test_document_we_dont_have_yet_links_to_tames(self) -> None:
+        """Does a document without a stored file say we don't have it yet and offer it on TAMES?"""
+        r = self.get(self.missing)
+        self.assertContains(r, "have a copy of this document yet")
+        self.assertContains(r, "View on TAMES")
+        self.assertContains(r, f'href="{self.TAMES_URL}"')
+        self.assertNotContains(r, 'role="tablist"')
+
+    def test_other_urls_on_the_docket_return_404(self) -> None:
+        """Do a malformed media_id, another spelling of a real one and the attachment route all answer 404?"""
+        media_id = str(self.pdf.media_id)
+        urls = [
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": doc_num,
+                    "slug": self.docket.slug,
+                },
+            )
+            for doc_num in ("not-a-uuid", media_id.upper())
+        ] + [
+            reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": media_id,
+                    "att_num": 1,
+                    "slug": self.docket.slug,
+                },
+            )
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_redirect_to_download_falls_back_to_tames(self) -> None:
+        """Does redirect_to_download send a stored file's page to the file, and a missing one's to TAMES?"""
+        cases = [
+            (self.pdf, self.pdf.filepath_local.url),
+            (self.missing, self.TAMES_URL),
+        ]
+        for document, expected in cases:
+            with self.subTest(document=document.description):
+                r = self.get(document, "?redirect_to_download=True")
+                self.assertRedirects(
+                    r, expected, fetch_redirect_response=False
+                )
+
+    def test_admin_toolbar_links_to_texas_admin_pages(self) -> None:
+        """Does the staff toolbar link to the Texas entry and document admin pages, not RECAP's?"""
+        self.client.force_login(UserFactory(is_staff=True, is_superuser=True))
+        content = self.get(self.pdf).content.decode()
+        self.assertIn(
+            reverse(
+                "admin:search_texasdocketentry_change", args=[self.entry.pk]
+            ),
+            content,
+        )
+        self.assertIn(
+            reverse("admin:search_texasdocument_change", args=[self.pdf.pk]),
+            content,
+        )
+        self.assertNotIn("search_recapdocument_change", content)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_document_flag_waffle")
+@override_flag("texas_docket_page", active=False)
+class TexasDocumentFlagDisabledTest(TestCase):
+    """With texas_docket_page off, does a Texas document page answer 404, both the page and its download redirect?"""
+
+    def test_document_page_returns_404(self) -> None:
+        """Is the page of a real Texas document hidden while the flag is off?"""
+        document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=DocketFactory(court=CourtFactory(id="tex"))
+            ),
+            filepath_local="texas/brief.pdf",
+        )
+        for params in ("", "?redirect_to_download=True"):
+            with self.subTest(params=params):
+                r = self.client.get(f"{document.get_absolute_url()}{params}")
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
 
@@ -2091,6 +2257,9 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_li",
             "document_download_button",
             "document_unavailable_message",
+            "document_heading",
+            "document_search_button",
+            "document_embed",
         ),
     }
 
@@ -2796,7 +2965,7 @@ class TexasDocketPageTest(TestCase):
                 self.assertNotIn("<script>alert(1)</script>", content)
 
     def test_document_urls_return_404(self) -> None:
-        """Texas documents have no detail page: does a document or attachment URL on a Texas docket answer 404 rather than fail?"""
+        """Texas document pages are keyed by media_id: does a numbered document or attachment URL on a Texas docket answer 404 rather than fail?"""
         urls = [
             reverse(
                 "view_recap_document",
