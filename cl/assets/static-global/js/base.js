@@ -402,3 +402,24 @@ $(function () {
   // search_mode_icon.html to avoid a visual flash.
 });
 
+
+// Rewrite times in the visitor's own time zone, with the zone's abbreviation.
+// Opt in with <time data-local-time datetime="...">. The server renders the
+// same time in the site's time zone as a fallback, which stays in place if the
+// datetime can't be parsed or this fails.
+function localizeTimes() {
+  $('time[data-local-time][datetime]').each(function () {
+    var date = new Date($(this).attr('datetime'));
+    if (isNaN(date.getTime())) return;
+    $(this).text(date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }));
+  });
+}
+
+$(localizeTimes);
