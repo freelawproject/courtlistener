@@ -2551,23 +2551,64 @@ class MatchGroupTest(TestCase):
             [("update", newer.pk)],
         )
 
-    def test_first_collision_is_duplicate(self) -> None:
-        """Do members that `First` takes the same row fail as duplicates even though their keys differ?"""
-        self.entry("same")
-        lowered = Fn(operator.methodcaller("lower"))
-        match = Match(
-            Key(
-                lowered(Database(DocketEntry.description))
-                == lowered(Scrape(dict)["description"]),
-                ambiguous=First("pk"),
+    def test_later_tier_first_uses_its_own_ordering(self) -> None:
+        """Does a later tier's `First` take the first row in its own ordering, not in the first tier's order?"""
+        older = self.entry("twice", number=1)
+        newer = self.entry("twice", number=2)
+        for row, year in ((older, 2020), (newer, 2021)):
+            DocketEntry.objects.filter(pk=row.pk).update(
+                date_created=datetime(year, 1, 1, tzinfo=UTC)
             )
-        )
 
         self.assertVerdicts(
-            match,
-            [entry_scrape("SAME"), entry_scrape("same")],
-            [("failed", "2 scraped items share a key")] * 2,
+            Match(
+                Key("entry_number"),
+                Key("description", ambiguous=First("-date_created")),
+            ),
+            [entry_scrape("twice", number=99)],
+            [("update", newer.pk)],
         )
+
+    def test_first_collision_is_duplicate(self) -> None:
+        """Do members that differ on a `Narrow` term but whose `First` takes one row fail as duplicates, with one log line?"""
+        docket = DocketFactory.create()
+        party = PartyFactory.create(name="Two Roles", docket=docket)
+        for role in ("Appellant", "Respondent"):
+            PartyTypeFactory.create(docket=docket, party=party, name=role)
+        bound = Match(
+            Key(
+                "name",
+                ambiguous=Narrow(
+                    Annotation("role") == Scrape(dict)["role"],
+                    ambiguous=First("pk"),
+                ),
+            )
+        ).bind(PartyPoolMerger, PARTY_POOL)
+        group = MatchGroup(
+            PartyPoolMerger,
+            bound,
+            PARTY_POOL.reader(
+                PartyPoolMerger,
+                relation=None,
+                params=RelatedParams(None, parent=docket),
+                ordering=bound.tiers[0].ordering,
+            ),
+        )
+        mergers = [
+            PartyPoolMerger({"name": "Two Roles", "role": role}, params=None)
+            for role in ("Appellant", "Respondent")
+        ]
+        for merger in mergers:
+            group.join(merger, lookup_state(merger))
+
+        with self.matcher_errors() as logs:
+            verdicts = [group.verdict(m, lookup_state(m)) for m in mergers]
+
+        for verdict in verdicts:
+            kind, reason = summarise(verdict)
+            self.assertEqual(kind, "failed")
+            self.assertIn("2 scraped items share a key", reason)
+        self.assertEqual(len(logs.records), 1)
 
     def test_first_collision_next_creates_on_last_tier(self) -> None:
         """Do members `First` takes one row create when the last tier lets duplicates through?"""

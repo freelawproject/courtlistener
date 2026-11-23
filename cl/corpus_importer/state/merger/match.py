@@ -1065,12 +1065,13 @@ class MatchGroup[M: Model]:
     def _fail(
         self, tier: BoundTier, group: list[_Entry[M]], message: str
     ) -> None:
-        """Fail entries with a reason, logging each distinct reason once.
+        """Fail entries with a reason, logging the failure once however many entries it fails.
 
         Args:
             tier: The tier being assigned.
-            group: The entries to fail. Those sharing a key share the reason,
-                and so its log line.
+            group: The entries to fail: one entry, or a set of duplicates.
+                Each carries the reason with its own key; the log line is the
+                first entry's.
             message: What the reason says before the tier and key.
         """
         texts = [
@@ -1080,8 +1081,7 @@ class MatchGroup[M: Model]:
         ]
         for entry, text in zip(group, texts, strict=True):
             entry.outcome = _Failure(text)
-        for text in dict.fromkeys(texts):
-            logger.error("%s", text)
+        logger.error("%s", texts[0])
 
     def _collide(self, tier: BoundTier, entries: list[_Entry[M]]) -> None:
         """Apply the tier's `duplicate` outcome to entries that took the same row."""
