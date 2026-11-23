@@ -1,3 +1,4 @@
+import operator
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -30,6 +31,15 @@ from cl.corpus_importer.state.merger import (
     Scrape,
     ThroughParameters,
     Update,
+)
+from cl.corpus_importer.state.merger.match import (
+    BoundNarrow,
+    Fail,
+    First,
+    Key,
+    Match,
+    Narrow,
+    Next,
 )
 from cl.corpus_importer.state.merger.pool import (
     Global,
@@ -2017,4 +2027,271 @@ class PoolTest(TestCase):
                 for q in queries
             ),
             1,
+        )
+
+
+class NumberedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
+    """A docket entry whose number is scraped as text."""
+
+    config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+        model=DocketEntry, key=("entry_number",)
+    )
+
+    entry_number: str = Scrape(dict)["number"]
+
+
+class MatchDeclarationTest(SimpleTestCase):
+    """Declaring match tiers and binding them to a merger."""
+
+    def test_rejections(self) -> None:
+        """Is each invalid declaration rejected, naming the problem?"""
+        cases: dict[str, tuple[Match, str]] = {
+            "unknown shorthand field": (Match(Key("nope")), "nope"),
+            "shorthand not computed by merger": (
+                Match(Key("entry_number")),
+                "entry_number",
+            ),
+            "stored side reads scrape": (
+                Match(
+                    Key(
+                        Fn(operator.add)(
+                            Database(DocketEntry.description),
+                            Scrape(dict)["x"],
+                        )
+                        == Constant(1)
+                    )
+                ),
+                "may only read",
+            ),
+            "stored side reads params": (
+                Match(Key(Fn(str)(Params(Any)) == Scrape(dict)["x"])),
+                "exactly one side",
+            ),
+            "neither side reads row": (
+                Match(Key(Constant(1) == Scrape(dict)["x"])),
+                "exactly one side",
+            ),
+            "both sides read row": (
+                Match(
+                    Key(
+                        cast(Any, Database(DocketEntry.description))
+                        == Database(DocketEntry.description)
+                    )
+                ),
+                "exactly one side",
+            ),
+            "annotation not in pool": (
+                Match(Key(Annotation("role") == Scrape(dict)["r"])),
+                "role",
+            ),
+            "ordering not a field": (
+                Match(Key("description", ambiguous=First("nope"))),
+                "nope",
+            ),
+            "ordering is an expression": (
+                Match(
+                    Key("description", ambiguous=First("description__lower"))
+                ),
+                "description__lower",
+            ),
+            "non-term": (Match(Key(cast(Any, False))), "False"),
+            "invalid term in a narrow": (
+                Match(Key("description", ambiguous=Narrow("nope"))),
+                "nope",
+            ),
+        }
+        for name, (match, problem) in cases.items():
+            with self.subTest(name):
+                with self.assertRaises(ExceptionGroup) as raised:
+                    match.bind(KeyedEntryMerger, None)
+                self.assertIn(problem, str(raised.exception))
+
+    def test_every_problem_is_reported(self) -> None:
+        """Does the group carry one error for each problem in the declaration?"""
+        with self.assertRaises(ExceptionGroup) as raised:
+            Match(
+                Key("nope"), Key("description", ambiguous=First("nah"))
+            ).bind(KeyedEntryMerger, None)
+        self.assertEqual(len(raised.exception.exceptions), 2)
+
+    def test_annotation_in_declared_pool_is_accepted(self) -> None:
+        """Is an annotation the declared pool adds accepted in a term?"""
+        pool = Siblings().annotate(role=F("description"))
+        Match(Key(Annotation("role") == Scrape(dict)["r"])).bind(
+            KeyedEntryMerger, pool
+        )
+
+    def test_bound_tier_ordering_ends_in_pk(self) -> None:
+        """Does every tier's ordering end in `pk`, whether or not it has a `First`?"""
+        bound = Match(
+            Key("description", ambiguous=First("-date_created")),
+            Key("description"),
+        ).bind(KeyedEntryMerger, None)
+        self.assertEqual(bound.tiers[0].ordering, ("-date_created", "pk"))
+        self.assertEqual(bound.tiers[1].ordering, ("pk",))
+
+    def test_ordering_naming_pk_is_unchanged(self) -> None:
+        """Is `pk` left alone when the ordering already names it?"""
+        bound = Match(Key("description", ambiguous=First("pk"))).bind(
+            KeyedEntryMerger, None
+        )
+        self.assertEqual(bound.tiers[0].ordering, ("pk",))
+
+    def test_tier_ordering_is_that_of_the_first_a_narrow_chain_ends_in(
+        self,
+    ) -> None:
+        """Does a tier take the ordering of the `First` ending its `Narrow` chain?"""
+        bound = Match(
+            Key(
+                "description",
+                ambiguous=Narrow(
+                    Database(DocketEntry.entry_number)
+                    == Scrape(dict)["number"],
+                    ambiguous=First("-date_created"),
+                ),
+            )
+        ).bind(KeyedEntryMerger, None)
+        self.assertEqual(bound.tiers[0].ordering, ("-date_created", "pk"))
+
+    def test_columns_include_stored_fields_and_orderings(self) -> None:
+        """Are the columns every stored field of every term plus every ordering field?"""
+        bound = Match(
+            Key(
+                "description",
+                ambiguous=Narrow(
+                    Database(DocketEntry.entry_number)
+                    == Scrape(dict)["number"],
+                    ambiguous=First("-date_created", "pk"),
+                ),
+            )
+        ).bind(KeyedEntryMerger, None)
+        self.assertEqual(
+            bound.columns, {"description", "entry_number", "date_created"}
+        )
+
+    def test_bare_fail_is_normalised(self) -> None:
+        """Is `Fail` passed as a class turned into an instance, wherever it is an outcome?"""
+        self.assertEqual(Key().ambiguous, Fail())
+        self.assertEqual(Key(missing=Fail, duplicate=Fail).missing, Fail())
+        self.assertEqual(Key(missing=Fail, duplicate=Fail).duplicate, Fail())
+        self.assertEqual(Narrow().missing, Fail())
+        self.assertEqual(Narrow().ambiguous, Fail())
+
+    def test_default_outcomes(self) -> None:
+        """Do tiers and narrows default to the outcomes the declaration documents?"""
+        key = Key()
+        self.assertIs(key.missing, Next)
+        self.assertEqual(key.ambiguous, Fail())
+        self.assertEqual(key.duplicate, Fail())
+
+    def test_bound_outcomes_are_carried(self) -> None:
+        """Does a bound tier carry its outcomes, with a `Narrow` bound too?"""
+        message = Fail("no")
+        bound = Match(
+            Key(
+                "description",
+                missing=Create,
+                ambiguous=Narrow(
+                    Database(DocketEntry.entry_number)
+                    == Scrape(dict)["number"],
+                    missing=message,
+                ),
+                duplicate=Next,
+            )
+        ).bind(KeyedEntryMerger, None)
+        tier = bound.tiers[0]
+        self.assertEqual(tier.index, 1)
+        self.assertIs(tier.missing, Create)
+        self.assertIs(tier.duplicate, Next)
+        self.assertIsInstance(tier.ambiguous, BoundNarrow)
+        self.assertEqual(cast(BoundNarrow, tier.ambiguous).missing, message)
+        self.assertEqual(len(tier.chain_terms), 1)
+        self.assertEqual(len(tier.terms), 1)
+
+    def test_distinct_comparisons_are_unequal(self) -> None:
+        """Do two comparisons compare unequal without evaluating the `==` of their sides?"""
+        a = Database(DocketEntry.description) == Scrape(dict)["a"]
+        b = Database(DocketEntry.description) == Scrape(dict)["a"]
+        self.assertNotEqual(a, b)
+        self.assertEqual(a, a)
+
+    def test_keyed_pool_needs_a_bare_term(self) -> None:
+        """Does a keyed pool reject a tier with no bare `Database` term, and a whole pool accept it?"""
+        bound = Match(
+            Key(
+                Fn(operator.methodcaller("lower"))(
+                    Database(DocketEntry.description)
+                )
+                == Scrape(dict)["d"]
+            )
+        ).bind(KeyedEntryMerger, None)
+        self.assertTrue(bound.check_pool(Global()))
+        self.assertTrue(bound.check_pool(Relatives()))
+        self.assertFalse(bound.check_pool(Siblings()))
+
+    def test_keyed_pool_accepts_bare_terms(self) -> None:
+        """Is a tier with a shorthand term or a bare `Database` term accepted by a keyed pool?"""
+        for name, key in {
+            "shorthand": Key("description"),
+            "explicit": Key(
+                Database(DocketEntry.description) == Scrape(dict)["d"]
+            ),
+        }.items():
+            with self.subTest(name):
+                bound = Match(key).bind(KeyedEntryMerger, None)
+                self.assertEqual(bound.check_pool(Global()), [])
+
+    def test_keyed_pool_reports_each_bare_less_tier(self) -> None:
+        """Is there one error per tier without a bare term?"""
+        bound = Match(
+            Key(),
+            Key("description"),
+            Key(cast(Any, Constant(1)) == Database(DocketEntry.entry_number)),
+        ).bind(KeyedEntryMerger, None)
+        self.assertEqual(len(bound.check_pool(Global())), 1)
+
+    def test_shorthand_term_values(self) -> None:
+        """Does the shorthand read the stored column and the merger's computed value, converted by the field?"""
+        bound = Match(Key("entry_number")).bind(NumberedEntryMerger, None)
+        (term,) = bound.tiers[0].terms
+        merger = SimpleNamespace(entry_number="5")
+        state = MergerState.Lookup({"number": "5"}, None, {})
+        self.assertEqual(
+            term.scraped_value(cast(Any, merger), state),
+            5,
+        )
+        self.assertEqual(term.stored_value(DocketEntry(entry_number=5)), 5)
+        self.assertIsNotNone(term.field)
+        self.assertEqual(term.attribute, "entry_number")
+
+    def test_explicit_term_values(self) -> None:
+        """Does an explicit term evaluate each side against its own input?"""
+        bound = Match(
+            Key(
+                Fn(operator.methodcaller("lower"))(
+                    Database(DocketEntry.description)
+                )
+                == Fn(str.lower)(Scrape(dict)["d"])
+            )
+        ).bind(KeyedEntryMerger, None)
+        (term,) = bound.tiers[0].terms
+        state = MergerState.Lookup({"d": "AbC"}, None, {})
+        self.assertEqual(
+            term.scraped_value(cast(Any, SimpleNamespace()), state), "abc"
+        )
+        self.assertEqual(
+            term.stored_value(DocketEntry(description="XyZ")), "xyz"
+        )
+        self.assertIsNone(term.field)
+        self.assertIsNone(term.attribute)
+
+    def test_explicit_bare_term_converts_scraped_value(self) -> None:
+        """Is the scraped side of a bare `Database` term converted by the stored field?"""
+        bound = Match(
+            Key(Database(DocketEntry.entry_number) == Scrape(dict)["n"])
+        ).bind(KeyedEntryMerger, None)
+        (term,) = bound.tiers[0].terms
+        state = MergerState.Lookup({"n": "7"}, None, {})
+        self.assertEqual(
+            term.scraped_value(cast(Any, SimpleNamespace()), state), 7
         )

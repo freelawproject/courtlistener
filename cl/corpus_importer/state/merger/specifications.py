@@ -296,13 +296,16 @@ class AttributeMerger[Scrape, Params, Transform](
         return self._transform(scrape, params, database)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class Comparison:
     """A term declaring that two expressions must evaluate to equal values.
 
     Built by `==` between two expressions. It only describes the term: it has
     no truth value, so it fails loudly if used in an `if` or `assert` instead
     of being declared in a `Key`.
+
+    Comparisons are equal only to themselves: a field-wise comparison would
+    apply the overloaded `==` to the sides, which has no truth value.
     """
 
     left: AttributeMerger
