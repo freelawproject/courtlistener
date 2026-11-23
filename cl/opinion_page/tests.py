@@ -1170,12 +1170,54 @@ class ViewTexasDocumentTest(TestCase):
         self.assertNotContains(r, "<script>alert(1)</script>")
         self.assertContains(
             r,
-            f"{self.docket.get_absolute_url()}#minute-entry-{self.entry.pk}",
+            f"{self.docket.get_absolute_url()}?filed_after=10/01/2026"
+            f"#minute-entry-{self.entry.pk}",
         )
         self.assertContains(r, "Oct 01, 2026")
         self.assertNotContains(r, "Search this PDF")
         self.assertNotContains(r, "Document #")
         self.assertNotContains(r, "pray_and_pay.js")
+
+    def test_heading_link_reaches_an_entry_past_the_first_page(self) -> None:
+        """On a docket longer than one page, does the heading's link open a page holding the document's entry, in both stacks?"""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        entries = TexasDocketEntry.objects.bulk_create(
+            TexasDocketEntry(
+                docket=docket,
+                entry_type=f"Event {i}",
+                date_filed=date(2026, 1, 1) + datetime.timedelta(days=i),
+                sequence_number=f"{i:03}",
+            )
+            for i in range(130)
+        )
+        entry = entries[120]
+        document = TexasDocumentFactory(docket_entry=entry)
+        anchor = f'id="minute-entry-{entry.pk}"'
+        link = (
+            f"{docket.get_absolute_url()}"
+            f"?filed_after={entry.date_filed:%m/%d/%Y}"
+        )
+        self.assertContains(self.get(document), f"{link}#minute-entry-")
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("use_new_design", active=new_design),
+            ):
+                self.assertNotContains(
+                    self.client.get(docket.get_absolute_url()), anchor
+                )
+                self.assertContains(self.client.get(link), anchor)
+
+    def test_heading_link_of_an_undated_entry_has_no_date_filter(self) -> None:
+        """Does the heading skip the date filter for an entry with no filing date, which that filter would hide?"""
+        entry = TexasDocketEntryFactory(
+            docket=self.docket, date_filed=None, sequence_number="undated.001"
+        )
+        document = TexasDocumentFactory(docket_entry=entry)
+        self.assertContains(
+            self.get(document),
+            f'href="{self.docket.get_absolute_url()}#minute-entry-{entry.pk}"',
+        )
 
     def test_mp3_gets_an_audio_player(self) -> None:
         """Is a stored MP3 played in an audio player and downloaded as an MP3, never put in the PDF viewer?"""

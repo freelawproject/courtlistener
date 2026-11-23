@@ -1,7 +1,7 @@
-{# TAMES numbers neither documents nor attachments, so the heading names the document and links to its entry, and there is no attachments menu. #}
+{# TAMES numbers neither documents nor attachments, so the heading names the document and links to its entry, and there is no attachments menu. Entries have no number for entry_gte, so filed_after is what puts the entry on the docket's first page. #}
 <h3 style="margin-top: 10px; margin-left:0px;">
   {% if rd.description %}{{ rd.description }}
     <span class="gray">&mdash;</span>
   {% endif %}
-  <a href="{{ rd.docket_entry.docket.get_absolute_url }}#minute-entry-{{ rd.docket_entry_id }}">Document</a>
+  <a href="{{ rd.docket_entry.docket.get_absolute_url }}{% if rd.docket_entry.date_filed %}?filed_after={{ rd.docket_entry.date_filed|date:"m/d/Y" }}{% endif %}#minute-entry-{{ rd.docket_entry_id }}">Document</a>
 </h3>
