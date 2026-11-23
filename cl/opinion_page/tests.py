@@ -77,6 +77,8 @@ from cl.opinion_page.docket_entry_sources import (
     MetadataItem,
     _recap_document_detail_url,
     _scotus_document_detail_url,
+    _texas_document_detail_url,
+    attach_display_fields,
     build_scotus_metadata,
     document_url,
 )
@@ -2761,13 +2763,14 @@ class TexasDocketEntrySourceTest(TestCase):
         )
 
     def test_entries_and_documents_load_in_two_queries(self) -> None:
-        """Do the docket page's entries and their documents take two queries, however many entries there are?"""
+        """Do the docket page's entries and their documents, links included, take two queries, however many entries there are?"""
         docket = DocketFactory(court=CourtFactory(id="tex"))
         for n in (1, 2, 3):
             TexasDocumentFactory(
                 docket_entry=TexasDocketEntryFactory(
                     docket=docket, sequence_number=f"2026-10-0{n}.001"
-                )
+                ),
+                filepath_local=f"texas/{n}.pdf",
             )
         source = docket_entry_sources.TEXAS
         with self.assertNumQueries(2):
@@ -2776,7 +2779,24 @@ class TexasDocketEntrySourceTest(TestCase):
                 for entry in source.entries_queryset(docket)
                 for document in source.documents_for_entry(entry)
             ]
+            for document in documents:
+                attach_display_fields(source, document)
         self.assertEqual(len(documents), 3)
+        self.assertTrue(all(document.detail_url for document in documents))
+
+    def test_texas_document_detail_urls_are_internal(self) -> None:
+        """Does a document link to its own CourtListener page once we have its file, and to no page before?"""
+        entry = TexasDocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(id="tex"))
+        )
+        with_file = TexasDocumentFactory(
+            docket_entry=entry, filepath_local="texas/brief.pdf"
+        )
+        without_file = TexasDocumentFactory(docket_entry=entry)
+        self.assertEqual(
+            _texas_document_detail_url(with_file), with_file.get_absolute_url()
+        )
+        self.assertIsNone(_texas_document_detail_url(without_file))
 
     def test_entries_reuse_their_docket(self) -> None:
         """Do the entries come with their docket already loaded, so reading entry.docket, as the RSS feed does for each item, takes no extra query?"""
@@ -2794,9 +2814,10 @@ class TexasDocketEntrySourceTest(TestCase):
             urls = {entry.docket.get_absolute_url() for entry in entries}
         self.assertEqual(urls, {docket.get_absolute_url()})
 
-    def test_initial_document_buttons_link_to_tames(self) -> None:
-        """Does the initial-document button point at the first document of the earliest entry, on TAMES, in one query?"""
-        docket = DocketFactory(court=CourtFactory(id="tex"))
+    def test_initial_document_buttons_prefer_our_page(self) -> None:
+        """Does the initial-document button point at the first document of the earliest entry, on its CourtListener page when we have the file and on TAMES otherwise, in one query for every docket?"""
+        court = CourtFactory(id="tex")
+        docket = DocketFactory(court=court)
         later = TexasDocketEntryFactory(
             docket=docket, sequence_number="2026-10-02.001"
         )
@@ -2807,16 +2828,27 @@ class TexasDocketEntrySourceTest(TestCase):
         TexasDocumentFactory(
             docket_entry=earliest, url="https://example.com/a"
         )
+        stored = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=DocketFactory(court=court)
+            ),
+            filepath_local="texas/petition.pdf",
+            url="https://example.com/c",
+        )
+        stored_docket_id = stored.docket_entry.docket_id
         with self.assertNumQueries(1):
             buttons = docket_entry_sources.TEXAS.initial_document_buttons(
-                [docket.pk]
+                [docket.pk, stored_docket_id]
             )
         self.assertEqual(
             buttons,
             {
                 docket.pk: docket_entry_sources.InitialDocumentButton(
                     None, "https://example.com/a", "Initial Document"
-                )
+                ),
+                stored_docket_id: docket_entry_sources.InitialDocumentButton(
+                    stored.get_absolute_url(), None, "Initial Document"
+                ),
             },
         )
 
@@ -2990,6 +3022,23 @@ class TexasDocketPageTest(TestCase):
                 with self.subTest(url=url):
                     r = self.client.get(url)
                     self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_entry_row_links_to_the_document_page(self) -> None:
+        """Does each stack link a document we have the file of to its CourtListener page?"""
+        TexasDocument.objects.filter(pk=self.document.pk).update(
+            filepath_local="texas/petition.pdf"
+        )
+        document_url = TexasDocument.objects.get(
+            pk=self.document.pk
+        ).get_absolute_url()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn(f'href="{document_url}"', content)
 
     def test_document_description_is_escaped(self) -> None:
         """Does each stack escape a scraped document description, even where the legacy stack renders descriptions unescaped?"""

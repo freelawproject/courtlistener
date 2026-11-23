@@ -1004,8 +1004,10 @@ def _texas_document_label(document: TexasDocument) -> str:
 
 
 def _texas_document_detail_url(document: TexasDocument) -> str | None:
-    """Return None: Texas documents have no CourtListener page, since the page URLs need a document number."""
-    return None
+    """Return the URL of the CourtListener page for one Texas document, or None if we don't have the file yet, as for SCOTUS."""
+    if not document.filepath_local:
+        return None
+    return document.get_absolute_url()
 
 
 def _texas_document_external_url(document: TexasDocument) -> str | None:
@@ -1028,15 +1030,15 @@ def _texas_initial_document_buttons(
     """Return the initial-document button of each Texas docket.
 
     The initial document is the first document of the docket's earliest
-    entry that has documents. Texas documents have no CourtListener page
-    yet, so the button links to the document on TAMES.
+    entry that has documents. Like SCOTUS, the button links to our copy's
+    page when we have the file and to TAMES otherwise.
     """
     # distinct() on the docket keeps the first row of each docket in the
     # order_by below: its earliest entry, then its first document. pk
     # breaks ties, so the same document wins on every search.
     initial_documents = (
         TexasDocument.objects.filter(docket_entry__docket_id__in=docket_ids)
-        .select_related("docket_entry")
+        .select_related("docket_entry__docket")
         .order_by(
             "docket_entry__docket_id",
             "docket_entry__sequence_number",
@@ -1044,14 +1046,26 @@ def _texas_initial_document_buttons(
             "pk",
         )
         .distinct("docket_entry__docket_id")
-        .only("pk", "url", "docket_entry__docket_id")
+        .only(
+            "pk",
+            "url",
+            "filepath_local",
+            "media_id",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+        )
     )
     buttons: dict[int, InitialDocumentButton] = {}
     for initial_document in initial_documents:
-        if external_url := _texas_document_external_url(initial_document):
-            buttons[initial_document.docket_entry.docket_id] = (
-                InitialDocumentButton(None, external_url, "Initial Document")
-            )
+        url = _texas_document_detail_url(initial_document)
+        external_url = (
+            None if url else _texas_document_external_url(initial_document)
+        )
+        if not url and not external_url:
+            continue
+        buttons[initial_document.docket_entry.docket_id] = (
+            InitialDocumentButton(url, external_url, "Initial Document")
+        )
     return buttons
 
 
