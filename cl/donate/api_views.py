@@ -258,15 +258,15 @@ class MembershipWebhookViewSet(
         """
         match trigger_event:
             case "createMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_CREATION
+                return NeonWebhookEvent.MEMBERSHIP_CREATION
             case "updateMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_UPDATE
+                return NeonWebhookEvent.MEMBERSHIP_UPDATE
             case "editMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_EDIT
+                return NeonWebhookEvent.MEMBERSHIP_EDIT
             case "deleteMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_DELETE
-
-        return trigger
+                return NeonWebhookEvent.MEMBERSHIP_DELETE
+            case _:
+                raise AssertionError(f"unknown trigger event: {trigger_event}")
 
     def _store_webhook_payload(self, webhook_data) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])

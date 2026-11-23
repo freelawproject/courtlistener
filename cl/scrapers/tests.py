@@ -3017,10 +3017,9 @@ class SCOTUSEmailIntegrationTest(TestCase):
             read_data=b"fake email body"
         )
         mock_email_cls.return_value.email_type = SCOTUSEmailType.INVALID
-        mock_email_cls.return_value.handle_email.return_value = {
-            "email_type": SCOTUSEmailType.INVALID.value,
-            "data": None,
-        }
+        mock_email_cls.return_value.handle_email.side_effect = TypeError(
+            "Unknown email type."
+        )
 
         with patch.object(process_scotus_email, "delay") as mock_delay:
             response = await self.async_client.post(

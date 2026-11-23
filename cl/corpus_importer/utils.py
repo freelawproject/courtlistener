@@ -1505,8 +1505,11 @@ def texas_originating_court_to_court_id(
         The matching Court ID or None if no court could be found.
     """
     court_type = court_data["court_type"]
-    match court_type:
-        case CourtType.APPELLATE.value:
+    if court_type not in CourtType:
+        return None
+
+    match CourtType(court_type):
+        case CourtType.APPELLATE:
             # Given `CourtType.APPELLATE`, we can safely narrow the type
             appellate_court_data = cast(
                 TexasOriginatingAppellateCourt, court_data
@@ -1514,7 +1517,7 @@ def texas_originating_court_to_court_id(
             return texas_js_court_id_to_court_id(
                 appellate_court_data["court_id"]
             )
-        case CourtType.DISTRICT.value:
+        case CourtType.DISTRICT:
             # Given `CourtType.DISTRICT`, we can safely narrow the type
             district_court_data = cast(
                 TexasOriginatingDistrictCourt, court_data
@@ -1525,11 +1528,16 @@ def texas_originating_court_to_court_id(
                     district_number = district_number + 1
                 return f"texdistct{district_number}"
             return "texdistct"
-        case CourtType.BUSINESS.value:
+        case CourtType.BUSINESS:
             return "texbizct"
-        case CourtType.MUNICIPAL.value:
+        case CourtType.MUNICIPAL:
             return "texctyct"
-        case CourtType.PROBATE.value:
+        case CourtType.PROBATE:
             return "texprobct"
-    # County, justice, and unknown court types
-    return None
+        case (
+            CourtType.COUNTY
+            | CourtType.JUSTICE
+            | CourtType.SUPREME
+            | CourtType.UNKNOWN
+        ):
+            return None

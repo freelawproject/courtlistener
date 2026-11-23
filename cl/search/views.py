@@ -16,13 +16,14 @@ from django.views.decorators.http import require_POST
 from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
-from cl.alerts.constants import (
-    LEGACY_MEMBERSHIP_HELP_URL,
-    RECAP_ALERT_QUOTAS,
-)
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.donate.models import NeonMembershipLevel
+from cl.donate.utils import (
+    LEGACY_MEMBERSHIP_HELP_URL,
+    get_membership_upgrade_url,
+)
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import (
     ratelimit_deny_list,
@@ -52,8 +53,14 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
     if not user.is_authenticated or not hasattr(user, "profile"):
         return None
 
-    level = user.membership.level if user.profile.is_member else "free"
-    neon_id = user.membership.neon_id if user.profile.is_member else ""
+    # request.user is typed as a union that has no "membership", and a missing
+    # reverse one-to-one raises an AttributeError subclass, so getattr's
+    # default covers users without a membership.
+    membership = (
+        getattr(user, "membership", None) if user.profile.is_member else None
+    )
+    level = membership.level if membership else "free"
+    upgrade_url = get_membership_upgrade_url(membership) if membership else ""
     # Legacy memberships can't be upgraded online, so the modal routes
     # them to a help page instead of the Neon upgrade flow (see #7136).
     is_legacy = level == NeonMembershipLevel.LEGACY
@@ -71,7 +78,7 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
         "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
         "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
         "level": level,
-        "neon_id": neon_id,
+        "upgradeUrl": upgrade_url,
         "isLegacy": is_legacy,
         "legacyHelpUrl": LEGACY_MEMBERSHIP_HELP_URL,
         "counts": counts,
