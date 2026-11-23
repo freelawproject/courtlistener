@@ -5,6 +5,7 @@ import csv
 import itertools
 import os
 import re
+from pathlib import Path
 from typing import TypedDict, cast
 
 from asgiref.sync import async_to_sync
@@ -61,10 +62,10 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
 
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")
-    base_path = options["base_path"]
+    base_path = Path(options["base_path"])
     csv_files = []
     for file in options["files"]:
-        f = open(f"{base_path}/{file}", encoding="utf-8")
+        f = (base_path / file).open(encoding="utf-8")
         reader = csv.DictReader(f)
         match = regex.search(file)
         if match:
@@ -79,6 +80,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
         username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
     throttle = CeleryThrottle(queue_name=q)
+    reports_path = Path(settings.MEDIA_ROOT) / "list_of_creditors" / "reports"
     completed = 0
     for i, rows in enumerate(
         itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
@@ -104,31 +106,12 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
             )
             d_number_file_name = docket_number.replace(":", "-")
 
-            # Check if the reports directory already exists
-            html_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports"
-            )
-            if not os.path.exists(html_path):
-                # Create the directory if it doesn't exist
-                os.makedirs(html_path)
+            court_id_path = reports_path / court_id
+            court_id_path.mkdir(parents=True, exist_ok=True)
 
-            # Check if the court_id directory already exists
-            court_id_path = os.path.join(
-                settings.MEDIA_ROOT, "list_of_creditors", "reports", court_id
-            )
-            if not os.path.exists(court_id_path):
-                # Create the court_id if it doesn't exist
-                os.makedirs(court_id_path)
+            html_file = court_id_path / f"{court_id}-{d_number_file_name}.html"
 
-            html_file = os.path.join(
-                settings.MEDIA_ROOT,
-                "list_of_creditors",
-                "reports",
-                court_id,
-                f"{court_id}-{d_number_file_name}.html",
-            )
-
-            if os.path.exists(html_file):
+            if html_file.exists():
                 logger.info(
                     f"The report {html_file} already exist court: {court_id}"
                 )
@@ -147,7 +130,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                     court_id,
                     d_number_file_name,
                     docket_number,
-                    html_file,
+                    str(html_file),
                     i,
                     row,
                 ).set(queue=q).apply_async()

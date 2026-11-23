@@ -151,7 +151,7 @@ def handle_soft_bounce(
                     )
 
                 backoff_threshold = next_retry_date + timedelta(
-                    hours=settings.BACKOFF_THRESHOLD  # type: ignore
+                    hours=settings.BACKOFF_THRESHOLD
                 )
                 # Check if the bounce event comes in
                 # BACKOFF_THRESHOLD hours after the last retry_date.
@@ -429,7 +429,7 @@ def add_bcc_random(
     returned_value = random.randint(1, 100)
     normalized_bcc_rate = int(bcc_rate * 100)
     if returned_value <= normalized_bcc_rate:
-        message.bcc.append(settings.BCC_EMAIL_ADDRESS)  # type: ignore
+        message.bcc.append(settings.BCC_EMAIL_ADDRESS)
     return message
 
 

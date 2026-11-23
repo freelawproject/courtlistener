@@ -4,6 +4,7 @@ import fcntl
 import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from celery.canvas import chain
 from django.utils.timezone import make_aware, now
@@ -75,7 +76,7 @@ class Command(VerboseCommand):
             # Note that multiple scripts on multiple machines could still be
             # run.
             court_str = "-".join(sorted(options["courts"]))
-            with open(f"/tmp/rss-scraper-{court_str}.pid", "w") as fp:
+            with Path(f"/tmp/rss-scraper-{court_str}.pid").open("w") as fp:
                 try:
                     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError:

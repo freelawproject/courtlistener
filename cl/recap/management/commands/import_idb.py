@@ -3,6 +3,7 @@
 import re
 import sys
 from datetime import date
+from pathlib import Path
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -54,7 +55,7 @@ def create_or_update_row(
             fjc_row = FjcIntegratedDatabase.objects.create(**values)
             logger.info("Added row: %s", fjc_row)
             break
-        elif existing_row_count == 1:
+        if existing_row_count == 1:
             existing_rows.update(date_modified=now(), **values)
             fjc_row = existing_rows[0]
             logger.info(f"Updated row: {fjc_row}")
@@ -146,8 +147,7 @@ class Command(VerboseCommand, CommandUtils):
         '''
         value = re.sub(r'"$', "", value)
         value = re.sub(r'^"', "", value)
-        value = re.sub(r'""', '"', value)
-        return value
+        return re.sub(r'""', '"', value)
 
     def make_csv_row_dict(self, line, col_headers):
         """Because the PACER data is so nasty, we need our own CSV parser.
@@ -193,11 +193,10 @@ class Command(VerboseCommand, CommandUtils):
                 row.append(value)
 
         # Convert to dict with column headers as keys.
-        row_dict = {}
-        for row_value, col_header in zip(row, col_headers):
-            row_dict[col_header] = row_value
-
-        return row_dict
+        return {
+            col_header: row_value
+            for row_value, col_header in zip(row, col_headers)
+        }
 
     def handle(self, *args, **options):
         """Import each line of the file from the start line on.
@@ -217,8 +216,8 @@ class Command(VerboseCommand, CommandUtils):
         self.build_field_data()
 
         logger.info(f"Importing IDB file at: {options['input_file']}")
-        with open(
-            options["input_file"], encoding="cp1252", newline="\r\n"
+        with Path(options["input_file"]).open(
+            encoding="cp1252", newline="\r\n"
         ) as f:
             col_headers = f.readline().strip().split("\t")
             for i, line in enumerate(f):
@@ -246,10 +245,9 @@ class Command(VerboseCommand, CommandUtils):
                     raise NotImplementedError(
                         "This file type not implemented."
                     )
-                else:
-                    values = self.convert_to_cl_data_model(
-                        row, options["filetype"]
-                    )
+                values = self.convert_to_cl_data_model(
+                    row, options["filetype"]
+                )
                 create_or_update_row(values)
 
     def normalize_nulls(self, row):

@@ -9,8 +9,7 @@ def reverse_endpoints_if_needed(start, end):
     """
     if start.date_filed < end.date_filed:
         return start, end
-    else:
-        return end, start
+    return end, start
 
 
 def within_max_hops(good_nodes, child_authority_id, hops_taken, max_hops):

@@ -201,10 +201,9 @@ def is_texas_court(court_id: str) -> bool:
     return (
         court_id == "tex"
         or court_id == "texcrimapp"
-        or court_id.startswith("txctapp")
-        or court_id.startswith("texdistct")
-        or court_id.startswith("texcrimdistct")
-        or court_id.startswith("texctyct")
+        or court_id.startswith(
+            ("txctapp", "texdistct", "texcrimdistct", "texctyct")
+        )
     )
 
 
@@ -268,16 +267,17 @@ def clean_texas_docket_number(docket_number: str | None) -> str:
         if regex.fullmatch(docket_number):
             return docket_number
 
-    tokens = [
+    tokens = (
         # Strip leading and trailing punctuation from tokens since it's likely invalid.
         re.compile(r"^[^a-z0-9]+|[^a-z0-9]+$", re.IGNORECASE).sub("", token)
         for token in docket_number.split()
+    )
+    matching_parts = [
+        token
+        for token in tokens
+        for regex in TEXAS_DN_REGEXES
+        if regex.fullmatch(token)
     ]
-    matching_parts = []
-    for token in tokens:
-        for regex in TEXAS_DN_REGEXES:
-            if regex.fullmatch(token):
-                matching_parts.append(token)
 
     if len(matching_parts) == 0:
         logger.warning(
@@ -691,10 +691,7 @@ def invert_choices_group_lookup[K, V](c: Iterable[tuple[K, V]]) -> dict[V, K]:
 
     (key:, 'value') -> {'value': key}.
     """
-    d = {}
-    for choice, value in c:
-        d[value] = choice
-    return d
+    return {value: choice for choice, value in c}
 
 
 def choices_to_csv[M: Model](obj: M, field_name: str) -> SafeString:

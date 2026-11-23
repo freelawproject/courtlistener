@@ -605,8 +605,7 @@ class LoggingMixin:
         timing_key = f"{api_prefix}.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
-        results = pipe.execute()
-        return results
+        return pipe.execute()
 
     def _handle_events(self, results, user, api_version):
         total_count = results[0]
@@ -1774,7 +1773,7 @@ def invert_user_logs(
     for k, v in out.items():
         try:
             user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
+        except User.DoesNotExist, ValueError:
             user_keyed_out[k] = v
         else:
             user_keyed_out[user.username] = v
@@ -1902,6 +1901,47 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     return results[0] / results[1]
 
 
+async def get_coverage_data_fds() -> dict[str, int]:
+    """Get estimated row counts for the financial disclosure tables.
+
+    Uses Postgres's table estimates instead of COUNT(*), since exact counts
+    of the bigger tables (e.g. investments) are too slow to run in a request.
+
+    Returns:
+        A dict mapping item types to their estimated counts.
+    """
+    # Imported here because cl.search.models imports this module (via
+    # cl.users.models), and both of these import cl.search.models.
+    from cl.disclosures.models import (
+        Agreement,
+        Debt,
+        FinancialDisclosure,
+        Gift,
+        Investment,
+        NonInvestmentIncome,
+        Position,
+        Reimbursement,
+        SpouseIncome,
+    )
+    from cl.search.selectors import get_total_estimate_count
+
+    models: dict[str, type[Model]] = {
+        "disclosures": FinancialDisclosure,
+        "investments": Investment,
+        "positions": Position,
+        "agreements": Agreement,
+        "non_investment_income": NonInvestmentIncome,
+        "spousal_income": SpouseIncome,
+        "reimbursements": Reimbursement,
+        "gifts": Gift,
+        "debts": Debt,
+    }
+    return {
+        k: await sync_to_async(get_total_estimate_count)(model._meta.db_table)
+        for k, model in models.items()
+    }
+
+
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """Returns the next retry datetime to schedule a webhook retry based on its current retry counter.
 
@@ -1933,10 +1973,7 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """
     INITIAL_TIME = 3  # minutes
     # Update new_next_retry_date exponentially
-    new_next_retry_date = now() + timedelta(
-        minutes=pow(INITIAL_TIME, retry_counter + 1)
-    )
-    return new_next_retry_date
+    return now() + timedelta(minutes=pow(INITIAL_TIME, retry_counter + 1))
 
 
 WEBHOOK_MAX_RETRY_COUNTER = 7
@@ -2096,12 +2133,11 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
     Returns:
         The ISO-8601 formatted date string with UTC timezone.
     """
-    deprecation_date = (
+    return (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
         .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         .isoformat()
     )
-    return deprecation_date
 
 
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
@@ -2118,7 +2154,7 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     match webhook.version:
         case WebhookVersions.v1:
             deprecation_date = get_webhook_deprecation_date(
-                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
+                settings.WEBHOOK_V1_DEPRECATION_DATE
             )
         case WebhookVersions.v2:
             deprecation_date = None
@@ -2160,8 +2196,7 @@ def log_webhook_event(webhook_user_id: int) -> list[int | float]:
     # the number of successful webhook request the user made in total.
     pipe.zincrby(f"{webhook_prefix}.user.counts", 1, webhook_user_id)
 
-    results = pipe.execute()
-    return results
+    return pipe.execute()
 
 
 def handle_webhook_events(results: list[int | float], user: User) -> None:
@@ -2464,9 +2499,9 @@ class RetrieveFilteredFieldsMixin:
             # with them.
             field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
-            for name in field_names:
-                if should_defer(name, items):
-                    child_names.append(name)
+            child_names.extend(
+                name for name in field_names if should_defer(name, items)
+            )
 
             if child_names:
                 nested_defer_map[parent] = (nested_model, child_names)

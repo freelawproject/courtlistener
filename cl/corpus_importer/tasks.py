@@ -18,7 +18,17 @@ from pathlib import Path
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs, cast
+from typing import (
+    IO,
+    Any,
+    Literal,
+    Never,
+    NotRequired,
+    TypedDict,
+    TypeIs,
+    Unpack,
+    cast,
+)
 from urllib.parse import urljoin
 from uuid import UUID
 
@@ -322,7 +332,7 @@ def generate_ia_json(
         *[
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
-            attorney_prefetch,  # type: ignore
+            attorney_prefetch,
         ],
     )
 
@@ -344,7 +354,7 @@ def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
         output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join(output_directory, f"{d_pk}.json"), "w") as f:
+    with (Path(output_directory) / f"{d_pk}.json").open("w") as f:
         f.write(j)
 
 
@@ -398,9 +408,9 @@ async def download_recap_item(
     and an existing file are logged rather than raised.
     """
     logger.info("  Getting item at: %s", url)
-    location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
+    location = Path(settings.MEDIA_ROOT) / "recap" / filename
     try:
-        if os.path.isfile(location) and not clobber:
+        if location.is_file() and not clobber:
             raise OSError(f"    IOError: File already exists at {location}")
         async with httpx.AsyncClient(
             follow_redirects=True, http2=True
@@ -814,14 +824,13 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
             raise self.retry(exc=exc)
-        else:
-            msg = (
-                "Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None
+        msg = (
+            "Ran into unknown HTTPError while getting PDF: "
+            f"{exc.response.status_code}. Aborting."
+        )
+        logger.error(msg)
+        self.request.chain = None
+        return None
     except PacerLoginException as exc:
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -1901,6 +1910,26 @@ def probe_or_scrape_iquery_pages(
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
+class DocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see DocketReport.query()
+    """
+
+    date_range_type: NotRequired[Literal["Filed", "Entered"]]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    doc_num_start: NotRequired[str | int | None]
+    doc_num_end: NotRequired[str | int | None]
+    show_parties_and_counsel: NotRequired[bool]
+    show_terminated_parties: NotRequired[bool]
+    show_list_of_member_cases: NotRequired[bool]
+    include_pdf_headers: NotRequired[bool]
+    show_multiple_docs: NotRequired[bool]
+    output_format: NotRequired[Literal["html", "pdf"]]
+    order_by: NotRequired[Literal["date", "-date", "document_number"]]
+
+
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
@@ -1917,7 +1946,7 @@ def get_docket_by_pacer_case_id(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
     try:
@@ -1942,7 +1971,7 @@ async def get_docket_by_pacer_case_id_base(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
@@ -1970,7 +1999,7 @@ async def get_docket_by_pacer_case_id_base(
         return None
 
     # Attempt a light docket look up, we'll do better after fetching more data
-    pacer_case_id = data.get("pacer_case_id")
+    pacer_case_id = data["pacer_case_id"]
     docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = await Docket.objects.aget(pk=docket_pk)
@@ -2035,6 +2064,24 @@ async def get_docket_by_pacer_case_id_base(
     }
 
 
+class AppellateDocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see AppellateDocketReport.query()
+    """
+
+    show_docket_entries: NotRequired[bool]
+    show_orig_docket: NotRequired[bool]
+    show_prior_cases: NotRequired[bool]
+    show_associated_cases: NotRequired[bool]
+    show_panel_info: NotRequired[bool]
+    show_party_atty_info: NotRequired[bool]
+    show_caption: NotRequired[bool]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    output_format: NotRequired[Literal["html", "xml"]]
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException,),
@@ -2049,7 +2096,7 @@ def get_appellate_docket_by_docket_number(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_appellate_docket_by_docket_number_base."""
     try:
@@ -2072,7 +2119,7 @@ async def get_appellate_docket_by_docket_number_base(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
@@ -2227,11 +2274,10 @@ def get_attachment_page_by_rd(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc=exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting."
-            logger.error(msg, exc.response.status_code)
-            self.request.chain = None
-            return None
+        msg = "Ran into unknown HTTPError. %s. Aborting."
+        logger.error(msg, exc.response.status_code)
+        self.request.chain = None
+        return None
     except RequestError as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
@@ -2352,7 +2398,7 @@ def create_attachment_pq(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     user = User.objects.get(pk=user_pk)
-    pq = ProcessingQueue(
+    return ProcessingQueue(
         court_id=rd.docket_entry.docket.court_id,
         pacer_doc_id=rd.pacer_doc_id,
         uploader=user,
@@ -2360,7 +2406,6 @@ def create_attachment_pq(
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
         source=source,
     )
-    return pq
 
 
 @app.task(bind=True, ignore_result=True)
@@ -3073,6 +3118,22 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
+def list_of_creditors_report_path(court_id: str, file_name: str) -> Path:
+    """Get the path of a list of creditors report file for a court.
+
+    :param court_id: The court the report belongs to.
+    :param file_name: The name of the report file.
+    :return: The file's path inside the court's reports directory.
+    """
+    return (
+        Path(settings.MEDIA_ROOT)
+        / "list_of_creditors"
+        / "reports"
+        / court_id
+        / file_name
+    )
+
+
 def make_csv_file(
     pipe_limited_file: str, court_id: str, d_number_file_name: str
 ) -> None:
@@ -3083,12 +3144,8 @@ def make_csv_file(
     """
     import pandas as pd  # Only import pandas if function is called.
 
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "list_of_creditors",
-        "reports",
-        court_id,
-        f"{court_id}-{d_number_file_name}.csv",
+    csv_file = list_of_creditors_report_path(
+        court_id, f"{court_id}-{d_number_file_name}.csv"
     )
     docket_number = d_number_file_name.replace("-", ":")
     # Read the pipe-delimited text into a pandas DataFrame
@@ -3277,12 +3334,10 @@ async def query_and_save_list_of_creditors_base(
             "utf-8"
         )
         report._parse_text(text)
-        pipe_limited_file = os.path.join(
-            settings.MEDIA_ROOT,
-            "list_of_creditors",
-            "reports",
-            court_id,
-            f"{court_id}-{d_number_file_name}-raw.txt",
+        pipe_limited_file = str(
+            list_of_creditors_report_path(
+                court_id, f"{court_id}-{d_number_file_name}-raw.txt"
+            )
         )
 
         raw_data = report.data
@@ -4427,22 +4482,31 @@ def download_and_parse_scotus_docket(
     logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
-        content = f.read().decode("utf-8")
+        content = cast(bytes, f.read()).decode("utf-8")
 
     ext = s3_key.rsplit(".", 1)[-1].lower()
-    parser_map: dict[str, type] = {
-        "json": SCOTUSDocketReport,
-        "html": SCOTUSDocketReportHTML,
-        "htm": SCOTUSDocketReportHTM,
-    }
-    if not (parser_cls := parser_map.get(ext)):
-        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+    match ext:
+        case "json":
+            parser = SCOTUSDocketReport()
+        case "html":
+            parser = SCOTUSDocketReportHTML()
+        case "htm":
+            parser = SCOTUSDocketReportHTM()
+        case _:
+            logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+            self.request.chain = None
+            return None
+
+    parser._parse_text(content)
+    data = parser.data
+    if not data:
+        logger.error(
+            "Unparsable SCOTUS Docket at bucket: %s s3_key: %s", bucket, s3_key
+        )
         self.request.chain = None
         return None
 
-    parser = parser_cls()
-    parser._parse_text(content)
-    return parser.data
+    return data
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
@@ -4965,7 +5029,7 @@ def is_texas_supreme_docket(
 # TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
 # function should be replaced by a simple `is None` check.
 def is_texas_docket(
-    d: dict[str, None]
+    d: dict[Never, Never]
     | TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
@@ -5691,7 +5755,8 @@ def fl_ingest_docket_task(
         )
 
     merger = FloridaDocketMerger(scrape=case, params=case.entries)
-    result = merger.merge()
+    with transaction.atomic():
+        result = merger.merge()
     if result.failures:
         logger.error(
             "An error occurred while merging Florida case %s: %s",
@@ -5811,7 +5876,7 @@ def merge_state_scrape_row(
         return
 
     try:
-        label, result = loader_class.merge_payload(payload)
+        label, result, files = loader_class.merge_payload(payload)
     except ValidationError as error:
         logger.error(
             "Row %s of the %s run no longer validates for %s: %s",
@@ -5860,7 +5925,7 @@ def merge_state_scrape_row(
 
     if result.success:
         logger.info("Merged row %s of the %s run (%s)", row, loader, label)
-        ledger.merged(row, result)
+        ledger.merged(row, result, files)
     else:
         logger.error(
             "Merge of row %s of the %s run (%s) reported failures: %s",
@@ -5870,7 +5935,7 @@ def merge_state_scrape_row(
             result.failures,
             extra=fingerprint(loader, LoadPhase.MERGE),
         )
-        ledger.rejected(row, result)
+        ledger.rejected(row, result, files)
 
     if not extract:
         return

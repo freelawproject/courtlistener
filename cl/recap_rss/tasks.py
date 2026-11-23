@@ -308,8 +308,7 @@ async def check_if_feed_changed_base(
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
             return None
-        else:
-            raise exc
+        raise exc
 
     return rss_feed.data
 
@@ -319,8 +318,7 @@ def hash_item(item):
     """Hash an RSS item. Item should be a dict at this stage."""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
-    item_hash = sha256(item_j)
-    return item_hash
+    return sha256(item_j)
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed

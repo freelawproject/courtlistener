@@ -298,7 +298,6 @@ class Command(VerboseCommand):
 
                 continue
 
-            else:
-                check_prayer_pacer.delay(rd.pk, None)
+            check_prayer_pacer.delay(rd.pk, None)
 
         logger.info("Done!")

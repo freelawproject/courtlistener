@@ -13,6 +13,7 @@ from cl.corpus_importer.bulk_utils import (
     make_bankr_docket_number,
 )
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
     get_pacer_doc_by_rd,
@@ -66,13 +67,13 @@ def get_dockets(options):
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="ilnb",
-                cookies_data=session_data,
+                session_data=session_data,
                 tag_names=[TAG],
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
-                },
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=True,
+                ),
             ).set(queue=q),
         ).apply_async()
 

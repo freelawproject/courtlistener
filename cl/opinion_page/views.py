@@ -99,6 +99,7 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     build_idb_rows,
+    build_party_groups,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -286,10 +287,7 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("court_publish_page", kwargs={"pk": pk})
             )
-        else:
-            messages.info(
-                request, "Error submitting form, please review below."
-            )
+        messages.info(request, "Error submitting form, please review below.")
     return TemplateResponse(
         request,
         "publish.html",
@@ -487,8 +485,7 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket with pagination."""
-    page = request.GET.get("page", 1)
+    """Show the parties and attorneys tab, 1,000 party types per page."""
     docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
@@ -521,6 +518,8 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
+    page = request.GET.get("page", 1)
+
     @sync_to_async
     def paginate_parties(
         party_queryset: QuerySet[PartyType], parties_page: int | str
@@ -534,15 +533,19 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: dict[str, list] = {}
     # Page.object_list is typed as _SupportsPagination, but here it is the
     # sliced QuerySet, which supports async iteration.
-    async for party_type in cast(
-        QuerySet[PartyType], party_types_paginator.object_list
-    ):
-        if party_type.name not in parties:
-            parties[party_type.name] = []
-        parties[party_type.name].append(party_type)
+    party_types_on_page = [
+        party_type
+        async for party_type in cast(
+            QuerySet[PartyType], party_types_paginator.object_list
+        )
+    ]
+    # TODO: Remove the legacy parties dict once new design is completely
+    # rolled out.
+    parties: dict[str, list] = {}
+    for party_type in party_types_on_page:
+        parties.setdefault(party_type.name, []).append(party_type)
 
     return TemplateResponse(
         request,
@@ -550,6 +553,9 @@ async def view_parties(
         context
         | {
             "parties": parties,
+            "party_groups": await sync_to_async(build_party_groups)(
+                party_types_on_page
+            ),
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
         },
@@ -803,12 +809,11 @@ async def recap_document_context(
         # redirect_or_modal instead opens the Buy-on-PACER modal.
         if rd.is_available:
             return HttpResponseRedirect(rd.filepath_local.url)
-        else:
-            external_url = source.document_external_url(rd)
-            if external_url and rd_download_redirect:
-                return HttpResponseRedirect(external_url)
-            if source.has_pay_and_pray and external_url and redirect_or_modal:
-                redirect_to_pacer_modal = True
+        external_url = source.document_external_url(rd)
+        if external_url and rd_download_redirect:
+            return HttpResponseRedirect(external_url)
+        if source.has_pay_and_pray and external_url and redirect_or_modal:
+            redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
@@ -921,14 +926,14 @@ def get_attachment_values(
             end = rd_index + 1 + max_after  # Doesn't matter if this is over
         # Build each sibling's URL directly from its (docket_id, slug,
         # doc_num, attachment_number) - no need to modify `rd`.
-        for rdv in rd_values[start:end]:
-            attachments.append(
-                {
-                    "attachment_number": rdv[1],
-                    "url": document_url(docket_id, slug, doc_num, rdv[1]),
-                    "description": rdv[2],
-                }
-            )
+        attachments.extend(
+            {
+                "attachment_number": rdv[1],
+                "url": document_url(docket_id, slug, doc_num, rdv[1]),
+                "description": rdv[2],
+            }
+            for rdv in rd_values[start:end]
+        )
 
         if end < doc_len:
             attachments.append(
@@ -1561,8 +1566,7 @@ async def make_reporter_dict() -> dict:
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
                 reporters[name].append(abbrev)
-    reporters = OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
-    return reporters
+    return OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
 
 
 async def citation_handler(
@@ -1658,7 +1662,7 @@ async def attempt_reporter_variation(
             {"no_reporters": True, "reporter": reporter, "private": True},
         )
 
-    elif len(possible_canonicals) == 1:
+    if len(possible_canonicals) == 1:
         # Unambiguous reporter variation. Great. Redirect to the canonical
         # reporter
         return HttpResponseRedirect(
@@ -1670,7 +1674,7 @@ async def attempt_reporter_variation(
             ),
         )
 
-    elif len(possible_canonicals) > 1:
+    if len(possible_canonicals) > 1:
         # The reporter variation is ambiguous b/c it can refer to more than
         # one reporter. Abort with a 300 status.
         return TemplateResponse(
@@ -1684,8 +1688,7 @@ async def attempt_reporter_variation(
             },
             status=HTTPStatus.MULTIPLE_CHOICES,
         )
-    else:
-        return HttpResponse(status=500)
+    return HttpResponse(status=500)
 
 
 async def citation_redirector(
@@ -1726,11 +1729,11 @@ async def citation_redirector(
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:
         return await citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
+    if proper_reporter and volume and page is None:
         return await reporter_or_volume_handler(
             request, proper_reporter, volume
         )
-    elif proper_reporter and volume is None and page is None:
+    if proper_reporter and volume is None and page is None:
         return await reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
@@ -1764,13 +1767,12 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
-        else:
-            # Error in form, somehow.
-            return TemplateResponse(
-                request,
-                "citation_redirect_info_page.html",
-                {"show_homepage": True, "form": form, "private": False},
-            )
+        # Error in form, somehow.
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {"show_homepage": True, "form": form, "private": False},
+        )
 
     form = CitationRedirectorForm()
     reporter_dict = await make_reporter_dict()

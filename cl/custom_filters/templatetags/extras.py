@@ -111,16 +111,16 @@ def granular_date(
     if iso is False:
         if granularity == GRANULARITY_DAY:
             return date_format(d, format="F j, Y")
-        elif granularity == GRANULARITY_MONTH:
+        if granularity == GRANULARITY_MONTH:
             return date_format(d, format="F, Y")
-        elif granularity == GRANULARITY_YEAR:
+        if granularity == GRANULARITY_YEAR:
             return date_format(d, format="Y")
     else:
         if granularity == GRANULARITY_DAY:
             return date_format(d, format="Y-m-d")
-        elif granularity == GRANULARITY_MONTH:
+        if granularity == GRANULARITY_MONTH:
             return date_format(d, format="Y-m")
-        elif granularity == GRANULARITY_YEAR:
+        if granularity == GRANULARITY_YEAR:
             return date_format(d, format="Y")
 
     raise ValidationError(

@@ -163,13 +163,12 @@ def prelim_clean_F(s: str) -> str:
     s = re.sub(r"_\d+$", "", s)  # Remove trailing numbers after underscores
     s = re.sub(r"^-+|-+$", "", s)  # Remove leading/trailing dashes
     s = re.sub(r"\.+$", "", s)  # Remove trailing periods
-    s = re.sub(
+    return re.sub(
         r"^(?:No\.?|Case No\.?|Docket No\.?|Docket|Case)\s+",
         "",
         s,
         flags=re.IGNORECASE,
     )  # Remove common prefixes
-    return s
 
 
 def regex_clean_F(s: str) -> str:
@@ -386,7 +385,7 @@ def process_llm_batches(
             for i in range(0, len(remaining), current_batch_size)
         ]
         with ThreadPoolExecutor(
-            max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS  # type: ignore
+            max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS
         ) as executor:
             future_to_batch = {
                 executor.submit(
@@ -459,8 +458,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_one,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
         all_cleaned=dict(),
     )
     model_two_results = process_llm_batches(
@@ -468,8 +467,8 @@ def call_models_and_compare_results(
         system_prompt=system_prompts.get(court_mapping, ""),
         model_id=model_two,
         retry=0,
-        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,  # type: ignore
-        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,  # type: ignore
+        max_retries=settings.DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES,
+        batch_size=settings.DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE,
         all_cleaned=dict(),
     )
 

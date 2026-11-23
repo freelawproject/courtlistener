@@ -5,6 +5,7 @@ import logging
 import os
 import pickle
 from datetime import date
+from pathlib import Path
 
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
@@ -372,8 +373,7 @@ def add_case_from_filepath(filepath):
         filepath: Filepath string to where the item is stored
     """
     query = LASCSearch(None)
-    with open(filepath) as f:
-        original_data = f.read()
+    original_data = Path(filepath).read_text()
 
     case_data = query._parse_case_data(json.loads(original_data))
     case_id = make_case_id(case_data)
@@ -429,11 +429,9 @@ async def fetch_date_range_base(start: date, end: date) -> None:
         )
         if not await case_object.aexists():
             await QueuedCase.objects.acreate(
-                **{
-                    "internal_case_id": internal_case_id,
-                    "judge_code": case["judge_code"],
-                    "case_type_code": case["case_type_code"],
-                }
+                internal_case_id=internal_case_id,
+                judge_code=case["judge_code"],
+                case_type_code=case["case_type_code"],
             )
             cases_added_cnt += 1
             logger.info(

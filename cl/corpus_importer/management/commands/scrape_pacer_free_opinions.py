@@ -101,11 +101,10 @@ def get_last_complete_date(
 
     # Ensure that we go back a few days from the last time we had success if
     # that success was in the last few days.
-    last_complete_date = min(
+    return min(
         now().date() - datetime.timedelta(days=RECENT_REQUERY_DAYS),
         last_completion_log.date_queried,
     )
-    return last_complete_date
 
 
 def get_outstanding_failed_dates(
@@ -234,7 +233,7 @@ def fetch_doc_report(
     try:
         status, rows_to_create = get_and_save_free_document_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
-        )  # type: ignore
+        )
     except (
         HTTPError,
         TimeoutError,
@@ -380,7 +379,7 @@ def get_and_save_free_document_reports(
             exc = fetch_doc_report(
                 pacer_court_id,
                 _start,
-                _end,  # type: ignore
+                _end,
                 day_span=day_span,
             )
             if exc:
@@ -697,12 +696,12 @@ class Command(VerboseCommand):
         """
         if not opts.get("date_start") and not opts.get("date_end"):
             return True
-        elif not opts.get("date_start") or not opts.get("date_end"):
+        if not opts.get("date_start") or not opts.get("date_end"):
             logger.error(
                 "Both --date-start and --date-end must be specified together."
             )
             return False
-        elif opts.get("date_start") > opts.get("date_end"):
+        if opts.get("date_start") > opts.get("date_end"):
             logger.error(
                 "--date-end must be greater than or equal to --date-start."
             )

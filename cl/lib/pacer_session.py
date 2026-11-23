@@ -245,6 +245,7 @@ def get_pacer_cookie_from_cache(
         except Exception:
             pass
         r.delete(session_key % user_pk)
+    return None
 
 
 @sync_to_async

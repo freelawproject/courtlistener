@@ -11,7 +11,7 @@ from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import api_views as user_views
 from cl.users import views
 from cl.users.forms import CustomSetPasswordForm
-from cl.users.views import view_donations
+from cl.users.views import view_membership
 from cl.visualizations.views import VisualizationDeprecationRedirectView
 
 router = DefaultRouter()
@@ -30,11 +30,9 @@ urlpatterns = [
         "sign-in/",
         ratelimiter_unsafe_10_per_m(
             views.SafeRedirectLoginView.as_view(
-                **{
-                    "template_name": "register/login.html",
-                    "authentication_form": ConfirmedEmailAuthenticationForm,
-                    "extra_context": {"private": False},
-                }
+                template_name="register/login.html",
+                authentication_form=ConfirmedEmailAuthenticationForm,
+                extra_context={"private": False},
             )
         ),
         name="sign-in",
@@ -42,10 +40,8 @@ urlpatterns = [
     path(
         "sign-out/",
         auth_views.LogoutView.as_view(
-            **{
-                "template_name": "register/logged_out.html",
-                "extra_context": {"private": False},
-            },
+            template_name="register/logged_out.html",
+            extra_context={"private": False},
         ),
         name="sign-out",
     ),
@@ -59,31 +55,25 @@ urlpatterns = [
     path(
         "reset-password/instructions-sent/",
         auth_views.PasswordResetDoneView.as_view(
-            **{
-                "template_name": "register/password_reset_done.html",
-                "extra_context": {"private": True},
-            },
+            template_name="register/password_reset_done.html",
+            extra_context={"private": True},
         ),
         name="password_reset_done",
     ),
     re_path(
         r"^confirm-password/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$",
         auth_views.PasswordResetConfirmView.as_view(
-            **{
-                "template_name": "register/password_reset_confirm.html",
-                "form_class": CustomSetPasswordForm,
-                "extra_context": {"private": True},
-            },
+            template_name="register/password_reset_confirm.html",
+            form_class=CustomSetPasswordForm,
+            extra_context={"private": True},
         ),
         name="confirm_password",
     ),
     path(
         "reset-password/complete/",
         auth_views.PasswordResetCompleteView.as_view(
-            **{
-                "template_name": "register/password_reset_complete.html",
-                "extra_context": {"private": True},
-            },
+            template_name="register/password_reset_complete.html",
+            extra_context={"private": True},
         ),
         name="password_reset_complete",
     ),
@@ -127,7 +117,9 @@ urlpatterns = [
     ),
     path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
     path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
-    path("profile/your-support/", view_donations, name="profile_your_support"),
+    path(
+        "profile/your-support/", view_membership, name="profile_your_support"
+    ),
     re_path(
         "profile/webhooks/(logs|test-logs)/",
         views.view_webhook_logs,

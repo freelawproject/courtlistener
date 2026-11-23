@@ -58,9 +58,11 @@ def filter_by_matching_antecedent(
     antecedent_guess = strip_punct(antecedent_guess)
     candidates: list[Opinion] = []
 
-    for o in opinion_candidates:
-        if antecedent_guess in best_case_name(o.cluster):
-            candidates.append(o)
+    candidates.extend(
+        o
+        for o in opinion_candidates
+        if antecedent_guess in best_case_name(o.cluster)
+    )
 
     # Remove duplicates and only accept if one candidate remains
     candidates = list(set(candidates))
@@ -117,7 +119,7 @@ def resolve_fullcase_citation(
                     # return the first item by ordering key
                     # pyrefly:ignore[bad-return] This method is defined to always return a query set with at least one result
                     return clusters[0].ordered_opinions.first()
-                elif _count >= 2:
+                if _count >= 2:
                     # set an attribute to differentiate 0-match and
                     # more-than-one-match citations
                     setattr(full_citation, MULTIPLE_MATCHES_FLAG, True)
@@ -133,7 +135,7 @@ def resolve_fullcase_citation(
             result_id = db_search_results[0]["id"]
             try:
                 return Opinion.objects.get(pk=result_id)
-            except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
+            except Opinion.DoesNotExist, Opinion.MultipleObjectsReturned:
                 pass
 
     # Case 2: FullLawCitation (TODO: implement support)
@@ -161,13 +163,16 @@ def resolve_shortcase_citation(
     matched_opinions = [
         o for c, o in resolved_full_cites if type(o) is Opinion
     ]
-    for opinion in matched_opinions:
-        for c in opinion.cluster.citations.all():
-            if (
-                short_citation.corrected_reporter() == c.reporter
-                and short_citation.groups["volume"] == str(c.volume)
-            ):
-                candidates.append(opinion)
+
+    candidates.extend(
+        opinion
+        for opinion in matched_opinions
+        for c in opinion.cluster.citations.all()
+        if (
+            short_citation.corrected_reporter() == c.reporter
+            and short_citation.groups["volume"] == c.volume
+        )
+    )
 
     # Remove duplicates
     candidates = list(set(candidates))
@@ -177,10 +182,9 @@ def resolve_shortcase_citation(
         return candidates[0]
 
     # Otherwise, try to refine further using the antecedent guess
-    else:
-        return filter_by_matching_antecedent(
-            candidates, short_citation.metadata.antecedent_guess
-        )
+    return filter_by_matching_antecedent(
+        candidates, short_citation.metadata.antecedent_guess
+    )
 
 
 def resolve_supra_citation(

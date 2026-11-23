@@ -2,8 +2,8 @@
 
 import json
 import logging
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -89,7 +89,7 @@ class Command(CommandUtils, BaseCommand):
         self.dry_run = options["dry_run"]
         self.single_reporter = options["reporter"]
         self.single_volume = options["volume"]
-        self.output_dir = options["output_dir"]
+        self.output_dir = Path(options["output_dir"])
         self.start_from_reporter = options["start_from_reporter"]
         self.updated_after = None
         if options["updated_after"]:
@@ -111,8 +111,7 @@ class Command(CommandUtils, BaseCommand):
                         "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS+00:00"
                     )
 
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.setup_s3_client()
         self.total_cases_processed = 0
@@ -328,14 +327,13 @@ class Command(CommandUtils, BaseCommand):
             if matching_cluster:
                 # Match found, return object
                 return matching_cluster
-            else:
-                logger.info(
-                    "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
-                    cap_case_id,
-                    reporter_slug,
-                    volume,
-                    page,
-                )
+            logger.info(
+                "No match found for CAP ID %s (reporter: %s, volume: %s, page: %s)",
+                cap_case_id,
+                reporter_slug,
+                volume,
+                page,
+            )
 
         except Exception as e:
             logger.exception(
@@ -457,8 +455,8 @@ class Command(CommandUtils, BaseCommand):
             index: Index of the reporter being processed.
         """
         filename = f"{reporter_name.replace(' ', '_').replace('.', '_')}.json"
-        filepath = os.path.join(self.output_dir, filename)
-        with open(filepath, "w") as f:
+        filepath = self.output_dir / filename
+        with filepath.open("w") as f:
             json.dump(crosswalk, f, indent=2)
         self.stdout.write(self.style.SUCCESS(f"Saved crosswalk to {filepath}"))
 

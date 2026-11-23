@@ -36,8 +36,7 @@ def process_date_string(date_input):
     """Return date as YYYY-MM-DD."""
     if not date_input:
         return None
-    date_object = datetime.strptime(date_input, "%Y-%m-%d")
-    return date_object
+    return datetime.strptime(date_input, "%Y-%m-%d")
 
 
 C = Counter()  # for fixing school names.
@@ -53,8 +52,7 @@ def get_school(schoolname, testing=False):
         school = schools[0]
         if school.is_alias_of is not None:
             return school.is_alias_of
-        else:
-            return school
+        return school
 
     # print('No exact matches: ' + schoolname + '. Running "contains".')
 
@@ -66,9 +64,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -95,9 +92,8 @@ def get_school(schoolname, testing=False):
         if school.is_alias_of is not None:
             # print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
-        else:
-            # print(schoolname,'matched to',school)
-            return school
+        # print(schoolname,'matched to',school)
+        return school
     if len(schools) > 1:
         # print('Multiple normalized matches:',schoolname,[x.name for x in schools])
         C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
@@ -239,8 +235,7 @@ def get_suffix(suffstr):
     }
     if suffstr:
         return ""
-    else:
-        return suffdict[suffstr]
+    return suffdict[suffstr]
 
 
 def get_races(str_race):
@@ -270,10 +265,7 @@ def get_races(str_race):
         rawraces = [x.strip() for x in str_race.split("/")]
     else:
         rawraces = [str_race]
-    races = []
-    for rawrace in rawraces:
-        races.append(racedict[rawrace])
-    return races
+    return [racedict[rawrace] for rawrace in rawraces]
 
 
 def get_aba(abastr):
@@ -296,8 +288,7 @@ def get_aba(abastr):
     )
     if not abastr:
         return None
-    aba = abadict[abastr]
-    return aba
+    return abadict[abastr]
 
 
 def get_select(state, year):
@@ -316,5 +307,4 @@ def get_gender(gender_str):
         "Male": "m",
         "Other": "o",
     }
-    gender = gender_dict[gender_str]
-    return gender
+    return gender_dict[gender_str]

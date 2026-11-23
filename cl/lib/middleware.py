@@ -62,14 +62,12 @@ class RobotsHeaderMiddleware:
         """Pass the request through to the next handler."""
         if self.async_mode:
             return self.__acall__(request)
-        response = self.get_response(request)
-        return response
+        return self.get_response(request)
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
-        response = await cast(
+        return await cast(
             Awaitable[HttpResponseBase], self.get_response(request)
         )
-        return response
 
     def process_template_response(
         self,
@@ -129,8 +127,7 @@ class IncrementalNewTemplateMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
         """Pass the request through to the next handler."""
-        response = self.get_response(request)
-        return response
+        return self.get_response(request)
 
     @staticmethod
     def template_exists(template_name: str) -> bool:

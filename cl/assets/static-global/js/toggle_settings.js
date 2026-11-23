@@ -56,5 +56,5 @@ function toggleSettings(e) {
 }
 
 $(document).ready(function () {
-  $('.toggle-docket-alert, .toggle-monthly-donation').on('click', toggleSettings);
+  $('.toggle-docket-alert').on('click', toggleSettings);
 });

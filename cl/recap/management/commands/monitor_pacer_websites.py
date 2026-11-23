@@ -61,8 +61,7 @@ def make_simple_url(court: Court) -> str:
     """Make the URL of a court's PACER website."""
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
-    else:
-        return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
+    return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
 
 
 def down_for_only_me(session: requests.Session, url: str) -> bool:
@@ -86,9 +85,8 @@ def down_for_only_me(session: requests.Session, url: str) -> bool:
         if j["status_code"] is not None:
             # Down from our server, but up from our proxy. Yikes!
             return True
-        else:
-            # Down from our server, and down from our proxy. OK.
-            return False
+        # Down from our server, and down from our proxy. OK.
+        return False
 
     # Up from our server. OK.
     return False

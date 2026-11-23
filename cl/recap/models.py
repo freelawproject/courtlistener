@@ -1,6 +1,7 @@
 """Models for RECAP uploads, recap.email notifications, PACER fetches, and the FJC IDB."""
 
 import logging
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -253,10 +254,9 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return f"ProcessingQueue {self.pk}: {self.court_id} case #{self.pacer_case_id} ({self.get_upload_type_display()})"
-        elif self.upload_type == UPLOAD_TYPE.PDF:
+        if self.upload_type == UPLOAD_TYPE.PDF:
             return f"ProcessingQueue: {self.pk}: {self.court_id}.{self.pacer_case_id or None}.{self.document_number or None}.{self.attachment_number or 0} ({self.get_upload_type_display()})"
-        else:
-            return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
+        return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
     class Meta:
         permissions = (
@@ -266,8 +266,7 @@ class ProcessingQueue(AbstractDateTimeModel):
     @property
     def file_contents(self) -> str:
         """The contents of the uploaded file."""
-        with open(self.filepath_local.path) as f:
-            return f.read()
+        return Path(self.filepath_local.path).read_text()
 
     def print_file_contents(self) -> None:
         """Print the contents of the uploaded file."""

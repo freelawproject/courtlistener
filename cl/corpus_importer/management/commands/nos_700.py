@@ -8,6 +8,7 @@ from django.conf import settings
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     filter_docket_by_tags,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -101,12 +102,11 @@ def get_nos_700_items():
         FAMILY_AND_MEDICAL_LEAVE_ACT,
         EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT,
     ]
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_cand_items():
@@ -183,13 +183,12 @@ def get_cand_items():
         ARBITRATION,
         APA_REVIEW_OR_APPEAL_OF_AGENCY_DECISION,
     }
-    items = FjcIntegratedDatabase.objects.filter(
+    return FjcIntegratedDatabase.objects.filter(
         district_id="cand",
         nature_of_suit__in=nos_codes,
         date_terminated__gt="2009-01-01",
         date_filed__gt="2009-01-01",
     )
-    return items
 
 
 def get_nos_700_docket_sample(options):
@@ -271,11 +270,11 @@ def get_dockets(options, items, tags: list[str], sample_size=0):
                 court_id=row.district_id,
                 session_data=session,
                 tag_names=tags,
-                **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
-                },
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=True,
+                ),
             ).set(queue=q),
         ).apply_async()
 

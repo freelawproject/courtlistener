@@ -10,8 +10,7 @@ from cl.lib.migration_utils import load_migration_fixture
 def load_fixture(apps, schema_editor):
     if 'test' in sys.argv:
         return
-    else:
-        fixture = 'florida_state_court_data'
+    fixture = 'florida_state_court_data'
     load_migration_fixture(apps, schema_editor, fixture, 'search')
 
 

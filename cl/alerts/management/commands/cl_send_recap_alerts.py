@@ -130,7 +130,7 @@ def compute_estimated_remaining_time(
         task_status.start_time_millis / 1000.0
     )
     time_now = datetime.datetime.now()
-    estimated_time_remaining = max(
+    return max(
         datetime.timedelta(
             seconds=(
                 (time_now - start_time).total_seconds() / task_status.created
@@ -139,8 +139,6 @@ def compute_estimated_remaining_time(
         ).total_seconds(),
         initial_wait,
     )
-
-    return estimated_time_remaining
 
 
 def retrieve_task_info(
@@ -729,7 +727,7 @@ def query_and_send_alerts(
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, sent_time, True, custom_date)
             qd = override_alert_query(alert, cut_off_date)
-            alert.query_run = qd.urlencode()  # type: ignore
+            alert.query_run = qd.urlencode()
             hits.append(
                 [
                     alert,
@@ -825,10 +823,10 @@ def query_and_schedule_alerts(
                 child_result_objects = []
                 hit_copy = copy.deepcopy(hit)
                 if hasattr(hit_copy, "child_docs"):
-                    for child_doc in hit_copy.child_docs:
-                        child_result_objects.append(
-                            child_doc["_source"].to_dict()
-                        )
+                    child_result_objects.extend(
+                        child_doc["_source"].to_dict()
+                        for child_doc in hit_copy.child_docs
+                    )
                 hit_copy["child_docs"] = child_result_objects
                 scheduled_hits_to_create.append(
                     ScheduledAlertHit(

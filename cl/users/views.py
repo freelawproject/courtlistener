@@ -4,6 +4,7 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from typing import TypedDict
 
 from django.conf import settings
 from django.contrib import messages
@@ -28,7 +29,9 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import now
+from django.utils.formats import date_format
+from django.utils.html import format_html
+from django.utils.timezone import localdate, localtime, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -53,12 +56,18 @@ from cl.api.utils import (
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
+from cl.donate.models import NeonMembership
+from cl.donate.utils import (
+    DONOR_PORTAL_URL,
+    FLP_MEMBERSHIP_URL,
+    get_membership_upgrade_url,
+)
 from cl.favorites.forms import NoteForm
 from cl.favorites.utils import NOTEABLE_MODELS
 from cl.lib.auth import filter_by_email
 from cl.lib.crypto import generate_activation_key
 from cl.lib.ratelimiter import (
-    ratelimiter_all_2_per_m,
+    ratelimiter_all_5_per_m,
     ratelimiter_unsafe_10_per_m,
     ratelimiter_unsafe_2000_per_h,
 )
@@ -267,14 +276,85 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+class MembershipDetail(TypedDict):
+    """One labelled row in the membership details list."""
+
+    label: str
+    value: str
+
+
+def build_membership_details(
+    membership: NeonMembership,
+) -> list[MembershipDetail]:
+    """Build the Level / Term / Payment / Status rows of the Membership page.
+
+    Values are display-ready. The term end is a ``<time>`` element showing the
+    time in the site's time zone, which ``base.js`` rewrites in the
+    visitor's own time zone. Status comes last, preceded by Payment for
+    inactive memberships, where it usually explains why. An active
+    membership's term always "ends". An inactive one can still have an end
+    date in the future (e.g., a declined renewal payment), so its term row says
+    "ended" only once the date has passed.
+    """
+    is_active = membership.is_active
+    details: list[MembershipDetail] = [
+        {"label": "Level", "value": membership.get_level_display()}
+    ]
+    if termination_date := membership.termination_date:
+        term_ended = not is_active and (
+            localdate(termination_date) < localdate()
+        )
+        details.append(
+            {
+                "label": "Term ended" if term_ended else "Term ends",
+                "value": format_html(
+                    '<time data-local-time datetime="{}">{}</time>',
+                    termination_date.isoformat(),
+                    date_format(
+                        localtime(termination_date), r"F j, Y \a\t g:i A T"
+                    ),
+                ),
+            }
+        )
+    if not is_active:
+        details.append(
+            {
+                "label": "Payment",
+                "value": membership.get_payment_status_display(),
+            }
+        )
+    details.append(
+        {"label": "Status", "value": "Active" if is_active else "Inactive"}
+    )
+    return details
+
+
 @login_required
 @never_cache
-def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Render the user's support page."""
+def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show the user's membership level and status, and how to manage it.
+
+    The membership may exist but be inactive (e.g., a failed payment or an
+    ended term), so the template checks ``membership.is_active`` rather than
+    only whether a membership exists.
+    """
+    membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
         request,
-        "profile/donations.html",
-        {"page": "profile_your_support", "private": True},
+        "profile/membership.html",
+        {
+            "page": "profile_your_support",
+            "private": True,
+            "membership": membership,
+            "details": (
+                build_membership_details(membership) if membership else []
+            ),
+            "upgrade_url": (
+                get_membership_upgrade_url(membership) if membership else ""
+            ),
+            "membership_url": FLP_MEMBERSHIP_URL,
+            "donor_portal_url": DONOR_PORTAL_URL,
+        },
     )
 
 
@@ -700,10 +780,9 @@ def register(request: HttpRequest) -> HttpResponse:
             "register/register.html",
             {"form": form, "consent_form": consent_form, "private": False},
         )
-    else:
-        # The user is already logged in. Direct them to their settings page as
-        # a logical fallback
-        return HttpResponseRedirect(reverse("view_settings"))
+    # The user is already logged in. Direct them to their settings page as
+    # a logical fallback
+    return HttpResponseRedirect(reverse("view_settings"))
 
 
 @never_cache
@@ -730,7 +809,7 @@ def register_success(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimiter_all_2_per_m
+@ratelimiter_all_5_per_m
 @sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
@@ -739,8 +818,14 @@ def confirm_email(request, activation_key):
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
 
+    Confirmation only happens on POST. A GET renders a page with a button, so
+    that mail scanners and link prefetchers that follow links in emails can't
+    consume the single-use key before the human clicks it.
+
     Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
-    protection against brute-forcing activation_key.
+    protection against brute-forcing activation_key. The limit allows several
+    requests a minute because one confirmation takes a GET and a POST, and
+    users reload and scanners prefetch.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -773,6 +858,15 @@ def confirm_email(request, activation_key):
             request,
             "register/confirm.html",
             {"expired": True, "private": True},
+        )
+
+    if request.method != "POST":
+        # Valid key, but don't change anything on a GET. Ask the human to
+        # confirm.
+        return TemplateResponse(
+            request,
+            "register/confirm.html",
+            {"needs_confirmation": True, "private": True},
         )
 
     # Tests pass; Save the profile
