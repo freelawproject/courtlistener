@@ -1283,6 +1283,33 @@ class IconComponentTest(SimpleTestCase):
         self.assertEqual(icon.get("class").split(), ["shrink-0", "size-3"])
 
 
+class MenuButtonItemTest(SimpleTestCase):
+    """Tests the icon variant of c-menu-button.item."""
+
+    def test_icon_outline_selects_the_outline_file(self) -> None:
+        """icon_outline swaps the item's icon for its _outline file."""
+        cases = [
+            ('icon="bell"', {}, "bell"),
+            ('icon="bell" icon_outline', {}, "bell_outline"),
+            (
+                'icon="bell" :icon_outline="flag"',
+                {"flag": True},
+                "bell_outline",
+            ),
+            ('icon="bell" :icon_outline="flag"', {"flag": False}, "bell"),
+        ]
+        for props, context, expected_file in cases:
+            with self.subTest(props=props, context=context):
+                compiled = CottonCompiler().process(
+                    f'<c-menu-button.item href="#" {props}>Item</c-menu-button.item>'
+                )
+                html = engines["django"].from_string(compiled).render(context)
+                self.assertEqual(
+                    fromstring(html).xpath("//path/@d"),
+                    fromstring(svg(expected_file)).xpath("//path/@d"),
+                )
+
+
 class ToastComponentTest(SimpleTestCase):
     """The c-toast component renders its optional parts only when given."""
 

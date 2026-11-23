@@ -159,7 +159,8 @@
         <c-slot name="menu_content">
           <c-menu-button.item
             href="{% url 'profile_alerts' %}"
-            icon="bell_outline"
+            icon="bell"
+            icon_outline
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -168,7 +169,8 @@
           </c-menu-button.item>
           <c-menu-button.item
             href="{% url 'profile_notes' %}"
-            icon="bookmark_outline"
+            icon="bookmark"
+            icon_outline
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -177,7 +179,8 @@
           </c-menu-button.item>
           <c-menu-button.item
             href="{% url 'tag_list' username=request.user.username %}"
-            icon="tag_outline"
+            icon="tag"
+            icon_outline
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -214,7 +217,8 @@
           </c-menu-button.item>
           <c-menu-button.item
             href="{% url 'view_settings' %}"
-            icon="avatar_outline"
+            icon="avatar"
+            icon_outline
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
