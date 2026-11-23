@@ -22,10 +22,11 @@ from cl.search.models import (
     RECAPDocument,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocument,
 )
 
 # The document models an ESDocketSource can index.
-type SourceDocument = RECAPDocument | SCOTUSDocument
+type SourceDocument = RECAPDocument | SCOTUSDocument | TexasDocument
 
 
 @dataclass(frozen=True)

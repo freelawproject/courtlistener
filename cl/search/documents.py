@@ -608,6 +608,11 @@ class ES_CHILD_ID:
         return f"scotusd_{self.instance_id}"
 
     @property
+    def TEXAS(self) -> str:
+        """The ID of a Texas document child document."""
+        return f"texasd_{self.instance_id}"
+
+    @property
     def OPINION(self) -> str:
         """The ID of an opinion child document."""
         return f"o_{self.instance_id}"
@@ -1349,6 +1354,20 @@ class ESRECAPBaseDocument(DSLDocument):
         },
         search_analyzer="search_analyzer",
     )
+    disposition = fields.TextField(
+        attr="docket_entry.disposition",
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                attr="docket_entry.disposition",
+                term_vector="with_positions_offsets",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     entry_number = fields.LongField(attr="docket_entry.entry_number")
     entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
     short_description = fields.TextField(
@@ -1484,7 +1503,8 @@ class ESRECAPDocument(
 
     def prepare_document_number(self, instance):
         """Get the document number, or None if it is empty."""
-        return instance.document_number or None
+        # Texas documents have no document number.
+        return getattr(instance, "document_number", None) or None
 
     def prepare_document_type(self, instance):
         """Get the display name of the document type, or None for documents without one."""
@@ -1507,8 +1527,10 @@ class ESRECAPDocument(
         return instance.is_available
 
     def prepare_absolute_url(self, instance):
-        """Get the document's absolute URL."""
-        return instance.get_absolute_url()
+        """Get the document's absolute URL, or None for documents without a page."""
+        # Texas documents have no page yet.
+        get_url = getattr(instance, "get_absolute_url", None)
+        return get_url() if get_url else None
 
     def prepare_docket_child(self, instance):
         """Join the document to its docket as a child document."""

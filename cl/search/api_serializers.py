@@ -630,6 +630,8 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "capital_case",
             "uid",
             "docket_entry_uid",
+            # Texas fields aren't exposed until Texas content is searchable.
+            "disposition",
         )
 
 
@@ -897,6 +899,7 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "capital_case",
             "uid",
             "docket_entry_uid",
+            "disposition",
         )
 
 
