@@ -75,7 +75,8 @@
 </head>
 
 {# htmx elements inherit hx-headers, so every hx-post on a v2 page carries the CSRF token without repeating it. X-CL-Design tells IncrementalNewTemplateMiddleware to answer with the v2 partial. #}
-<body class="{% block body-classes %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}", "X-CL-Design": "v2"}'{% if track_events %} data-view-count-label="{{ event_label }}" data-view-count-url="{% url 'increment-event-list' version='v4' %}"{% endif %}>
+{# hx-history="false" keeps private pages out of htmx's history cache, which is stored in sessionStorage. htmx checks the whole document for it, so it covers every component on the page. #}
+<body class="{% block body-classes %}{% endblock %}"{% if private %} hx-history="false"{% endif %} hx-headers='{"X-CSRFToken": "{{ csrf_token }}", "X-CL-Design": "v2"}'{% if track_events %} data-view-count-label="{{ event_label }}" data-view-count-url="{% url 'increment-event-list' version='v4' %}"{% endif %}>
   {% require_script "js/alpine/composables/recap_detection.js" %}
   {% if track_events %}{% require_script "js/alpine/composables/view_count.js" %}{% endif %}
   {% corpus_search_scopes as corpus_search_scopes_data %}
