@@ -30,7 +30,7 @@
         hx-sync="this:replace"
         class="flex flex-wrap items-center"
       >
-        <ul role="list" class="tabs-list hidden md:flex">
+        <ul role="list" class="tabs-list w-full hidden md:flex">
           {% for tab in tabs %}
             <c-tabs.tab :tab="tab" :active_tab="active_tab" :tabs_id="tabs_id" />
           {% endfor %}
