@@ -738,6 +738,29 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("The syllabus.", cluster.syllabus)
         self.assertNotIn("syllabus", cluster.headmatter)
 
+    def test_import_schema_2(self) -> None:
+        """Is a schema 2 file, with its syllabus under a heading, imported?"""
+        xml = self.scan_xml.replace('schema="1"', 'schema="2"').replace(
+            "<court>",
+            '<heading><page-number label="1">*1</page-number>'
+            "<em>Syllabus by the Court</em></heading>"
+            "<syllabus>1. The first point.</syllabus>"
+            "<syllabus>2. The second point.</syllabus><court>",
+            1,
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.syllabus,
+            "<p>1. The first point.</p> <p>2. The second point.</p>",
+        )
+        self.assertNotIn("syllabus", cluster.headmatter.lower())
+        self.assertIn(
+            '<page-number label="1">*1</page-number>', cluster.headmatter
+        )
+
     def test_merge_links_the_judges_it_fills(self) -> None:
         """Are the judges a merge fills in linked, keeping set authors?"""
         judges = self.make_judges()

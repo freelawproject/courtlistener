@@ -80,7 +80,7 @@ cnt = CaseNameTweaker()
 FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
-SUPPORTED_SCHEMAS = {"1"}
+SUPPORTED_SCHEMAS = {"1", "2"}
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
