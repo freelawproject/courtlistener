@@ -723,9 +723,11 @@ def get_field_names(mapping_dict):
     for key, value in mapping_dict["properties"].items():
         field_names.append(key)
         if "fields" in value:
-            for subfield in value["fields"]:
-                if not subfield.endswith(("exact", "raw")):
-                    field_names.append(f"{key}.{subfield}")
+            field_names.extend(
+                f"{key}.{subfield}"
+                for subfield in value["fields"]
+                if not subfield.endswith(("exact", "raw"))
+            )
     return field_names
 
 
@@ -1133,7 +1135,7 @@ def get_alert_estimation_count(
         InputTooLongError,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
-    except (TransportError, ConnectionError, RequestError):
+    except TransportError, ConnectionError, RequestError:
         raise ElasticServerError()
     except ApiError as e:
         if "Failed to parse query" in str(e):

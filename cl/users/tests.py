@@ -1,7 +1,7 @@
 import json
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
@@ -562,7 +562,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "Tags",
                 "Developer Tools",
                 "Prayers",
-                "Your Support",
+                "Membership",
                 "Account",
             ],
         )
@@ -6206,3 +6206,37 @@ class MembershipHeaderLinkTest(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(self.url)
         self.assertContains(response, "Join FLP")
+
+
+class MembershipPageTest(TestCase):
+    """Tests for the profile's Membership page."""
+
+    def test_page_follows_membership_state(self) -> None:
+        """The page offers join, upgrade or renew, and words the term to match."""
+        user = UserProfileWithParentsFactory.create().user
+        self.client.force_login(user)
+        url = reverse("profile_your_support")
+        now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+
+        with time_machine.travel(now, tick=False):
+            with self.subTest(state="none"):
+                response = self.client.get(url)
+                self.assertContains(response, "Become a Member")
+
+            membership = NeonMembershipFactory(
+                user=user,
+                level=NeonMembershipLevel.TIER_2,
+                termination_date=now + timedelta(days=60),
+            )
+            with self.subTest(state="active"):
+                response = self.client.get(url)
+                self.assertContains(response, "Upgrade Membership")
+                self.assertContains(response, "<dt>Term ends</dt>")
+                self.assertContains(response, "at 4:00 AM PST")
+
+            membership.termination_date = now - timedelta(days=60)
+            membership.save()
+            with self.subTest(state="lapsed"):
+                response = self.client.get(url)
+                self.assertContains(response, "Renew Your Membership")
+                self.assertContains(response, "<dt>Term ended</dt>")
