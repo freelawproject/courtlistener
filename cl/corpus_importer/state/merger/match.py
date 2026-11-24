@@ -352,6 +352,10 @@ class _Binder:
         self.fields: dict[str, Field] = {
             f.name: f for f in self.model._meta.concrete_fields
         }
+        self.named_fields: dict[str, Field] = {
+            **{f.attname: f for f in self.model._meta.concrete_fields},
+            **self.fields,
+        }
         self.errors: list[Exception] = []
         self.tier_index: int = 0
 
@@ -453,11 +457,14 @@ class _Binder:
     def shorthand(self, name: str) -> BoundTerm | None:
         """Bind a field name as a comparison of that stored field with the merger's computed value.
 
+        The name is a concrete field's name or, for a foreign key, its attname;
+        the merger must compute it under the name as written.
+
         Returns:
             The bound term, or `None` if the name is not a concrete field of the
             model that the merger computes, which is recorded.
         """
-        if (field := self.fields.get(name)) is None:
+        if (field := self.named_fields.get(name)) is None:
             self.problem(
                 ValueError(
                     f"{name!r} is not a concrete field of {self.model.__name__}"

@@ -846,6 +846,16 @@ class KeyedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
     description: str = Scrape(dict)["description"]
 
 
+class DocketIdEntryMerger(Merger[dict[str, int], Any, DocketEntry]):
+    """A docket entry that computes its docket as the foreign key's raw ID."""
+
+    config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(
+        model=DocketEntry
+    )
+
+    docket_id: int = Scrape(dict)["docket_id"]
+
+
 class KeyedDocketMerger(Merger[dict[str, Any], Any, Docket]):
     """A docket found by its docket number, with its entries."""
 
@@ -2179,6 +2189,16 @@ class MatchDeclarationTest(SimpleTestCase):
         self.assertEqual(
             bound.columns, {"description", "entry_number", "date_created"}
         )
+
+    def test_shorthand_on_a_foreign_key_attname_binds_to_the_field(
+        self,
+    ) -> None:
+        """Does a shorthand term named by a foreign key's attname bind to the foreign key, loading its column?"""
+        bound = Match(Key("docket_id")).bind(DocketIdEntryMerger, None)
+        term = bound.tiers[0].terms[0]
+        self.assertIs(term.field, DocketEntry._meta.get_field("docket"))
+        self.assertEqual(term.attribute, "docket_id")
+        self.assertEqual(bound.columns, {"docket"})
 
     def test_bare_fail_is_normalised(self) -> None:
         """Is `Fail` passed as a class turned into an instance, wherever it is an outcome?"""
