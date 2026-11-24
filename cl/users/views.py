@@ -521,8 +521,8 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     if not claim_daily_export(request.user):
         form.add_error(
             None,
-            "You can download your data once a day. Please try again "
-            "tomorrow.",
+            "You can download your data once every 24 hours. Please try "
+            "again 24 hours after your last download.",
         )
         return TemplateResponse(
             request,

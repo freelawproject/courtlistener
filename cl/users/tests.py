@@ -1,5 +1,6 @@
 import json
 import re
+import sys
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -41,6 +42,8 @@ from redis import ConnectionError as RedisConnectionError
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
+from sentry_sdk.consts import DEFAULT_OPTIONS as SENTRY_DEFAULT_OPTIONS
+from sentry_sdk.utils import event_from_exception
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag, override_switch
 
@@ -108,6 +111,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
+from cl.settings.third_party.sentry import before_send, scrub_private_frames
 from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -6272,6 +6276,28 @@ class DataExportTest(TestCase):
 
         self.assertNotIn("Not mine", content)
 
+    def test_error_reports_omit_export_data(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Does an error while exporting reach Sentry without the user's data?"""
+        mock_usage.side_effect = RuntimeError
+
+        try:
+            build_user_data_export(self.user)
+        except RuntimeError:
+            event, hint = event_from_exception(
+                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
+            )
+        before_send(event, hint)
+
+        frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+        modules = [frame["module"] for frame in frames]
+        first_private = modules.index("cl.users.data_export")
+        self.assertIn("vars", frames[first_private - 1])
+        for frame in frames[first_private:]:
+            with self.subTest(function=frame["function"]):
+                self.assertNotIn("vars", frame)
+
     def test_empty_account(self, mock_usage: MagicMock) -> None:
         """Does an account with no saved items export empty sections?"""
         export = build_user_data_export(self.other_user)
@@ -6347,7 +6373,7 @@ class TakeOutViewTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
         self.assertContains(
             response,
-            "You can download your data once a day.",
+            "Please try again 24 hours after your last download.",
             status_code=HTTPStatus.TOO_MANY_REQUESTS,
         )
         self.assertNotIn("Content-Disposition", response)
@@ -6372,3 +6398,41 @@ class TakeOutViewTest(TestCase):
 
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn(reverse("sign-in"), response["Location"])
+
+
+class SentryScrubTest(SimpleTestCase):
+    """Tests for scrubbing private local variables from Sentry events."""
+
+    @staticmethod
+    def frame(module: str, function: str) -> dict:
+        """Make a Sentry stack frame that has local variables."""
+        return {"module": module, "function": function, "vars": {"x": "1"}}
+
+    def test_scrubs_private_frames_and_their_callees(self) -> None:
+        """Are the view, and everything it called, scrubbed in every stack?"""
+        for key in ("exception", "threads"):
+            with self.subTest(key=key):
+                frames = [
+                    self.frame("django.core.handlers.base", "_get_response"),
+                    self.frame("cl.users.views", "take_out"),
+                    self.frame("django.core.serializers.python", "end_object"),
+                ]
+                event = {key: {"values": [{"stacktrace": {"frames": frames}}]}}
+
+                scrub_private_frames(event)
+
+                self.assertEqual(
+                    ["vars" in frame for frame in frames], [True, False, False]
+                )
+
+    def test_leaves_other_code_alone(self) -> None:
+        """Do frames outside the export keep their variables?"""
+        frames = [
+            self.frame("cl.users.views", "delete_account"),
+            self.frame("cl.search.models", "save"),
+        ]
+        event = {"exception": {"values": [{"stacktrace": {"frames": frames}}]}}
+
+        scrub_private_frames(event)
+
+        self.assertTrue(all("vars" in frame for frame in frames))
