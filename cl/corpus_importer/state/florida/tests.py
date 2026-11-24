@@ -1374,7 +1374,7 @@ class FloridaCaseTransferMergerTest(TestCase):
             transfer.destination_docket_id, merged_docket(result).pk
         )
 
-    @merger_test(expected_query_count=10)
+    @merger_test(expected_query_count=8)
     def test_merge_creates_all_transfers(self):
         """Are multiple transfers merged as separate objects?"""
         docket_data = self._make_case(
@@ -1411,7 +1411,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         self.assertNotIn("CaseTransfer", second.updates)
         self.assertEqual(CaseTransfer.objects.count(), 1)
 
-    @merger_test(expected_query_count=7)
+    @merger_test(expected_query_count=6)
     def test_merge_fills_existing_partial_transfer(self):
         """Does merging fill in the destination docket FK on an existing transfer that only knows its origin docket?"""
         scrape_transfer = self._circuit_transfer()
@@ -1445,6 +1445,64 @@ class FloridaCaseTransferMergerTest(TestCase):
         # The origin side set by the earlier merge is left alone.
         self.assertEqual(partial.origin_docket_id, origin_docket.pk)
 
+    def test_partial_transfer_is_filled_before_attached_one(self):
+        """When a partial transfer and one attached to the docket are equal on the key, is the partial one filled in and the attached one left alone?"""
+        scrape_transfer = self._circuit_transfer()
+        docket_data = self._make_case(scrape_transfer)
+        first = merge_case(docket_data)
+        attached = CaseTransfer.objects.get()
+        partial = CaseTransfer.objects.create(
+            origin_court=self.flacirct,
+            origin_docket_number=scrape_transfer.docket_number,
+            origin_docket=DocketFactory.create(
+                court=self.flacirct,
+                docket_number=scrape_transfer.docket_number,
+            ),
+            destination_court=self.flsc,
+            destination_docket_number=docket_data.docket_number,
+            destination_docket=None,
+            transfer_date=docket_data.date_filed,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        result = merge_case(docket_data)
+
+        self.assertTrue(result.success)
+        self.assertNotIn("CaseTransfer", result.creates)
+        self.assertEqual(result.updates["CaseTransfer"], {partial.pk})
+        self.assertEqual(
+            dict(
+                CaseTransfer.objects.values_list("pk", "destination_docket_id")
+            ),
+            {
+                attached.pk: merged_docket(first).pk,
+                partial.pk: merged_docket(first).pk,
+            },
+        )
+
+    def test_transfer_created_by_sibling_is_not_matched(self):
+        """When two scraped transfers are equal on the key, do both fail as duplicates rather than the second updating the row the first created?"""
+        transfer = self._circuit_transfer()
+        docket_data = self._make_case(transfer, transfer)
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+        with self.assertLogs(
+            "cl.corpus_importer.state.merger.match", "ERROR"
+        ) as logs:
+            result = merge_case(docket_data)
+
+        self.assertEqual(result.failures["CaseTransfer"], [None, None])
+        self.assertNotIn("CaseTransfer", result.creates)
+        self.assertNotIn("CaseTransfer", result.updates)
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn(
+            "FloridaCaseTransferMerger: 2 scraped items share a key; the key "
+            "needs another term (tier 1, key (",
+            logs.records[0].getMessage(),
+        )
+        self.assertFalse(CaseTransfer.objects.exists())
+
     @merger_test(expected_query_count=20)
     def test_merge_skips_unmergeable_transfer(self):
         """Is a transfer that is outbound, has a reason with no CaseTransfer type, comes from a court with no CourtListener mapping or one missing from the DB, or has no docket number skipped without failing the merge?"""
@@ -1462,7 +1520,6 @@ class FloridaCaseTransferMergerTest(TestCase):
                 docket_data = self._make_case(
                     self._circuit_transfer(**overrides)
                 )
-
                 result = merge_case(docket_data)
 
                 self.assertTrue(result.success)
