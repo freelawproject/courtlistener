@@ -5,7 +5,6 @@ The input is the standard Juriscraper docket format described in
 """
 
 import logging
-from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -607,22 +606,17 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
 
 @dataclass(frozen=True)
 class ScrapedIssue:
-    """One of a case's issues, with what the merger needs beyond the issue.
+    """One of a case's issues, with the codes it is stored under.
 
     Attributes:
         issue: The issue as the scraper classified it.
         category: The code stored for the issue's category.
         subcategory: The code stored for the issue's subcategory.
-        alone_in_category: Whether this is the only issue the scrape states
-            under this category and subcategory. `NYCoAIssueMerger` identifies an
-            issue by that pair, so it needs to know when the pair is shared, and a
-            child merger cannot see its siblings.
     """
 
     issue: NYCoAIssue
     category: int
     subcategory: int
-    alone_in_category: bool
 
 
 class NYCoAIssueMerger[ParamType](
@@ -630,16 +624,14 @@ class NYCoAIssueMerger[ParamType](
 ):
     """Merger for one issue the Court assigned to a case.
 
-    An issue is identified by its category, subcategory, and details which is what
-    `NYCoADocketIssue` is indexed on, so the Court rewording a description it
+    An issue is identified by its category, subcategory, and detail. Failing
+    that, by the category pair alone, so the Court rewording a description it
     has already published updates the issue in place rather than replacing the
-    row. The Court does assign a case two issues under one category pair,
-    though, and then the description is the only thing separating them, so for
-    those it joins the identity; see `lookup`.
+    row; see `match`.
     """
 
     config: ClassVar[MergerConfig[NYCoADocketIssue]] = MergerConfig(
-        model=NYCoADocketIssue, key=("category", "subcategory")
+        model=NYCoADocketIssue
     )
 
     category: int = Scrape(ScrapedIssue).category
@@ -647,112 +639,30 @@ class NYCoAIssueMerger[ParamType](
     category_raw: str = Scrape(ScrapedIssue).issue.category_raw
     detail: str = Scrape(ScrapedIssue).issue.detail
 
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            ScrapedIssue,
-            RelatedParams[ParamType],
-            NYCoADocketIssue,
-        ],
-    ) -> MergerState.LookupOutput[
-        ScrapedIssue,
-        RelatedParams[ParamType],
-        NYCoADocketIssue,
-    ]:
-        """The issues already stored on this case under the same category pair.
-
-        Narrows to the description as well when the scrape states another issue
-        under that pair. Matching on the pair alone would then hand both scraped
-        issues whichever row was found first, merging two issues into one; the
-        description is what the Court tells them apart by, so it is what the
-        merger has to as well.
-
-        Returns:
-            The candidate rows, oldest first, so that `resolve` is
-            deterministic.
-        """
-        candidates = self.stored.filter(
-            category=self.category,
-            subcategory=self.subcategory,
-        )
-        if not state.scrape.alone_in_category:
-            candidates = candidates.filter(detail=self.detail)
-        return state.resolve(candidates.order_by("pk"))
-
-    @override
-    def resolve(
-        self,
-        state: MergerState.Resolve[
-            ScrapedIssue,
-            RelatedParams[ParamType],
-            NYCoADocketIssue,
-        ],
-    ) -> MergerState.ResolveOutput[
-        ScrapedIssue,
-        RelatedParams[ParamType],
-        NYCoADocketIssue,
-    ]:
-        """Pick which of the stored issues this scraped one is.
-
-        Several rows can share a category pair -- an earlier scrape stated two
-        issues under it and this one states fewer -- and all of them are
-        candidates for the same issue. The row whose description still matches
-        wins, so a case that kept an issue and dropped another keeps the right
-        row; failing that the oldest does, and `ManyStrategy.REPLACE` on the
-        relation prunes the rest.
-
-        Args:
-            state: Carries the candidates `lookup` found.
-
-        Returns:
-            The state to continue in: creating, or updating the row to
-            merge into.
-        """
-        candidates = list(state.candidates)
-
-        if not candidates:
-            return state.create()
-        detail = self.detail
-        return state.update(
-            next(
-                (
-                    candidate
-                    for candidate in candidates
-                    if candidate.detail == detail
-                ),
-                candidates[0],
-            )
-        )
+    # The Court can assign a case two issues under one category pair, and then
+    # the description is the only thing separating them, so the first tier
+    # includes it. An issue whose description is not stored falls back to the
+    # category pair, and takes the row the other scraped issues left unclaimed.
+    match: ClassVar[Match] = Match(
+        Key("category", "subcategory", "detail", ambiguous=First("pk")),
+        Key(
+            "category",
+            "subcategory",
+            ambiguous=First("pk"),
+            duplicate=Next,
+        ),
+    )
 
 
 def _case_issues(case: NYCoACase) -> Sequence[ScrapedIssue]:
-    """The case's issues, each paired with the codes it is stored under.
-
-    The codes are classified here rather than in the child merger because
-    whether another issue shares an issue's category pair decides how the
-    merger identifies it, and only the case sees all of them at once. See
-    `ScrapedIssue`.
-    """
-    classified = [
-        (
-            issue,
-            issue_code(issue.category),
-            issue_code(issue.subcategory),
-        )
-        for issue in case.issues
-    ]
-    shared = Counter(
-        (category, subcategory) for _, category, subcategory in classified
-    )
+    """The case's issues, each paired with the codes it is stored under."""
     return [
         ScrapedIssue(
             issue=issue,
-            category=category,
-            subcategory=subcategory,
-            alone_in_category=shared[(category, subcategory)] == 1,
+            category=issue_code(issue.category),
+            subcategory=issue_code(issue.subcategory),
         )
-        for issue, category, subcategory in classified
+        for issue in case.issues
     ]
 
 
