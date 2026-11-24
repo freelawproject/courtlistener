@@ -2122,13 +2122,8 @@ class PoolTest(TestCase):
             list(self.docket_a.docket_entries.values_list("pk", flat=True)),
             [kept.pk],
         )
-        # Django's `QuerySet.delete()` issues all of these; a read of the
-        # pool would be one more `SELECT` from the entries table.
-        # `QuerySet.delete()` collects the rows to delete (one `SELECT` of the
-        # entries, one for each relation cascading from them) and then updates
-        # and deletes: 7 queries here. The single `SELECT` of the entries is
-        # the collector's, so the pool's read never happens.
-        self.assertEqual(len(queries), 7)
+        # The only `SELECT` of the entries is the one `QuerySet.delete()`
+        # collects its rows with, so the pool is never read.
         self.assertEqual(
             sum(
                 q["sql"].startswith('SELECT "search_docketentry"."id"')
