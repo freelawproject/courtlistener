@@ -46,7 +46,9 @@ class ThroughParameters[Params](RelatedParams[Params]):
 Lookup = Sentinel("Lookup")
 """Find the object to merge into in the DB, creating it if there is none."""
 Create = Sentinel("Create")
-"""Skip the lookup and create a new object."""
+"""Create a new object without looking for one to merge into.
+
+Passed as `existing=Create` to skip a merger's lookup, and declared as a match `Key`'s `missing` or `ambiguous` outcome to create a new object when a tier finds no row or too many."""
 
 
 @dataclass(slots=True)

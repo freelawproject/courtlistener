@@ -324,6 +324,7 @@ class BoundNarrow:
 
 
 type AmbiguousBound = Outcome | First | BoundNarrow
+"""What a bound `ambiguous` outcome can be: an `Outcome`, or a `First` or `BoundNarrow` to choose among the candidates."""
 
 
 @dataclass(frozen=True)
