@@ -1,13 +1,19 @@
 """California state content models."""
 
+from datetime import date
+from typing import override
+
 import pghistory
 from django.db import models
+from zoneinfo import ZoneInfo
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import AbstractStateDocument
+
+CALIFORNIA_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 
 class CADocumentType(models.IntegerChoices):
@@ -187,6 +193,15 @@ class CaliforniaDocument(AbstractDateTimeModel, AbstractStateDocument):
     def expected_extensions(cls) -> NonEmptyTuple[str]:
         """File extensions California is known to serve."""
         return (".pdf",)
+
+    @override
+    def path_date_filed(self) -> date | None:
+        """Convert to California's local calendar day before storing."""
+        if self.docket_entry.date_filed is None:
+            return None
+        return self.docket_entry.date_filed.astimezone(
+            CALIFORNIA_TIMEZONE
+        ).date()
 
     class Meta:
         app_label = "search"
