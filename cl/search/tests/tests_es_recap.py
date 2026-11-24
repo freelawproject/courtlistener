@@ -147,6 +147,7 @@ from cl.search.signals import (
     texas_document_field_mapping,
 )
 from cl.search.state.texas.factories import (
+    TexasCaseEventDictFactory,
     TexasCasePartyDictFactory,
     TexasCourtOfAppealsDocketDictFactory,
     TexasDocketEntryFactory,
@@ -9491,6 +9492,216 @@ class SCOTUSIndexingParityTest(ESIndexTestCase, TestCase):
                         "cl_index_parent_and_child_docs",
                         search_type=SEARCH_TYPES.RECAP,
                         source="scotus",
+                        document_type=document_type,
+                        queue="celery",
+                        pk_offset=0,
+                        testing_mode=True,
+                    )
+                self.assertEqual(self._indexed_docs(), signal_docs)
+
+
+class IndexTexasCommandTest(ESIndexTestCase, TestCase):
+    """Does cl_index_parent_and_child_docs --source texas backfill the Texas Dockets and documents that were never indexed, like the ones merged before Texas was an ES source?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create one Docket per Texas data shape. The signals don't index them, since a TestCase never commits."""
+        court = CourtFactory(id="txctapp1", jurisdiction="SA")
+        entry = TexasDocketEntryFactory(
+            docket__court=court, docket__source=Docket.SCRAPER
+        )
+        cls.docket_with_documents = entry.docket
+        cls.td_1 = TexasDocumentFactory(docket_entry=entry)
+        cls.td_2 = TexasDocumentFactory(docket_entry=entry)
+        # A TAMES docket with no events yet.
+        cls.docket_without_events = DocketFactory(
+            court=court, source=Docket.SCRAPER
+        )
+        cls.opinion_only_docket = DocketFactory(
+            court=court, source=Docket.SCRAPER
+        )
+        OpinionClusterFactory(docket=cls.opinion_only_docket)
+
+    def setUp(self) -> None:
+        """Start every test from an empty Docket index and no auto-resume offsets logged in Redis."""
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+        self.r = get_redis_interface("CACHE")
+        self.redis_keys = [
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name=source,
+                document_type=document_type,
+            )
+            for source in ["scotus", "texas"]
+            for document_type in [None, "parent", "child"]
+        ]
+        self.r.delete(*self.redis_keys)
+
+    def tearDown(self) -> None:
+        """Remove the auto-resume offsets the test logged in Redis."""
+        self.r.delete(*self.redis_keys)
+        super().tearDown()
+
+    def _index(self, **options) -> None:
+        """Run the command for the Texas source with the given options."""
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            source="texas",
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+            **options,
+        )
+
+    def _indexed_docket_ids(self) -> set[int]:
+        """Return the pks of the Dockets currently in the index."""
+        s = DocketDocument.search().query(Q("match", docket_child="docket"))
+        return {hit.docket_id for hit in s.extra(size=100).execute()}
+
+    def assertTexasDocumentsIndexed(self) -> None:
+        """Assert every TexasDocument is indexed under its texasd_ id with its uid fields, routed and joined to its own Docket."""
+        docket_id = self.docket_with_documents.pk
+        for td in [self.td_1, self.td_2]:
+            with self.subTest(td=td.pk):
+                doc = ESRECAPDocument.get(
+                    id=ES_CHILD_ID(td.pk).TEXAS, routing=docket_id
+                )
+                self.assertIsNone(doc.id)
+                self.assertEqual(doc.uid, f"texas_{td.pk}")
+                self.assertEqual(
+                    doc.docket_entry_uid, f"texas_{td.docket_entry_id}"
+                )
+                self.assertEqual(doc.disposition, td.docket_entry.disposition)
+                self.assertEqual(doc.docket_child.parent, docket_id)
+        s = DocketDocument.search().query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(s.count(), 2)
+
+    def test_parent_then_child(self) -> None:
+        """Are the Dockets with entries or without opinions indexed, the opinion-only one left out, and the documents indexed under their Docket?"""
+        self._index(document_type="parent")
+        self.assertEqual(
+            self._indexed_docket_ids(),
+            {self.docket_with_documents.pk, self.docket_without_events.pk},
+        )
+
+        self._index(document_type="child")
+        self.assertTexasDocumentsIndexed()
+
+    def test_child_only(self) -> None:
+        """Can the documents be indexed before their Dockets, routed by their own Docket?"""
+        self._index(document_type="child")
+        self.assertTexasDocumentsIndexed()
+
+    def test_missing_schedules_only_the_missing_document(self) -> None:
+        """Does --missing look documents up by their texasd_ id, so only the one missing from ES is scheduled again, with the Texas source?"""
+        self._index()
+        ESRECAPDocument.get(
+            id=ES_CHILD_ID(self.td_2.pk).TEXAS,
+            routing=self.docket_with_documents.pk,
+        ).delete(refresh=True)
+
+        with mock.patch.object(index_parent_or_child_docs_in_es, "si") as si:
+            self._index(document_type="child", missing=True)
+
+        scheduled = [pk for call in si.call_args_list for pk in call.args[0]]
+        self.assertEqual(scheduled, [self.td_2.pk])
+        self.assertEqual(
+            {call.kwargs["source_name"] for call in si.call_args_list},
+            {"texas"},
+        )
+
+    def test_auto_resume_uses_the_texas_key(self) -> None:
+        """Does a Texas run resume from its own key, ignoring the SCOTUS one?"""
+        self.assertEqual(
+            compose_redis_key(
+                SEARCH_TYPES.RECAP, source_name="texas", document_type="parent"
+            ),
+            "es_r_texas_parent_indexing:log",
+        )
+        log_last_document_indexed(
+            10_000_000,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP,
+                source_name="scotus",
+                document_type="parent",
+            ),
+        )
+        log_last_document_indexed(
+            self.docket_without_events.pk,
+            compose_redis_key(
+                SEARCH_TYPES.RECAP, source_name="texas", document_type="parent"
+            ),
+        )
+
+        self._index(document_type="parent", auto_resume=True)
+
+        # docket_with_documents was created before it, so it's below the
+        # logged offset.
+        self.assertEqual(
+            self._indexed_docket_ids(), {self.docket_without_events.pk}
+        )
+
+
+class TexasIndexingParityTest(ESIndexTestCase, TransactionTestCase):
+    """Does a backfill with cl_index_parent_and_child_docs index exactly what the ES signals index when merge_texas_docket merges the same dockets?"""
+
+    def _indexed_docs(self) -> dict[str, tuple[str | None, dict]]:
+        """Return every document in the index as {_id: (_routing, _source)}, without the indexing timestamp, which differs between runs."""
+        hits = DocketDocument.search().extra(size=100).execute()
+        return {
+            hit.meta.id: (
+                getattr(hit.meta, "routing", None),
+                {k: v for k, v in hit.to_dict().items() if k != "timestamp"},
+            )
+            for hit in hits
+        }
+
+    def test_command_indexes_what_signals_index(self) -> None:
+        """For a merged docket with events, one without events and an opinion-only one, do a single run and a parent then child run index the same documents as the signals?"""
+        court = CourtFactory(id="txctapp1", jurisdiction="SA")
+        CourtFactory(id="texdistct6")
+        for docket_number, case_events in [
+            (
+                "01-25-00011-CV",
+                [TexasCaseEventDictFactory(), TexasCaseEventDictFactory()],
+            ),
+            ("01-25-00012-CV", []),
+        ]:
+            merge_texas_docket(
+                TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=docket_number,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5
+                    ),
+                    parties=[TexasCasePartyDictFactory(representatives=[])],
+                    case_events=case_events,
+                    appellate_briefs=[],
+                    transfer_from=None,
+                    transfer_to=None,
+                ),
+                download_attachments=False,
+            )
+        OpinionClusterFactory(
+            docket=DocketFactory(court=court, source=Docket.SCRAPER)
+        )
+        signal_docs = self._indexed_docs()
+        # The merged dockets and the documents of the one with events.
+        self.assertEqual(len(signal_docs), 4)
+
+        for document_types in [[None], ["parent", "child"]]:
+            with self.subTest(document_types=document_types):
+                self.delete_index("search.Docket")
+                self.create_index("search.Docket")
+                for document_type in document_types:
+                    call_command(
+                        "cl_index_parent_and_child_docs",
+                        search_type=SEARCH_TYPES.RECAP,
+                        source="texas",
                         document_type=document_type,
                         queue="celery",
                         pk_offset=0,
