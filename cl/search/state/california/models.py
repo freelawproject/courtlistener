@@ -10,6 +10,106 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import AbstractStateDocument
 
 
+class CADocumentType(models.IntegerChoices):
+    """Normalized type of a California document."""
+
+    UNKNOWN = 0, "Unknown"
+    AMICUS_CURIAE_BRIEF = 1, "Amicus curiae brief"
+    ANSWER_BRIEF_ON_THE_MERITS = (
+        2,
+        "Answer brief on the merits",
+    )
+    OPENING_BRIEF_ON_THE_MERITS = (
+        3,
+        "Opening brief on the merits",
+    )
+    REPLY_BRIEF_ON_THE_MERITS = (
+        4,
+        "Reply brief on the merits",
+    )
+    PETITION_FOR_REVIEW = 5, "Petition for review"
+    SUPPLEMENTAL_BRIEF = 6, "Supplemental brief"
+    REQUEST_FOR_JUDICIAL_NOTICE = (
+        7,
+        "Request for judicial notice",
+    )
+    ANSWER_TO_PETITION_FOR_REVIEW = (
+        8,
+        "Answer to petition for review",
+    )
+    RESPONSE_TO_AMICUS_CURIAE_BRIEF = (
+        9,
+        "Response to amicus curiae brief",
+    )
+    FOCUS_ISSUES_LETTER = 10, "Focus issues letter"
+    REPLY_TO_ANSWER_TO_PETITION_FOR_REVIEW = (
+        11,
+        "Reply to answer to petition for review",
+    )
+    REPLY_BRIEF = 12, "Reply brief"
+    BRIEF = 13, "Brief"
+    OPENING_BRIEF = 14, "Opening brief"
+    ADDITIONAL_AUTHORITIES_LETTER = (
+        15,
+        "Additional authorities letter",
+    )
+    OPPOSITION = 16, "Opposition"
+    NOTICE_OF_ERRATA = 17, "Notice of errata"
+    LETTER_BRIEF = 18, "Letter brief"
+    REPLY_TO_SUPPLEMENTAL_BRIEF = (
+        19,
+        "Reply to supplemental brief",
+    )
+    SUPPLEMENTAL_REPLY_BRIEF = (
+        20,
+        "Supplemental reply brief",
+    )
+    SUPPLEMENTAL_LETTER_BRIEF = (
+        21,
+        "Supplemental letter brief",
+    )
+    REQUEST_TO_ANSWER_QUESTION_OF_STATE_LAW = (
+        22,
+        "Request to answer question of state law",
+    )
+    WRITTEN_RETURN = 23, "Written return"
+    NEW_AUTHORITIES_LETTER = (
+        24,
+        "New authorities letter",
+    )
+    SUPPLEMENTAL_OPENING_BRIEF = (
+        25,
+        "Supplemental opening brief",
+    )
+    MOTION = 26, "Motion"
+    TRAVERSE = 27, "Traverse"
+    LETTER = 28, "Letter"
+    JOINDER_TO_BRIEF_ON_THE_MERITS = (
+        29,
+        "Joinder to brief on the merits",
+    )
+    PETITION_FOR_WRIT_OF_HABEAS_CORPUS = (
+        30,
+        "Petition for writ of habeas corpus",
+    )
+    JOINDER_TO_PETITION = 31, "Joinder to petition"
+    INFORMAL_RESPONSE = 32, "Informal response"
+    RESPONSE_BRIEF_RE_REFEREES_REPORT = (
+        33,
+        "Response brief re referee's report",
+    )
+    REPLY_TO_INFORMAL_RESPONSE = (
+        34,
+        "Reply to informal response",
+    )
+    EXHIBITS = 35, "Exhibits"
+    SUPPLEMENTAL_AUTHORITIES_LETTER = (
+        36,
+        "Supplemental authorities letter",
+    )
+    ORDER = 37, "Order"
+
+
 @pghistory.track()
 @document_model
 class CaliforniaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
@@ -72,7 +172,9 @@ class CaliforniaDocument(AbstractDateTimeModel, AbstractStateDocument):
     )
     document_number = models.SmallIntegerField()
     description = models.TextField(blank=True)
-    document_type = models.SmallIntegerField()
+    document_type = models.SmallIntegerField(
+        choices=CADocumentType, default=CADocumentType.UNKNOWN
+    )
     document_type_raw = models.TextField(blank=True)
     file_name = models.CharField(max_length=255)
 
