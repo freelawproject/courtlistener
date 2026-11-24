@@ -2341,6 +2341,10 @@ Sample code here.
         <c-slot name="description">NoteForm instance for the notes modal.</c-slot>
       </c-library.item>
       <c-library.item only>
+        <c-slot name="label"><code>docket_tags</code></c-slot>
+        <c-slot name="description">The user's tags for the Tags button, as built by <code>user_docket_tags</code>: <code>options</code> for the combobox and <code>associations</code>, which maps each applied tag's id to the id of the <code>DocketTag</code> applying it.</c-slot>
+      </c-library.item>
+      <c-library.item only>
         <c-slot name="label"><code>tab_content_id</code></c-slot>
         <c-slot name="description">DOM id for the tab content panel. Defaults to <code>"tab-content"</code>.</c-slot>
       </c-library.item>
@@ -2363,6 +2367,7 @@ Sample code here.
   :tabs="tabs"
   :has_alert="has_alert"
   :note_form="note_form"
+  :docket_tags="docket_tags"
 &gt;
   {# Tab content here #}
 &lt;/c-docket-page&gt;
