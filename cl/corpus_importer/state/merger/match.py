@@ -19,7 +19,7 @@ from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
 from .parameters import Create, Update
-from .pool import Ordering, Pool, PoolReader, Relatives
+from .pool import Ordering, Pool, PoolReader
 from .specifications import (
     AttributeMerger,
     Comparison,
@@ -383,7 +383,7 @@ class BoundMatch:
         Returns:
             One error per tier that cannot be queried in `pool`.
         """
-        if not isinstance(pool, Relatives):
+        if not pool.keyed:
             return []
         return [
             ValueError(

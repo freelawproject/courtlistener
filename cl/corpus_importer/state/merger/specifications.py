@@ -875,12 +875,10 @@ class RelatedMerger[
         """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for.
 
         A relation is only prefetched when its merger is matched among what the
-        parent holds in it, as a `Siblings` pool does. Every other pool reads
-        rows the relation does not hold.
+        parent holds in it. Any other pool reads rows the relation does not
+        hold.
         """
-        from .pool import Siblings
-
-        if not isinstance(pool := self.pool, Siblings):
+        if not (pool := self.pool).prefetchable:
             return []
         return [
             Prefetch(

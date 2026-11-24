@@ -7,7 +7,7 @@ import typing
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from operator import attrgetter
-from typing import Any, Self, cast, override
+from typing import Any, ClassVar, Self, cast, override
 
 from django.db.models import Manager, Model, Q, QuerySet
 from django.db.models.expressions import Combinable
@@ -165,6 +165,12 @@ class Pool(ABC):
         they are read back under.
     """
 
+    keyed: ClassVar[bool]
+    """Whether the pool's reader queries the rows each match tier claims, so that a tier needs a term comparing a stored field directly to bound its query."""
+
+    prefetchable: ClassVar[bool]
+    """Whether the pool's rows are what a parent holds in the relation being merged, so that prefetching the relation loads them."""
+
     def __init__(self, **filters: Any) -> None:
         """Build a pool bounded by filters.
 
@@ -265,6 +271,9 @@ class Siblings(Pool):
     already have been prefetched.
     """
 
+    keyed: ClassVar[bool] = False
+    prefetchable: ClassVar[bool] = True
+
     def __init__(self) -> None:
         """Build the pool."""
         super().__init__()
@@ -298,6 +307,9 @@ class Relatives(Pool):
     Read keyed: the scope has no bound tied to a single group, so reading it
     whole would load every row once per group.
     """
+
+    keyed: ClassVar[bool] = True
+    prefetchable: ClassVar[bool] = False
 
     def __init__(self, **filters: Any) -> None:
         """Build the pool.
