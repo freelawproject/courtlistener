@@ -216,24 +216,22 @@ class BaseMergerTest(TestCase):
         # pyrefly:ignore[bad-assignment]
         cls.docket_number: str = cls.docket.docket_number
 
-    def parties_merger(
-        self, strategy: ManyStrategy = ManyStrategy.REPLACE
+    def existing_docket_merger(
+        self,
     ) -> type[Merger[dict[str, Any], None, Docket]]:
-        """A merger of `self.docket` and the parties on it, each typed through `PartyType`."""
+        """A merger that finds `self.docket` by its primary key and keeps its court, source and docket number.
+
+        Tests subclass it to add the specs they exercise, overriding any of
+        its own specs to change the stored docket.
+        """
         docket = self.docket
 
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
+        class ExistingDocketMerger(Merger[dict[str, Any], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
             court: Court = Constant(docket.court)
             source: int = Constant(docket.source)
             docket_number: str | None = Constant(docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                NamedPartyMerger,
-                Scrape(dict)["parties"],
-                PartyTypeMerger,
-                strategy=strategy,
-            )
 
             @override
             def lookup(
@@ -245,6 +243,22 @@ class BaseMergerTest(TestCase):
                         *self.config.fields
                     )[:2],
                 )
+
+        return ExistingDocketMerger
+
+    def parties_merger(
+        self, strategy: ManyStrategy = ManyStrategy.REPLACE
+    ) -> type[Merger[dict[str, Any], None, Docket]]:
+        """A merger of `self.docket` and the parties on it, each typed through `PartyType`."""
+        ExistingDocketMerger = self.existing_docket_merger()
+
+        class TestMerger(ExistingDocketMerger):
+            parties: list[Party] = ManyToManyRelation(
+                NamedPartyMerger,
+                Scrape(dict)["parties"],
+                PartyTypeMerger,
+                strategy=strategy,
+            )
 
         return TestMerger
 
@@ -302,6 +316,7 @@ class BaseMergerTest(TestCase):
 
     @merger_test(expected_query_count=2)
     def test_merger_updates_docket(self) -> None:
+        """Does a merger whose lookup finds the docket update it in place from its specs?"""
         tc = self
         new_dn = self.docket_number + "New"
         start_docket_count = Docket.objects.count()
@@ -382,12 +397,6 @@ class BaseMergerTest(TestCase):
 
             docket_number: str = Scrape(dict)["sr"]
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> OriginatingCourtInformation | None:
-                return None
-
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
@@ -420,7 +429,6 @@ class BaseMergerTest(TestCase):
     @merger_test(expected_query_count=9)
     def test_related_mergers_reverse_1to1(self) -> None:
         """Does a reverse one-to-one relation, where the OneToOneField lives on the child, create the child pointing at the parent, then update that row on a later merge instead of creating a second one? The child merger does not declare the foreign key; the relation sets it."""
-        tc = self
 
         class TestRelatedMerger(
             Merger[dict[str, str], RelatedParams[None], TrialCourtData]
@@ -431,29 +439,19 @@ class BaseMergerTest(TestCase):
 
             docket_number_trial: str = Scrape(dict)["dn"]
 
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
+        ExistingDocketMerger = self.existing_docket_merger()
+
+        class TestMerger(ExistingDocketMerger):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(
                 model=Docket, reads=DOCKET_SAVE_READS
             )
 
-            court: Court = Constant(tc.court)
+            court: Court = Constant(self.court)
             source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str | None = Constant(tc.docket.docket_number)
             trialcourtdata: TrialCourtData = OneToOneRelation(
                 TestRelatedMerger,
                 Scrape(dict)["trial"],
             )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return self.found(
-                    state,
-                    Docket.objects.filter(pk=tc.docket.pk).only(
-                        *self.config.fields
-                    )[:2],
-                )
 
         result = TestMerger({"trial": {"dn": "CR-123"}}, params=None).merge()
 
@@ -658,30 +656,14 @@ class BaseMergerTest(TestCase):
         """Does DISASSOCIATE on a plain many-to-many remove stale associations while keeping the objects themselves?"""
         stale = PersonFactory.create()
         self.docket.panel.add(stale)
-        tc = self
+        ExistingDocketMerger = self.existing_docket_merger()
 
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(tc.docket.court)
-            source: int = Constant(tc.docket.source)
-            docket_number: str | None = Constant(tc.docket.docket_number)
+        class TestMerger(ExistingDocketMerger):
             panel: list[Person] = ManyToManyRelation(
                 SluggedPersonMerger,
                 Scrape(dict)["panel"],
                 strategy=ManyStrategy.DISASSOCIATE,
             )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return self.found(
-                    state,
-                    Docket.objects.filter(pk=tc.docket.pk).only(
-                        *self.config.fields
-                    )[:2],
-                )
 
         i = {
             "panel": [
@@ -745,7 +727,6 @@ class BaseMergerTest(TestCase):
         stale = DocketEntry.objects.create(
             docket=self.docket, description="Stale"
         )
-        tc = self
 
         class TestRelatedMerger(
             Merger[dict[str, str], RelatedParams[None], DocketEntry]
@@ -761,27 +742,13 @@ class BaseMergerTest(TestCase):
             def validator(scrape: dict[str, str]) -> bool:
                 return scrape["df"] != "Invalid"
 
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+        ExistingDocketMerger = self.existing_docket_merger()
 
-            court: Court = Constant(tc.docket.court)
-            source: int = Constant(tc.docket.source)
-            docket_number: str | None = Constant(tc.docket.docket_number)
+        class TestMerger(ExistingDocketMerger):
             docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
                 Scrape(dict)["entries"],
             )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return self.found(
-                    state,
-                    Docket.objects.filter(pk=tc.docket.pk).only(
-                        *self.config.fields
-                    )[:2],
-                )
 
         i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
         result = TestMerger(i, params=None).merge()
@@ -1627,29 +1594,53 @@ class SaveStateTest(TestCase):
         self.assertEqual(len(queries), 0, queries.captured_queries)
 
 
-class SpecAccessTrackingTest(SimpleTestCase):
-    """What specs record about the inputs they read."""
+class ExpressionSourceTest(SimpleTestCase):
+    """What expressions record about the inputs they read, and how `==` builds terms."""
 
     def test_specs_track_what_they_read(self) -> None:
-        """Does every kind of expression report whether it reads the scrape and which stored fields it reads?"""
-        cases: list[tuple[str, Any, bool, set[str]]] = [
-            ("constant", Constant(1), False, set()),
-            ("params", Params(dict)["a"], False, set()),
-            ("scrape item", Scrape(dict)["a"], True, set()),
-            ("scrape attribute", Scrape(ScrapeDocument).url, True, set()),
-            ("database", Database(CASE_NAME), False, {"case_name"}),
+        """Does every kind of expression report which inputs it reads and which stored fields it reads?"""
+        cases: list[tuple[str, Any, Source, set[str]]] = [
+            ("constant", Constant(1), Source.CONSTANT, set()),
+            ("params item", Params(dict)["a"], Source.PARAMS, set()),
+            (
+                "params attribute",
+                Params(SimpleNamespace).x,
+                Source.PARAMS,
+                set(),
+            ),
+            ("scrape item", Scrape(dict)["a"], Source.SCRAPE, set()),
+            (
+                "scrape attribute",
+                Scrape(ScrapeDocument).url,
+                Source.SCRAPE,
+                set(),
+            ),
+            ("ancestor", Ancestor(Docket).pk, Source.ANCESTOR, set()),
+            ("database", Database(CASE_NAME), Source.DATABASE, {"case_name"}),
             (
                 "database attribute",
                 cast(str, Database(CASE_NAME)).upper,
-                False,
+                Source.DATABASE,
                 {"case_name"},
             ),
-            ("call on scrape", Fn(str)(Scrape(dict)["a"]), True, set()),
+            ("annotation", Annotation("role"), Source.ANNOTATION, set()),
+            (
+                "call on scrape",
+                Fn(str)(Scrape(dict)["a"]),
+                Source.CONSTANT | Source.SCRAPE,
+                set(),
+            ),
             (
                 "call on database",
                 Fn(_prefer_stored)(Database(CASE_NAME_FULL), Constant("")),
-                False,
+                Source.CONSTANT | Source.DATABASE,
                 {"case_name_full"},
+            ),
+            (
+                "call on database and a plain value",
+                Fn(_prefer_stored)(Database(CASE_NAME), ""),
+                Source.CONSTANT | Source.DATABASE,
+                {"case_name"},
             ),
             (
                 "related",
@@ -1662,37 +1653,37 @@ class SpecAccessTrackingTest(SimpleTestCase):
                         ),
                     ),
                 ),
-                True,
+                Source.CONSTANT | Source.SCRAPE | Source.DATABASE,
                 {"case_name"},
             ),
             (
                 "coalesce",
                 Coalesce(Database(CASE_NAME), Scrape(dict)["a"], default=""),
-                True,
+                Source.SCRAPE | Source.DATABASE,
                 {"case_name"},
             ),
             (
                 "coalesce without scrape",
                 Coalesce(Database(CASE_NAME), Constant("a"), default=""),
-                False,
+                Source.CONSTANT | Source.DATABASE,
                 {"case_name"},
             ),
             (
                 "item keyed by database",
                 Constant(cast(Any, {}))[Database(CASE_NAME)],
-                False,
+                Source.CONSTANT | Source.DATABASE,
                 {"case_name"},
             ),
             (
                 "item keyed by scrape",
                 Constant(cast(Any, {}))[Scrape(dict)["a"]],
-                True,
+                Source.CONSTANT | Source.SCRAPE,
                 set(),
             ),
         ]
-        for name, spec, uses_scrape, db_fields in cases:
+        for name, spec, sources, db_fields in cases:
             with self.subTest(name):
-                self.assertEqual(Source.SCRAPE in spec._sources, uses_scrape)
+                self.assertEqual(spec._sources, sources)
                 self.assertEqual(set(spec._db_fields), db_fields)
 
     def test_item_keyed_by_expression_on_scrape(self) -> None:
@@ -1708,28 +1699,6 @@ class SpecAccessTrackingTest(SimpleTestCase):
         self.assertEqual(
             spec.transform({}, None, Docket(case_name="Stored")), "STORED"
         )
-
-
-class ExpressionSourceTest(SimpleTestCase):
-    """What expressions record about their sources, and how `==` builds terms."""
-
-    def test_sources_are_tracked(self) -> None:
-        """Does every kind of expression report which inputs it reads?"""
-        cases: list[tuple[str, Any, Source]] = [
-            ("scrape", Scrape(dict)["a"], Source.SCRAPE),
-            ("params", Params(SimpleNamespace).x, Source.PARAMS),
-            ("ancestor", Ancestor(Docket).pk, Source.ANCESTOR),
-            ("database", Database(Docket.case_name), Source.DATABASE),
-            ("annotation", Annotation("role"), Source.ANNOTATION),
-            (
-                "fn over database",
-                Fn(_prefer_stored)(Database(Docket.case_name), ""),
-                Source.CONSTANT | Source.DATABASE,
-            ),
-        ]
-        for name, spec, sources in cases:
-            with self.subTest(name):
-                self.assertEqual(spec._sources, sources)
 
     def test_annotations_are_propagated_without_duplicates(self) -> None:
         """Are the annotation keys an expression reads collected once each, in order?"""
@@ -2246,27 +2215,26 @@ class MatchDeclarationTest(SimpleTestCase):
         )
 
     def test_bound_tier_ordering_ends_in_pk(self) -> None:
-        """Does every tier's ordering end in `pk`, whether or not it has a `First`?"""
-        bound = Match(
-            Key("description", ambiguous=First("-date_created")),
-            Key("description"),
-        ).bind(KeyedEntryMerger, None)
-        self.assertEqual(bound.tiers[0].ordering, ("-date_created", "pk"))
-        self.assertEqual(bound.tiers[1].ordering, ("pk",))
-
-    def test_ordering_naming_pk_is_unchanged(self) -> None:
-        """Is `pk` left alone when the ordering already names it?"""
-        bound = Match(Key("description", ambiguous=First("pk"))).bind(
-            KeyedEntryMerger, None
-        )
-        self.assertEqual(bound.tiers[0].ordering, ("pk",))
-
-    def test_ordering_naming_descending_pk_is_unchanged(self) -> None:
-        """Is no ascending `pk` appended when the ordering names `-pk`?"""
-        bound = Match(Key("description", ambiguous=First("-pk"))).bind(
-            KeyedEntryMerger, None
-        )
-        self.assertEqual(bound.tiers[0].ordering, ("-pk",))
+        """Does every tier's ordering end in `pk`, whether or not it has a `First`, leaving an ordering that already names `pk` or `-pk` as written?"""
+        cases: dict[str, tuple[Key, tuple[str, ...]]] = {
+            "no First": (Key("description"), ("pk",)),
+            "First without pk": (
+                Key("description", ambiguous=First("-date_created")),
+                ("-date_created", "pk"),
+            ),
+            "First naming pk": (
+                Key("description", ambiguous=First("pk")),
+                ("pk",),
+            ),
+            "First naming -pk": (
+                Key("description", ambiguous=First("-pk")),
+                ("-pk",),
+            ),
+        }
+        for name, (key, ordering) in cases.items():
+            with self.subTest(name):
+                bound = Match(key).bind(KeyedEntryMerger, None)
+                self.assertEqual(bound.tiers[0].ordering, ordering)
 
     def test_tier_ordering_is_that_of_the_first_a_narrow_chain_ends_in(
         self,
@@ -2310,20 +2278,21 @@ class MatchDeclarationTest(SimpleTestCase):
         self.assertEqual(term.attribute, "docket_id")
         self.assertEqual(bound.columns, {"docket"})
 
-    def test_bare_fail_is_normalised(self) -> None:
-        """Is `Fail` passed as a class turned into an instance, wherever it is an outcome?"""
-        self.assertEqual(Key().ambiguous, Fail())
-        self.assertEqual(Key(missing=Fail, duplicate=Fail).missing, Fail())
-        self.assertEqual(Key(missing=Fail, duplicate=Fail).duplicate, Fail())
-        self.assertEqual(Narrow().missing, Fail())
-        self.assertEqual(Narrow().ambiguous, Fail())
-
-    def test_default_outcomes(self) -> None:
-        """Do tiers and narrows default to the outcomes the declaration documents?"""
-        key = Key()
-        self.assertIs(key.missing, Next)
-        self.assertEqual(key.ambiguous, Fail())
-        self.assertEqual(key.duplicate, Fail())
+    def test_outcomes(self) -> None:
+        """Do tiers and narrows default to the outcomes the declaration documents, with `Fail` passed as a class turned into an instance wherever it is an outcome?"""
+        bare = Key(missing=Fail, duplicate=Fail)
+        cases: dict[str, tuple[Any, Any]] = {
+            "tier missing": (Key().missing, Next),
+            "tier ambiguous": (Key().ambiguous, Fail()),
+            "tier duplicate": (Key().duplicate, Fail()),
+            "narrow missing": (Narrow().missing, Fail()),
+            "narrow ambiguous": (Narrow().ambiguous, Fail()),
+            "bare Fail for missing": (bare.missing, Fail()),
+            "bare Fail for duplicate": (bare.duplicate, Fail()),
+        }
+        for name, (outcome, expected) in cases.items():
+            with self.subTest(name):
+                self.assertEqual(outcome, expected)
 
     def test_bound_outcomes_are_carried(self) -> None:
         """Does a bound tier carry its outcomes, with a `Narrow` bound too?"""
@@ -2781,47 +2750,45 @@ class MatchGroupTest(TestCase):
             "another term (tier 1, key ('shared',))",
         )
 
-    def test_duplicate_next_last_tier_each_creates(self) -> None:
-        """Do members sharing a key that no row has each create on a loose last tier?"""
-        self.assertVerdicts(
-            Match(Key("description", duplicate=Next)),
-            [entry_scrape("shared"), entry_scrape("shared")],
-            [("create", None)] * 2,
-        )
+    def test_duplicate_next_on_last_tier(self) -> None:
+        """Does a loose last tier match members sharing a key one by one: each creating when no row has the key, a member claiming the row one placed earlier left, and all of them ambiguous when they share the same rows?"""
+        loose = Key("description", duplicate=Next)
+        shared_twice = [entry_scrape("shared"), entry_scrape("shared")]
 
-    def test_duplicate_next_last_tier_claims_remaining_row(self) -> None:
-        """Does a member sharing a key with one placed earlier claim the row left on a loose last tier?"""
-        first = self.entry("shared", number=1)
-        second = self.entry("shared", number=2)
+        with table_row(self, "no row has the key"):
+            self.assertVerdicts(
+                Match(loose), shared_twice, [("create", None)] * 2
+            )
 
-        self.assertVerdicts(
-            Match(
-                Key("entry_number"),
-                Key("description", duplicate=Next),
-            ),
-            [
-                entry_scrape("shared", number=1),
-                entry_scrape("shared", number=99),
-            ],
-            [("update", first.pk), ("update", second.pk)],
-        )
+        with table_row(self, "claims the row left"):
+            first = self.entry("shared", number=1)
+            second = self.entry("shared", number=2)
 
-    def test_duplicate_next_last_tier_ambiguous(self) -> None:
-        """Are members sharing a key and the same rows all ambiguous on a loose last tier?"""
-        self.entry("shared")
-        self.entry("shared")
+            self.assertVerdicts(
+                Match(Key("entry_number"), loose),
+                [
+                    entry_scrape("shared", number=1),
+                    entry_scrape("shared", number=99),
+                ],
+                [("update", first.pk), ("update", second.pk)],
+            )
 
-        self.assertVerdicts(
-            Match(Key("description", duplicate=Next)),
-            [entry_scrape("shared"), entry_scrape("shared")],
-            [
-                (
-                    "failed",
-                    "cannot pick one DocketEntry: 2 rows for 2 scraped items",
-                )
-            ]
-            * 2,
-        )
+        with table_row(self, "members share the same rows"):
+            self.entry("shared")
+            self.entry("shared")
+
+            self.assertVerdicts(
+                Match(loose),
+                shared_twice,
+                [
+                    (
+                        "failed",
+                        "cannot pick one DocketEntry: 2 rows for 2 scraped "
+                        "items",
+                    )
+                ]
+                * 2,
+            )
 
     def test_duplicate_counts_members_assigned_earlier(self) -> None:
         """Is a member a duplicate of one that an earlier tier already placed?"""
@@ -2901,33 +2868,6 @@ class MatchGroupTest(TestCase):
             ),
             [entry_scrape("twice", number=1)],
             [("update", first.pk)],
-        )
-
-    def test_narrow_separates_rows(self) -> None:
-        """Does a `Narrow` pick the row equal on its terms?"""
-        self.entry("twice", number=1)
-        second = self.entry("twice", number=2)
-
-        self.assertVerdicts(
-            Match(Key("description", ambiguous=Narrow("entry_number"))),
-            [entry_scrape("twice", number=2)],
-            [("update", second.pk)],
-        )
-
-    def test_narrow_missing_create(self) -> None:
-        """Does a `Narrow` that leaves no candidates apply its `missing` outcome?"""
-        self.entry("twice", number=1)
-        self.entry("twice", number=2)
-
-        self.assertVerdicts(
-            Match(
-                Key(
-                    "description",
-                    ambiguous=Narrow("entry_number", missing=Create),
-                )
-            ),
-            [entry_scrape("twice", number=3)],
-            [("create", None)],
         )
 
     def test_narrow_separates_members(self) -> None:

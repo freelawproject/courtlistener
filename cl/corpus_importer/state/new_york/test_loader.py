@@ -8,11 +8,8 @@ earliest filing -- and the rows it leaves out.
 import hashlib
 import json
 import logging
-import sqlite3
-from contextlib import closing
 from datetime import date
 from pathlib import Path, PurePosixPath
-from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
@@ -23,7 +20,6 @@ from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     IssueCategory,
 )
 
-from cl.corpus_importer.state.ledger import PARTS as LEDGER_PARTS
 from cl.corpus_importer.state.loader import (
     ExtractionReport,
     LoadPhase,
@@ -32,8 +28,12 @@ from cl.corpus_importer.state.loader import (
 from cl.corpus_importer.state.new_york.loader import NYCoACourtPassLoader
 from cl.corpus_importer.state.new_york.storage import PRIVATE_PREFIX
 from cl.corpus_importer.state.storage import PublishOutcome
+from cl.corpus_importer.state.test_helpers import (
+    ArchivedFile,
+    RunDatabaseTestCase,
+    write_run_database,
+)
 from cl.corpus_importer.state.utils import FileTally
-from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Party
 from cl.search.factories import CourtFactory
 from cl.search.models import Docket
@@ -43,7 +43,6 @@ from cl.search.state.new_york.models import (
     NYCoADocument,
 )
 from cl.search.state.new_york.vocabularies import UNASSIGNED, UNKNOWN
-from cl.tests.cases import TestCase
 
 DOCKET_NUMBER = "APL-2024-00177"
 DOCKET_NUMBER_CORE = "apl202400177"
@@ -54,7 +53,7 @@ DOCKET_NUMBER_CORE = "apl202400177"
 PRIVATE_PATH = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_brief_0.pdf"
 
 
-def archived(local_path: str) -> tuple[str, str, int, str]:
+def archived(local_path: str) -> ArchivedFile:
     """The archive row a jkent run holds for a file it downloaded.
 
     Args:
@@ -75,13 +74,9 @@ def archived(local_path: str) -> tuple[str, str, int, str]:
 def _run_database(
     path: Path,
     rows: list[tuple[str, dict]],
-    archive: list[tuple[str, str, int, str]] | None = None,
+    archive: list[ArchivedFile] | None = None,
 ) -> None:
-    """Write a minimal stand-in for a jkent run database.
-
-    Only the columns the loaders read are created, since the loader's contract
-    is with the `results` and `archived_files` tables rather than with the
-    whole schema.
+    """Write a Court-PASS run database.
 
     Args:
         path: Where to write the database.
@@ -99,35 +94,11 @@ def _run_database(
             if result_type == "NYCourtPassFile"
             and (local_path := data.get("local_path"))
         ]
-    with closing(sqlite3.connect(path)) as connection:
-        connection.execute(
-            "CREATE TABLE results ("
-            "  id INTEGER PRIMARY KEY,"
-            "  result_type VARCHAR NOT NULL,"
-            "  data_json VARCHAR NOT NULL,"
-            "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
-            ")"
-        )
-        connection.execute(
-            "CREATE TABLE archived_files ("
-            "  id INTEGER PRIMARY KEY,"
-            "  file_path VARCHAR NOT NULL,"
-            "  expected_type VARCHAR,"
-            "  file_size INTEGER,"
-            "  content_hash VARCHAR"
-            ")"
-        )
-        connection.executemany(
-            "INSERT INTO results (result_type, data_json) VALUES (?, ?)",
-            [(result_type, json.dumps(data)) for result_type, data in rows],
-        )
-        connection.executemany(
-            "INSERT INTO archived_files "
-            "(file_path, content_hash, file_size, expected_type) "
-            "VALUES (?, ?, ?, ?)",
-            archive,
-        )
-        connection.commit()
+    write_run_database(
+        path,
+        [(result_type, json.dumps(data)) for result_type, data in rows],
+        archive,
+    )
 
 
 def _docket(**overrides: Any) -> dict[str, Any]:
@@ -195,15 +166,17 @@ def _one_document(local_path: str = PRIVATE_PATH) -> list[tuple[str, dict]]:
     ]
 
 
-class NYCoALoaderTest(TestCase):
+class NYCoALoaderTest(RunDatabaseTestCase):
     """Tests for turning a Court-PASS run database into merged dockets.
 
     Stands in for S3 as well as for the extraction queue: each merge is
     followed by moving the files it wrote documents for out of the private
-    bucket, so a load run
-    against a real storage backend would reach for the network once per file.
-    `publish_outcome` makes the copy report whichever way of failing a test is
-    after.
+    bucket, so a load run against a real storage backend would reach for the
+    network once per file. `publish_outcome` makes the copy report whichever
+    way of failing a test is after.
+
+    Extraction is mocked out and never runs, so a load's extraction wait
+    reaches the stalled exit rather than sitting out the timeout.
     """
 
     publish_outcome: PublishOutcome
@@ -213,18 +186,12 @@ class NYCoALoaderTest(TestCase):
         cls.ny = CourtFactory.create(id="ny")
 
     def setUp(self) -> None:
-        self.directory = TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.database = Path(self.directory.name) / "run.db"
+        super().setUp()
         extraction = patch("cl.scrapers.tasks.extract_formatted_text_document")
         self.extraction = extraction.start()
         self.addCleanup(extraction.stop)
         self.publish_outcome = PublishOutcome.PUBLISHED
         self.stub_storage()
-        self.key = f"state_scrape_load:test:{self.id()}"
-        self.redis = get_redis_interface("CACHE")
-        self.clear_run_keys()
-        self.addCleanup(self.clear_run_keys)
 
     def stub_storage(self) -> None:
         """Keep the file moves each merge is followed by off the network."""
@@ -246,12 +213,9 @@ class NYCoALoaderTest(TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def clear_run_keys(self) -> None:
-        """Take away the run's checkpoint and every part of its ledger."""
-        self.redis.delete(
-            self.key,
-            *(f"{self.key}:{part}" for part in LEDGER_PARTS),
-        )
+    def loader_class(self) -> type[NYCoACourtPassLoader]:
+        """The Court-PASS loader."""
+        return NYCoACourtPassLoader
 
     def start_over(self) -> None:
         """Take away everything a load left behind, so that a test running several loads gives each a run of its own rather than merging into the docket the last one wrote."""
@@ -260,23 +224,10 @@ class NYCoALoaderTest(TestCase):
         self.extraction.reset_mock()
         self.database.unlink(missing_ok=True)
 
-    def loader(self, **kwargs: Any) -> NYCoACourtPassLoader:
-        """A loader over the test run, keeping a ledger so that its report is filled in from what the merges actually did.
-
-        Neither wait sleeps: celery runs eagerly here, so the merges have
-        already happened, and extraction is mocked out and never will -- a
-        zero `in_flight_time` says exactly that, so the waits reach the
-        stalled exit rather than sitting out the timeout.
-        """
-        kwargs.setdefault("run_key", self.key)
-        kwargs.setdefault("in_flight_time", 0)
-        kwargs.setdefault("verify_timeout", 0)
-        return NYCoACourtPassLoader(self.database, **kwargs)
-
     def scrape(
         self,
         rows: list[tuple[str, dict]],
-        archive: list[tuple[str, str, int, str]] | None = None,
+        archive: list[ArchivedFile] | None = None,
     ) -> Any:
         """The single scrape the loader reads out of a run holding `rows`, asserting that the run holds exactly one.
 
@@ -316,30 +267,22 @@ class NYCoALoaderTest(TestCase):
         )
 
     def test_joins_the_archive_row_onto_the_file(self) -> None:
-        """What the file is and what it hashes to are known only to the download, which the run records apart from the docket. Does the loader put the archive's account of a file onto the file itself?"""
-        _, digest, size, _ = archived(PRIVATE_PATH)
-
-        scrape = self.scrape(_one_document())
-
-        document = scrape.entries[0].attachments[0]
-        self.assertEqual(document.content_hash, digest)
-        self.assertEqual(document.file_size, size)
-        self.assertEqual(
-            document.content_type,
-            "application/pdf",
-            "The archive says the file is a PDF; the loader says what that "
-            "means to S3.",
-        )
-
-    def test_an_oral_argument_playlist_is_typed_as_one(self) -> None:
-        """Court-PASS publishes recordings as playlists rather than PDFs, and a playlist served as a PDF is one a browser will not play. Is the type taken from the file rather than assumed?"""
+        """What the file is and what it hashes to are known only to the download, which the run records apart from the docket. Does the loader put the archive's account of a file onto the file itself, saying what its kind means to S3? Court-PASS publishes recordings as playlists rather than PDFs, and a playlist served as a PDF is one a browser will not play: is the type taken from the file rather than assumed?"""
         playlist = f"{PRIVATE_PREFIX}nycourts_gov/{DOCKET_NUMBER}_webcast.asx"
+        for local_path, content_type in (
+            (PRIVATE_PATH, "application/pdf"),
+            (playlist, "video/x-ms-asf"),
+        ):
+            with self.subTest(content_type):
+                self.start_over()
+                _, digest, size, _ = archived(local_path)
 
-        scrape = self.scrape(_one_document(playlist))
+                scrape = self.scrape(_one_document(local_path))
 
-        self.assertEqual(
-            scrape.entries[0].attachments[0].content_type, "video/x-ms-asf"
-        )
+                document = scrape.entries[0].attachments[0]
+                self.assertEqual(document.content_hash, digest)
+                self.assertEqual(document.file_size, size)
+                self.assertEqual(document.content_type, content_type)
 
     def test_a_file_with_no_archive_row_is_left_undescribed(self) -> None:
         """A downloaded file is always hashed, so a path with no archive row is the run contradicting itself. Does the file merge anyway, with nothing said about bytes nothing accounted for?"""
@@ -360,8 +303,7 @@ class NYCoALoaderTest(TestCase):
         self,
     ) -> None:
         """The archive's account of a file and the name it was stored under have to agree, or one of them is wrong about what the file is. Is the type withheld rather than read off the wrong one?"""
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.new_york.loader", level=logging.ERROR
@@ -544,11 +486,7 @@ class NYCoALoaderTest(TestCase):
                 ),
             ],
         )
-        # The test runner disables logging outright for speed, and the log is
-        # the only place an operator learns which docket drift in the file
-        # table cost.
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -783,10 +721,11 @@ class NYCoALoaderTest(TestCase):
         Is the document handed off for text extraction as the load goes, on
         the queue the load was given?
         """
-        for label, kwargs, queue in (
+        cases: tuple[tuple[str, dict[str, Any], str], ...] = (
             ("default queue", {}, "celery"),
             ("queue given", {"extraction_queue": "batch1"}, "batch1"),
-        ):
+        )
+        for label, kwargs, queue in cases:
             with self.subTest(label):
                 self.start_over()
                 self._run_holding_one_document()
@@ -814,23 +753,33 @@ class NYCoALoaderTest(TestCase):
         return extraction
 
     def test_extraction_that_never_ran_is_reported(self) -> None:
-        """A merge reporting success says extraction was dispatched, not that it ran, and a failed call to the extraction service leaves no other trace. Does the load notice the document sitting there unextracted?"""
-        self._run_holding_one_document()
+        """A merge reporting success says extraction was dispatched, not that it ran, and a failed call to the extraction service leaves no other trace. Does the load notice the document sitting there unextracted? A count that never moved is a finding, while a run that gives up while extraction is still coming down has found nothing wrong: are the two told apart?"""
+        for label, kwargs, wait, abandoned in (
+            ("stalled", {}, WaitOutcome.STALLED, True),
+            (
+                "still running",
+                {"in_flight_time": 600, "verify_timeout": 0},
+                WaitOutcome.TIMED_OUT,
+                False,
+            ),
+        ):
+            with self.subTest(label):
+                self.start_over()
+                self._run_holding_one_document()
 
-        extraction = self.extraction_report()
+                extraction = self.extraction_report(**kwargs)
 
-        document = NYCoADocument.objects.get()
-        self.assertEqual(extraction.dispatched, 1)
-        self.assertEqual(
-            (extraction.outstanding, extraction.failed),
-            (1, 0),
-            "Extraction is mocked out here, so it never ran.",
-        )
-        self.assertEqual(extraction.sample, [document.pk])
-        self.assertFalse(extraction.complete)
-        self.assertTrue(
-            extraction.abandoned, "The count never moved, so it is a finding."
-        )
+                document = NYCoADocument.objects.get()
+                self.assertEqual(extraction.dispatched, 1)
+                self.assertEqual(
+                    (extraction.outstanding, extraction.failed),
+                    (1, 0),
+                    "Extraction is mocked out here, so it never ran.",
+                )
+                self.assertEqual(extraction.sample, [document.pk])
+                self.assertFalse(extraction.complete)
+                self.assertEqual(extraction.wait, wait)
+                self.assertEqual(extraction.abandoned, abandoned)
 
     def test_a_document_extraction_ran_on_is_not_outstanding(self) -> None:
         """The check has to clear once extraction has run, or every load would end by crying wolf, and a document extraction ran on and failed is the extraction pipeline's problem rather than the load's. Does a document that came back count as done, with one that failed counted apart from those extraction never reached?"""
@@ -872,10 +821,7 @@ class NYCoALoaderTest(TestCase):
     def test_unextracted_documents_get_their_own_sentry_issue(self) -> None:
         """Extraction that never ran is a different problem from a merge that failed. Is it filed on its own, under the loader rather than the run?"""
         self._run_holding_one_document()
-        # The test runner disables logging outright for speed, and the error
-        # is what carries this to Sentry.
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -904,22 +850,6 @@ class NYCoALoaderTest(TestCase):
             "One wait for each, each with its own budget.",
         )
 
-    def test_extraction_still_running_is_not_called_abandoned(self) -> None:
-        """A run that gives up while extraction is still coming down has found nothing wrong. Is that told apart from extraction that stopped?"""
-        self._run_holding_one_document()
-
-        extraction = self.extraction_report(
-            in_flight_time=600, verify_timeout=0
-        )
-
-        self.assertEqual(extraction.outstanding, 1)
-        self.assertEqual(extraction.wait, WaitOutcome.TIMED_OUT)
-        self.assertFalse(
-            extraction.abandoned,
-            "Nothing says these will not be extracted; the load just stopped "
-            "watching.",
-        )
-
     def test_reports_what_became_of_the_files_the_run_moved(self) -> None:
         """Only the workers see a file move, so a load has no way to know what became of one except by what the merges wrote down, and a file that never reached the public bucket leaves a document with nothing to serve, which no other count in the report would show. Does each outcome reach the report, with the two ways of failing reported apart so a reader knows whether re-running the load would mend it?"""
         for outcome, expected, unpublished in (
@@ -946,8 +876,7 @@ class NYCoALoaderTest(TestCase):
         """A file stuck in the private bucket is a different problem from a merge that failed -- the merge succeeded. Is it filed on its own?"""
         self.publish_outcome = PublishOutcome.FAILED
         self._run_holding_one_document()
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
