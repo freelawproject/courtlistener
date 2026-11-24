@@ -1,4 +1,5 @@
 {
+  "min_severity": "error",
   "errors": [
     {
       "column": 5,
@@ -25,7 +26,7 @@
       "column": 17,
       "path": "cl/ai/llm_providers/google.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `str | None` is not assignable to parameter `src` with type `BatchJobSource | list[InlinedRequest] | list[InlinedRequestDict] | str | BatchJobSourceDict` in function `google.genai.batches.Batches.create`",
+      "concise_description": "Argument `str | None` is not assignable to parameter `src` with type `BatchJobSource | BatchJobSourceDict | list[InlinedRequest] | list[InlinedRequestDict] | str` in function `google.genai.batches.Batches.create`",
       "severity": "error"
     },
     {
@@ -449,17 +450,10 @@
       "severity": "error"
     },
     {
-      "column": 34,
+      "column": 9,
       "path": "cl/api/views.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `date_filed`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/api/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
+      "concise_description": "Object of class `Court` has no attribute `count`",
       "severity": "error"
     },
     {
@@ -638,31 +632,10 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 33,
       "path": "cl/corpus_importer/management/commands/bulk_iquery_project.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, Unknown]` is not assignable to parameter `options` with type `OptionsType` in function `add_all_cases_to_cl`",
-      "severity": "error"
-    },
-    {
-      "column": 13,
-      "path": "cl/corpus_importer/management/commands/claims_activity_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -673,24 +646,17 @@
       "severity": "error"
     },
     {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/export_control.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
       "column": 55,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
+      "concise_description": "Argument `OpinionQuerySet[Opinion]` is not assignable to parameter `sub_opinions` with type `list[Opinion]` in function `fetch_cl_opinion_content`",
       "severity": "error"
     },
     {
       "column": 47,
       "path": "cl/corpus_importer/management/commands/harvard_merge.py",
       "name": "bad-argument-type",
-      "concise_description": "Argument `QuerySet[Opinion, Opinion]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
+      "concise_description": "Argument `OpinionQuerySet[Opinion]` is not assignable to parameter `cluster_sub_opinions` with type `list[Unknown]` in function `update_matching_opinions`",
       "severity": "error"
     },
     {
@@ -705,20 +671,6 @@
       "path": "cl/corpus_importer/management/commands/list_of_creditors_project.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `dict[str, Unknown]` is not assignable to parameter `options` with type `OptionsType` in function `query_and_save_creditors_data`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/management/commands/ready_mix_cases_project.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
       "severity": "error"
     },
     {
@@ -747,20 +699,6 @@
       "path": "cl/corpus_importer/management/commands/recap_into_opinions.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `Unknown | None` is not assignable to parameter `queue` with type `str` in function `import_opinions_from_recap`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/management/commands/scrape_pacer_free_opinions.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -806,10 +744,59 @@
       "severity": "error"
     },
     {
+      "column": 5,
+      "path": "cl/corpus_importer/state/florida/mergers.py",
+      "name": "bad-specialization",
+      "concise_description": "`FloridaParty` is not assignable to upper bound `Party[Representative]` of type variable `PType`",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "cl/corpus_importer/state/florida/mergers.py",
+      "name": "bad-specialization",
+      "concise_description": "`FloridaParty` is not assignable to upper bound `Party[Representative]` of type variable `PType`",
+      "severity": "error"
+    },
+    {
       "column": 13,
       "path": "cl/corpus_importer/state/florida/mergers.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `ForeignObjectRel` has no attribute `max_length`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "cl/corpus_importer/state/new_york/mergers.py",
+      "name": "bad-specialization",
+      "concise_description": "`NYCoAParty` is not assignable to upper bound `Party[Representative]` of type variable `PType`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "cl/corpus_importer/state/new_york/mergers.py",
+      "name": "bad-specialization",
+      "concise_description": "`NYCoAParty` is not assignable to upper bound `Party[Representative]` of type variable `PType`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/corpus_importer/state/new_york/nycourts_gov.py",
+      "name": "bad-override",
+      "concise_description": "Class member `NYCoDocketEntry.date_filed` overrides parent class `DocketEntry` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/corpus_importer/state/new_york/nycourts_gov.py",
+      "name": "bad-specialization",
+      "concise_description": "`NYCoDocketEntry` is not assignable to upper bound `DocketEntry[Document]` of type variable `_DocketDocketEntry`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "cl/corpus_importer/state/new_york/nycourts_gov.py",
+      "name": "bad-override",
+      "concise_description": "Class member `NYCoACase.date_filed` overrides parent class `Docket` in an inconsistent manner",
       "severity": "error"
     },
     {
@@ -887,27 +874,6 @@
       "path": "cl/corpus_importer/tasks.py",
       "name": "bad-return",
       "concise_description": "Returned type `Docket` is not assignable to declared return type `dict[str, Any] | None`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/corpus_importer/utils.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
       "severity": "error"
     },
     {
@@ -1142,6 +1108,27 @@
       "severity": "error"
     },
     {
+      "column": 31,
+      "path": "cl/lib/import_lib.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Court` has no attribute `earliest_date`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "cl/lib/import_lib.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `dict[str, date | None]` is not assignable to declared return type `dict[str, date]`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "cl/lib/import_lib.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `Court` has no attribute `earliest_date`",
+      "severity": "error"
+    },
+    {
       "column": 19,
       "path": "cl/lib/zoho.py",
       "name": "missing-attribute",
@@ -1163,59 +1150,10 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `date` has no attribute `field`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/opinion_page/forms.py",
       "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `date | None` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of type `str | None` has no attribute `field`",
+      "concise_description": "Object of class `NoneType` has no attribute `help_text`",
       "severity": "error"
     },
     {
@@ -1233,27 +1171,6 @@
       "severity": "error"
     },
     {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
-      "column": 19,
-      "path": "cl/opinion_page/forms.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `str` has no attribute `field`",
-      "severity": "error"
-    },
-    {
       "column": 22,
       "path": "cl/opinion_page/sitemap.py",
       "name": "missing-attribute",
@@ -1265,6 +1182,20 @@
       "path": "cl/opinion_page/types.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `OpinionCluster` has no attribute `citation_depth`",
+      "severity": "error"
+    },
+    {
+      "column": 33,
+      "path": "cl/opinion_page/views.py",
+      "name": "bad-assignment",
+      "concise_description": "`str | None` is not assignable to dict key `court_seal` with type `bool | str`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "cl/opinion_page/views.py",
+      "name": "unsupported-operation",
+      "concise_description": "Cannot set item in `dict[str, bool | str]`",
       "severity": "error"
     },
     {
@@ -1293,41 +1224,6 @@
       "path": "cl/opinion_page/views.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `filter`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 24,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `split`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/people_db/import_judges/populate_fjc_judges.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `split`",
       "severity": "error"
     },
     {
@@ -1422,34 +1318,6 @@
       "severity": "error"
     },
     {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_or_bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 17,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 25,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/api_serializers.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
-      "severity": "error"
-    },
-    {
       "column": 20,
       "path": "cl/recap/management/commands/clean_up_docket_judges.py",
       "name": "bad-argument-type",
@@ -1461,27 +1329,6 @@
       "path": "cl/recap/management/commands/clean_up_docket_judges.py",
       "name": "bad-argument-type",
       "concise_description": "Argument `str` is not assignable to parameter `event_date` with type `date | None`",
-      "severity": "error"
-    },
-    {
-      "column": 23,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `appellate_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `bankruptcy_courts`",
-      "severity": "error"
-    },
-    {
-      "column": 27,
-      "path": "cl/recap/management/commands/import_idb.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `district_courts`",
       "severity": "error"
     },
     {
@@ -1503,13 +1350,6 @@
       "path": "cl/recap/management/commands/merge_idb_into_dockets.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `district_id`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap/management/commands/monitor_pacer_websites.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -1810,7 +1650,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1831,7 +1671,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1894,7 +1734,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -1922,7 +1762,7 @@
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",
-      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `str`",
+      "concise_description": "`str | None` is not assignable to attribute `pacer_case_id` with type `Combinable | int | str`",
       "severity": "error"
     },
     {
@@ -2133,13 +1973,6 @@
       "path": "cl/recap/utils.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `court_id`",
-      "severity": "error"
-    },
-    {
-      "column": 18,
-      "path": "cl/recap_rss/management/commands/scrape_rss.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `Manager` has no attribute `all_pacer_courts`",
       "severity": "error"
     },
     {
@@ -2462,6 +2295,27 @@
       "path": "cl/scrapers/test_assets/test_oral_arg_scraper.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `xpath`",
+      "severity": "error"
+    },
+    {
+      "column": 43,
+      "path": "cl/scrapers/test_fl_poller.py",
+      "name": "missing-argument",
+      "concise_description": "Missing argument `active` in function `juriscraper.state.florida.courts.FloridaCourt.model_construct`",
+      "severity": "error"
+    },
+    {
+      "column": 66,
+      "path": "cl/scrapers/test_fl_poller.py",
+      "name": "missing-argument",
+      "concise_description": "Missing argument `page` in function `juriscraper.state.florida.common.FloridaPaginatedResults.model_construct`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "cl/scrapers/test_fl_poller.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Sequence[FloridaUpdate]` is not assignable to parameter `results` with type `list[FloridaUpdate]` in function `juriscraper.state.florida.common.FloridaPaginatedResults.model_construct`",
       "severity": "error"
     },
     {
@@ -2885,13 +2739,6 @@
       "severity": "error"
     },
     {
-      "column": 35,
-      "path": "cl/search/management/commands/generate_opinion_embeddings.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
       "column": 9,
       "path": "cl/search/management/commands/llm_clean_docket_number_daemon.py",
       "name": "missing-attribute",
@@ -3214,13 +3061,6 @@
       "severity": "error"
     },
     {
-      "column": 49,
-      "path": "cl/search/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `int` is not assignable to parameter `id` with type `str` in function `elasticsearch.dsl._sync.document.Document.exists`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/search/tasks.py",
       "name": "bad-argument-type",
@@ -3239,20 +3079,6 @@
       "path": "cl/search/tasks.py",
       "name": "unexpected-keyword",
       "concise_description": "Unexpected keyword argument `params` in function `elasticsearch._sync.client.Elasticsearch.delete_by_query`",
-      "severity": "error"
-    },
-    {
-      "column": 15,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
-      "severity": "error"
-    },
-    {
-      "column": 9,
-      "path": "cl/search/tasks.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `QuerySet` has no attribute `with_best_text`",
       "severity": "error"
     },
     {
