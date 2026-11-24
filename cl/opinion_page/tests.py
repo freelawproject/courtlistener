@@ -778,18 +778,15 @@ class ViewRecapDocumentTest(TestCase):
         )
         await add_docket_entries(docket, de_data["docket_entries"])
 
-        att_data = cast(
-            dict[str, Any],
-            await sync_to_async(AppellateAttachmentPageFactory)(
-                attachments=[
-                    AppellateAttachmentFactory(
-                        attachment_number=1, pacer_doc_id="288651"
-                    ),
-                    AppellateAttachmentFactory(),
-                ],
-                pacer_doc_id="288651",
-                pacer_case_id="104490",
-            ),
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1, pacer_doc_id="288651"
+                ),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="288651",
+            pacer_case_id="104490",
         )
         await merge_attachment_page_data(
             court,
