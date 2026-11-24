@@ -2,11 +2,12 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -163,6 +164,22 @@ from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
+
+TEST_ASSETS_DIR = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+
+
+def load_test_asset(file_name: str) -> Any:
+    """Load a JSON file from this app's test assets.
+
+    Args:
+        file_name: The name of the file in the test assets directory.
+
+    Returns:
+        The parsed JSON object.
+    """
+    return json.loads(
+        (TEST_ASSETS_DIR / file_name).read_text(encoding="utf-8")
+    )
 
 
 class UserTest(LiveServerTestCase):
@@ -405,7 +422,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -425,6 +442,53 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_unknown_or_used_key_explains_what_happened(self) -> None:
+        """Does an unknown or already-used key get a helpful message?
+
+        Once a key is spent it is blanked, so a used key looks the same as one
+        that never existed. The page should say so rather than just "invalid".
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        url = reverse("email_confirm", args=[up.activation_key])
+        await self.async_client.post(url)  # Spends the key.
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = await getattr(self.async_client, method)(url)
+                self.assertEqual(r.status_code, 200)
+                content = r.content.decode()
+                self.assertIn("Confirmation Link Not Found", content)
+                self.assertIn("may have already been used", content)
+
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -436,7 +500,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -505,7 +569,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "Tags",
                 "Developer Tools",
                 "Prayers",
-                "Your Support",
+                "Membership",
                 "Account",
             ],
         )
@@ -1338,33 +1402,17 @@ class LiveUserTest(BaseSeleniumTest):
 class SNSWebhookTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
-            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
-        ):
-            cls.soft_bounce_asset = json.load(general_soft_bounce)
-            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
-            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.suppressed_asset = json.load(suppressed_bounce)
-            cls.no_failed_bounce_asset = json.load(no_bounce)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.soft_bounce_cnt_rejected_asset = load_test_asset(
+            "cnt_rejected_bounce.json"
+        )
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.suppressed_asset = load_test_asset("suppressed_bounce.json")
+        cls.no_failed_bounce_asset = load_test_asset("no_bounce.json")
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event.
@@ -1444,7 +1492,7 @@ class SNSWebhookTest(TestCase):
 
         mock_logger.exception.assert_called_once()
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged when a unexpected bounceSubType event is received."""
         # Trigger a content_rejected event
@@ -1692,7 +1740,7 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned when an unexpected hard bounceSubType event is received. Also checks that if an email address is previously banned avoid creating a new ban object for that email address."""
         # Trigger a suppressed_asset event
@@ -1944,30 +1992,16 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
-            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
-            cls.complaint_asset = json.load(complaint)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_asset_2 = load_test_asset("general_soft_bounce_2.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.complaint_asset = load_test_asset("complaint.json")
 
-        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
-        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.attachment_150 = TEST_ASSETS_DIR / "file_sample_150kB.pdf"
+        cls.attachment_500 = TEST_ASSETS_DIR / "file_example_500kB.pdf"
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -2992,17 +3026,10 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-        ):
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_with_id_asset = load_test_asset(
+            "soft_bounce_msg_id.json"
+        )
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -3027,7 +3054,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.email_handlers.logging")
+    @mock.patch("cl.users.email_handlers.logger")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
         """This test checks if a warning is logged when trying to enqueue a message but the stored message doesn't exist anymore because it was deleted."""
         # Create a backoff event message ID:
@@ -3509,29 +3536,15 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
-            cls.mail_box_full_soft_bounce_asset = json.load(
-                mail_box_full_soft_bounce
-            )
-            cls.msg_large_bounce_asset = json.load(msg_large_bounce)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.no_email_hard_bounce_asset = load_test_asset(
+            "no_email_hard_bounce.json"
+        )
+        cls.mail_box_full_soft_bounce_asset = load_test_asset(
+            "mail_box_full_soft_bounce.json"
+        )
+        cls.msg_large_bounce_asset = load_test_asset("msg_large_bounce.json")
         cls.user = UserFactory()
 
     async def send_signal(self, test_asset, event_name, signal) -> None:
@@ -4171,7 +4184,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4208,7 +4221,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4234,7 +4247,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -6436,3 +6449,37 @@ class SentryScrubTest(SimpleTestCase):
         scrub_private_frames(event)
 
         self.assertTrue(all("vars" in frame for frame in frames))
+
+
+class MembershipPageTest(TestCase):
+    """Tests for the profile's Membership page."""
+
+    def test_page_follows_membership_state(self) -> None:
+        """The page offers join, upgrade or renew, and words the term to match."""
+        user = UserProfileWithParentsFactory.create().user
+        self.client.force_login(user)
+        url = reverse("profile_your_support")
+        now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+
+        with time_machine.travel(now, tick=False):
+            with self.subTest(state="none"):
+                response = self.client.get(url)
+                self.assertContains(response, "Become a Member")
+
+            membership = NeonMembershipFactory(
+                user=user,
+                level=NeonMembershipLevel.TIER_2,
+                termination_date=now + timedelta(days=60),
+            )
+            with self.subTest(state="active"):
+                response = self.client.get(url)
+                self.assertContains(response, "Upgrade Membership")
+                self.assertContains(response, "<dt>Term ends</dt>")
+                self.assertContains(response, "at 4:00 AM PST")
+
+            membership.termination_date = now - timedelta(days=60)
+            membership.save()
+            with self.subTest(state="lapsed"):
+                response = self.client.get(url)
+                self.assertContains(response, "Renew Your Membership")
+                self.assertContains(response, "<dt>Term ended</dt>")

@@ -1,6 +1,5 @@
 import re
 from datetime import datetime
-from os.path import join
 
 from django.conf import settings
 from juriscraper.OpinionSite import ExtractedMetaData, OpinionSite
@@ -11,9 +10,9 @@ class Site(OpinionSite):
         super().__init__()
         self.court_id = self.__module__
         self.url = "http://test"
-        self.mock_url = join(
-            settings.INSTALL_ROOT,
-            "cl/scrapers/test_assets/test_opinion_site.xml",
+        self.mock_url = str(
+            settings.INSTALL_ROOT
+            / "cl/scrapers/test_assets/test_opinion_site.xml"
         )
         self.method = "LOCAL"
 

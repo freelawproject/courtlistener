@@ -1,3 +1,5 @@
+"""Celery tasks for indexing search documents, percolating alerts, and generating embeddings."""
+
 import asyncio
 import concurrent.futures
 import csv
@@ -10,7 +12,7 @@ from datetime import UTC, date, datetime
 from importlib import import_module
 from pathlib import PurePosixPath
 from random import randint
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict
 
 from botocore import exceptions as botocore_exception
 from celery import Task
@@ -25,6 +27,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from elastic_transport import ObjectApiResponse
 from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
 from elasticsearch.exceptions import (
     ApiError,
@@ -330,9 +333,8 @@ def es_save_document(
             document_content=doc,
             app_label=app_label,
         )
-    else:
-        self.request.chain = None
-        return None
+    self.request.chain = None
+    return None
 
 
 def document_fields_to_update(
@@ -461,7 +463,7 @@ def email_search_results(self: Task, user_id: int, query: str):
     # Retry task if an error occurred and retry limit not reached.
     if error:
         if self.request.retries == self.max_retries:
-            return None
+            return
         raise self.retry()
 
     if not search_results:
@@ -569,11 +571,11 @@ def update_es_document(
     main_model = apps.get_model(main_app_label)
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
-        return
+        return None
 
     es_doc = get_doc_from_es(es_document, main_model_instance)
     if not es_doc:
-        return
+        return None
 
     related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
@@ -585,7 +587,7 @@ def update_es_document(
             related_instance_id, related_instance_model
         )
         if not related_instance:
-            return
+            return None
 
     # Get the fields to update and their values from DB.
     fields_values_to_update = document_fields_to_update(
@@ -597,14 +599,14 @@ def update_es_document(
     )
     if not fields_values_to_update:
         # Abort, avoid updating not indexed fields, like "source" in Docket.
-        return
+        return None
 
     embeddings = None
     if should_check_for_embeddings and es_document_name == "OpinionDocument":
         storage = AWSMediaStorage()
         embeddings = download_embedding(storage, main_instance_id)
         if not embeddings:
-            logging.error(
+            logger.error(
                 "Expected embeddings for OpinionDocument %s, but none found",
                 main_instance_id,
             )
@@ -841,7 +843,6 @@ def update_children_docs_by_query(
         count_query = Position.objects.filter(person_id=parent_instance_id)
 
     elif es_document is ESRECAPDocument:
-        main_instance_id = None
         if event_table == EventTable.DOCKET_ENTRY:
             s = s.query("term", docket_entry_id=parent_instance_id)
             parent_instance = get_instance_from_db(
@@ -864,7 +865,7 @@ def update_children_docs_by_query(
             count_query = RECAPDocument.objects.filter(
                 docket_entry__docket_id=parent_instance_id
             )
-        if not main_instance_id:
+        else:
             return
         parent_doc_class = DocketDocument
         main_doc = parent_doc_class.exists(main_instance_id)
@@ -1280,9 +1281,15 @@ def index_parent_or_child_docs_in_es(
         source_name: The name of a registered ESDocketSource. For the
             RECAP search type, child instance_ids are its documents; other
             search types don't use it.
+
+    Raises:
+        ValueError: If indexing child documents for a search type that has
+            none.
     """
     parent_instances = QuerySet()
     child_instances = QuerySet()
+    child_es_document = None
+    child_id_property = None
     source = ES_SOURCE_BY_NAME[source_name]
     match search_type:
         case SEARCH_TYPES.RECAP:
@@ -1317,6 +1324,8 @@ def index_parent_or_child_docs_in_es(
         "_index": parent_es_document._index._name,
     }
     if document_type == "child":
+        if child_es_document is None:
+            raise ValueError(f"{search_type} has no child documents to index.")
         # Then index only child documents in bulk.
         failed_docs = index_documents_in_bulk_from_queryset(
             child_instances,
@@ -1652,20 +1661,23 @@ def index_related_cites_fields(
         percolate_opinion: Whether to percolate the related opinion document in
             order to trigger search alerts.
     """
-    documents_to_update = []
-    cites_doc_to_update = {}
-    base_doc = {}
-    citing_doc = None
-    es_child_doc_class = None
+    documents_to_update: list[ESDictDocument]
+    cites_doc_to_update: ESDictDocument
+    base_doc: ESDictDocument
+    citing_doc: ESModelType | None
+    child_doc_model: type[Opinion] | type[RECAPDocument]
+    es_child_doc_class: type[OpinionDocument] | type[ESRECAPDocument]
     match model_name:
         case OpinionsCited.__name__:
             base_doc = {
                 "_op_type": "update",
                 "_index": OpinionClusterDocument._index._name,
             }
-            documents_to_update.extend(
-                build_cite_count_update(cluster_ids_to_update or [])
-            )
+            # TODO: adjust `cites_doc_to_update` so that the structured type can be conserved.
+            documents_to_update = [
+                dict(d)
+                for d in build_cite_count_update(cluster_ids_to_update or [])
+            ]
 
             # Finally build the Opinion dict for updating the cites.
             child_doc_model = Opinion
@@ -1680,12 +1692,15 @@ def index_related_cites_fields(
                 "_op_type": "update",
                 "_index": DocketDocument._index._name,
             }
+            documents_to_update = []
 
             child_doc_model = RECAPDocument
             es_child_doc_class = ESRECAPDocument
             cites_doc_to_update, citing_doc = build_bulk_cites_doc(
                 es_child_doc_class, child_id, child_doc_model
             )
+        case _:
+            return
 
     if cites_doc_to_update and base_doc:
         cites_doc_to_update.update(base_doc)
@@ -1694,7 +1709,7 @@ def index_related_cites_fields(
     if not documents_to_update:
         return
 
-    index_documents_in_bulk(cast(list[dict[str, Any]], documents_to_update))
+    index_documents_in_bulk(documents_to_update)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -1807,7 +1822,7 @@ def remove_documents_by_query(
     testing_mode: bool = False,
     requests_per_second: int | None = None,
     max_docs: int = 0,
-) -> None | dict[str, str]:
+) -> ObjectApiResponse[Any] | None:
     """Remove documents from ES by query.
 
     This method deletes documents from a specified ES document type based on a
@@ -1914,10 +1929,12 @@ def inception_cpu_batch_request(batch: dict) -> list[dict]:
 
 
 def embeddings_cache_key():
+    """Get the prefix of embeddings cache keys."""
     return "embeddings:"
 
 
 def get_embeddings_cache_key(batch_uuid: str, batch_range: str) -> str:
+    """Get the cache key for an embeddings batch's range."""
     return f"{embeddings_cache_key()}{batch_uuid}-{batch_range}"
 
 
@@ -1952,10 +1969,10 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     """
     opinion = Opinion.objects.filter(id=pk).with_best_text().first()
     if not opinion:
-        return None
+        return
 
     if opinion.token_count < settings.MIN_OPINION_SIZE:
-        return None
+        return
 
     embeddings = asyncio.run(
         microservice(
@@ -1967,7 +1984,7 @@ def compute_single_opinion_embeddings(self, pk: int) -> None:
     if not embeddings.is_success:
         if not isinstance(embeddings, list):
             log_invalid_embedding_errors(embeddings)
-        return None
+        return
 
     # Save embeddings to S3.
     storage = S3IntelligentTieringStorage()
@@ -2102,11 +2119,11 @@ def save_embeddings(
             "Embeddings for the opinion range %s are missing from Redis",
             batch_range,
         )
-        return None
+        return
 
     if not isinstance(embeddings, list):
         log_invalid_embedding_errors(embeddings)
-        return None
+        return
 
     storage = S3IntelligentTieringStorage()
     for embedding_record in embeddings:
@@ -2151,8 +2168,7 @@ def download_embedding(
     try:
         with storage.open(file_path, "rb") as f:
             file_contents = f.read().decode("utf-8")
-        embedding_data = json.loads(file_contents)
-        return embedding_data
+        return json.loads(file_contents)
     except FileNotFoundError:
         logger.error("Embeddings for opinion ID:%s doesn't exist.", pk)
         return None
@@ -2249,7 +2265,7 @@ def index_embeddings(
         documents_to_update.append(doc_to_update)
 
     if not documents_to_update:
-        return None
+        return
 
     index_documents_in_bulk(documents_to_update)
 

@@ -320,7 +320,8 @@ def check_membership(
         What happened to the membership.
     """
     user = membership.user
-    account_id = user.profile.neon_account_id  # type: ignore
+    # pyrefly: ignore[missing-attribute]
+    account_id = user.profile.neon_account_id
     if not account_id:
         logger.warning(
             "User %s has a membership but no Neon account ID; skipping.",
@@ -417,6 +418,7 @@ class Command(VerboseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add the expiry window and deletion age options."""
         parser.add_argument(
             "--min-hours-expired",
             type=int,
@@ -445,6 +447,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Sync the expired memberships in the window and report the counts.
+
+        Raises:
+            CommandError: If ``--delete-after-days`` is positive but within
+                the membership grace period.
+        """
         super().handle(*args, **options)
         delete_after_days = options["delete_after_days"]
         grace_days = settings.NEON_MEMBERSHIP_GRACE_PERIOD_DAYS

@@ -1,4 +1,7 @@
+"""Create judges and their positions from Federal Judicial Center data."""
+
 import re
+from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
@@ -36,6 +39,12 @@ from cl.people_db.models import (
 
 
 def transform_employ(string):
+    """Split an FJC employment text cell into jobs.
+
+    Returns:
+        Parallel lists of positions, locations, start years, and end years,
+        or four ``[None]`` lists if the cell is null.
+    """
     if pd.isnull(string):
         return [None], [None], [None], [None]
     string_list = re.split("<BR>|;|<br>", string)
@@ -100,6 +109,13 @@ def transform_employ(string):
 
 
 def transform_bankruptcy(string):
+    """Split an FJC bankruptcy and magistrate service text cell into jobs.
+
+    Returns:
+        Parallel lists of positions, locations, start dates, and end dates,
+        or four ``[None]`` lists if the cell is empty or describes an
+        allotment as circuit justice.
+    """
     month_list = [
         "June",
         "March",
@@ -208,9 +224,27 @@ def transform_bankruptcy(string):
     return position, location, start_year, end_year
 
 
+@dataclass(slots=True, kw_only=True)
+class _PrevPolitics:
+    affiliation: PoliticalAffiliation
+    party: str
+
+
 def add_positions_from_row(item, person, testing, fix_nums=None):
+    """Create a person's judicial positions from an FJC row.
+
+    Handles up to six positions, skipping duplicates of existing positions.
+    Each position's appointer, political affiliation, and ABA rating are
+    recorded too, along with an FJC source per position. Nothing is saved
+    when ``testing``, and positions, affiliations, and ratings are only
+    saved for position numbers in ``fix_nums`` when it is given.
+
+    Raises:
+        Exception: If ``match_court_string`` finds no court for a
+            position's court name.
+    """
     # add position items (up to 6 of them)
-    prev_politics = None
+    prev_politics: _PrevPolitics | None = None
     for posnum in range(1, 7):
         # Save the position if we're running all positions or specifically
         # fixing this one.
@@ -228,6 +262,8 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             courtid = match_court_string(
                 item[f"Court Name{pos_str}"], federal_district=True
             )
+        else:
+            courtid = None
 
         if courtid is None:
             raise Exception
@@ -390,14 +426,18 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 )
                 if not testing and save_this_position:
                     politics.save()
-                prev_politics = party
-            elif party != prev_politics:
+                prev_politics = _PrevPolitics(
+                    affiliation=politics, party=party
+                )
+            elif party != prev_politics.party:
                 # account for changing political affiliation
-                politics.date_end = date_nominated
-                politics.date_granularity_end = GRANULARITY_DAY
+                prev_politics.affiliation.date_end = date_nominated
+                prev_politics.affiliation.date_granularity_end = (
+                    GRANULARITY_DAY
+                )
                 if not testing and save_this_position:
-                    politics.save()
-                politics = PoliticalAffiliation(
+                    prev_politics.affiliation.save()
+                prev_politics.affiliation = PoliticalAffiliation(
                     person=person,
                     political_party=party,
                     date_start=date_nominated,
@@ -405,7 +445,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     source="a",
                 )
                 if not testing and save_this_position:
-                    politics.save()
+                    prev_politics.affiliation.save()
         rating = get_aba(item[f"ABA Rating{pos_str}"])
         if rating is not None:
             nom_year = date_nominated.year
@@ -468,16 +508,13 @@ def make_federal_judge(item, testing=False):
             if len(item["Middle Name"]) == 1:
                 item["Middle Name"] += "."
 
-        if not pd.isnull(item["Gender"]):
-            gender = get_gender(item["Gender"])
-
         # Instantiate Judge object.
         person = Person(
             name_first=item["First Name"],
             name_middle=item["Middle Name"],
             name_last=item["Last Name"],
             name_suffix=get_suffix(item["Suffix"]),
-            gender=gender,
+            gender=get_gender(item["Gender"]),
             fjc_id=item["jid"],
             date_dob=date_dob,
             date_granularity_dob=date_granularity_dob,
@@ -651,9 +688,6 @@ def make_mag_bk_judge(item, testing=False):
         if len(item["NAME_MIDDLE"]) == 1:
             item["NAME_MIDDLE"] += "."
 
-    if not pd.isnull(item["GENDER"]):
-        gender = get_gender(item["GENDER"])
-
     if not item["NAME_SUFFIX"] == "":
         suffix = get_suffix(item["NAME_SUFFIX"])
     else:
@@ -665,7 +699,7 @@ def make_mag_bk_judge(item, testing=False):
         name_middle=item["NAME_MIDDLE"],
         name_last=item["NAME_LAST"],
         name_suffix=suffix,
-        gender=gender,
+        gender=get_gender(item["GENDER"]),
     )
 
     if not testing:
@@ -674,12 +708,10 @@ def make_mag_bk_judge(item, testing=False):
     # Add position.
     if re.search("Bankruptcy", item["POSITION"]):
         position_type = Position.JUDGE
-        if item["COURT"]:
-            court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
+        court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
     else:
         position_type = Position.MAGISTRATE
-        if item["COURT"]:
-            court = FJC_DISTRICT_COURTS[item["COURT"]]
+        court = FJC_DISTRICT_COURTS[item["COURT"]]
 
     date_start = process_date_string(item["START_DATE"])
 

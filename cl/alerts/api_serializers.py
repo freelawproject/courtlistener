@@ -1,3 +1,5 @@
+"""REST API serializers for search and docket alerts."""
+
 from http import HTTPStatus
 from typing import Any
 
@@ -7,11 +9,6 @@ from django.http import QueryDict
 from rest_framework import serializers
 from rest_framework.exceptions import APIException, PermissionDenied
 
-from cl.alerts.constants import (
-    FLP_MEMBERSHIP_URL,
-    LEGACY_MEMBERSHIP_HELP_URL,
-    MEMBERSHIP_UPGRADE_BASE_URL,
-)
 from cl.alerts.models import (
     Alert,
     DocketAlert,
@@ -26,6 +23,7 @@ from cl.alerts.utils import (
 )
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.donate.models import NeonMembershipLevel
+from cl.donate.utils import FLP_MEMBERSHIP_URL, get_membership_upgrade_url
 from cl.search.models import SEARCH_TYPES
 
 # The number of days the alert frequency estimation averages over, matching
@@ -49,6 +47,7 @@ class BroadAlertQueryError(APIException):
     default_code = "broad_alert_query"
 
     def __init__(self, estimated_hits: int, detail: str) -> None:
+        """Build the error from the query's estimated hits and a message."""
         # Typed as dict[str, Any] because, unlike DRF's ErrorDetail-based
         # payloads, this intentionally carries a raw integer for the estimated
         # hits so it isn't coerced into a stringified list.
@@ -62,6 +61,12 @@ class BroadAlertQueryError(APIException):
 class SearchAlertSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
+    """Serializer for search alerts owned by the requesting user.
+
+    Validation enforces the user's alert quotas and rejects overly broad
+    queries.
+    """
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     alert_type = serializers.CharField(required=False)
 
@@ -198,19 +203,17 @@ class SearchAlertSerializer(
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
                 membership = user.membership
+                upgrade_url = get_membership_upgrade_url(membership)
                 if membership.level == NeonMembershipLevel.LEGACY:
-                    # Legacy memberships can't be upgraded online, so point
-                    # them at the help page instead of the Neon upgrade flow.
+                    # Legacy memberships can't be upgraded online, so the
+                    # upgrade URL is a help page about their options.
                     raise PermissionDenied(
                         "You've used all of the alerts included with your "
                         "legacy membership. Legacy memberships can't be "
                         "upgraded online; see "
-                        f"{LEGACY_MEMBERSHIP_HELP_URL} to learn how to get "
+                        f"{upgrade_url} to learn how to get "
                         "more features, or disable a RECAP Alert."
                     )
-                upgrade_url = (
-                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
-                )
                 raise PermissionDenied(
                     "You've used all of the alerts included with your "
                     "membership. To create this alert, upgrade your membership "
@@ -276,9 +279,16 @@ class SearchAlertSerializer(
         return representation
 
     def create(self, validated_data):
+        """Create the alert."""
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        """Update the alert.
+
+        Raises:
+            serializers.ValidationError: If the alert type changes in a
+                disallowed way.
+        """
         # On alert updates, validates that the alert_type hasn't changed in a
         # disallowed way.
         alert_type = validated_data.get("alert_type")
@@ -304,6 +314,8 @@ class SearchAlertSerializerModel(
 
 
 class DocketAlertSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
+    """Serializer for docket alerts owned by the requesting user."""
+
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:

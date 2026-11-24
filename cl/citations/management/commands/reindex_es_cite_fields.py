@@ -1,5 +1,8 @@
+"""Re-index the citation fields of opinion and cluster search documents."""
+
 import time
 from collections.abc import Callable
+from typing import Literal
 
 from django.db.models import QuerySet
 
@@ -15,6 +18,8 @@ from cl.search.tasks import (
 
 
 class Command(VerboseCommand):
+    """Update cluster citation counts or opinion cites in Elasticsearch for an ID range."""
+
     help = """Update OpinionClusterDocument.citeCount and OpinionDocument.cites
 
     Useful to re index these fields after Elastic got unsynced from the DB when
@@ -22,9 +27,11 @@ class Command(VerboseCommand):
     """
 
     def add_arguments(self, parser):
+        """Add the target field, ID range, and batch size options."""
         parser.add_argument(
             "--reindex-target",
             choices=["citeCount", "cites"],
+            required=True,
             help="What ElasticSearch Document field to update",
         )
         parser.add_argument(
@@ -46,11 +53,22 @@ class Command(VerboseCommand):
             help="Size of the ids batch to send in a single Elastic bulk update",
         )
 
-    def handle(self, *args, **options):
-        reindex_target = options["reindex_target"]
-        start_id = options["start_id"]
-        end_id = options["end_id"]
+    def handle(
+        self,
+        *args,
+        reindex_target: Literal["citeCount", "cites"],
+        start_id: int | None,
+        end_id: int | None,
+        **options,
+    ):
+        """Re-index the target field for objects in the ID range.
 
+        The range includes ``--start-id`` and excludes ``--end-id``. Only
+        clusters with citations or opinions that cite others are re-indexed.
+
+        Raises:
+            ValueError: If the start or end ID is missing.
+        """
         if start_id is None or end_id is None:
             raise ValueError("`start_id` and `end_id` should have values")
 

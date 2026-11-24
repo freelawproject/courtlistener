@@ -1,3 +1,5 @@
+"""Views for managing, disabling, and enabling search and docket alerts."""
+
 from http import HTTPStatus
 
 import waffle
@@ -51,6 +53,11 @@ def edit_alert_redirect(request, pk):
 
 @login_required
 def delete_alert(request, pk):
+    """Delete one of the user's search alerts and redirect.
+
+    Redirects to the alert's search results if ``redirect_to_search_page``
+    is posted, otherwise to the user's alert list.
+    """
     try:
         pk = int(pk)
     except ValueError:
@@ -68,12 +75,12 @@ def delete_alert(request, pk):
     )
     if request.POST.get("redirect_to_search_page", None):
         return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
-    else:
-        return HttpResponseRedirect(reverse("profile_search_alerts"))
+    return HttpResponseRedirect(reverse("profile_search_alerts"))
 
 
 @login_required
 def delete_alert_confirm(request, pk):
+    """Render the confirmation page for deleting a search alert."""
     return render(
         request,
         "delete_confirm.html",
@@ -199,6 +206,11 @@ def disable_alert_list(request: HttpRequest):
 
 @ratelimit_deny_list
 def enable_alert(request, secret_key):
+    """Set a search alert's rate from the ``rate`` query parameter.
+
+    The alert is found by its secret key. The rendered page reports whether
+    the rate was missing or unknown.
+    """
     alert = get_object_or_404(Alert, secret_key=secret_key)
     rate = request.GET.get("rate")
     if not rate:
@@ -343,10 +355,9 @@ def _toggle_docket_alert_legacy(
             msg = "Alerts are now enabled for this docket"
 
         return HttpResponse(msg)
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"}, content="Not an ajax POST request."
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"}, content="Not an ajax POST request."
+    )
 
 
 async def new_docket_alert(

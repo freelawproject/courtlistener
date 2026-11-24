@@ -1,3 +1,5 @@
+"""Settings for Sentry, initializing it when a DSN is configured."""
+
 from typing import Any
 
 import environ

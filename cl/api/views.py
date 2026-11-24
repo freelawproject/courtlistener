@@ -1,3 +1,5 @@
+"""API views for the court index, wiki coverage data, result counts, and usage reporting."""
+
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -20,6 +22,7 @@ from rest_framework.viewsets import ViewSet
 from cl.alerts.utils import get_alert_estimation_count
 from cl.api.utils import (
     ApiUsageRateThrottle,
+    get_coverage_data_fds,
     get_current_throttle_usage,
     get_user_api_usage,
 )
@@ -37,8 +40,8 @@ from cl.search.documents import (
 )
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.selectors import get_total_estimate_count
 from cl.search.utils import get_redis_stat_sum
-from cl.simple_pages.views import get_coverage_data_fds
 from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
@@ -66,7 +69,7 @@ async def get_cached_court_counts(
         cache.set(
             cache_key,
             court_counts,
-            timeout=settings.QUERY_RESULTS_CACHE,  # type: ignore
+            timeout=settings.QUERY_RESULTS_CACHE,
         )
     return court_counts or {}
 
@@ -165,6 +168,7 @@ async def get_result_count(request, version, day_count):
 
 
 async def deprecated_api(request, v):
+    """Respond with 410 Gone and a message to upgrade to the newest API version."""
     return JsonResponse(
         {
             "meta": {
@@ -267,7 +271,7 @@ async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
 async def get_or_build_wiki_json(
     request: HttpRequest,
     cache_key: str,
-    build_data: Callable[[bool], Awaitable[dict]],
+    build_data: Callable[[], Awaitable[dict]],
 ) -> JsonResponse:
     """Serve a cached JSON payload for the wiki, rebuilding it on request.
 
@@ -276,17 +280,12 @@ async def get_or_build_wiki_json(
 
     Staff users can pass ?bust_cache to skip the cached response and rebuild
     it, e.g. after the underlying data changes. The rebuild is expensive, so
-    the param is ignored for everybody else. The flag is also passed to
-    build_data() so it can bust any caches of its own nested in the data it
-    fetches — otherwise a "fresh" rebuild here could still return
-    data that's stale by as much as those inner caches' own TTLs.
+    the param is ignored for everybody else.
 
     Args:
         request: The request. Only used to check for ?bust_cache + staff.
         cache_key: The cache key this payload is stored under.
-        build_data: An async callable that computes a fresh payload. It
-            receives the bust_cache flag so it can propagate it to any caches
-            of its own.
+        build_data: An async callable that computes a fresh payload.
 
     Returns:
         The cached or freshly-built payload as a JsonResponse.
@@ -299,7 +298,7 @@ async def get_or_build_wiki_json(
         if data is not None:
             return JsonResponse(data)
 
-    data = await build_data(bust_cache)
+    data = await build_data()
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
     return JsonResponse(data)
@@ -318,16 +317,11 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     return await get_or_build_wiki_json(request, "wiki-data", build_wiki_data)
 
 
-async def build_wiki_data(bust_cache: bool = False) -> dict:
+async def build_wiki_data() -> dict:
     """Build the payload served by wiki_data().
 
     Kept separate from the view so get_or_build_wiki_json() can call it only
     when the cached payload is missing or busted.
-
-    Args:
-        bust_cache: Passed through to nested caches (e.g. financial
-            disclosure counts) so busting this endpoint's cache doesn't leave
-            stale data behind in those.
 
     Returns:
         The wiki-data payload.
@@ -335,12 +329,15 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).acount()
-    citation_count = await Citation.objects.acount()
+    # Do an estimate, since an exact count is too slow on this table
+    citation_count = await sync_to_async(get_total_estimate_count)(
+        Citation._meta.db_table
+    )
 
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
-    fd_data = await get_coverage_data_fds(bust_cache=bust_cache)
+    fd_data = await get_coverage_data_fds()
     # Yesterday's alert total; start=1 skips today's still-filling bucket.
     alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
@@ -376,7 +373,7 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
     }
     prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
-    data = {
+    return {
         "court_count": court_count,
         "citation_count": citation_count,
         "alerts_sent_count": alerts_sent_count,
@@ -421,7 +418,6 @@ async def build_wiki_data(bust_cache: bool = False) -> dict:
             ),
         },
     }
-    return data
 
 
 async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
@@ -441,22 +437,16 @@ async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
     )
 
 
-async def build_wiki_coverage_data(bust_cache: bool = False) -> dict:
+async def build_wiki_coverage_data() -> dict:
     """Build the payload served by wiki_coverage_data().
 
     Kept separate from the view so get_or_build_wiki_json() can call it only
     when the cached payload is missing or busted.
 
-    Args:
-        bust_cache: Passed through to get_coverage_data_fds() so busting
-            this endpoint's cache actually refreshes the financial disclosure
-            counts too, instead of leaving up to a week-old counts from that
-            function's own cache in place.
-
     Returns:
         The wiki-coverage-data payload.
     """
-    fd_data = await get_coverage_data_fds(bust_cache=bust_cache)
+    fd_data = await get_coverage_data_fds()
     judge_count = await Person.objects.all().acount()
 
     oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
@@ -531,6 +521,7 @@ class ApiUsageViewSet(ViewSet):
         return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
+        """Report the user's current throttle usage, recent usage, and membership."""
         # IsAuthenticated permission class rules out AnonymousUser at runtime.
         user = cast(User, request.user)
         return Response(

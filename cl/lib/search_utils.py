@@ -1,3 +1,5 @@
+"""Helpers for running, caching, and summarizing searches."""
+
 import logging
 import pickle
 import re
@@ -72,6 +74,7 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
+from cl.search.types import ESDocumentType
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -382,6 +385,8 @@ def store_search_api_query(
 
 
 class CachedESSearchResults(TypedDict):
+    """Elasticsearch search results and counts as stored in the cache."""
+
     es_results_items: Response | list
     main_query_hits: int | None
     cardinality_count_response: Response | int | None
@@ -686,6 +691,8 @@ def remove_missing_citations(
 
 
 class ESSearchResult(TypedDict):
+    """The results of a search and the context for rendering them."""
+
     results: Page | list
     results_details: list[int | None]
     search_form: Any
@@ -743,7 +750,7 @@ def do_es_search(
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
-    document_type = None
+    document_type: type[ESDocumentType] | None
     error_message = ""
     suggested_query = ""
     total_child_results: int | None = 0
@@ -774,6 +781,8 @@ def do_es_search(
             )
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
+        case _:
+            document_type = None
 
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form

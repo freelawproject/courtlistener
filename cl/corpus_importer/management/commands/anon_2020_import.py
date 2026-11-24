@@ -1,7 +1,9 @@
+"""Import opinions from the anonymous 2020 database."""
+
 import json
 import re
 from datetime import date, datetime
-from glob import iglob
+from pathlib import Path
 from typing import Any, cast
 
 from bs4 import BeautifulSoup as bs4
@@ -16,6 +18,7 @@ from reporters_db import REPORTERS
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
+from cl.lib.utils import glob_files
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 
@@ -298,7 +301,7 @@ def attempt_cluster_lookup(
         cite_count = cites.count()
         if cite_count == 1:
             return cites[0].cluster_id
-        elif cite_count > 1:
+        if cite_count > 1:
             new_docket_number = clean_docket_number(new_docket_number)
             for cite in cites:
                 found_dn = clean_docket_number(
@@ -345,8 +348,7 @@ def do_docket_number(data: dict[str, Any]) -> str:
             length=5000,
             ellipsis="...",
         )
-    else:
-        return ""
+    return ""
 
 
 def find_court_id(court_str: str) -> str:
@@ -404,18 +406,19 @@ def import_anon_2020_db(
         import_dir: Location of directory of import data.
         skip_until: ID for case we should begin processing, if any.
     """
-    directories = iglob(f"{import_dir}/*/????-*.json")
-    for dir in directories:
-        logger.info(f"Importing case id: {dir.split('/')[-2]}")
+    case_json_files = glob_files(Path(import_dir), "*/????-*.json")
+    for json_file in case_json_files:
+        logger.info(f"Importing case id: {json_file.parent.name}")
         if skip_until:
-            if skip_until in dir:
+            if skip_until in str(json_file):
                 skip_until = ""
             continue
 
         # Prepare data and html
-        with open(dir, "rb") as f:
+        with json_file.open("rb") as f:
             data = json.load(f)
-        with open(dir.replace("json", "html"), "rb") as f:
+        html_file = Path(str(json_file).replace("json", "html"))
+        with html_file.open("rb") as f:
             soup = bs4(f.read(), "html.parser")
 
         case_names = do_case_name(soup, data)
@@ -461,9 +464,12 @@ def import_anon_2020_db(
 
 
 class Command(VerboseCommand):
+    """Import the anonymous 2020 database from a directory of files."""
+
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
+        """Add the import directory and skip-until options."""
         parser.add_argument(
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
@@ -479,6 +485,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Import the files in the import directory."""
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
         import_anon_2020_db(import_dir, skip_until)

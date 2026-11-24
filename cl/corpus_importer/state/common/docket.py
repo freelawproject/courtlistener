@@ -1,8 +1,9 @@
+"""Base merger for scraped state dockets, with their parties and entries."""
+
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
-from django.db.models import Model
 from juriscraper.state.docket import (
     Docket as ScrapeDocket,
 )
@@ -17,18 +18,22 @@ from cl.corpus_importer.state.merger import (
     ManyStrategy,
     ManyToManyRelation,
     Merger,
+    MergerConfig,
     OneToManyRelation,
     Params,
     Scrape,
     WithStrategy,
-    overwrite,
 )
-from cl.corpus_importer.state.merger.specifications import AttributeMerger
 from cl.people_db.models import Party
 from cl.search.models import Docket
 
 
 def add_scraper_source(scrape: int | None, db: int | None) -> int:
+    """Add the scraper to a docket's stored source, ignoring the scraped value.
+
+    A missing source is treated as 0. Sources that already include the
+    scraper are kept as they are.
+    """
     if not db:
         db = 0
     if db in Docket.NON_SCRAPER_SOURCES():
@@ -53,7 +58,7 @@ def PartyRelation(
     *,
     party_type: type[Merger[Any, Any, Any]] = PartyTypeMerger,
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_parties,
-) -> list[Party]:
+) -> Sequence[Party]:
     """Merge a docket's parties.
 
     A re-scrape with no parties (or a party with no representatives) keeps the
@@ -61,7 +66,7 @@ def PartyRelation(
     """
     return ManyToManyRelation(
         merger,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         party_type,
         strategy=ManyStrategy.DISASSOCIATE,
     )
@@ -73,35 +78,35 @@ def DocketEntryRelation(
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_entries,
     strategy: ManyStrategy = ManyStrategy.APPEND,
 ) -> list[Any]:
+    """Declare a docket's entries as a one-to-many relation.
+
+    Defaults to merging the scraped docket's entries and appending them to
+    the docket's existing entries. Entries resolve the party that filed them
+    against the docket's parties, so those are merged first.
+    """
     return OneToManyRelation(
         merger,
-        cast(AttributeMerger, Fn(transform)(Scrape(Any), Params(Any))),
+        Fn(transform)(Scrape(Any), Params(Any)),
         strategy=strategy,
+        after=["parties"],
     )
 
 
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     Merger[DType, ParamType, Docket], abstract=True
 ):
-    model: ClassVar[type[Model]] = Docket
+    """Base merger for a scraped state docket into a ``Docket``.
 
-    atomic = True
+    Merges the docket's names, number, filing date, source, and parties.
+    """
+
+    config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
     source: int = WithStrategy(Constant(Docket.SCRAPER), add_scraper_source)
-    date_filed: date | None = WithStrategy(
-        Scrape(ScrapeDocket).date_filed, overwrite
-    )
-    case_name: str = WithStrategy(Scrape(ScrapeDocket).case_name, overwrite)
-    case_name_full: str = WithStrategy(
-        Scrape(ScrapeDocket).case_name_full, overwrite
-    )
-    case_name_short: str = WithStrategy(
-        Scrape(ScrapeDocket).case_name_short, overwrite
-    )
-    docket_number: str | None = WithStrategy(
-        Scrape(ScrapeDocket).docket_number, overwrite
-    )
-    docket_number_raw: str = WithStrategy(
-        Scrape(ScrapeDocket).docket_number, overwrite
-    )
-    parties: list[Party] = PartyRelation()
+    date_filed: date | None = Scrape(ScrapeDocket).date_filed
+    case_name: str = Scrape(ScrapeDocket).case_name
+    case_name_full: str = Scrape(ScrapeDocket).case_name_full
+    case_name_short: str = Scrape(ScrapeDocket).case_name_short
+    docket_number: str | None = Scrape(ScrapeDocket).docket_number
+    docket_number_raw: str = Scrape(ScrapeDocket).docket_number
+    parties: Sequence[Party] = PartyRelation()

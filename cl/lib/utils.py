@@ -1,7 +1,10 @@
+"""General-purpose helpers shared across apps."""
+
 import datetime
 import re
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Iterator
 from itertools import chain, islice, tee
+from pathlib import Path, PurePath
 from re import Match
 from typing import Any, TypeIs
 
@@ -12,7 +15,7 @@ from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
-from cl.lib.types import CleanData
+from cl.lib.types import CleanData, TabItem
 from cl.search.exception import (
     DisallowedWildcardPattern,
     InvalidRelativeDateSyntax,
@@ -63,13 +66,11 @@ def deepgetattr(obj: object, name: str, default: Any = _UNSPECIFIED) -> Any:
         if "." in name:
             attr, subname = name.split(".", 1)
             return deepgetattr(getattr(obj, attr), subname, default)
-        else:
-            return getattr(obj, name)
+        return getattr(obj, name)
     except AttributeError:
         if default is _UNSPECIFIED:
             raise
-        else:
-            return default
+        return default
 
 
 def chunks[T](
@@ -113,6 +114,7 @@ def previous_and_next[T](
 
 
 def is_iter(item: Any) -> TypeIs[Iterable]:
+    """Check if an item is iterable."""
     # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
@@ -123,6 +125,67 @@ def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     See: https://stackoverflow.com/a/9427216/64911
     """
     return [dict(t) for t in {tuple(d.items()) for d in dicts}]
+
+
+def glob_files(
+    root: Path, pattern: str, recursive: bool = False
+) -> Iterator[Path]:
+    """Yield paths under `root` matching `pattern`, as `glob.glob` would.
+
+    `Path.glob` differs from `glob.glob` in two ways that this smooths over:
+    wildcards match names starting with a dot, and `**` always recurses.
+
+    Args:
+        root: Directory the pattern is relative to. Never matched against
+            the hidden-name rule, so it may itself live under a dot directory.
+        pattern: Relative glob pattern. Hidden files and directories are
+            only matched when the pattern is itself explicit about them.
+        recursive: Whether `**` matches any number of directories. When
+            False, `**` is treated like `*`.
+
+    Returns:
+        The matching paths, in arbitrary order.
+    """
+    pattern_parts = PurePath(pattern).parts
+    if not recursive:
+        pattern_parts = tuple("*" if p == "**" else p for p in pattern_parts)
+    for path in root.glob("/".join(pattern_parts)):
+        relative_parts = path.relative_to(root).parts
+        if any(
+            part.startswith(".") and not pattern_part.startswith(".")
+            for part, pattern_part in zip(
+                relative_parts,
+                _align_pattern_parts(pattern_parts, len(relative_parts)),
+                strict=True,
+            )
+        ):
+            continue
+        yield path
+
+
+def _align_pattern_parts(
+    pattern_parts: tuple[str, ...], length: int
+) -> list[str]:
+    """Pair each matched path component with its glob pattern component.
+
+    `**` is expanded to cover however many components it consumed.
+
+    Args:
+        pattern_parts: Components of a glob pattern.
+        length: Number of components in the matched path.
+
+    Returns:
+        A list of `length` pattern components.
+    """
+    expansion = length - (len(pattern_parts) - pattern_parts.count("**"))
+    aligned: list[str] = []
+    for part in pattern_parts:
+        if part == "**":
+            aligned.extend(["**"] * max(expansion, 0))
+            expansion = 0
+        else:
+            aligned.append(part)
+    return aligned
 
 
 def human_sort[T: str | tuple[str, Any]](
@@ -247,8 +310,7 @@ def modify_court_id_queries(query_str: str) -> str:
         the original query string if no valid 'court_id:' queries are found.
     """
     pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
-    modified_query = re.sub(pattern, extend_child_courts, query_str)
-    return modified_query
+    return re.sub(pattern, extend_child_courts, query_str)
 
 
 def check_query_for_disallowed_wildcards(query_string: str) -> bool:
@@ -316,11 +378,9 @@ def perform_special_character_replacements(query_string: str) -> str:
     # Replace * (universal character) that is not at the end of a word with ?.
     universal_char_pattern = r"\*(?=\w)"
     universal_char_replacement = "?"
-    query_string = re.sub(
+    return re.sub(
         universal_char_pattern, universal_char_replacement, query_string
     )
-
-    return query_string
 
 
 def cleanup_main_query(query_string: str) -> str:
@@ -425,8 +485,7 @@ def cleanup_main_query(query_string: str) -> str:
     cleaned_query = re.sub(r'(")\s*(?=~\d+)', r"\1", cleaned_query)
     # If it's a court_id query, parse it, append the child courts, and then
     # reintegrate them into the original query.
-    final_query = modify_court_id_queries(cleaned_query)
-    return final_query
+    return modify_court_id_queries(cleaned_query)
 
 
 def check_for_proximity_tokens(query: str) -> bool:
@@ -541,10 +600,9 @@ def map_to_docket_entry_sorting(sort_string: str) -> str:
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
     if sort_string == "dateFiled asc":
         return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
+    if sort_string == "dateFiled desc":
         return "entry_date_filed desc"
-    else:
-        return sort_string
+    return sort_string
 
 
 def append_value_in_cache(key: str, value: object) -> None:
@@ -637,6 +695,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
 
 
 def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
+    """Create a Chrome driver, remote if ``DOCKER_SELENIUM_HOST`` is set and headless if configured."""
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")
@@ -655,3 +714,26 @@ def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
             keep_alive=keep_alive,
         )
     return webdriver.Chrome(options=options, keep_alive=keep_alive)
+
+
+def resolve_active_tab(tabs: list[TabItem], active_tab: str | None) -> str:
+    """Pick the key of the tab a c-tabs component opens on.
+
+    Use it in views that read the requested tab from the query string, so a
+    missing or unknown value opens the first tab instead of an empty section.
+    Panel-mode views need it for `?tab=`. Link-mode views usually don't, since
+    each page already knows its own tab; the component library is the
+    exception, because all its demo tabs are the same page.
+
+    Args:
+        tabs: The entries passed to the component. Must not be empty.
+        active_tab: The key asked for, usually from the query string.
+
+    Returns:
+        `active_tab` when it matches a tab's key, else the first tab's key.
+    """
+    for tab in tabs:
+        if tab["key"] == active_tab:
+            return tab["key"]
+
+    return tabs[0]["key"]

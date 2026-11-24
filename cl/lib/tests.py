@@ -1,9 +1,11 @@
 import datetime
 import pickle
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
+from pathlib import Path
 from typing import TypedDict, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -95,10 +97,13 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.types import TabItem
 from cl.lib.utils import (
     check_for_proximity_tokens,
     check_unbalanced_parenthesis,
     check_unbalanced_quotes,
+    glob_files,
+    resolve_active_tab,
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
 )
@@ -1490,13 +1495,13 @@ class TestDateTimeHelpers(SimpleTestCase):
         # Date in PSD time -8 hours UTC offset
         pst_date = datetime.date(2023, 1, 3)
         pst_date_time = midnight_pt(pst_date)
-        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pst_utc_offset_hours, -8.0)
 
         # Date in PDT time -7 hours UTC offset
         pdt_date = datetime.date(2023, 5, 3)
         pdt_date_time = midnight_pt(pdt_date)
-        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600
         self.assertEqual(pdt_utc_offset_hours, -7.0)
 
 
@@ -2971,7 +2976,7 @@ class TieredCacheTest(SimpleTestCase):
         @tiered_cache(memory_timeout=60, redis_timeout=60)
         def get_nothing() -> None:
             self.call_count += 1
-            return None
+            return
 
         self.assertIsNone(get_nothing())
         self.assertEqual(self.call_count, 1)
@@ -3323,3 +3328,73 @@ class DocumentModelTest(SimpleTestCase):
             with self.subTest(field=field_name):
                 self.assertEqual(fields[field_name].help_text, doc)
                 self.assertEqual(fields[field_name].db_comment, doc)
+
+
+class TestGlobFiles(SimpleTestCase):
+    """`glob_files` must match what `glob.glob` returned."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        for name in (
+            "a.json",
+            ".hidden.json",
+            "sub/b.json",
+            "sub/deep/c.json",
+            ".dot/d.json",
+            "sub/.dot/e.json",
+        ):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+
+    def matches(self, pattern: str, recursive: bool = False) -> set[str]:
+        return {
+            str(p.relative_to(self.root))
+            for p in glob_files(self.root, pattern, recursive=recursive)
+        }
+
+    def test_wildcards_skip_hidden_files_and_directories(self) -> None:
+        """Wildcards do not match names beginning with a dot."""
+        with self.subTest("file"):
+            self.assertEqual(self.matches("*.json"), {"a.json"})
+        with self.subTest("directory"):
+            self.assertEqual(self.matches("*/*.json"), {"sub/b.json"})
+
+    def test_explicit_dot_is_matched(self) -> None:
+        """A pattern that names a hidden entry literally still matches it."""
+        self.assertEqual(self.matches(".dot/*.json"), {".dot/d.json"})
+        self.assertEqual(self.matches(".*.json"), {".hidden.json"})
+
+    def test_double_star_only_recurses_when_recursive(self) -> None:
+        """`**` acts like `*` unless `recursive` is set, as in `glob.glob`."""
+        with self.subTest(recursive=False):
+            self.assertEqual(self.matches("**/*.json"), {"sub/b.json"})
+        with self.subTest(recursive=True):
+            self.assertEqual(
+                self.matches("**/*.json", recursive=True),
+                {"a.json", "sub/b.json", "sub/deep/c.json"},
+            )
+
+
+class ResolveActiveTabTest(SimpleTestCase):
+    """Tests for resolve_active_tab."""
+
+    tabs: list[TabItem] = [
+        {"key": "search", "label": "Search Alerts", "icon": "search"},
+        {"key": "docket", "label": "Docket Alerts", "icon": "bell"},
+    ]
+
+    def test_resolves_requested_or_first_tab(self) -> None:
+        """A known key is kept; an unknown or missing one opens the first."""
+        cases = [
+            ("docket", "docket"),
+            ("unknown", "search"),
+            (None, "search"),
+        ]
+        for requested, expected in cases:
+            with self.subTest(requested=requested):
+                self.assertEqual(
+                    resolve_active_tab(self.tabs, requested), expected
+                )

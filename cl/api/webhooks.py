@@ -1,3 +1,5 @@
+"""Build and send webhook events to users' endpoints."""
+
 import json
 import random
 
@@ -43,7 +45,7 @@ def send_webhook_event(
             the webhook is sent.
     """
     proxy_server = {
-        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),  # type: ignore
+        "http": random.choice(settings.WEBHOOK_EGRESS_PROXY_HOSTS),
     }
     headers = {
         "Content-type": "application/json",
@@ -91,18 +93,14 @@ async def send_old_alerts_webhook_event(
         webhook: The Webhook object to send the event to.
         report: A dict containing information about old alerts
     """
-    serialized_very_old_alerts = []
-    serialized_disabled_alerts = []
-
-    for very_old_alert in report.very_old_alerts:
-        serialized_very_old_alerts.append(
-            DocketAlertSerializer(very_old_alert.da_alert).data
-        )
-
-    for disabled_alert in report.disabled_alerts:
-        serialized_disabled_alerts.append(
-            DocketAlertSerializer(disabled_alert.da_alert).data
-        )
+    serialized_very_old_alerts = [
+        DocketAlertSerializer(very_old_alert.da_alert).data
+        for very_old_alert in report.very_old_alerts
+    ]
+    serialized_disabled_alerts = [
+        DocketAlertSerializer(disabled_alert.da_alert).data
+        for disabled_alert in report.disabled_alerts
+    ]
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

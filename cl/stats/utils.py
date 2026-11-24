@@ -1,3 +1,5 @@
+"""Helpers for tallying stats and checking the health of services."""
+
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
@@ -70,7 +72,9 @@ def _validate_labels(name: str, labels: dict[str, str]) -> None:
     # Check each value is valid
     for label_name, value in labels.items():
         allowed_enum = STAT_LABEL_VALUES.get(label_name)
-        allowed_values = [e.value for e in allowed_enum]
+        allowed_values = (
+            [e.value for e in allowed_enum] if allowed_enum else []
+        )
         if value not in allowed_values:
             raise ValueError(
                 f"Invalid value '{value}' for label '{label_name}'. "
@@ -145,10 +149,11 @@ def tally_stat(
 
 
 def check_redis() -> bool:
+    """Check if the stats Redis database responds to a ping."""
     r = get_redis_interface("STATS")
     try:
         r.ping()
-    except (redis.exceptions.ConnectionError, ConnectionRefusedError):
+    except redis.exceptions.ConnectionError, ConnectionRefusedError:
         return False
     return True
 

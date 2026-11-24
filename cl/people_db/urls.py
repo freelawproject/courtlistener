@@ -1,3 +1,5 @@
+"""URL routes for people pages."""
+
 from django.urls import path
 
 from cl.people_db.views import view_person
