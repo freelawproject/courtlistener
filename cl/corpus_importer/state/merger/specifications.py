@@ -49,6 +49,7 @@ from .parameters import (
 )
 
 if typing.TYPE_CHECKING:
+    from django.db.models.fields import _FieldDescriptor
     from django.db.models.fields.related_descriptors import RelatedManager
 
     from .base import Merger
@@ -582,8 +583,7 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
-# TODO: Correctly type this once Pyrefly updates to handle Django field descriptors
-def Database[GT](field: GT) -> GT | None:
+def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]]) -> GT | None:
     """Start an expression from a model field passed to the merger.
 
     For example, `Database(Docket.docket_number)`.
