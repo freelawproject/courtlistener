@@ -1,6 +1,7 @@
 """Create judges and their positions from Federal Judicial Center data."""
 
 import re
+from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
@@ -223,6 +224,12 @@ def transform_bankruptcy(string):
     return position, location, start_year, end_year
 
 
+@dataclass(slots=True, kw_only=True)
+class _PrevPolitics:
+    affiliation: PoliticalAffiliation
+    party: str
+
+
 def add_positions_from_row(item, person, testing, fix_nums=None):
     """Create a person's judicial positions from an FJC row.
 
@@ -237,8 +244,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             position's court name.
     """
     # add position items (up to 6 of them)
-    prev_politics = None
-    politics: PoliticalAffiliation | None = None
+    prev_politics: _PrevPolitics | None = None
     for posnum in range(1, 7):
         # Save the position if we're running all positions or specifically
         # fixing this one.
@@ -406,7 +412,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         p = item[f"Party of Appointing President{pos_str}"]
         if not pd.isnull(p) and p not in ["Assignment", "Reassignment"]:
             party = get_party(item[f"Party of Appointing President{pos_str}"])
-            if politics is None:
+            if prev_politics is None:
                 if pd.isnull(date_nominated):
                     politicsgran = ""
                 else:
@@ -420,13 +426,17 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 )
                 if not testing and save_this_position:
                     politics.save()
-                prev_politics = party
-            elif party != prev_politics:
+                prev_politics = _PrevPolitics(
+                    affiliation=politics, party=party
+                )
+            elif party != prev_politics.party:
                 # account for changing political affiliation
-                politics.date_end = date_nominated
-                politics.date_granularity_end = GRANULARITY_DAY
+                prev_politics.affiliation.date_end = date_nominated
+                prev_politics.affiliation.date_granularity_end = (
+                    GRANULARITY_DAY
+                )
                 if not testing and save_this_position:
-                    politics.save()
+                    prev_politics.affiliation.save()
                 politics = PoliticalAffiliation(
                     person=person,
                     political_party=party,

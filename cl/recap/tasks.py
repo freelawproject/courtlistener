@@ -3260,7 +3260,7 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.error_message = ""
                 pq.save()
                 return pq
-        elif not magic_number:
+        if not magic_number:
             r_msg = "No magic number available to download the document."
         elif is_bankr_short_doc_id:
             r_msg = "Invalid short pacer_doc_id for bankruptcy court."
