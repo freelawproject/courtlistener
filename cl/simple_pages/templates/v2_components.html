@@ -1890,51 +1890,87 @@ Sample code here.
 
     <h4 class="mt-3">Demo</h4>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-      <c-combobox
-        label="Court"
-        placeholder="Search courts"
-        :options="[
-          {'value': 'scotus', 'label': 'Supreme Court'},
-          {'value': 'ca1', 'label': 'First Circuit'},
-          {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
-          {'value': 'ca9', 'label': 'Ninth Circuit'},
-          {'value': 'cafc', 'label': 'Federal Circuit'},
-        ]"
-      />
-      <c-combobox
-        label="Courts"
-        placeholder="Search courts"
-        multiple
-        :options="[
-          {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
-          {'value': 'ca1', 'label': 'First Circuit'},
-          {'value': 'ca2', 'label': 'Second Circuit'},
-          {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
-          {'value': 'cafc', 'label': 'Federal Circuit'},
-        ]"
-      />
-      <c-combobox
-        label="Status"
-        placeholder="Choose an option"
-        :searchable="False"
-        :options="[
-          {'value': 'published', 'label': 'Published'},
-          {'value': 'unpublished', 'label': 'Unpublished'},
-          {'value': 'errata', 'label': 'Errata'},
-        ]"
-      />
-      <c-combobox
-        label="Tags"
-        placeholder="Search or create tags"
-        multiple
-        creatable
-        create_label="Create tag:"
-        :options="[
-          {'value': 1, 'label': 'appeals'},
-          {'value': 2, 'label': 'bankruptcy', 'selected': True},
-          {'value': 3, 'label': 'patents'},
-        ]"
-      />
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500">Single selection (default)</p>
+        <c-combobox
+          label="Court"
+          placeholder="Search courts"
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court'},
+            {'value': 'ca1', 'label': 'First Circuit'},
+            {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
+            {'value': 'ca9', 'label': 'Ninth Circuit'},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>multiple</code></p>
+        <c-combobox
+          label="Courts"
+          placeholder="Search courts"
+          multiple
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
+            {'value': 'ca1', 'label': 'First Circuit'},
+            {'value': 'ca2', 'label': 'Second Circuit'},
+            {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>:searchable="False"</code></p>
+        <c-combobox
+          label="Status"
+          placeholder="Choose an option"
+          :searchable="False"
+          :options="[
+            {'value': 'published', 'label': 'Published'},
+            {'value': 'unpublished', 'label': 'Unpublished'},
+            {'value': 'errata', 'label': 'Errata'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>multiple</code> and <code>creatable</code></p>
+        <c-combobox
+          label="Tags"
+          placeholder="Search or create tags"
+          multiple
+          creatable
+          create_label="Create tag:"
+          :options="[
+            {'value': 1, 'label': 'appeals'},
+            {'value': 2, 'label': 'bankruptcy', 'selected': True},
+            {'value': 3, 'label': 'patents'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2 items-start">
+        <p class="text-sm text-greyscale-500"><code>inline</code>, inside a popover</p>
+        <c-button variant="outline" popovertarget="combobox-inline-demo" x-ref="comboboxInlineTrigger">Reporters</c-button>
+        <div
+          id="combobox-inline-demo"
+          popover
+          role="dialog"
+          aria-label="Reporters"
+          x-anchor.bottom-start.offset.8="$refs.comboboxInlineTrigger"
+          class="m-0 w-80 max-w-[calc(100vw-2rem)] p-4 border border-greyscale-200 rounded-lg bg-white shadow-lg"
+        >
+          <c-combobox
+            label="Reporters"
+            placeholder="Search reporters"
+            multiple
+            inline
+            :options="[
+              {'value': 'us', 'label': 'U.S. Reports', 'selected': True},
+              {'value': 'f3d', 'label': 'Federal Reporter, Third Series'},
+              {'value': 'fsupp', 'label': 'Federal Supplement'},
+            ]"
+          />
+        </div>
+      </div>
     </div>
 
     <c-library.list title="Props" only>
@@ -1967,6 +2003,10 @@ Sample code here.
         <c-slot name="description">Text shown before the typed text in the create option. Defaults to <code>Create:</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
+        <c-slot name="label"><code>inline</code></c-slot>
+        <c-slot name="description">Renders the list below the field, in the page flow and always visible, instead of opening it as a popup. For a combobox inside a popover or a dialog, which does the opening and closing. Escape pressed in the field does not close a native popover; close it from a <code>keydown.escape</code> listener in the capture phase.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
         <c-slot name="label"><code>class</code></c-slot>
         <c-slot name="description">Additional CSS classes for the root.</c-slot>
       </c-library.item>
@@ -1979,15 +2019,15 @@ Sample code here.
     <c-library.list title="Events" only>
       <c-library.item only>
         <c-slot name="label"><code>combobox-add</code></c-slot>
-        <c-slot name="description">An option was selected. <code>detail.option</code> holds its <code>value</code> and <code>label</code>.</c-slot>
+        <c-slot name="description">An option was selected. <code>detail.option</code> holds its <code>value</code> and <code>label</code>. <code>detail.undo()</code> deselects it again without dispatching events, for a listener that could not save the change.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>combobox-remove</code></c-slot>
-        <c-slot name="description">An option was deselected: from the list, from its chip, by emptying the field, or because another option replaced it as the single selection, in which case it follows that option's <code>combobox-add</code>. <code>detail.option</code> holds its <code>value</code> and <code>label</code>.</c-slot>
+        <c-slot name="description">An option was deselected: from the list, from its chip, by emptying the field, or because another option replaced it as the single selection, in which case it follows that option's <code>combobox-add</code>. <code>detail.option</code> holds its <code>value</code> and <code>label</code>. <code>detail.undo()</code> selects it again without dispatching events.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>combobox-create</code></c-slot>
-        <c-slot name="description">The create option was chosen. <code>detail.label</code> holds the typed text. Unless a listener calls <code>preventDefault()</code>, the text becomes a new selected option whose value is its label, and <code>combobox-add</code> follows.</c-slot>
+        <c-slot name="description">The create option was chosen. <code>detail.label</code> holds the typed text. Unless a listener calls <code>preventDefault()</code>, the text becomes a new selected option whose value is its label, and <code>combobox-add</code> follows. A listener that cancels the event can call <code>detail.add({value, label})</code> later, for instance once the server has given the new option its id; the option is then added and selected, and <code>combobox-add</code> follows.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -2018,6 +2058,12 @@ Sample code here.
   x-on:combobox-remove="detachTag"
   x-on:combobox-create="createTag"
 /&gt;
+
+&lt;!-- List always visible, inside a popover that its button opens and closes --&gt;
+&lt;c-button variant="outline" popovertarget="reporters" x-ref="trigger"&gt;Reporters&lt;/c-button&gt;
+&lt;div id="reporters" popover role="dialog" aria-label="Reporters" x-anchor.bottom-start.offset.8="$refs.trigger"&gt;
+  &lt;c-combobox label="Reporters" multiple inline :options="reporter_options" /&gt;
+&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </section>
