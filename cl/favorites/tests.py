@@ -67,6 +67,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, RECAPDocument
+from cl.search.state.texas.factories import TexasDocumentFactory
 from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
@@ -176,6 +177,45 @@ class NoteTest(SimpleUserDataMixin, AudioTestCase):
         self.assertFalse(Note.objects.filter(pk=rd_note.pk).exists())
         self.assertFalse(Note.objects.filter(pk=cluster_note.pk).exists())
         self.assertTrue(Note.objects.filter(pk=unrelated_note.pk).exists())
+
+    def test_texas_document_note_can_be_saved_and_deleted(self) -> None:
+        """Can a user save, then delete, a note on a Texas document through the endpoints the notes modal posts to?"""
+        document = TexasDocumentFactory(docket_entry__docket=self.docket_2)
+        content_type = ContentType.objects.get_for_model(document)
+        params = {
+            "content_type": content_type.pk,
+            "object_id": document.pk,
+            "name": "foo",
+            "notes": "testing notes",
+        }
+        notes = Note.objects.filter(
+            user=self.user, content_type=content_type, object_id=document.pk
+        )
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+        for url_name, note_exists in (
+            ("save_or_update_note", True),
+            ("delete_note", False),
+        ):
+            with self.subTest(url_name=url_name):
+                r = self.client.post(
+                    reverse(url_name),
+                    params,
+                    headers={"x-requested-with": "XMLHttpRequest"},
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertEqual(notes.exists(), note_exists)
+
+    def test_deleting_texas_document_removes_its_notes(self) -> None:
+        """Does deleting a Texas document clean up the Notes pointing at it, like it does for the other noteable objects?"""
+        document = TexasDocumentFactory(docket_entry__docket=self.docket_3)
+        note = NoteFactory(content_object=document, user=self.user)
+
+        document.delete()
+
+        self.assertFalse(Note.objects.filter(pk=note.pk).exists())
 
     def test_duplicate_note_is_rejected(self) -> None:
         """A second Note for the same (content_type, object_id, user) is rejected."""

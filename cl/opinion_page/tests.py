@@ -23,6 +23,7 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.staticfiles.finders import find
 from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -59,6 +60,7 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
+from cl.favorites.factories import NoteFactory
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
@@ -1299,6 +1301,24 @@ class ViewTexasDocumentTest(TestCase):
             content,
         )
         self.assertNotIn("search_recapdocument_change", content)
+
+    def test_user_note_shows_on_the_document_page(self) -> None:
+        """Does a user's note on a Texas document fill the notes sidebar and the note form, keyed to the TexasDocument?"""
+        user = UserFactory()
+        NoteFactory(
+            content_object=self.pdf, user=user, notes="Check the brief"
+        )
+        self.client.force_login(user)
+
+        r = self.get(self.pdf)
+
+        note_form = r.context["note_form"]
+        self.assertEqual(
+            note_form.instance.content_type,
+            ContentType.objects.get_for_model(TexasDocument),
+        )
+        self.assertEqual(note_form.instance.object_id, self.pdf.pk)
+        self.assertContains(r, "Check the brief")
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_texas_document_flag_waffle")

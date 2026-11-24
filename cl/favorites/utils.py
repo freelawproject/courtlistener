@@ -36,6 +36,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
     SCOTUSDocument,
+    TexasDocument,
 )
 
 # Models that can have a Note attached, mapped to the bucket label the
@@ -46,6 +47,7 @@ NOTEABLE_MODELS: dict[type[models.Model], str] = {
     Audio: "Oral Arguments",
     RECAPDocument: "Documents",
     SCOTUSDocument: "Documents",
+    TexasDocument: "Documents",
 }
 
 

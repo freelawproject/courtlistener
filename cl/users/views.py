@@ -64,7 +64,7 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
-from cl.search.es_docket_sources import es_uid
+from cl.search.es_docket_sources import SOURCE_BY_MODEL, es_uid
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
@@ -232,6 +232,10 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     ids: list[str] = []
     uids: list[str] = []
     for _, d in note_forms["Documents"]:
+        # Documents from sources that aren't indexed yet (e.g. Texas) are
+        # left out: their pks would match unrelated RECAP documents by id.
+        if type(d) not in SOURCE_BY_MODEL:
+            continue
         if uid := es_uid(type(d), d.pk):
             uids.append(uid)
         else:
@@ -239,14 +243,14 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     id_query = f"id:({' OR '.join(ids)})"
     uid_query = f"uid:({' OR '.join(uids)})"
     # ES rejects an empty "id:()" or "uid:()", so each is only added when
-    # it has values.
-    if ids and uids:
-        document_query = f"({id_query} OR {uid_query})"
-    elif uids:
-        document_query = uid_query
-    else:
-        document_query = id_query
-    recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
+    # it has values, and there's no link when no document is searchable.
+    recap_search_url: str | None = None
+    if ids or uids:
+        if ids and uids:
+            document_query = f"({id_query} OR {uid_query})"
+        else:
+            document_query = id_query if ids else uid_query
+        recap_search_url = f"{search_url}?type=r&q=xxx AND {document_query}"
     opinion_search_url = (
         f"{search_url}?q=xxx AND cluster_id:("
         + " OR ".join(str(target.pk) for _, target in note_forms["Opinions"])

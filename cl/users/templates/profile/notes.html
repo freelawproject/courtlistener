@@ -74,16 +74,19 @@
                     {% endif %}
                     <th data-label="Notes" class="sorter-false">Notes</th>
                     <th class="sorter-false">
-                      {% if type == "Dockets" %}
-                        <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
-                      {% elif type == "Oral Arguments" %}
-                        <a class="btn btn-default" href="{{ oral_search_url }}" role="button">
-                      {% elif type == "Documents" %}
-                        <a class="btn btn-default" href="{{ recap_search_url }}" role="button">
-                      {% elif type == "Opinions" %}
-                        <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
+                      {# No link when none of the noted documents is searchable yet. #}
+                      {% if type != "Documents" or recap_search_url %}
+                        {% if type == "Dockets" %}
+                          <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
+                        {% elif type == "Oral Arguments" %}
+                          <a class="btn btn-default" href="{{ oral_search_url }}" role="button">
+                        {% elif type == "Documents" %}
+                          <a class="btn btn-default" href="{{ recap_search_url }}" role="button">
+                        {% elif type == "Opinions" %}
+                          <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
+                        {% endif %}
+                        <i class="fa fa-search"></i> Search Notes</a>
                       {% endif %}
-                      <i class="fa fa-search"></i> Search Notes</a>
                     </th>
                   </tr>
                   </thead>
