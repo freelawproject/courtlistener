@@ -6243,6 +6243,12 @@ class DocketNoteFormV2Test(TestCase):
         cls.docket = DocketFactory(
             source=Docket.RECAP, idb_data=FjcIntegratedDatabaseFactory()
         )
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
 
     async def test_docket_page_gets_the_v2_note_form(self) -> None:
         """Does the v2 docket page get the v2 note form?"""
@@ -6255,16 +6261,21 @@ class DocketNoteFormV2Test(TestCase):
             type(r.context["note_form"]), favorites_forms_v2.NoteForm
         )
 
-    async def test_idb_tab_gets_the_v2_note_form(self) -> None:
-        """Does the FJC IDB tab, which has a v2 template, get the v2 form?"""
-        r = await self.async_client.get(
-            reverse("docket_idb_data", args=[self.docket.pk, self.docket.slug])
-        )
+    async def test_tabs_with_a_v2_template_get_the_v2_note_form(self) -> None:
+        """Do the tabs that have a v2 template get the v2 form?"""
+        for url_name, template in (
+            ("docket_idb_data", "v2_docket_idb_data.html"),
+            ("docket_parties", "v2_docket_parties.html"),
+        ):
+            with self.subTest(tab=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
 
-        self.assertTemplateUsed(r, "v2_docket_idb_data.html")
-        self.assertIs(
-            type(r.context["note_form"]), favorites_forms_v2.NoteForm
-        )
+                self.assertTemplateUsed(r, template)
+                self.assertIs(
+                    type(r.context["note_form"]), favorites_forms_v2.NoteForm
+                )
 
     async def test_tab_without_a_v2_template_keeps_the_v1_form(self) -> None:
         """Does a tab with no v2 template keep the v1 form?
@@ -6273,10 +6284,12 @@ class DocketNoteFormV2Test(TestCase):
         modal.
         """
         r = await self.async_client.get(
-            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+            reverse(
+                "docket_authorities", args=[self.docket.pk, self.docket.slug]
+            )
         )
 
-        self.assertTemplateUsed(r, "docket_parties.html")
+        self.assertTemplateUsed(r, "docket_authorities.html")
         self.assertIs(type(r.context["note_form"]), NoteForm)
 
     async def test_logged_out_user_gets_sign_in_links(self) -> None:

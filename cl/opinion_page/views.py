@@ -491,7 +491,16 @@ async def view_parties(
     slug: str,
 ) -> HttpResponse:
     """Show the parties and attorneys tab, 1,000 party types per page."""
-    docket, context = await core_docket_data(request, docket_id)
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
