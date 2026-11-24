@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, Unpack, overload
+from typing import Any, Never, TypedDict, Unpack, overload
 from zipfile import ZipFile
 
 import httpx
@@ -40,6 +40,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
+from juriscraper.pacer.attachment_page import AttachmentPageData
 from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
@@ -844,7 +845,9 @@ async def process_recap_docket(pk):
 
 async def get_att_data_from_pq(
     pq: ProcessingQueue,
-) -> tuple[ProcessingQueue, dict, str | None]:
+) -> tuple[
+    ProcessingQueue, AttachmentPageData | dict[Never, Never], str | None
+]:
     """Extract attachment data from a ProcessingQueue object.
 
     Args:
@@ -1721,7 +1724,7 @@ async def process_recap_acms_appellate_attachment(
         return None
     logger.info("Parsing completed of item %s", pq)
 
-    if data == {}:
+    if not data:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid acms appellate attachment page upload."
         await mark_pq_status(pq, text, PROCESSING_STATUS.INVALID_CONTENT)
@@ -1794,7 +1797,7 @@ async def process_recap_appellate_attachment(
     att_data = get_data_from_appellate_att_report(text, pq.court_id)
     logger.info("Parsing completed for item %s", pq)
 
-    if att_data == {}:
+    if not att_data:
         # Bad attachment page.
         msg = "Not a valid appellate attachment page upload."
         pq_status, msg = await mark_pq_status(
@@ -2401,7 +2404,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         att_data = r.data
         text = json.dumps(r.data, default=str)
 
-    if att_data == {}:
+    if not att_data:
         msg = "Not a valid attachment page upload"
         async_to_sync(mark_fq_status)(
             fq, msg, PROCESSING_STATUS.INVALID_CONTENT
@@ -3022,7 +3025,7 @@ async def get_attachment_page_by_url(
     async with httpx.AsyncClient(follow_redirects=True, http2=True) as client:
         att_response = await client.get(att_page_url, timeout=req_timeout)
     att_data = get_data_from_att_report(att_response.text, court_id)
-    if att_data == {}:
+    if not att_data:
         msg = "Not a valid attachment page upload for recap.email"
         logger.warning(msg)
         return None
