@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from copy import deepcopy
 from datetime import date, timedelta
-from typing import Any, Literal, NotRequired, TypedDict, overload
+from typing import Any, Literal, NotRequired, TypedDict, cast, overload
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
@@ -2067,16 +2067,21 @@ def add_claims_to_docket(
             add_claim_history_entry(new_history, db_claim)
 
 
-def get_data_from_att_report(text: str, court_id: str) -> dict[str, str]:
-    """Parse a district or bankruptcy attachment page's text for a court."""
+def get_data_from_att_report(text: str, court_id: str) -> dict[str, Any]:
+    """Parse a district or bankruptcy attachment page's text for a court.
+
+    Returns an empty dict if the page could not be parsed.
+    """
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    return att_page.data
+    # juriscraper types this as a TypedDict or an empty dict. Callers treat
+    # it as a plain dict (checking emptiness, then indexing), so cast it.
+    return cast(dict[str, Any], att_page.data)
 
 
 def get_data_from_appellate_att_report(
     text: str, court_id: str
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Get attachments data from Juriscraper AppellateAttachmentPage.
 
     Args:
@@ -2084,11 +2089,14 @@ def get_data_from_appellate_att_report(
         court_id: The CourtListener court_id we're working with
 
     Returns:
-        The appellate attachment page data
+        The appellate attachment page data, or an empty dict if the page
+        could not be parsed.
     """
     att_page = AppellateAttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
-    return att_page.data
+    # juriscraper types this as a TypedDict or an empty dict. Callers treat
+    # it as a plain dict (checking emptiness, then indexing), so cast it.
+    return cast(dict[str, Any], att_page.data)
 
 
 async def add_tags_to_objs(
