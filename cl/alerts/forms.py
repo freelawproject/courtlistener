@@ -17,6 +17,7 @@ from cl.alerts.utils import (
 from cl.donate.models import NeonMembershipLevel
 from cl.donate.utils import FLP_MEMBERSHIP_URL, get_membership_upgrade_url
 from cl.search.models import SEARCH_TYPES
+from cl.sso.membership import get_effective_membership
 
 
 class CreateAlertForm(ModelForm):
@@ -93,6 +94,17 @@ class CreateAlertForm(ModelForm):
                     )
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
+                effective = get_effective_membership(self.user)
+                if effective is not None and effective.is_organization:
+                    raise ValidationError(
+                        format_html(
+                            "You've used all of the alerts included with your "
+                            "organization's membership. Ask your "
+                            "organization's administrator about a higher "
+                            "tier, or <a href='{}'>disable a RECAP Alert</a>.",
+                            reverse("profile_search_alerts"),
+                        )
+                    )
                 membership = self.user.membership
                 upgrade_url = get_membership_upgrade_url(membership)
                 if membership.level == NeonMembershipLevel.LEGACY:

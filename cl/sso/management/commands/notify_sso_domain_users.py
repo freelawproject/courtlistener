@@ -14,7 +14,7 @@ from django.db.models.functions import Lower
 from cl.lib.command_utils import VerboseCommand
 from cl.sso.emails import emails
 from cl.sso.models import Enforcement, OrganizationDomain
-from cl.sso.policy import enabled_connection, sso_start_url
+from cl.sso.policy import enabled_connection, sso_enabled, sso_start_url
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,8 @@ class Command(VerboseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Count, or with --send email, the domain's existing accounts."""
         super().handle(*args, **options)
+        if options["send"] and not sso_enabled():
+            raise CommandError("Turn on the sso flag before emailing people.")
         domain = (
             OrganizationDomain.objects.filter(
                 domain=options["domain"].strip().lower(),

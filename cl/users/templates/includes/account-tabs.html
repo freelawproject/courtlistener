@@ -12,9 +12,11 @@
       <a href="{% url "profile_your_support" %}">
         <i class="fa fa-money"></i>&nbsp;Membership</a>
     </li>
-    <li class="{% if page == "profile_password" %} active {% endif %} medium">
-      <a href="{% url "password_change" %}">
-        <i class="fa fa-lock"></i>&nbsp;Password</a>
-    </li>
+    {% if user.has_usable_password %}
+      <li class="{% if page == "profile_password" %} active {% endif %} medium">
+        <a href="{% url "password_change" %}">
+          <i class="fa fa-lock"></i>&nbsp;Password</a>
+      </li>
+    {% endif %}
   </ul>
 </div>

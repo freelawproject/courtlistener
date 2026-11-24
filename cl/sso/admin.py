@@ -57,10 +57,12 @@ class SSOConnectionInline(admin.TabularInline):
         """Show the URLs to send the organization's IdP admin."""
         if not obj.pk:
             return "Save first."
+        if not (urls := obj.get_idp_settings()):
+            return "Give the SocialApp an ID with no slashes first."
         return format_html_join(
             mark_safe("<br>"),
             "{}: <code>{}</code>",
-            obj.get_idp_settings().items(),
+            urls.items(),
         )
 
 

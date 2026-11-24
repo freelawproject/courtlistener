@@ -25,6 +25,7 @@ from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.donate.models import NeonMembershipLevel
 from cl.donate.utils import FLP_MEMBERSHIP_URL, get_membership_upgrade_url
 from cl.search.models import SEARCH_TYPES
+from cl.sso.membership import get_effective_membership
 
 # The number of days the alert frequency estimation averages over, matching
 # the value used by the alert_frequency endpoint in the frontend.
@@ -202,6 +203,14 @@ class SearchAlertSerializer(
                     f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
+                effective = get_effective_membership(user)
+                if effective is not None and effective.is_organization:
+                    raise PermissionDenied(
+                        "You've used all of the alerts included with your "
+                        "organization's membership. Ask your organization's "
+                        "administrator about a higher tier, or disable a "
+                        "RECAP Alert."
+                    )
                 membership = user.membership
                 upgrade_url = get_membership_upgrade_url(membership)
                 if membership.level == NeonMembershipLevel.LEGACY:

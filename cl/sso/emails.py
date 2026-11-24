@@ -21,6 +21,20 @@ emails: dict[str, EmailType] = {
         "The Free Law Project Team\n\n",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    "sign_in_with_sso": {
+        "subject": "Sign in to CourtListener with your organization's SSO",
+        "body": "Hello,\n\n"
+        "Somebody, hopefully you, asked to reset the CourtListener password "
+        "for this address. %s requires its people to sign in through its "
+        "single sign-on instead of a password, so there is nothing to "
+        "reset. Sign in here:\n\n"
+        "    https://www.courtlistener.com%s\n\n"
+        "If you can't sign in through your organization, ask its IT team, "
+        "or contact us:\n\n"
+        "    https://www.courtlistener.com%s\n\n"
+        "The Free Law Project Team\n\n",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+    },
     "seat_limit_reached": {
         "subject": "%s has used all of its CourtListener seats",
         "body": "Hello,\n\n"

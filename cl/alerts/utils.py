@@ -82,6 +82,7 @@ from cl.search.types import (
     PercolatorResponses,
     SearchAlertHitType,
 )
+from cl.sso.membership import get_effective_membership
 
 COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
@@ -1041,11 +1042,8 @@ def check_alert_limits(
     }:
         return AlertLimitResult(None, free_quota)
 
-    level_key = (
-        user.membership.level  # type: ignore[attr-defined]
-        if profile.is_member
-        else "free"
-    )
+    membership = get_effective_membership(user)
+    level_key = membership.level if membership else "free"
     allowed = quotas.get(level_key, free_quota)
 
     query_params: dict[str, Any] = {"user": user}

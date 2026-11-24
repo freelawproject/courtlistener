@@ -279,7 +279,7 @@ def flag_for_support(
         "accounts SOP on wiki.free.law."
     )
     # Only once the link is committed; a refused login sends nothing.
-    transaction.on_commit(lambda: mail_managers(subject, body))
+    transaction.on_commit(lambda: mail_managers(subject, body), robust=True)
 
 
 def refuse_if_linked(user: User, connection: SSOConnection) -> None:
@@ -356,7 +356,9 @@ def find_or_create_account(
             "new account instead of linking one of them.",
         )
     if not settings.DEVELOPMENT:
-        transaction.on_commit(lambda: create_neon_account.delay(user.pk))
+        transaction.on_commit(
+            lambda: create_neon_account.delay(user.pk), robust=True
+        )
     return user, AuthOutcome.CREATED
 
 
@@ -394,9 +396,11 @@ def join_organization(
     membership.save()
 
     if gained_seat:
-        transaction.on_commit(lambda: sync_user_throttles(user))
+        transaction.on_commit(lambda: sync_user_throttles(user), robust=True)
     elif created:
-        transaction.on_commit(lambda: notify_seat_limit(user, organization))
+        transaction.on_commit(
+            lambda: notify_seat_limit(user, organization), robust=True
+        )
     return membership
 
 

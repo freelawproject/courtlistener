@@ -43,6 +43,7 @@ from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
+from cl.sso.membership import get_effective_membership
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 
@@ -53,14 +54,14 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
     if not user.is_authenticated or not hasattr(user, "profile"):
         return None
 
-    # request.user is typed as a union that has no "membership", and a missing
-    # reverse one-to-one raises an AttributeError subclass, so getattr's
-    # default covers users without a membership.
-    membership = (
-        getattr(user, "membership", None) if user.profile.is_member else None
-    )
+    membership = get_effective_membership(user)
     level = membership.level if membership else "free"
-    upgrade_url = get_membership_upgrade_url(membership) if membership else ""
+    # Not an organization's, so it's the user's own NeonMembership.
+    upgrade_url = (
+        get_membership_upgrade_url(getattr(user, "membership"))
+        if membership and not membership.is_organization
+        else ""
+    )
     # Legacy memberships can't be upgraded online, so the modal routes
     # them to a help page instead of the Neon upgrade flow (see #7136).
     is_legacy = level == NeonMembershipLevel.LEGACY
@@ -80,6 +81,8 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
         "level": level,
         "upgradeUrl": upgrade_url,
         "isLegacy": is_legacy,
+        # Organization members can't upgrade themselves.
+        "isOrganization": bool(membership and membership.is_organization),
         "legacyHelpUrl": LEGACY_MEMBERSHIP_HELP_URL,
         "counts": counts,
         "limits": RECAP_ALERT_QUOTAS,
