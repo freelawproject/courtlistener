@@ -1403,7 +1403,7 @@ class ToastComponentTest(SimpleTestCase):
 
 
 class ComboboxComponentTest(SimpleTestCase):
-    """The c-combobox component embeds its options and renders what each of its flags asks for."""
+    """The markup c-combobox renders for each prop, which its script and the Alpine UI plugin read in the browser."""
 
     options = [
         {"value": 1, "label": "appeals", "selected": True},
@@ -1419,49 +1419,98 @@ class ComboboxComponentTest(SimpleTestCase):
         )
         return fromstring(html).xpath("//*[@x-data='combobox']")[0]
 
-    def test_options_are_embedded_as_json(self) -> None:
-        """The root holds the options as a JSON script that parses back to the list given."""
+    def test_options_reach_the_script_as_json(self) -> None:
+        """The JSON script the component's script loads parses back to the options given, HTML in a label included."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
         script = root.xpath("./script[@type='application/json']")[0]
         self.assertEqual(json.loads(script.text), self.options)
 
-    def test_creatable_renders_the_create_option(self) -> None:
-        """A creatable combobox offers an option that creates the typed text."""
+    def test_listeners_land_on_the_root(self) -> None:
+        """A listener written on the component tag sits on the element that dispatches the component's events."""
         root = self.render(
-            '<c-combobox label="Tags" :options="options" creatable />'
+            '<c-combobox label="Tags" :options="options" x-on:combobox-add="attach" />'
         )
-        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 1)
+        self.assertEqual(root.get("x-on:combobox-add"), "attach")
 
-    def test_without_creatable_no_create_option_is_rendered(self) -> None:
-        """A combobox that isn't creatable only offers the options given."""
-        root = self.render('<c-combobox label="Tags" :options="options" />')
-        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
-
-    def test_single_select_is_the_default(self) -> None:
-        """Without the flag, the root doesn't ask the plugin for multiple selection."""
+    def test_single_selection_is_the_default(self) -> None:
+        """Without `multiple`, the root lacks the attribute that turns on multiple selection."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
         self.assertIsNone(root.get("multiple"))
 
-    def test_multiple_enables_multi_select(self) -> None:
-        """The flag reaches the root, where the plugin reads it."""
+    def test_multiple_turns_on_multiple_selection(self) -> None:
+        """With `multiple`, the root carries the attribute that turns on multiple selection."""
         root = self.render(
             '<c-combobox label="Tags" :options="options" multiple />'
         )
         self.assertIsNotNone(root.get("multiple"))
 
+    def test_only_multiple_shows_the_selection_as_chips(self) -> None:
+        """The chip rendered per selected option exists only with `multiple`."""
+        chips = ".//template[@x-for='option in $combobox.value']"
+        single = self.render('<c-combobox label="Tags" :options="options" />')
+        multiple = self.render(
+            '<c-combobox label="Tags" :options="options" multiple />'
+        )
+        self.assertEqual(len(single.xpath(chips)), 0)
+        self.assertEqual(len(multiple.xpath(chips)), 1)
+
+    def test_creatable_offers_the_create_option(self) -> None:
+        """With `creatable`, the list has the option that creates the typed text and the root enables it."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" creatable />'
+        )
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 1)
+        self.assertIsNotNone(root.get("data-creatable"))
+
+    def test_without_creatable_there_is_no_create_option(self) -> None:
+        """Without `creatable`, the list only holds the options given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
+        self.assertIsNone(root.get("data-creatable"))
+
+    def test_creatable_needs_search(self) -> None:
+        """`creatable` has no effect on a combobox that takes no typed text."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" creatable :searchable="False" />'
+        )
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
+        self.assertIsNone(root.get("data-creatable"))
+
     def test_searchable_is_the_default(self) -> None:
-        """Without the prop, the input takes text to filter the options."""
+        """Without the prop, the input accepts the text that filters the options."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
         self.assertIsNone(root.xpath(".//input")[0].get("x-on:beforeinput"))
 
     def test_not_searchable_blocks_typing(self) -> None:
-        """A combobox with search turned off rejects text entered in its input."""
+        """With search turned off, the input rejects the text entered in it."""
         root = self.render(
             '<c-combobox label="Tags" :options="options" :searchable="False" />'
         )
         self.assertEqual(
             root.xpath(".//input")[0].get("x-on:beforeinput"), "blockTyping"
         )
+
+    def test_list_is_a_popup_by_default(self) -> None:
+        """Without `inline`, the plugin opens and closes the list."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNone(listbox.get("static"))
+
+    def test_inline_keeps_the_list_visible(self) -> None:
+        """With `inline`, the list tells the plugin to keep it shown."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" inline />'
+        )
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNotNone(listbox.get("static"))
+
+    def test_inline_keeps_the_button_the_plugin_needs(self) -> None:
+        """An inline combobox still renders the plugin's button, which the plugin reads on every click outside."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" inline />'
+        )
+        buttons = root.xpath(".//button[@*[name()='x-combobox:button']]")
+        self.assertEqual(len(buttons), 1)
 
 
 class ComponentsToastDemoTest(TestCase):
