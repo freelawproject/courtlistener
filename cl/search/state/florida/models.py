@@ -13,7 +13,7 @@ import httpx
 import pghistory
 from django.db import models
 from juriscraper.state.florida.scraper import FLORIDA_API_BASE
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from zoneinfo import ZoneInfo
 
 from cl.lib.decorators import document_model, retry
@@ -24,6 +24,7 @@ from cl.search.state.shared import (
     AbstractStateDocument,
     CourtRefused,
     DocketEntryType,
+    DocumentNotFound,
 )
 from cl.settings import COURT_REQUEST_USER_AGENT
 
@@ -307,17 +308,35 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
             CourtRefused: When ACIS answers the challenge request with 403. A
                 block on the shared challenge endpoint is the same transient
                 refusal as one on the document, and is retried the same way.
+            DocumentNotFound: When ACIS answers the challenge request with
+                404, which means the document path it was asked to gate does
+                not exist.
         """
         scheme, netloc, path, params, query, fragment = urlparse(self.url)
 
         try:
             challenge = AltchaData(resource=path).fetch()
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != HTTPStatus.FORBIDDEN:
-                raise
-            raise CourtRefused(
-                type(self).__name__, self.pk, str(exc.request.url)
-            ) from exc
+        except (httpx.HTTPError, ValidationError) as exc:
+            match exc:
+                case httpx.HTTPStatusError(
+                    response=httpx.Response(status_code=HTTPStatus.FORBIDDEN)
+                ):
+                    raise CourtRefused(
+                        type(self).__name__, self.pk, str(exc.request.url)
+                    ) from exc
+                case httpx.HTTPStatusError(
+                    response=httpx.Response(status_code=HTTPStatus.NOT_FOUND)
+                ):
+                    raise DocumentNotFound(
+                        type(self).__name__, self.pk, str(exc.request.url)
+                    ) from exc
+            # The gate was unreachable after retries, or answered with
+            # something that isn't a challenge; neither is this document's
+            # fault, so it is skipped rather than failing the batch.
+            logger.exception(
+                "Failed to fetch Florida challenge for %s", self.pk
+            )
+            return None
         if challenge is None:
             return self.url
         solution = challenge.solve()

@@ -1,0 +1,26 @@
+BEGIN;
+--
+-- Alter field processing_error on floridadocument
+--
+-- (no-op)
+--
+-- Alter field processing_error on floridadocumentevent
+--
+-- (no-op)
+--
+-- Alter field processing_error on nycoadocument
+--
+-- (no-op)
+--
+-- Alter field processing_error on nycoadocumentevent
+--
+-- (no-op)
+--
+-- Alter field processing_error on texasdocument
+--
+-- (no-op)
+--
+-- Alter field processing_error on texasdocumentevent
+--
+-- (no-op)
+COMMIT;

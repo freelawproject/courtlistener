@@ -124,6 +124,7 @@ from cl.search.models import (
     SCOTUSDocketEntry,
     SCOTUSDocument,
 )
+from cl.search.state.shared import ProcessingError
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
     TexasDocumentFactory,
@@ -662,6 +663,53 @@ class ExtractFormattedTextSanitizationTest(TestCase):
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
         self.assertIn("Courtlistener", texas_document.plain_text)
+
+
+class ExtractFormattedTextProcessingErrorTest(TestCase):
+    """`extract_formatted_text_document_base` records an extraction that produced no text on a state document, and clears that record once an extraction succeeds."""
+
+    def setUp(self) -> None:
+        self.document = TexasDocumentFactory.create()
+        self.document.filepath_local.save(
+            "document.pdf", ContentFile(b"document")
+        )
+        self.microservice = self.enterContext(
+            mock.patch(
+                "cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock
+            )
+        )
+
+    def extract(self, content: str) -> None:
+        """Run extraction with Doctor answering `content`, and reload the document."""
+        self.microservice.return_value = httpx.Response(
+            200, json={"content": content, "extracted_by_ocr": False}
+        )
+        async_to_sync(extract_formatted_text_document_base)(
+            self.document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+        self.document.refresh_from_db()
+
+    def test_no_text_records_extraction_failure(self) -> None:
+        """Is an extraction that yields no text recorded as an extraction failure?"""
+        self.extract("")
+
+        self.assertEqual(
+            self.document.processing_error,
+            ProcessingError.EXTRACTION_FAILURE,
+        )
+
+    def test_successful_extraction_clears_failure(self) -> None:
+        """Once an extraction yields text, is the failure recorded by an earlier attempt cleared?"""
+        self.document.processing_error = ProcessingError.EXTRACTION_FAILURE
+        self.document.save()
+
+        self.extract("Hello")
+
+        self.assertEqual(self.document.plain_text, "Hello")
+        self.assertIsNone(self.document.processing_error)
 
 
 class ExtractFormattedTextReleasesConnectionTest(TransactionTestCase):
