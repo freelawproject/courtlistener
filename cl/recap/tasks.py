@@ -845,7 +845,9 @@ async def process_recap_docket(pk):
 
 async def get_att_data_from_pq(
     pq: ProcessingQueue,
-) -> tuple[ProcessingQueue, AttachmentPageData | dict[Never, Never], str | None]:
+) -> tuple[
+    ProcessingQueue, AttachmentPageData | dict[Never, Never], str | None
+]:
     """Extract attachment data from a ProcessingQueue object.
 
     Args:
