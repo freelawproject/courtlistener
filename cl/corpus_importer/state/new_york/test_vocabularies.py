@@ -12,7 +12,7 @@ the raw string the Court printed where the value alone cannot say. Neither may
 ever cost a docket its merge.
 """
 
-from typing import cast
+from typing import Any, cast
 
 from django.db.models import IntegerChoices
 from juriscraper.state.docket import DocketEntryType
@@ -72,11 +72,22 @@ _MIRRORS: tuple[
 """Every Juriscraper vocabulary CourtListener mirrors, with its mirror."""
 
 
+def _entry(**fields: Any) -> NYCoDocketEntry:
+    """A Court-PASS filing with no documents, stating `fields`."""
+    return NYCoDocketEntry(
+        docket_entry_id="e:appellant-brief:smith:1",
+        entry_type=DocketEntryType.UNKNOWN,
+        attachments=[],
+        entry_index=0,
+        **fields,
+    )
+
+
 class DocketNumberTest(SimpleTestCase):
     """Tests for normalizing a Court of Appeals docket number."""
 
     def test_normalizes_a_docket_number(self) -> None:
-        """Is the Court's own format reduced to a matchable core?"""
+        """Is the Court's own format reduced to a matchable core, and does a string holding no Court of Appeals number yield nothing, so the merger can refuse the docket rather than write one it can never match again?"""
         for stated, expected in (
             ("APL-2024-00177", "apl202400177"),
             ("apl-2024-00177", "apl202400177"),
@@ -84,19 +95,16 @@ class DocketNumberTest(SimpleTestCase):
             # The case type comes from a dropdown, so any short prefix goes.
             ("CTQ-2023-00004", "ctq202300004"),
             ("JCR-2022-000012", "jcr2022000012"),
+            # Court-PASS prints the number inside a longer caption.
+            ("Case No. APL-2024-00177 (Part 2)", "apl202400177"),
+            ("Motion No. 12", ""),
+            ("", ""),
+            ("   ", ""),
+            ("SC1983-2014", ""),
+            ("garbage", ""),
         ):
             with self.subTest(stated=stated):
                 self.assertEqual(make_docket_number_core(stated), expected)
-
-    def test_finds_a_docket_number_in_surrounding_text(self) -> None:
-        """Court-PASS prints the number inside a longer caption.
-
-        Is it still found?
-        """
-        self.assertEqual(
-            make_docket_number_core("Case No. APL-2024-00177 (Part 2)"),
-            "apl202400177",
-        )
 
     def test_picks_one_of_several_deterministically(self) -> None:
         """A caption naming two numbers has to resolve the same way on every scrape, or the docket moves between rows."""
@@ -109,12 +117,6 @@ class DocketNumberTest(SimpleTestCase):
             ),
             "The order the caption names them in must not matter.",
         )
-
-    def test_unusable_docket_number(self) -> None:
-        """A string holding no Court of Appeals number yields nothing, so the merger can refuse the docket rather than write one it can never match again."""
-        for stated in ("Motion No. 12", "", "   ", "SC1983-2014", "garbage"):
-            with self.subTest(stated=stated):
-                self.assertEqual(make_docket_number_core(stated), "")
 
 
 class VocabularyMappingTest(SimpleTestCase):
@@ -207,132 +209,147 @@ class ClassifiedVocabularyTest(SimpleTestCase):
     for what the Court never stated.
     """
 
-    def test_entry_keeps_covered_values(self) -> None:
-        """Does a filing stating values the vocabularies cover classify them?"""
-        entry = NYCoDocketEntry(
-            docket_entry_id="e:appellant-brief:smith:1",
-            entry_type=DocketEntryType.UNKNOWN,
-            attachments=[],
-            entry_index=0,
-            raw_filing_type="Appellant Brief",
-            entry_filing_type="Appellant Brief",
-            entry_role="appellant",
-            entry_doctype="brf",
+    def test_entry_readings(self) -> None:
+        """Does a filing classify the type, role and document type it states, mark each one the vocabularies do not cover as needing a member, and read one it never stated as `UNKNOWN`, keeping the Court's own wording throughout?"""
+        cases: tuple[tuple[str, dict[str, Any], tuple[object, ...]], ...] = (
+            (
+                "covered values",
+                {
+                    "raw_filing_type": "Appellant Brief",
+                    "entry_filing_type": "Appellant Brief",
+                    "entry_role": "appellant",
+                    "entry_doctype": "brf",
+                },
+                (
+                    FilingType.APPELLANT_BRIEF,
+                    FilingRole.APPELLANT,
+                    FilingDocType.BRIEF,
+                ),
+            ),
+            (
+                "uncovered values",
+                {
+                    "raw_filing_type": "Appellant Sur-Reply Brief",
+                    "entry_role": "sur-appellant",
+                    "entry_doctype": "surbrf",
+                },
+                (Unclassified.UNASSIGNED,) * 3,
+            ),
+            # A filing type implying no role and carrying no document states
+            # nothing rather than something unreadable.
+            (
+                "no role or document type",
+                {
+                    "raw_filing_type": "SCJC Determination",
+                    "entry_role": None,
+                    "entry_doctype": None,
+                },
+                (
+                    Unclassified.UNASSIGNED,
+                    Unclassified.UNKNOWN,
+                    Unclassified.UNKNOWN,
+                ),
+            ),
+            # A filing the scraper reconstructed from a document has no
+            # FILINGS row behind it, which is the `UNKNOWN` case rather than
+            # the `UNASSIGNED` one; a raw string with nothing in it decides it.
+            (
+                "no table row named it",
+                {"raw_filing_type": ""},
+                (Unclassified.UNKNOWN,) * 3,
+            ),
+            (
+                "table row was blank",
+                {"raw_filing_type": "   "},
+                (Unclassified.UNKNOWN,) * 3,
+            ),
         )
-
-        self.assertEqual(entry.entry_filing_type, FilingType.APPELLANT_BRIEF)
-        self.assertEqual(entry.entry_role, FilingRole.APPELLANT)
-        self.assertEqual(entry.entry_doctype, FilingDocType.BRIEF)
-
-    def test_entry_survives_uncovered_values(self) -> None:
-        """Does a filing stating a type, role and document type nobody has seen still validate, with each of the three marked as needing a member?"""
-        entry = NYCoDocketEntry(
-            docket_entry_id="e:appellant-brief:smith:1",
-            entry_type=DocketEntryType.UNKNOWN,
-            attachments=[],
-            entry_index=0,
-            raw_filing_type="Appellant Sur-Reply Brief",
-            entry_role="sur-appellant",
-            entry_doctype="surbrf",
-        )
-
-        self.assertIs(entry.entry_filing_type, Unclassified.UNASSIGNED)
-        self.assertIs(entry.entry_role, Unclassified.UNASSIGNED)
-        self.assertIs(entry.entry_doctype, Unclassified.UNASSIGNED)
-        self.assertEqual(
-            entry.raw_filing_type,
-            "Appellant Sur-Reply Brief",
-            "The Court's own wording has to survive the failed reading.",
-        )
-
-    def test_filing_type_the_court_never_named(self) -> None:
-        """A filing the scraper reconstructed from a document has no FILINGS row behind it, which is the `UNKNOWN` case rather than the `UNASSIGNED` one. Does a raw string with nothing in it decide that?"""
-        for label, raw in (
-            ("no table row named it", ""),
-            ("table row was blank", "   "),
-        ):
+        for label, fields, expected in cases:
             with self.subTest(label):
-                entry = NYCoDocketEntry(
-                    docket_entry_id="d:none:none:smith:1",
-                    entry_type=DocketEntryType.UNKNOWN,
-                    attachments=[],
-                    entry_index=0,
-                    raw_filing_type=raw,
+                entry = _entry(**fields)
+
+                for reading, member in zip(
+                    (
+                        entry.entry_filing_type,
+                        entry.entry_role,
+                        entry.entry_doctype,
+                    ),
+                    expected,
+                    strict=True,
+                ):
+                    self.assertIs(reading, member)
+                self.assertEqual(
+                    entry.raw_filing_type,
+                    fields["raw_filing_type"],
+                    "The Court's own wording has to survive the reading.",
                 )
 
-                self.assertIs(entry.entry_filing_type, Unclassified.UNKNOWN)
+    def test_file_readings(self) -> None:
+        """Does a file whose name states a role and document type the vocabularies do not cover still validate, marked as needing members, and is a name following none of the Court's conventions read as stating nothing rather than as a failed reading?"""
+        for label, file_name, fields, expected in (
+            # Roughly 6% of file names state a document type that cannot be
+            # read.
+            (
+                "uncovered",
+                "SmithvJones-app-Smith-surbrf.pdf",
+                {"doc_type": "surbrf", "doc_role": "sur-appellant"},
+                Unclassified.UNASSIGNED,
+            ),
+            (
+                "nothing stated",
+                "SmithvJones-Webcast.asx",
+                {},
+                Unclassified.UNKNOWN,
+            ),
+        ):
+            with self.subTest(label):
+                file = NYCoAFile(file_name=file_name, **fields)
 
-    def test_entry_stating_no_role_or_doctype(self) -> None:
-        """A filing type implying no role and carrying no document states nothing rather than something unreadable. Is that `UNKNOWN`?"""
-        entry = NYCoDocketEntry(
-            docket_entry_id="e:appellant-brief:smith:1",
-            entry_type=DocketEntryType.UNKNOWN,
-            attachments=[],
-            entry_index=0,
-            raw_filing_type="SCJC Determination",
-            entry_role=None,
-            entry_doctype=None,
+                self.assertIs(file.doc_role, expected)
+                self.assertIs(file.doc_type, expected)
+                self.assertEqual(file.file_name, file_name)
+
+    def test_issue_readings(self) -> None:
+        """Does an issue classify what the vocabularies cover, mark a category they lack as needing a member, and read a category stated alone as stating no subcategory, keeping the Court's own wording throughout?"""
+        cases: tuple[
+            tuple[str, str, dict[str, Any], tuple[object, ...]], ...
+        ] = (
+            (
+                "uncovered category",
+                "Cryptocurrency--Staking",
+                {"category": "Cryptocurrency", "subcategory": "Staking"},
+                (Unclassified.UNASSIGNED, Unclassified.UNASSIGNED),
+            ),
+            # The Court states roughly 13% of issues as a category alone. The
+            # double dash it joins the two halves with is what separates that
+            # from a subcategory it stated and the vocabulary lacks.
+            (
+                "bare category",
+                "Crimes",
+                {"category": "Crimes"},
+                (IssueCategory.CRIMES, Unclassified.UNKNOWN),
+            ),
+            # A model built in Python rather than parsed from a scrape hands
+            # the vocabulary members themselves, which are left alone.
+            (
+                "members passed in",
+                "Crimes--Sentence",
+                {
+                    "category": IssueCategory.CRIMES,
+                    "subcategory": IssueSubcategory.SENTENCE,
+                },
+                (IssueCategory.CRIMES, IssueSubcategory.SENTENCE),
+            ),
         )
+        for label, category_raw, fields, expected in cases:
+            with self.subTest(label):
+                issue = NYCoAIssue(category_raw=category_raw, **fields)
 
-        self.assertIs(entry.entry_role, Unclassified.UNKNOWN)
-        self.assertIs(entry.entry_doctype, Unclassified.UNKNOWN)
-
-    def test_file_survives_an_uncovered_doctype(self) -> None:
-        """Roughly 6% of file names state a document type that cannot be read.
-
-        Does the file still validate?
-        """
-        file = NYCoAFile(
-            file_name="SmithvJones-app-Smith-surbrf.pdf",
-            doc_type="surbrf",
-            doc_role="sur-appellant",
-        )
-
-        self.assertIs(file.doc_type, Unclassified.UNASSIGNED)
-        self.assertIs(file.doc_role, Unclassified.UNASSIGNED)
-        self.assertEqual(file.file_name, "SmithvJones-app-Smith-surbrf.pdf")
-
-    def test_file_whose_name_states_nothing(self) -> None:
-        """A name that does not follow the Court's convention yields no role and no document type at all. Is that `UNKNOWN` rather than a failed reading?"""
-        file = NYCoAFile(file_name="SmithvJones-Webcast.asx")
-
-        self.assertIs(file.doc_role, Unclassified.UNKNOWN)
-        self.assertIs(file.doc_type, Unclassified.UNKNOWN)
-
-    def test_issue_survives_an_uncovered_category(self) -> None:
-        """Does an issue in a category the vocabulary lacks still validate, with the Court's own wording kept?"""
-        issue = NYCoAIssue(
-            category_raw="Cryptocurrency--Staking",
-            category="Cryptocurrency",
-            subcategory="Staking",
-        )
-
-        self.assertIs(issue.category, Unclassified.UNASSIGNED)
-        self.assertIs(issue.subcategory, Unclassified.UNASSIGNED)
-        self.assertEqual(issue.category_raw, "Cryptocurrency--Staking")
-
-    def test_issue_stated_as_a_bare_category(self) -> None:
-        """The Court states roughly 13% of issues as a category alone.
-
-        The double dash it joins the two halves with is what separates that
-        from a subcategory it stated and the vocabulary lacks. Is it read that
-        way?
-        """
-        issue = NYCoAIssue(category_raw="Crimes", category="Crimes")
-
-        self.assertEqual(issue.category, IssueCategory.CRIMES)
-        self.assertIs(issue.subcategory, Unclassified.UNKNOWN)
-
-    def test_members_pass_through_untouched(self) -> None:
-        """A model built in Python rather than parsed from a scrape hands the vocabulary members themselves. Are they left alone?"""
-        issue = NYCoAIssue(
-            category_raw="Crimes--Sentence",
-            category=IssueCategory.CRIMES,
-            subcategory=IssueSubcategory.SENTENCE,
-        )
-
-        self.assertEqual(issue.category, IssueCategory.CRIMES)
-        self.assertEqual(issue.subcategory, IssueSubcategory.SENTENCE)
+                for reading, member in zip(
+                    (issue.category, issue.subcategory), expected, strict=True
+                ):
+                    self.assertIs(reading, member)
+                self.assertEqual(issue.category_raw, category_raw)
 
     def test_readings_survive_a_round_trip(self) -> None:
         """Does a model dumped and read back state what it stated before?
@@ -362,16 +379,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
                 "an issue stated as a bare category",
                 NYCoAIssue(category_raw="Crimes", category="Crimes"),
             ),
-            (
-                "a filing no table row named",
-                NYCoDocketEntry(
-                    docket_entry_id="d:none:none:smith:1",
-                    entry_type=DocketEntryType.UNKNOWN,
-                    attachments=[],
-                    entry_index=0,
-                    raw_filing_type="",
-                ),
-            ),
+            ("a filing no table row named", _entry(raw_filing_type="")),
         ):
             with self.subTest(label):
                 self.assertEqual(

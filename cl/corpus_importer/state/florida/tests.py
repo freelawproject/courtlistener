@@ -1,7 +1,10 @@
 """Tests for Florida docket and originating-court-information merger."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from tempfile import NamedTemporaryFile
+from typing import IO
 from unittest import mock
 from uuid import uuid4
 
@@ -18,6 +21,7 @@ from juriscraper.state.docket import (
 from juriscraper.state.docket import TransferReason as ScrapeTransferReason
 from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
+from juriscraper.state.florida.parties import FloridaParty
 
 from cl.corpus_importer.management.commands.state_document_download import (
     extract_state_documents,
@@ -42,7 +46,11 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     Update,
 )
-from cl.corpus_importer.state.merger.tests import merger_test
+from cl.corpus_importer.state.merger.tests import (
+    merged_docket,
+    merger_test,
+    table_row,
+)
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
     download_fl_document,
@@ -72,6 +80,11 @@ from cl.search.state.shared import (
     ProcessingError,
 )
 from cl.tests.cases import TestCase
+
+
+def merge_case(case: FloridaCase) -> MergeResult:
+    """Run a full docket merge of a scraped Florida case."""
+    return FloridaDocketMerger(case, params=case.entries).merge()
 
 
 class FloridaUtilsTest(TestCase):
@@ -153,25 +166,23 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.FIRST_COA.value,
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         mock_merge.assert_not_called()
-        assert result.success is True
+        self.assertTrue(result.success)
 
     @merger_test(expected_query_count=12)
-    def test_merge_creates_new_oci(self):
-        """Does merge create a new OCI when none exists?"""
+    def test_merge_creates_new_oci_from_first_originating_case(self):
+        """Does merge create a new OCI from the first of the case's originating cases when the docket has none?"""
         self.docket_sc.originating_court_information = None
         self.docket_sc.save()
 
-        originating = FloridaOriginatingCaseFactory.build(
-            case_number="ORIG-001",
-        )
         docket_data = FloridaCaseFactory.create(
             court_id=FloridaCourtID.SUPREME_COURT.value,
-            originating_cases=[originating],
+            originating_cases=[
+                FloridaOriginatingCaseFactory.build(case_number="FIRST-001"),
+                FloridaOriginatingCaseFactory.build(case_number="SECOND-002"),
+            ],
         )
 
         result = FloridaDocketMerger(
@@ -185,8 +196,8 @@ class FloridaMergerTest(TestCase):
         self.assertIn("OriginatingCourtInformation", result.creates)
         oci_pk = next(iter(result.creates["OriginatingCourtInformation"]))
         oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
-        self.assertEqual(oci.docket_number, "ORIG-001")
-        self.assertEqual(oci.docket_number_raw, "ORIG-001")
+        self.assertEqual(oci.docket_number, "FIRST-001")
+        self.assertEqual(oci.docket_number_raw, "FIRST-001")
         self.docket_sc.refresh_from_db()
         self.assertEqual(
             self.docket_sc.originating_court_information_id, oci_pk
@@ -216,13 +227,15 @@ class FloridaMergerTest(TestCase):
             params=docket_data.entries,
         ).merge()
 
-        assert result.success is True
-        assert result.update is True
-        assert "OriginatingCourtInformation" not in result.creates
-        assert existing_oci.pk in result.updates["OriginatingCourtInformation"]
+        self.assertTrue(result.success)
+        self.assertTrue(result.update)
+        self.assertNotIn("OriginatingCourtInformation", result.creates)
+        self.assertIn(
+            existing_oci.pk, result.updates["OriginatingCourtInformation"]
+        )
         existing_oci.refresh_from_db()
-        assert existing_oci.docket_number == "UPDATED-001"
-        assert existing_oci.docket_number_raw == "UPDATED-001"
+        self.assertEqual(existing_oci.docket_number, "UPDATED-001")
+        self.assertEqual(existing_oci.docket_number_raw, "UPDATED-001")
 
     @merger_test(expected_query_count=11)
     def test_merge_no_originating_cases_skips_oci(self):
@@ -241,33 +254,9 @@ class FloridaMergerTest(TestCase):
             params=docket_data.entries,
         ).merge()
 
-        assert result.success is True
-        assert "OriginatingCourtInformation" not in result.creates
-        assert "OriginatingCourtInformation" not in result.updates
-
-    @merger_test(expected_query_count=12)
-    def test_merge_multiple_originating_cases_uses_first(self):
-        """Does merge pick the first originating case when several exist?"""
-        self.docket_sc.originating_court_information = None
-        self.docket_sc.save()
-
-        first = FloridaOriginatingCaseFactory(case_number="FIRST-001")
-        second = FloridaOriginatingCaseFactory(case_number="SECOND-002")
-        docket_data = FloridaCaseFactory(
-            court_id=FloridaCourtID.SUPREME_COURT.value,
-            originating_cases=[first, second],
-        )
-
-        result = FloridaDocketMerger(
-            docket_data,
-            existing=Update(self.docket_sc),
-            params=docket_data.entries,
-        ).merge()
-
-        assert result.success is True
-        oci_pk = next(iter(result.creates["OriginatingCourtInformation"]))
-        oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
-        assert oci.docket_number == "FIRST-001"
+        self.assertTrue(result.success)
+        self.assertNotIn("OriginatingCourtInformation", result.creates)
+        self.assertNotIn("OriginatingCourtInformation", result.updates)
 
     @merger_test(expected_query_count=0)
     def test_merge_docket_unknown_court_fails(self):
@@ -276,43 +265,50 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertEqual(result.success, False)
         self.assertIn("Docket", result.failures)
         self.assertEqual(result.failures["Docket"], [None])
 
-    @merger_test(expected_query_count=13)
-    def test_merge_docket_supreme_court_creates_new(self):
-        """Does merge_docket create a new supreme-court docket?"""
-        original_pks = set(Docket.objects.values_list("pk", flat=True))
-        docket_data = FloridaCaseFactory(
-            court_id=FloridaCourtID.SUPREME_COURT.value,
-            docket_number="SC2025-9999",
-            entries=[],
+    @merger_test(expected_query_count=24)
+    def test_merge_docket_creates_new_in_specific_court(self):
+        """Does merge_docket create a new docket in the case's specific CourtListener court, carrying the scrape's names and filing date, when no existing docket matches?"""
+        cases = (
+            (FloridaCourtID.SUPREME_COURT, "SC2025-9999", "fla"),
+            (FloridaCourtID.SECOND_COA, "2D2025-BRAND-NEW", "fladistctapp2"),
         )
+        for court_id, docket_number, cl_court_id in cases:
+            with table_row(self, cl_court_id):
+                original_pks = set(Docket.objects.values_list("pk", flat=True))
+                docket_data = FloridaCaseFactory(
+                    court_id=court_id.value,
+                    docket_number=docket_number,
+                    entries=[],
+                )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+                result = merge_case(docket_data)
 
-        assert result.success is True
-        new_pks = (
-            set(Docket.objects.values_list("pk", flat=True)) - original_pks
-        )
-        assert len(new_pks) == 1
-        new_pk = new_pks.pop()
-        assert new_pk in result.creates["Docket"]
-        new_docket = Docket.objects.get(pk=new_pk)
-        assert new_docket.court_id == "fla"
-        assert new_docket.docket_number == "SC2025-9999"
-        assert new_docket.docket_number_raw == "SC2025-9999"
-        assert new_docket.case_name == docket_data.case_name
-        assert new_docket.case_name_full == docket_data.case_name_full
-        assert new_docket.case_name_short == docket_data.case_name_short
-        assert new_docket.date_filed == docket_data.date_filed
+                self.assertTrue(result.success)
+                new_pks = (
+                    set(Docket.objects.values_list("pk", flat=True))
+                    - original_pks
+                )
+                self.assertEqual(len(new_pks), 1)
+                new_pk = new_pks.pop()
+                self.assertIn(new_pk, result.creates["Docket"])
+                new_docket = Docket.objects.get(pk=new_pk)
+                self.assertEqual(new_docket.court_id, cl_court_id)
+                self.assertEqual(new_docket.docket_number, docket_number)
+                self.assertEqual(new_docket.docket_number_raw, docket_number)
+                self.assertEqual(new_docket.case_name, docket_data.case_name)
+                self.assertEqual(
+                    new_docket.case_name_full, docket_data.case_name_full
+                )
+                self.assertEqual(
+                    new_docket.case_name_short, docket_data.case_name_short
+                )
+                self.assertEqual(new_docket.date_filed, docket_data.date_filed)
 
     @merger_test(expected_query_count=12)
     def test_merge_docket_existing_supreme_court_is_update(self):
@@ -323,16 +319,16 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert "Docket" in result.updates
-        assert self.docket_sc.pk in result.updates["Docket"]
-        assert self.docket_sc.pk not in result.creates.get("Docket", set())
+        self.assertTrue(result.success)
+        self.assertIn("Docket", result.updates)
+        self.assertIn(self.docket_sc.pk, result.updates["Docket"])
+        self.assertNotIn(
+            self.docket_sc.pk, result.creates.get("Docket", set())
+        )
         self.docket_sc.refresh_from_db()
-        assert self.docket_sc.case_name == docket_data.case_name
+        self.assertEqual(self.docket_sc.case_name, docket_data.case_name)
 
     @merger_test(expected_query_count=16)
     def test_merge_docket_appellate_disaggregates_existing(self):
@@ -351,38 +347,13 @@ class FloridaMergerTest(TestCase):
             docket_number=agg_dn,
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert "Docket" in result.updates
-        assert agg_docket.pk in result.updates["Docket"]
+        self.assertTrue(result.success)
+        self.assertIn("Docket", result.updates)
+        self.assertIn(agg_docket.pk, result.updates["Docket"])
         agg_docket.refresh_from_db()
-        assert agg_docket.court_id == "fladistctapp1"
-
-    @merger_test(expected_query_count=11)
-    def test_merge_docket_appellate_creates_new(self):
-        """Does merge_docket create a new docket in the specific appellate court when no existing docket matches?"""
-        original_pks = set(Docket.objects.values_list("pk", flat=True))
-        docket_data = FloridaCaseFactory(
-            court_id=FloridaCourtID.SECOND_COA.value,
-            docket_number="2D2025-BRAND-NEW",
-            entries=[],
-        )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        new_pks = (
-            set(Docket.objects.values_list("pk", flat=True)) - original_pks
-        )
-        assert len(new_pks) == 1
-        new_docket = Docket.objects.get(pk=new_pks.pop())
-        assert new_docket.court_id == "fladistctapp2"
-        assert new_docket.docket_number == "2D2025-BRAND-NEW"
+        self.assertEqual(agg_docket.court_id, "fladistctapp1")
 
     @merger_test(expected_query_count=16)
     def test_merge_docket_uses_latest_entry_for_date_last_filing(self):
@@ -401,13 +372,11 @@ class FloridaMergerTest(TestCase):
             entries=entries,
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
+        self.assertTrue(result.success)
         self.docket_sc.refresh_from_db()
-        assert self.docket_sc.date_last_filing == date(2025, 3, 10)
+        self.assertEqual(self.docket_sc.date_last_filing, date(2025, 3, 10))
 
     @merger_test(expected_query_count=12)
     def test_merge_docket_no_entries_falls_back_to_date_filed(self):
@@ -420,14 +389,12 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
+        self.assertTrue(result.success)
         self.docket_sc.refresh_from_db()
-        assert self.docket_sc.date_filed == filed.date()
-        assert self.docket_sc.date_last_filing == filed.date()
+        self.assertEqual(self.docket_sc.date_filed, filed.date())
+        self.assertEqual(self.docket_sc.date_last_filing, filed.date())
 
     @merger_test(expected_query_count=13)
     def test_uuid_matches(self):
@@ -437,7 +404,7 @@ class FloridaMergerTest(TestCase):
             docket_number="SC2026-1337",
         )
         docket = DocketFactory.create(
-            court=CourtFactory.create(id="fla"),
+            court=self.flsc,
             docket_number=docket_data.docket_number,
             docket_number_core=make_docket_number_core(
                 docket_data.docket_number
@@ -447,9 +414,7 @@ class FloridaMergerTest(TestCase):
             # making the query count above flaky.
             source=Docket.SCRAPER,
         )
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertTrue(result.update)
@@ -472,35 +437,21 @@ class FloridaPartyMergerTest(TestCase):
         )
 
     @staticmethod
-    def _merged_docket(result: MergeResult) -> Docket:
-        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
-
-    @merger_test(expected_query_count=9)
-    def test_merge_creates_party_with_type(self):
-        """Does merging create the scrape's party and link it to the docket with the correct party type?"""
-        scrape_party = FloridaCasePartyFactory.create(
+    def _represented_party() -> FloridaParty:
+        """Build an appellant scraped with one primary representative."""
+        return FloridaCasePartyFactory.create(
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
-            representatives=[],
+            representatives=[
+                FloridaRepresentativeFactory.create(
+                    name="Jane Lawyer", primary_flag=True
+                )
+            ],
         )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert "Party" in result.creates
-        docket = self._merged_docket(result)
-        party = docket.parties.get()
-        assert party.name == "Acme Corp"
-        party_type = PartyType.objects.get(docket=docket)
-        assert party_type.party_id == party.pk
-        assert party_type.name == "Appellant"
 
     @merger_test(expected_query_count=12)
     def test_merge_creates_all_parties(self):
-        """Are multiple parties in a scrape merged as separate objects, each with its own party type?"""
+        """Are multiple parties in a scrape merged as separate objects, each linked to the docket by its own party type?"""
         appellant = FloridaCasePartyFactory.create(
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
@@ -515,99 +466,30 @@ class FloridaPartyMergerTest(TestCase):
         )
         docket_data = self._make_case(appellant, appellee)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        docket = self._merged_docket(result)
-        assert set(docket.parties.values_list("name", flat=True)) == {
-            "Acme Corp",
-            "Bob Smith",
-        }
-        assert set(
-            PartyType.objects.filter(docket=docket).values_list(
-                "party__name", "name", "pro_se"
-            )
-        ) == {
-            ("Acme Corp", "Appellant", PartyType.PRO_SE_NO),
-            ("Bob Smith", "Appellee", PartyType.PRO_SE_YES),
-        }
-
-    @merger_test(expected_query_count=13)
-    def test_merge_primary_representative_is_lead_attorney(self):
-        """Is a primary representative merged as a lead attorney for the party on the merged docket?"""
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=True
+        self.assertTrue(result.success)
+        self.assertIn("Party", result.creates)
+        docket = merged_docket(result)
+        self.assertEqual(
+            set(docket.parties.values_list("name", flat=True)),
+            {"Acme Corp", "Bob Smith"},
         )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
+        self.assertEqual(
+            set(
+                PartyType.objects.filter(docket=docket).values_list(
+                    "party__name", "name", "pro_se"
+                )
+            ),
+            {
+                ("Acme Corp", "Appellant", PartyType.PRO_SE_NO),
+                ("Bob Smith", "Appellee", PartyType.PRO_SE_YES),
+            },
         )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        docket = self._merged_docket(result)
-        party = docket.parties.get()
-        attorney = party.attorneys.get()
-        role = Role.objects.get(party=party, attorney=attorney)
-        # pyrefly:ignore[missing-attribute]
-        assert role.docket_id == docket.pk
-        assert role.role == Role.ATTORNEY_LEAD
-
-    @merger_test(expected_query_count=13)
-    def test_merge_non_primary_representative_role_unknown(self):
-        """Is a non-primary representative given the unknown role?"""
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=False
-        )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
-        )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        docket = self._merged_docket(result)
-        party = docket.parties.get()
-        role = Role.objects.get(party=party)
-        assert role.role == Role.UNKNOWN
-
-    @merger_test(expected_query_count=13)
-    def test_merge_sets_attorney_name(self):
-        """Does the merged attorney carry the representative's name?"""
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=True
-        )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
-        )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        docket = self._merged_docket(result)
-        attorney = docket.parties.get().attorneys.get()
-        assert attorney.name == "Jane Lawyer"
 
     @merger_test(expected_query_count=16)
-    def test_merge_party_with_multiple_representatives(self):
-        """Are all of a party's representatives merged as separate attorneys with their own roles?"""
+    def test_merge_representatives_become_attorneys_with_roles(self):
+        """Is each of a party's representatives merged as a separate, named attorney, linked to the party on the merged docket as lead attorney when primary and with the unknown role otherwise?"""
         lead = FloridaRepresentativeFactory.create(
             name="Jane Lawyer", primary_flag=True
         )
@@ -621,30 +503,28 @@ class FloridaPartyMergerTest(TestCase):
         )
         docket_data = self._make_case(scrape_party)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        docket = self._merged_docket(result)
+        self.assertTrue(result.success)
+        docket = merged_docket(result)
         party = docket.parties.get()
-        assert party.attorneys.count() == 2
-        assert set(
-            Role.objects.filter(party=party).values_list("role", flat=True)
-        ) == {Role.ATTORNEY_LEAD, Role.UNKNOWN}
+        self.assertEqual(party.attorneys.count(), 2)
+        self.assertEqual(
+            set(
+                Role.objects.filter(party=party).values_list(
+                    "attorney__name", "role", "docket_id"
+                )
+            ),
+            {
+                ("Jane Lawyer", Role.ATTORNEY_LEAD, docket.pk),
+                ("John Counsel", Role.UNKNOWN, docket.pk),
+            },
+        )
 
     @merger_test(expected_query_count=22)
     def test_remerge_is_idempotent(self):
         """Does merging the same case twice avoid duplicating parties, attorneys, and their links?"""
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=True
-        )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
-        )
-        docket_data = self._make_case(scrape_party)
+        docket_data = self._make_case(self._represented_party())
 
         first_merger = FloridaDocketMerger(
             docket_data, params=docket_data.entries
@@ -671,73 +551,37 @@ class FloridaPartyMergerTest(TestCase):
         self.assertEqual(Role.objects.count(), 1)
         self.assertEqual(PartyType.objects.count(), 1)
 
-    @merger_test(expected_query_count=9)
-    def test_merge_does_not_modify_unrelated_parties(self):
-        """Does merging create a new party rather than renaming an existing party from another docket?"""
+    @merger_test(expected_query_count=13)
+    def test_merge_leaves_other_dockets_parties_alone(self):
+        """Does merging one docket create its own party rather than renaming a party on another docket, and leave that party's types and attorney roles in place?"""
         other_docket = DocketFactory.create(court=self.flsc)
         other_party = PartyFactory.create(
             name="Unrelated Party",
             docket=other_docket,
             attorneys=[AttorneyFactory.create(docket=other_docket)],
         )
-        PartyTypeFactory.create(
-            docket=other_docket, party=other_party, name="plaintiff"
-        )
-
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[],
-        )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        other_party.refresh_from_db()
-        assert other_party.name == "Unrelated Party"
-        docket = self._merged_docket(result)
-        assert list(docket.parties.values_list("name", flat=True)) == [
-            "Acme Corp"
-        ]
-
-    @merger_test(expected_query_count=13)
-    def test_merge_preserves_unrelated_party_types_and_roles(self):
-        """Does merging one docket leave party and attorney links on other dockets in place?"""
-        other_docket = DocketFactory.create(court=self.flsc)
-        other_attorney = AttorneyFactory.create(docket=other_docket)
-        other_party = PartyFactory.create(
-            name="Unrelated Party",
-            docket=other_docket,
-            attorneys=[other_attorney],
-        )
         other_party_type = PartyTypeFactory.create(
             docket=other_docket, party=other_party, name="plaintiff"
         )
         other_role = Role.objects.get(party=other_party)
+        docket_data = self._make_case(self._represented_party())
 
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=True
+        result = merge_case(docket_data)
+
+        self.assertTrue(result.success)
+        other_party.refresh_from_db()
+        self.assertEqual(other_party.name, "Unrelated Party")
+        self.assertEqual(
+            list(merged_docket(result).parties.values_list("name", flat=True)),
+            ["Acme Corp"],
         )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
+        self.assertTrue(
+            PartyType.objects.filter(pk=other_party_type.pk).exists()
         )
-        docket_data = self._make_case(scrape_party)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert PartyType.objects.filter(pk=other_party_type.pk).exists()
-        assert Role.objects.filter(pk=other_role.pk).exists()
+        self.assertTrue(Role.objects.filter(pk=other_role.pk).exists())
         other_role.refresh_from_db()
         # pyrefly:ignore[missing-attribute]
-        assert other_role.docket_id == other_docket.pk
+        self.assertEqual(other_role.docket_id, other_docket.pk)
 
     @merger_test(expected_query_count=16)
     def test_party_type_change_renames_in_place(self):
@@ -748,20 +592,16 @@ class FloridaPartyMergerTest(TestCase):
             representatives=[],
         )
         docket_data = self._make_case(scrape_party)
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-        assert first.success is True
-        docket = self._merged_docket(first)
+        first = merge_case(docket_data)
+        self.assertTrue(first.success)
+        docket = merged_docket(first)
 
         scrape_party.party_type = ScrapePartyType.APPELLEE
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        second = merge_case(docket_data)
 
-        assert second.success is True
+        self.assertTrue(second.success)
         party_type = PartyType.objects.get(docket=docket)
-        assert party_type.name == "Appellee"
+        self.assertEqual(party_type.name, "Appellee")
 
     @merger_test(expected_query_count=19)
     def test_remerge_keeps_same_name_parties_distinct(self):
@@ -777,15 +617,11 @@ class FloridaPartyMergerTest(TestCase):
             representatives=[],
         )
         docket_data = self._make_case(appellant, appellee)
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        first = merge_case(docket_data)
         self.assertTrue(first.success)
-        docket = self._merged_docket(first)
+        docket = merged_docket(first)
 
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        second = merge_case(docket_data)
 
         self.assertTrue(second.success, second.failures)
         self.assertFalse(second.create)
@@ -805,30 +641,18 @@ class FloridaPartyMergerTest(TestCase):
     @merger_test(expected_query_count=17)
     def test_merge_empty_parties_preserves_existing(self):
         """Does a scrape with no parties leave existing parties, types, and roles untouched?"""
-        rep = FloridaRepresentativeFactory.create(
-            name="Jane Lawyer", primary_flag=True
-        )
-        scrape_party = FloridaCasePartyFactory.create(
-            name="Acme Corp",
-            party_type=ScrapePartyType.APPELLANT,
-            representatives=[rep],
-        )
-        docket_data = self._make_case(scrape_party)
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-        assert first.success is True
-        docket = self._merged_docket(first)
+        docket_data = self._make_case(self._represented_party())
+        first = merge_case(docket_data)
+        self.assertTrue(first.success)
+        docket = merged_docket(first)
 
         docket_data.parties = []
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        second = merge_case(docket_data)
 
-        assert second.success is True
-        assert docket.parties.count() == 1
-        assert PartyType.objects.filter(docket=docket).count() == 1
-        assert Role.objects.filter(docket=docket).count() == 1
+        self.assertTrue(second.success)
+        self.assertEqual(docket.parties.count(), 1)
+        self.assertEqual(PartyType.objects.filter(docket=docket).count(), 1)
+        self.assertEqual(Role.objects.filter(docket=docket).count(), 1)
 
 
 class FloridaDocketEntryMergerTest(TestCase):
@@ -839,19 +663,16 @@ class FloridaDocketEntryMergerTest(TestCase):
         cls.flsc = CourtFactory.create(id="fla")
 
     @staticmethod
-    def _make_case(*entries) -> FloridaCase:
+    def _make_case(*entries, **kwargs) -> FloridaCase:
         return FloridaCaseFactory.create(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             entries=list(entries),
+            **kwargs,
         )
 
-    @staticmethod
-    def _merged_docket(result: MergeResult) -> Docket:
-        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
-
-    @merger_test(expected_query_count=13)
+    @merger_test(expected_query_count=15)
     def test_merge_creates_docket_entries(self):
-        """Does merging a case create its docket entries with the scrape's field values?"""
+        """Does merging a case create each of its docket entries as a separate object with the scrape's field values?"""
         entry = FloridaDocketEntryFactory.create(
             entry_type=ScrapeDocketEntryType.MOTION,
             entry_type_raw="motions other",
@@ -860,69 +681,54 @@ class FloridaDocketEntryMergerTest(TestCase):
             entry_status="Docketed",
             attachments=[],
         )
-        docket_data = self._make_case(entry)
+        others = [
+            FloridaDocketEntryFactory.create(attachments=[]) for _ in range(2)
+        ]
+        docket_data = self._make_case(entry, *others)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert "FloridaDocketEntry" in result.creates
-        docket = self._merged_docket(result)
+        self.assertTrue(result.success)
+        self.assertIn("FloridaDocketEntry", result.creates)
         # pyrefly:ignore[missing-attribute]
-        merged = docket.florida_docket_entries.get()
-        assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
-        assert merged.date_filed == entry.datetime_filed
-        assert merged.date_submitted == entry.date_submitted
-        assert merged.entry_type == DocketEntryType.MOTION
-        assert merged.entry_type_raw == "motions other"
-        assert merged.entry_name == "Motion for Extension"
-        assert merged.description == "Requesting more time."
+        merged_entries = merged_docket(result).florida_docket_entries
+        self.assertEqual(merged_entries.count(), 3)
+        self.assertEqual(
+            {
+                str(uuid)
+                for uuid in merged_entries.values_list(
+                    "docket_entry_uuid", flat=True
+                )
+            },
+            {str(e.docket_entry_uuid) for e in (entry, *others)},
+        )
+        merged = merged_entries.get(
+            docket_entry_uuid=str(entry.docket_entry_uuid)
+        )
+        self.assertEqual(merged.date_filed, entry.datetime_filed)
+        self.assertEqual(merged.date_submitted, entry.date_submitted)
+        self.assertEqual(merged.entry_type, DocketEntryType.MOTION)
+        self.assertEqual(merged.entry_type_raw, "motions other")
+        self.assertEqual(merged.entry_name, "Motion for Extension")
+        self.assertEqual(merged.description, "Requesting more time.")
         self.assertEqual(merged.status, FloridaDocketEntry.STATUS_DOCKETED)
         self.assertEqual(merged.submitted_by_name, "")
         self.assertIsNone(merged.submitted_by_id)
 
-    @merger_test(expected_query_count=15)
-    def test_merge_creates_all_docket_entries(self):
-        """Are multiple entries in a scrape merged as separate objects?"""
-        entries = [
-            FloridaDocketEntryFactory.create(attachments=[]) for _ in range(3)
-        ]
-        docket_data = self._make_case(*entries)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        docket = self._merged_docket(result)
-        # pyrefly:ignore[missing-attribute]
-        assert docket.florida_docket_entries.count() == 3
-        assert {
-            str(uuid)
-            # pyrefly:ignore[missing-attribute]
-            for uuid in docket.florida_docket_entries.values_list(
-                "docket_entry_uuid", flat=True
-            )
-        } == {str(e.docket_entry_uuid) for e in entries}
-
     @merger_test(expected_query_count=22)
     def test_remerge_entries_is_idempotent(self):
         """Does merging the same case twice avoid duplicating entries?"""
-        entry = FloridaDocketEntryFactory.create(attachments=[])
-        docket_data = self._make_case(entry)
+        docket_data = self._make_case(
+            FloridaDocketEntryFactory.create(attachments=[])
+        )
 
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        first = merge_case(docket_data)
+        second = merge_case(docket_data)
 
-        assert first.success is True
-        assert second.success is True
-        assert "FloridaDocketEntry" not in second.creates
-        assert FloridaDocketEntry.objects.count() == 1
+        self.assertTrue(first.success)
+        self.assertTrue(second.success)
+        self.assertNotIn("FloridaDocketEntry", second.creates)
+        self.assertEqual(FloridaDocketEntry.objects.count(), 1)
 
     @merger_test(expected_query_count=23)
     def test_remerge_updates_entry_fields(self):
@@ -931,114 +737,59 @@ class FloridaDocketEntryMergerTest(TestCase):
             entry_status="Docketed", attachments=[]
         )
         docket_data = self._make_case(entry)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
         merged = FloridaDocketEntry.objects.get()
 
         entry.entry_status = "Stricken"
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert merged.pk in result.updates["FloridaDocketEntry"]
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocketEntry"])
         merged.refresh_from_db()
         self.assertEqual(merged.status, FloridaDocketEntry.STATUS_STRICKEN)
 
     @merger_test(expected_query_count=13)
     def test_merge_unrecognized_entry_status_is_unknown(self):
         """Is an entry status Florida hasn't shown us before stored as unknown rather than failing the merge?"""
-        entry = FloridaDocketEntryFactory.create(
-            entry_status="Surprising", attachments=[]
+        docket_data = self._make_case(
+            FloridaDocketEntryFactory.create(
+                entry_status="Surprising", attachments=[]
+            )
         )
-        docket_data = self._make_case(entry)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         merged = FloridaDocketEntry.objects.get()
         self.assertEqual(merged.status, FloridaDocketEntry.STATUS_UNKNOWN)
 
-    @merger_test(expected_query_count=10)
-    def test_merge_submitted_by_links_docket_party(self):
-        """Is a submitter that matches a party on the docket linked to that party?"""
-        party = FloridaCasePartyFactory.create(
-            name="Acme Corp", representatives=[]
-        )
+    @merger_test(expected_query_count=17)
+    def test_submitted_by_party_link_survives_remerge(self):
+        """Is a submitter that matches a party on the docket linked to that party, and does a later scrape that can't match the submitter keep that link?"""
         entry = FloridaDocketEntryFactory.create(
             submitted_by=[
                 FloridaCaseActorFactory.create(display_name="Acme Corp")
             ],
             attachments=[],
         )
-        docket_data = FloridaCaseFactory.create(
-            court_id=FloridaCourtID.SUPREME_COURT.value,
-            entries=[entry],
-            parties=[party],
+        docket_data = self._make_case(
+            entry,
+            parties=[
+                FloridaCasePartyFactory.create(
+                    name="Acme Corp", representatives=[]
+                )
+            ],
         )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        self.assertTrue(result.success)
+        first = merge_case(docket_data)
+        self.assertTrue(first.success)
         merged = FloridaDocketEntry.objects.get()
         self.assertEqual(merged.submitted_by_name, "Acme Corp")
-        self.assertEqual(
-            # pyrefly:ignore[missing-attribute]
-            merged.submitted_by_id,
-            Party.objects.get(name="Acme Corp").pk,
-        )
-
-    @merger_test(expected_query_count=14)
-    def test_merge_submitted_by_unknown_party_keeps_name_only(self):
-        """Is a submitter who isn't a party on the docket -- court staff, for instance -- recorded by name with no party link?"""
-        entry = FloridaDocketEntryFactory.create(
-            submitted_by=[
-                FloridaCaseActorFactory.create(display_name="Broward Clerk")
-            ],
-            attachments=[],
-        )
-        docket_data = self._make_case(entry)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        self.assertTrue(result.success)
-        merged = FloridaDocketEntry.objects.get()
-        self.assertEqual(merged.submitted_by_name, "Broward Clerk")
+        resolved_party_id = Party.objects.get(name="Acme Corp").pk
         # pyrefly:ignore[missing-attribute]
-        self.assertIsNone(merged.submitted_by_id)
-
-    @merger_test(expected_query_count=17)
-    def test_remerge_keeps_resolved_submitted_by_party(self):
-        """Does a later scrape that can't match the submitter keep the party we resolved earlier?"""
-        party = FloridaCasePartyFactory.create(
-            name="Acme Corp", representatives=[]
-        )
-        entry = FloridaDocketEntryFactory.create(
-            submitted_by=[
-                FloridaCaseActorFactory.create(display_name="Acme Corp")
-            ],
-            attachments=[],
-        )
-        docket_data = FloridaCaseFactory.create(
-            court_id=FloridaCourtID.SUPREME_COURT.value,
-            entries=[entry],
-            parties=[party],
-        )
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
-        merged = FloridaDocketEntry.objects.get()
-        # pyrefly:ignore[missing-attribute]
-        resolved_party_id = merged.submitted_by_id
-        self.assertIsNotNone(resolved_party_id)
+        self.assertEqual(merged.submitted_by_id, resolved_party_id)
 
         entry.submitted_by = []
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         merged.refresh_from_db()
@@ -1046,22 +797,43 @@ class FloridaDocketEntryMergerTest(TestCase):
         self.assertEqual(merged.submitted_by_id, resolved_party_id)
         self.assertEqual(merged.submitted_by_name, "")
 
+    @merger_test(expected_query_count=14)
+    def test_merge_submitted_by_unknown_party_keeps_name_only(self):
+        """Is a submitter who isn't a party on the docket -- court staff, for instance -- recorded by name with no party link?"""
+        docket_data = self._make_case(
+            FloridaDocketEntryFactory.create(
+                submitted_by=[
+                    FloridaCaseActorFactory.create(
+                        display_name="Broward Clerk"
+                    )
+                ],
+                attachments=[],
+            )
+        )
+
+        result = merge_case(docket_data)
+
+        self.assertTrue(result.success)
+        merged = FloridaDocketEntry.objects.get()
+        self.assertEqual(merged.submitted_by_name, "Broward Clerk")
+        # pyrefly:ignore[missing-attribute]
+        self.assertIsNone(merged.submitted_by_id)
+
     @merger_test(expected_query_count=24)
     def test_merge_keeps_entries_missing_from_scrape(self):
         """Are DB entries kept when a later scrape doesn't include them?"""
-        first_entry = FloridaDocketEntryFactory.create(attachments=[])
-        docket_data = self._make_case(first_entry)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        docket_data = self._make_case(
+            FloridaDocketEntryFactory.create(attachments=[])
+        )
+        merge_case(docket_data)
 
         docket_data.entries = [
             FloridaDocketEntryFactory.create(attachments=[])
         ]
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert FloridaDocketEntry.objects.count() == 2
+        self.assertTrue(result.success)
+        self.assertEqual(FloridaDocketEntry.objects.count(), 2)
 
     @merger_test(expected_query_count=2)
     def test_entry_merger_standalone(self):
@@ -1076,10 +848,12 @@ class FloridaDocketEntryMergerTest(TestCase):
             params=RelatedParams([entry], parent=docket),
         ).merge()
 
-        assert result.success is True
+        self.assertTrue(result.success)
         # pyrefly:ignore[missing-attribute]
         merged = docket.florida_docket_entries.get()
-        assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
+        self.assertEqual(
+            str(merged.docket_entry_uuid), str(entry.docket_entry_uuid)
+        )
 
 
 class FloridaDocumentMergerTest(TestCase):
@@ -1112,81 +886,62 @@ class FloridaDocumentMergerTest(TestCase):
         )
         docket_data = self._make_case(document)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert "FloridaDocument" in result.creates
-        merged = FloridaDocument.objects.get()
-        assert merged.docket_entry.docket_entry_uuid is not None
-        assert str(merged.link_uuid) == str(document.document_link_uuid)
-        assert merged.document_name == "Initial Brief"
-        assert merged.document_type == "Brief"
-        assert merged.content_type == "application/pdf"
-        assert merged.page_count == 12
-        assert merged.file_size == 34567
-        assert merged.url == "https://acis.flcourts.gov/docs/1"
-
-    @merger_test(expected_query_count=17)
-    def test_merge_document_without_type_is_blank(self):
-        """Is a scrape document with no document type merged with a blank string instead of None?"""
-        document = FloridaDocumentFactory.create(document_type=None)
-        docket_data = self._make_case(document)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        merged = FloridaDocument.objects.get()
-        assert merged.document_type == ""
-
-    @merger_test(expected_query_count=17)
-    def test_merge_document_without_content_type_is_blank(self):
-        """Is a scrape document with no content type merged with a blank string instead of None?"""
-        document = FloridaDocumentFactory.create(content_type=None)
-        docket_data = self._make_case(document)
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
+        self.assertIn("FloridaDocument", result.creates)
         merged = FloridaDocument.objects.get()
-        self.assertEqual(merged.content_type, "")
+        self.assertIsNotNone(merged.docket_entry.docket_entry_uuid)
+        self.assertEqual(
+            str(merged.link_uuid), str(document.document_link_uuid)
+        )
+        self.assertEqual(merged.document_name, "Initial Brief")
+        self.assertEqual(merged.document_type, "Brief")
+        self.assertEqual(merged.content_type, "application/pdf")
+        self.assertEqual(merged.page_count, 12)
+        self.assertEqual(merged.file_size, 34567)
+        self.assertEqual(merged.url, "https://acis.flcourts.gov/docs/1")
+
+    @merger_test(expected_query_count=34)
+    def test_merge_document_missing_optional_text_is_blank(self):
+        """Is a scrape document with no document type or no content type merged with a blank string instead of None?"""
+        for field in ("document_type", "content_type"):
+            with table_row(self, field):
+                docket_data = self._make_case(
+                    FloridaDocumentFactory.create(**{field: None})
+                )
+
+                result = merge_case(docket_data)
+
+                self.assertTrue(result.success)
+                merged = FloridaDocument.objects.get()
+                self.assertEqual(getattr(merged, field), "")
 
     @merger_test(expected_query_count=27)
     def test_remerge_documents_is_idempotent(self):
-        """Does merging the same case twice avoid duplicating documents?"""
-        document = FloridaDocumentFactory.create()
-        docket_data = self._make_case(document)
+        """Does merging the same case twice match the stored document rather than duplicating it, and report it as updated while it has no stored file and no processing error, so a re-ingest retries its failed download?"""
+        docket_data = self._make_case(FloridaDocumentFactory.create())
 
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        first = merge_case(docket_data)
+        merged = FloridaDocument.objects.get()
+        second = merge_case(docket_data)
 
-        assert first.success is True
-        assert second.success is True
-        assert "FloridaDocument" not in second.creates
-        assert FloridaDocument.objects.count() == 1
+        self.assertTrue(first.success)
+        self.assertTrue(second.success)
+        self.assertNotIn("FloridaDocument", second.creates)
+        self.assertIn(merged.pk, second.updates["FloridaDocument"])
+        self.assertEqual(FloridaDocument.objects.count(), 1)
 
     @merger_test(expected_query_count=31)
     def test_merge_removes_documents_missing_from_scrape(self):
         """Are DB documents deleted when a later scrape doesn't include them?"""
-        document = FloridaDocumentFactory.create()
-        docket_data = self._make_case(document)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        docket_data = self._make_case(FloridaDocumentFactory.create())
+        merge_case(docket_data)
         stale = FloridaDocument.objects.get()
 
         replacement = FloridaDocumentFactory.create()
         docket_data.entries[0].attachments = [replacement]
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertEqual(
@@ -1205,7 +960,7 @@ class FloridaDocumentMergerTest(TestCase):
             url="https://acis.flcourts.gov/docs/old",
         )
         docket_data = self._make_case(document)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
 
         merged = FloridaDocument.objects.get()
         merged.processing_error = ProcessingError.BAD_URL
@@ -1222,9 +977,7 @@ class FloridaDocumentMergerTest(TestCase):
         )
 
         document.url = "https://acis.flcourts.gov/docs/new"
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertIn(merged.pk, result.updates["FloridaDocument"])
@@ -1235,31 +988,13 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertIsNone(merged.ocr_status)
 
     @merger_test(expected_query_count=27)
-    def test_remerge_missing_file_is_update(self):
-        """Is an unchanged document with no stored file and no processing error reported as updated, so a re-ingest retries its failed download?"""
-        document = FloridaDocumentFactory.create()
-        docket_data = self._make_case(document)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
-        merged = FloridaDocument.objects.get()
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        self.assertTrue(result.success)
-        self.assertIn("FloridaDocument", result.updates)
-        self.assertIn(merged.pk, result.updates["FloridaDocument"])
-
-    @merger_test(expected_query_count=27)
     def test_remerge_unchanged_document_keeps_download_state(self):
         """Is download state (bad-URL flag, stored file, OCR status) left alone when the rescraped document is unchanged?"""
         _document, docket_data, merged = (
             self._merge_downloaded_bad_url_document()
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertNotIn("FloridaDocument", result.updates)
@@ -1272,13 +1007,11 @@ class FloridaDocumentMergerTest(TestCase):
         """Is a document whose link UUID changed between scrapes matched on its title and updated, rather than duplicated?"""
         document = FloridaDocumentFactory.create()
         docket_data = self._make_case(document)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
         merged = FloridaDocument.objects.get()
 
         document.document_link_uuid = uuid4()
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertNotIn("FloridaDocument", result.creates)
@@ -1293,10 +1026,8 @@ class FloridaDocumentMergerTest(TestCase):
         second = FloridaDocumentFactory.create(document_name="Brief")
         docket_data = self._make_case(first, second)
 
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        merge_case(docket_data)
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertNotIn("FloridaDocument", result.creates)
@@ -1309,13 +1040,11 @@ class FloridaDocumentMergerTest(TestCase):
         """Is a document with an unseen title and link UUID created even though the entry already has another document?"""
         first = FloridaDocumentFactory.create(document_name="Brief")
         docket_data = self._make_case(first)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
 
         second = FloridaDocumentFactory.create(document_name="Reply")
         docket_data.entries[0].attachments = [first, second]
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertEqual(FloridaDocument.objects.count(), 2)
@@ -1330,15 +1059,13 @@ class FloridaDocumentMergerTest(TestCase):
                 attachments=[FloridaDocumentFactory.create()]
             )
         )
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
         merged = FloridaDocument.objects.get(
             link_uuid=document.document_link_uuid
         )
 
         document.document_link_uuid = uuid4()
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertNotIn("FloridaDocument", result.creates)
@@ -1353,9 +1080,7 @@ class FloridaDocumentMergerTest(TestCase):
                     document_name="Motion"
                 )
                 docket_data = self._make_case(original)
-                FloridaDocketMerger(
-                    docket_data, params=docket_data.entries
-                ).merge()
+                merge_case(docket_data)
                 stored = FloridaDocument.objects.get(
                     link_uuid=original.document_link_uuid
                 )
@@ -1368,9 +1093,7 @@ class FloridaDocumentMergerTest(TestCase):
                 if replacement_first:
                     attachments.reverse()
                 docket_data.entries[0].attachments = attachments
-                result = FloridaDocketMerger(
-                    docket_data, params=docket_data.entries
-                ).merge()
+                result = merge_case(docket_data)
 
                 self.assertTrue(result.success)
                 self.assertFalse(
@@ -1393,13 +1116,11 @@ class FloridaDocumentMergerTest(TestCase):
         first = FloridaDocumentFactory.create(document_name="Motion")
         second = FloridaDocumentFactory.create(document_name="Motion")
         docket_data = self._make_case(first, second)
-        FloridaDocketMerger(docket_data, params=docket_data.entries).merge()
+        merge_case(docket_data)
 
         replacement = FloridaDocumentFactory.create(document_name="Motion")
         docket_data.entries[0].attachments = [replacement]
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertEqual(len(result.creates["FloridaDocument"]), 1)
@@ -1438,49 +1159,56 @@ class FloridaCaseTransferMergerTest(TestCase):
         } | kwargs
         return FloridaDocketTransferFactory.create(**values)
 
-    @staticmethod
-    def _merged_docket(result: MergeResult) -> Docket:
-        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
-
-    def test_merge_creates_appeal_transfer_from_circuit_court(self):
-        """Does merging create an appeal transfer from the originating circuit court into the scraped docket's court?"""
-        docket_data = self._make_case(self._circuit_transfer())
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert "CaseTransfer" in result.creates
-        docket = self._merged_docket(result)
-        transfer = CaseTransfer.objects.get()
-        assert transfer.origin_court_id == "flacirct"
-        assert transfer.origin_docket_number == "2024-CA-001234"
-        assert transfer.origin_docket is None
-        assert transfer.destination_court_id == "fla"
-        assert transfer.destination_docket_number == docket_data.docket_number
-        assert transfer.destination_docket_id == docket.pk
-        assert transfer.transfer_date == docket_data.date_filed
-        assert transfer.transfer_type == CaseTransfer.APPEAL
-
-    @merger_test(expected_query_count=7)
-    def test_merge_creates_transfer_from_appellate_court(self):
-        """Does a transfer from a district court of appeal map to its specific CourtListener court?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(
-                court_id=FloridaCourtID.FIRST_COA.value,
-                docket_number="1D2023-1111",
-            )
+    @merger_test(expected_query_count=21)
+    def test_merge_creates_inbound_transfer(self):
+        """Does merging create a transfer from the scrape's origin court, mapped to its specific CourtListener court, into the scraped docket, typed by the transfer's reason?"""
+        cases = (
+            ("circuit appeal", {}, "flacirct", CaseTransfer.APPEAL),
+            (
+                "district court of appeal",
+                {
+                    "court_id": FloridaCourtID.FIRST_COA.value,
+                    "docket_number": "1D2023-1111",
+                },
+                "fladistctapp1",
+                CaseTransfer.APPEAL,
+            ),
+            (
+                "workload reason",
+                {"reason": ScrapeTransferReason.WORKLOAD},
+                "flacirct",
+                CaseTransfer.WORKLOAD,
+            ),
         )
+        for label, overrides, origin_court_id, transfer_type in cases:
+            with table_row(self, label):
+                scrape_transfer = self._circuit_transfer(**overrides)
+                docket_data = self._make_case(scrape_transfer)
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+                result = merge_case(docket_data)
 
-        assert result.success is True
-        transfer = CaseTransfer.objects.get()
-        assert transfer.origin_court_id == "fladistctapp1"
-        assert transfer.origin_docket_number == "1D2023-1111"
+                self.assertTrue(result.success)
+                self.assertIn("CaseTransfer", result.creates)
+                transfer = CaseTransfer.objects.get()
+                self.assertEqual(transfer.origin_court_id, origin_court_id)
+                self.assertEqual(
+                    transfer.origin_docket_number,
+                    scrape_transfer.docket_number,
+                )
+                self.assertIsNone(transfer.origin_docket)
+                self.assertEqual(transfer.destination_court_id, "fla")
+                self.assertEqual(
+                    transfer.destination_docket_number,
+                    docket_data.docket_number,
+                )
+                self.assertEqual(
+                    transfer.destination_docket_id,
+                    merged_docket(result).pk,
+                )
+                self.assertEqual(
+                    transfer.transfer_date, docket_data.date_filed
+                )
+                self.assertEqual(transfer.transfer_type, transfer_type)
 
     @merger_test(expected_query_count=10)
     def test_merge_creates_transfer_into_appellate_docket(self):
@@ -1494,30 +1222,15 @@ class FloridaCaseTransferMergerTest(TestCase):
             parties=[],
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
+        self.assertTrue(result.success)
         transfer = CaseTransfer.objects.get()
-        assert transfer.origin_court_id == "flacirct"
-        assert transfer.destination_court_id == "fladistctapp1"
-        assert transfer.destination_docket_id == self._merged_docket(result).pk
-
-    @merger_test(expected_query_count=7)
-    def test_merge_maps_transfer_reason(self):
-        """Does the transfer's reason map to the matching CaseTransfer type?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(reason=ScrapeTransferReason.WORKLOAD)
+        self.assertEqual(transfer.origin_court_id, "flacirct")
+        self.assertEqual(transfer.destination_court_id, "fladistctapp1")
+        self.assertEqual(
+            transfer.destination_docket_id, merged_docket(result).pk
         )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        transfer = CaseTransfer.objects.get()
-        assert transfer.transfer_type == CaseTransfer.WORKLOAD
 
     @merger_test(expected_query_count=10)
     def test_merge_creates_all_transfers(self):
@@ -1527,37 +1240,34 @@ class FloridaCaseTransferMergerTest(TestCase):
             self._circuit_transfer(docket_number="2023-CA-000999"),
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
-        assert result.success is True
-        assert set(
-            CaseTransfer.objects.values_list(
-                "origin_court_id", "origin_docket_number"
-            )
-        ) == {
-            ("flacirct", "2024-CA-001234"),
-            ("flacirct", "2023-CA-000999"),
-        }
+        self.assertTrue(result.success)
+        self.assertEqual(
+            set(
+                CaseTransfer.objects.values_list(
+                    "origin_court_id", "origin_docket_number"
+                )
+            ),
+            {
+                ("flacirct", "2024-CA-001234"),
+                ("flacirct", "2023-CA-000999"),
+            },
+        )
 
     @merger_test(expected_query_count=10)
     def test_remerge_is_idempotent(self):
         """Does merging the same case twice avoid duplicating transfers?"""
         docket_data = self._make_case(self._circuit_transfer())
 
-        first = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-        second = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        first = merge_case(docket_data)
+        second = merge_case(docket_data)
 
-        assert first.success is True
-        assert second.success is True
-        assert "CaseTransfer" not in second.creates
-        assert "CaseTransfer" not in second.updates
-        assert CaseTransfer.objects.count() == 1
+        self.assertTrue(first.success)
+        self.assertTrue(second.success)
+        self.assertNotIn("CaseTransfer", second.creates)
+        self.assertNotIn("CaseTransfer", second.updates)
+        self.assertEqual(CaseTransfer.objects.count(), 1)
 
     @merger_test(expected_query_count=7)
     def test_merge_fills_existing_partial_transfer(self):
@@ -1579,9 +1289,7 @@ class FloridaCaseTransferMergerTest(TestCase):
             transfer_type=CaseTransfer.APPEAL,
         )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+        result = merge_case(docket_data)
 
         self.assertTrue(result.success)
         self.assertNotIn("CaseTransfer", result.creates)
@@ -1590,80 +1298,33 @@ class FloridaCaseTransferMergerTest(TestCase):
         self.assertEqual(CaseTransfer.objects.count(), 1)
         partial.refresh_from_db()
         self.assertEqual(
-            partial.destination_docket_id, self._merged_docket(result).pk
+            partial.destination_docket_id, merged_docket(result).pk
         )
         # The origin side set by the earlier merge is left alone.
         self.assertEqual(partial.origin_docket_id, origin_docket.pk)
 
-    @merger_test(expected_query_count=4)
-    def test_merge_skips_outbound_transfer(self):
-        """Are outbound transfers skipped without failing the merge?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(direction=ScrapeTransferDirection.OUTBOUND)
-        )
+    @merger_test(expected_query_count=20)
+    def test_merge_skips_unmergeable_transfer(self):
+        """Is a transfer that is outbound, has a reason with no CaseTransfer type, comes from a court with no CourtListener mapping or one missing from the DB, or has no docket number skipped without failing the merge?"""
+        cases = {
+            "outbound": {"direction": ScrapeTransferDirection.OUTBOUND},
+            "unknown reason": {"reason": ScrapeTransferReason.UNKNOWN},
+            "unmappable court": {
+                "court_id": FloridaCourtID.COMPENSATION_CLAIMS.value
+            },
+            "court missing from DB": {"court_id": FloridaCourtID.COUNTY.value},
+            "empty docket number": {"docket_number": ""},
+        }
+        for label, overrides in cases.items():
+            with table_row(self, label):
+                docket_data = self._make_case(
+                    self._circuit_transfer(**overrides)
+                )
 
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
+                result = merge_case(docket_data)
 
-        assert result.success is True
-        assert CaseTransfer.objects.count() == 0
-
-    @merger_test(expected_query_count=4)
-    def test_merge_skips_unknown_transfer_reason(self):
-        """Are transfers whose reason has no CaseTransfer type skipped?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(reason=ScrapeTransferReason.UNKNOWN)
-        )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert CaseTransfer.objects.count() == 0
-
-    @merger_test(expected_query_count=4)
-    def test_merge_skips_unmappable_court(self):
-        """Are transfers from courts with no CourtListener mapping skipped without failing the merge?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(
-                court_id=FloridaCourtID.COMPENSATION_CLAIMS.value
-            )
-        )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert CaseTransfer.objects.count() == 0
-
-    @merger_test(expected_query_count=4)
-    def test_merge_skips_court_missing_from_db(self):
-        """Is a mappable court that isn't in the DB skipped without failing the merge?"""
-        docket_data = self._make_case(
-            self._circuit_transfer(court_id=FloridaCourtID.COUNTY.value)
-        )
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert CaseTransfer.objects.count() == 0
-
-    @merger_test(expected_query_count=4)
-    def test_merge_skips_empty_docket_number(self):
-        """Is a transfer with no docket number skipped?"""
-        docket_data = self._make_case(self._circuit_transfer(docket_number=""))
-
-        result = FloridaDocketMerger(
-            docket_data, params=docket_data.entries
-        ).merge()
-
-        assert result.success is True
-        assert CaseTransfer.objects.count() == 0
+                self.assertTrue(result.success)
+                self.assertEqual(CaseTransfer.objects.count(), 0)
 
 
 class FloridaIngestTaskTest(TestCase):
@@ -1683,6 +1344,22 @@ class FloridaIngestTaskTest(TestCase):
             court_id=FloridaCourtID.SUPREME_COURT.value,
             entries=[entry],
         )
+
+    def _ingest_with_stored_file(
+        self, download_mock: mock.Mock
+    ) -> tuple[FloridaCase, FloridaDocument]:
+        """Ingest a case, then give its document a stored file.
+
+        Resets `download_mock` so a re-ingest's download dispatches can be
+        checked on their own.
+        """
+        case = self._make_case()
+        fl_ingest_docket_task((case, "bucket", "key"))
+        document = FloridaDocument.objects.get()
+        document.filepath_local = "florida/stored-file.pdf"
+        document.save()
+        download_mock.reset_mock()
+        return case, document
 
     @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
     def test_ingest_merges_docket_and_dispatches_downloads(
@@ -1728,12 +1405,7 @@ class FloridaIngestTaskTest(TestCase):
         self, download_mock: mock.Mock
     ) -> None:
         """Does re-ingesting an unchanged case skip downloading a document whose file is already stored?"""
-        case = self._make_case()
-        fl_ingest_docket_task((case, "bucket", "key"))
-        document = FloridaDocument.objects.get()
-        document.filepath_local = "florida/stored-file.pdf"
-        document.save()
-        download_mock.reset_mock()
+        case, _document = self._ingest_with_stored_file(download_mock)
 
         result = fl_ingest_docket_task((case, "bucket", "key"))
 
@@ -1747,12 +1419,7 @@ class FloridaIngestTaskTest(TestCase):
         self, download_mock: mock.Mock
     ) -> None:
         """Does a rescrape that only updates a document's metadata skip downloading a file that's already stored for the same link UUID?"""
-        case = self._make_case()
-        fl_ingest_docket_task((case, "bucket", "key"))
-        document = FloridaDocument.objects.get()
-        document.filepath_local = "florida/stored-file.pdf"
-        document.save()
-        download_mock.reset_mock()
+        case, document = self._ingest_with_stored_file(download_mock)
 
         case.entries[0].attachments[0].document_name = "Renamed document"
         result = fl_ingest_docket_task((case, "bucket", "key"))
@@ -1766,12 +1433,7 @@ class FloridaIngestTaskTest(TestCase):
         self, download_mock: mock.Mock
     ) -> None:
         """Does a rescrape that changes a document's link UUID update the existing document and skip downloading its already stored file?"""
-        case = self._make_case()
-        fl_ingest_docket_task((case, "bucket", "key"))
-        document = FloridaDocument.objects.get()
-        document.filepath_local = "florida/stored-file.pdf"
-        document.save()
-        download_mock.reset_mock()
+        case, document = self._ingest_with_stored_file(download_mock)
 
         new_uuid = uuid4()
         case.entries[0].attachments[0].document_link_uuid = new_uuid
@@ -1842,11 +1504,27 @@ class FloridaDocumentDownloadTest(TestCase):
         self.extract_document_mock = self.extract_document_patch.start()
         self.addCleanup(self.extract_document_patch.stop)
 
-    def _mock_downloaded_file(self, tmp, sha1: str) -> None:
+    @staticmethod
+    @contextmanager
+    def _temporary_file(data: bytes) -> Iterator[IO[bytes]]:
+        """Yield an open temporary file holding `data`, rewound for reading."""
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(data)
+            tmp.flush()
+            tmp.seek(0)
+            yield tmp
+
+    def _mock_downloaded_file(self, tmp: IO[bytes], sha1: str) -> None:
         """Point the mocked download stream at an open temporary file."""
         self.download_document_mock.return_value.__enter__.return_value = (
             tmp,
             sha1,
+        )
+
+    def _refuse_downloads(self) -> None:
+        """Make every download attempt fail with a 403 refusal from the court."""
+        self.download_document_mock.return_value.__enter__.side_effect = (
+            requests.HTTPError(response=mock.Mock(status_code=403))
         )
 
     @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
@@ -1860,10 +1538,7 @@ class FloridaDocumentDownloadTest(TestCase):
         fl_document = FloridaDocumentModelFactory.create()
         pcs_mock.return_value = httpx.Response(200, text="1")
 
-        with NamedTemporaryFile(suffix=".tmp") as tmp:
-            tmp.write(b"fake pdf data")
-            tmp.flush()
-            tmp.seek(0)
+        with self._temporary_file(b"fake pdf data") as tmp:
             self._mock_downloaded_file(tmp, "pdfsha1")
 
             result = download_fl_document(fl_document.pk)
@@ -1934,10 +1609,7 @@ class FloridaDocumentDownloadTest(TestCase):
         pcs_mock.return_value = httpx.Response(200, text="1")
         refused = requests.HTTPError(response=mock.Mock(status_code=403))
 
-        with NamedTemporaryFile(suffix=".tmp") as tmp:
-            tmp.write(b"fake pdf data")
-            tmp.flush()
-            tmp.seek(0)
+        with self._temporary_file(b"fake pdf data") as tmp:
             self.download_document_mock.return_value.__enter__.side_effect = [
                 refused,
                 (tmp, "pdfsha1"),
@@ -1951,14 +1623,15 @@ class FloridaDocumentDownloadTest(TestCase):
         self.assertEqual(fl_document.sha1, "pdfsha1")
         self.extract_document_mock.assert_called_once()
 
-    def test_download_refusal_fails_after_retries(self) -> None:
-        """Does a court that keeps refusing eventually fail the task with the refusal, rather than retrying forever or passing silently?"""
+    def test_download_refusal_fails_after_full_backoff(self) -> None:
+        """Does a court that keeps refusing eventually fail the task with the refusal, rather than retrying forever or passing silently, after waiting every retry's whole backoff interval? A retry sent while the court is still blocking us is wasted, so the waits must not be shortened at random."""
         fl_document = FloridaDocumentModelFactory.create()
-        self.download_document_mock.return_value.__enter__.side_effect = (
-            requests.HTTPError(response=mock.Mock(status_code=403))
-        )
+        self._refuse_downloads()
 
-        result = download_fl_document.apply(args=(fl_document.pk,))
+        with mock.patch.object(
+            download_fl_document, "retry", wraps=download_fl_document.retry
+        ) as retry_mock:
+            result = download_fl_document.apply(args=(fl_document.pk,))
 
         self.assertTrue(result.failed())
         self.assertIsInstance(result.result, CourtRefused)
@@ -1966,22 +1639,6 @@ class FloridaDocumentDownloadTest(TestCase):
             self.download_document_mock.call_count,
             download_fl_document.max_retries + 1,
         )
-        fl_document.refresh_from_db()
-        self.assertFalse(fl_document.filepath_local)
-        self.extract_document_mock.assert_not_called()
-
-    def test_download_refusal_retries_wait_full_backoff(self) -> None:
-        """Does every retry of a refused download wait its whole backoff interval? A retry sent while the court is still blocking us is wasted, so the waits must not be shortened at random."""
-        fl_document = FloridaDocumentModelFactory.create()
-        self.download_document_mock.return_value.__enter__.side_effect = (
-            requests.HTTPError(response=mock.Mock(status_code=403))
-        )
-
-        with mock.patch.object(
-            download_fl_document, "retry", wraps=download_fl_document.retry
-        ) as retry_mock:
-            download_fl_document.apply(args=(fl_document.pk,))
-
         minute = 60
         # The final call to retry raises the refusal instead of waiting.
         waits = [
@@ -1994,98 +1651,57 @@ class FloridaDocumentDownloadTest(TestCase):
             waits,
             [5 * minute, 10 * minute, 20 * minute, 40 * minute, 60 * minute],
         )
-
-    @mock.patch("cl.search.state.shared.logger")
-    @mock.patch("cl.scrapers.utils.get_extension", return_value=".tiff")
-    def test_download_tiff_extracts_without_warning(
-        self,
-        ext_mock: mock.Mock,
-        logger_mock: mock.Mock,
-    ) -> None:
-        """Is a TIFF (expected and extractable) stored and extracted with no unexpected-extension warning?"""
-        fl_document = FloridaDocumentModelFactory.create()
-
-        with NamedTemporaryFile(suffix=".tmp") as tmp:
-            tmp.write(b"fake tiff data")
-            tmp.flush()
-            tmp.seek(0)
-            self._mock_downloaded_file(tmp, "tiffsha1")
-
-            result = download_fl_document(fl_document.pk)
-
-        self.assertEqual(result, fl_document.pk)
-        logger_mock.warning.assert_not_called()
         fl_document.refresh_from_db()
-        self.assertTrue(fl_document.filepath_local)
-        self.assertIn(".tiff", fl_document.filepath_local.name)
-        self.assertEqual(fl_document.sha1, "tiffsha1")
-        self.assertIsNone(fl_document.ocr_status)
-        self.extract_document_mock.assert_called_once()
-
-    @mock.patch("cl.search.state.shared.logger")
-    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
-    def test_download_html_unexpected_but_extractable(
-        self,
-        ext_mock: mock.Mock,
-        logger_mock: mock.Mock,
-    ) -> None:
-        """Is an HTML file (unexpected but extractable) stored with a warning and still sent to extraction?"""
-        fl_document = FloridaDocumentModelFactory.create()
-
-        with NamedTemporaryFile(suffix=".tmp") as tmp:
-            tmp.write(b"<html>test</html>")
-            tmp.flush()
-            tmp.seek(0)
-            self._mock_downloaded_file(tmp, "htmlsha1")
-
-            result = download_fl_document(fl_document.pk)
-
-        self.assertEqual(result, fl_document.pk)
-        logger_mock.warning.assert_any_call(
-            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
-            ".html",
-            "FloridaDocument",
-            fl_document.pk,
-            fl_document.url,
-        )
-        fl_document.refresh_from_db()
-        self.assertIn(".html", fl_document.filepath_local.name)
-        self.assertIsNone(fl_document.ocr_status)
-        self.extract_document_mock.assert_called_once()
-
-    @mock.patch("cl.search.state.shared.logger")
-    @mock.patch("cl.scrapers.utils.get_extension", return_value=".docx")
-    def test_download_unknown_extension_skips_extraction(
-        self,
-        ext_mock: mock.Mock,
-        logger_mock: mock.Mock,
-    ) -> None:
-        """Is an unknown file type stored with a warning, marked OCR_UNNECESSARY, and kept out of extraction?"""
-        fl_document = FloridaDocumentModelFactory.create()
-
-        with NamedTemporaryFile(suffix=".tmp") as tmp:
-            tmp.write(b"fake docx data")
-            tmp.flush()
-            tmp.seek(0)
-            self._mock_downloaded_file(tmp, "docxsha1")
-
-            result = download_fl_document(fl_document.pk)
-
-        self.assertEqual(result, fl_document.pk)
-        logger_mock.warning.assert_any_call(
-            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
-            ".docx",
-            "FloridaDocument",
-            fl_document.pk,
-            fl_document.url,
-        )
-        fl_document.refresh_from_db()
-        self.assertTrue(fl_document.filepath_local)
-        self.assertEqual(
-            fl_document.ocr_status, FloridaDocument.OCR_UNNECESSARY
-        )
-        self.assertIsNone(fl_document.processing_error)
+        self.assertFalse(fl_document.filepath_local)
         self.extract_document_mock.assert_not_called()
+
+    def test_download_non_pdf_file_types(self) -> None:
+        """Is a downloaded non-PDF file stored with a warning only when its type is unexpected, and sent to extraction only when extractable, being marked OCR_UNNECESSARY otherwise?"""
+        cases = (
+            # extension, unexpected, extractable
+            (".tiff", False, True),
+            (".html", True, True),
+            (".docx", True, False),
+        )
+        for extension, unexpected, extractable in cases:
+            with (
+                table_row(self, extension),
+                mock.patch(
+                    "cl.scrapers.utils.get_extension", return_value=extension
+                ),
+                mock.patch("cl.search.state.shared.logger") as logger_mock,
+                self._temporary_file(b"fake data") as tmp,
+            ):
+                self.extract_document_mock.reset_mock()
+                fl_document = FloridaDocumentModelFactory.create()
+                self._mock_downloaded_file(tmp, f"{extension}sha1")
+
+                result = download_fl_document(fl_document.pk)
+
+                self.assertEqual(result, fl_document.pk)
+                unexpected_warning = mock.call(
+                    "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
+                    extension,
+                    "FloridaDocument",
+                    fl_document.pk,
+                    fl_document.url,
+                )
+                self.assertEqual(
+                    logger_mock.warning.call_args_list,
+                    [unexpected_warning] if unexpected else [],
+                )
+                fl_document.refresh_from_db()
+                self.assertTrue(fl_document.filepath_local)
+                self.assertIn(extension, fl_document.filepath_local.name)
+                self.assertEqual(fl_document.sha1, f"{extension}sha1")
+                self.assertIsNone(fl_document.processing_error)
+                self.assertEqual(
+                    fl_document.ocr_status,
+                    None if extractable else FloridaDocument.OCR_UNNECESSARY,
+                )
+                self.assertEqual(
+                    self.extract_document_mock.call_count, int(extractable)
+                )
 
 
 class StateDocumentExtractionTest(TestCase):
@@ -2143,39 +1759,32 @@ class StateDocumentExtractionTest(TestCase):
         }
 
     def test_page_limit_filters_pdfs_only(self) -> None:
-        """Does --page-limit keep only PDFs with a real page count within the limit, while still scheduling non-PDF documents?"""
-        extract_state_documents(
-            FloridaDocument,
-            throttle_min_items=100,
-            extraction_queue="celery",
-            batch_size=10,
-            delay=0,
-            page_limit=50,
+        """Does --page-limit keep only PDFs with a real page count within the limit while still scheduling non-PDF documents, and does omitting it schedule every document regardless of its page_count, including null, zero and negative values?"""
+        cases = (
+            (50, {self.small_pdf.pk, self.html_doc.pk}),
+            (
+                None,
+                {
+                    self.small_pdf.pk,
+                    self.big_pdf.pk,
+                    self.zero_pdf.pk,
+                    self.negative_pdf.pk,
+                    self.null_pdf.pk,
+                    self.html_doc.pk,
+                },
+            ),
         )
+        for page_limit, expected_pks in cases:
+            with table_row(self, f"page_limit={page_limit}"):
+                self.extract_document_mock.reset_mock()
 
-        self.assertEqual(
-            self._scheduled_pks(),
-            {self.small_pdf.pk, self.html_doc.pk},
-        )
+                extract_state_documents(
+                    FloridaDocument,
+                    throttle_min_items=100,
+                    extraction_queue="celery",
+                    batch_size=10,
+                    delay=0,
+                    page_limit=page_limit,
+                )
 
-    def test_no_page_limit_schedules_everything(self) -> None:
-        """Without --page-limit, are all documents scheduled regardless of their page_count, including null, zero and negative values?"""
-        extract_state_documents(
-            FloridaDocument,
-            throttle_min_items=100,
-            extraction_queue="celery",
-            batch_size=10,
-            delay=0,
-        )
-
-        self.assertEqual(
-            self._scheduled_pks(),
-            {
-                self.small_pdf.pk,
-                self.big_pdf.pk,
-                self.zero_pdf.pk,
-                self.negative_pdf.pk,
-                self.null_pdf.pk,
-                self.html_doc.pk,
-            },
-        )
+                self.assertEqual(self._scheduled_pks(), expected_pks)
