@@ -13,15 +13,17 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
-from cl.search.constants import SCOTUS_COURT_IDS
+from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
 from cl.search.models import (
     BankruptcyInformation,
     Court,
     Docket,
     FederalCourtsQuerySet,
+    OpinionCluster,
     RECAPDocument,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocketEntry,
     TexasDocument,
 )
 
@@ -154,6 +156,32 @@ def _scotus_ready_to_index(docket: Docket) -> bool:
     return getattr(docket, "scotus_metadata", None) is not None
 
 
+def _texas_docket_belongs(docket: Docket) -> bool:
+    """True for a TAMES Docket, not one created only to hold a scraped Opinion. Like SCOTUS, merge_texas_docket and the opinion scrapers both use source=SCRAPER, so source alone can't tell the two apart.
+
+    True if the Docket was explicitly marked at save time
+    (merge_texas_docket sets `docket._index_in_es` before its save).
+    """
+    if docket.court_id not in TAMES_COURT_IDS:
+        return False
+    return getattr(docket, "_index_in_es", False)
+
+
+def _texas_docket_filter() -> Q:
+    """Select TAMES-court Dockets with a TexasDocketEntry or without an OpinionCluster, so bulk indexing also picks TAMES Dockets with no entries yet while leaving out the Dockets created only to hold a scraped Opinion.
+
+    The signal processor can't use this rule: opinion scrapers save a new
+    Docket before its OpinionCluster, so at that save the Docket has
+    neither.
+    """
+    # The court filter wraps both branches so the query can use the court
+    # index instead of checking every Docket.
+    return Q(court_id__in=TAMES_COURT_IDS) & (
+        Q(Exists(TexasDocketEntry.objects.filter(docket=OuterRef("pk"))))
+        | ~Q(Exists(OpinionCluster.objects.filter(docket=OuterRef("pk"))))
+    )
+
+
 RECAP_ES_SOURCE = ESDocketSource(
     name="recap",
     docket_entries_related_name="docket_entries",
@@ -181,12 +209,29 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     # empty; SCOTUS alerts always go through the percolator.
     in_alerts_sweep=False,
 )
+TEXAS_ES_SOURCE = ESDocketSource(
+    name="texas",
+    docket_entries_related_name="texasdocketentry_set",
+    document_model=TexasDocument,
+    child_id_property="TEXAS",
+    docket_belongs=_texas_docket_belongs,
+    docket_filter=_texas_docket_filter,
+    metadata_model=None,
+    percolator_setting="PERCOLATOR_TEXAS_SEARCH_ALERTS_ENABLED",
+    uid_namespace="texas",
+    court_ids=TAMES_COURT_IDS,
+    frontend_search_flag="texas_docket_page",
+    # Like SCOTUS, Texas documents leave RECAP's integer ids empty, so
+    # Texas alerts only go through the percolator.
+    in_alerts_sweep=False,
+)
 
 # Every known source, used wherever the shared code needs to loop over all
 # of them uniformly.
 ALL_ES_SOURCES: tuple[ESDocketSource, ...] = (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
+    TEXAS_ES_SOURCE,
 )
 
 # Each source by name, for callers that only have a string (CLI options,

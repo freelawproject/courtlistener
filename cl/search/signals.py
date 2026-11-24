@@ -56,6 +56,8 @@ from cl.search.models import (
     SCOTUSDocketEntry,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocketEntry,
+    TexasDocument,
 )
 from cl.search.state.shared import AbstractStateDocument
 from cl.settings import DEVELOPMENT, TESTING
@@ -494,6 +496,63 @@ scotus_document_field_mapping: DocumentModelMapping = {
     "reverse-delete": {},
 }
 
+texas_document_field_mapping: DocumentModelMapping = {
+    "save": {
+        TexasDocument: {
+            "self": {
+                "description": ["short_description"],
+                "plain_text": ["plain_text"],
+                "page_count": ["page_count"],
+                "filepath_local": ["filepath_local", "is_available"],
+                "docket_entry_id": ["prepare"],
+            },
+        },
+        TexasDocketEntry: {
+            "docket_entry": {
+                "description": ["description"],
+                "disposition": ["disposition"],
+                "date_filed": ["entry_date_filed"],
+            }
+        },
+        Docket: {
+            "docket_entry__docket": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+            }
+        },
+        Person: {
+            "assigned_to": {
+                "name_first": ["assignedTo"],
+                "name_middle": ["assignedTo"],
+                "name_last": ["assignedTo"],
+                "get_name_suffix_display": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_first": ["referredTo"],
+                "name_middle": ["referredTo"],
+                "name_last": ["referredTo"],
+                "get_name_suffix_display": ["referredTo"],
+            },
+        },
+    },
+    "delete": {TexasDocument: {}},
+    "m2m": {},
+    "reverse": {},
+    "reverse-delete": {},
+}
+
 o_field_mapping: DocumentModelMapping = {
     "save": {
         Docket: {
@@ -645,6 +704,9 @@ if not settings.ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED:
     )
     _scotus_document_signal_processor = ESSignalProcessor(
         SCOTUSDocument, ESRECAPDocument, scotus_document_field_mapping
+    )
+    _texas_document_signal_processor = ESSignalProcessor(
+        TexasDocument, ESRECAPDocument, texas_document_field_mapping
     )
 if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(

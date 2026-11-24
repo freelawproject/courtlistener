@@ -833,7 +833,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
 def get_docket_source(
     app_label: str, document_content: ESDictDocument
 ) -> ESDocketSource | None:
-    """Return the docket source (RECAP, SCOTUS) of a percolated document.
+    """Return the docket source (RECAP, SCOTUS, Texas) of a percolated document.
 
     :param app_label: The percolated document's app label.
     :param document_content: The percolated document's ES content.
@@ -843,7 +843,11 @@ def get_docket_source(
     match app_label:
         case "search.Docket":
             return source_for_court(document_content.get("court_id", ""))
-        case "search.RECAPDocument" | "search.SCOTUSDocument":
+        case (
+            "search.RECAPDocument"
+            | "search.SCOTUSDocument"
+            | "search.TexasDocument"
+        ):
             return SOURCE_BY_MODEL[apps.get_model(app_label)]
         case _:
             return None

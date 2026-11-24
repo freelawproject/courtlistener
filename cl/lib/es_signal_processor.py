@@ -55,6 +55,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocument,
+    TexasDocument,
 )
 from cl.search.tasks import (
     compute_single_opinion_embeddings,
@@ -230,6 +231,7 @@ def update_es_documents(
                 | OpinionCluster()
                 | Opinion()
                 | SCOTUSDocument()
+                | TexasDocument()
             ) if mapping_fields.get("self", None):
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
