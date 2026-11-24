@@ -11,6 +11,7 @@
   :searchable="True"
   creatable
   create_label="Create:"
+  inline
   class=""
 />
 
@@ -69,16 +70,20 @@
         class="flex-1 min-w-24 bg-transparent outline-none placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
       />
     </div>
-    <button x-combobox:button aria-label="Show options" class="flex items-center justify-center shrink-0 size-5 text-greyscale-400">
+    <button x-combobox:button aria-label="Show options" class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
       {% svg "chevron" class="size-full" aria_hidden="true" %}
     </button>
   </div>
   <ul
     x-combobox:options
-    x-anchor.bottom-start.offset.4="$refs.field"
-    x-cloak
+    {% if inline %}
+      static
+    {% else %}
+      x-anchor.bottom-start.offset.4="$refs.field"
+      x-cloak
+    {% endif %}
     {% if multiple %}aria-multiselectable="true"{% endif %}
-    class="z-20 w-full max-h-80 overflow-y-auto list-none p-1.5 border border-greyscale-200 rounded-lg bg-white shadow-lg"
+    class="w-full max-h-80 overflow-y-auto list-none {% if inline %}p-0{% else %}z-20 p-1.5 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
   >
     <template x-for="option in filteredOptions" x-bind:key="option.value">
       <li
