@@ -14,7 +14,8 @@ import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.db.models import QuerySet
+from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models.functions import Lower
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
 from django.urls import reverse
@@ -33,6 +34,7 @@ from zoneinfo import ZoneInfo
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm, get_note_form_for
+from cl.favorites.models import DocketTag, UserTag
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -1028,6 +1030,21 @@ async def _common_metadata_sections(
     ]
 
 
+class TagOption(TypedDict):
+    """A tag as an option of the c-combobox component."""
+
+    value: int
+    label: str
+    selected: bool
+
+
+class DocketTagsDict(TypedDict):
+    """A user's tags as the docket page's Tags button takes them."""
+
+    options: list[TagOption]
+    associations: dict[int, int]
+
+
 class CoreDocketDataDict(TypedDict):
     """Template context shared by every tab view of a docket."""
 
@@ -1035,6 +1052,7 @@ class CoreDocketDataDict(TypedDict):
     title: str
     note_form: NoteForm
     has_alert: bool
+    docket_tags: DocketTagsDict
     timezone: str
     private: bool
     docket_source: DocketEntrySource
@@ -1088,6 +1106,15 @@ async def core_docket_data(
         cast(User | AnonymousUser, await request.auser()), docket
     )
 
+    # Only the new design's docket page shows the tags.
+    # TODO: Gather them for every request once the new design is completely
+    # rolled out, and remove this flag check.
+    docket_tags: DocketTagsDict = {"options": [], "associations": {}}
+    if await sync_to_async(waffle.flag_is_active)(request, "use_new_design"):
+        docket_tags = await user_docket_tags(
+            cast(User | AnonymousUser, await request.auser()), docket
+        )
+
     timezone_str = COURT_TIMEZONES.get(docket.court_id, "US/Eastern")
     docket_source = docket.get_entry_source()
 
@@ -1126,6 +1153,7 @@ async def core_docket_data(
             "title": title,
             "note_form": note_form,
             "has_alert": has_alert,
+            "docket_tags": docket_tags,
             "timezone": timezone_str,
             "private": docket.blocked,
             "docket_source": docket_source,
@@ -1156,6 +1184,40 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
             docket=docket, user=user, alert_type=DocketAlert.SUBSCRIPTION
         ).aexists()
     return has_alert
+
+
+async def user_docket_tags(
+    user: AnonymousUser | User, docket: Docket
+) -> DocketTagsDict:
+    """Gather the user's tags for the docket page's Tags button.
+
+    ``options`` lists every tag the user owns by name, ignoring case, with the
+    ones applied to the docket selected. ``associations`` maps the id of each
+    applied tag to the id of the DocketTag applying it. Both are empty for
+    anonymous users.
+    """
+    tags: DocketTagsDict = {"options": [], "associations": {}}
+    if not user.is_authenticated:
+        return tags
+    rows = (
+        UserTag.objects.filter(user=user)
+        .annotate(
+            association=Subquery(
+                DocketTag.objects.filter(
+                    tag=OuterRef("pk"), docket=docket
+                ).values("pk")[:1]
+            )
+        )
+        .order_by(Lower("name"))
+        .values_list("pk", "name", "association")
+    )
+    async for pk, name, association in rows:
+        tags["options"].append(
+            {"value": pk, "label": name, "selected": association is not None}
+        )
+        if association is not None:
+            tags["associations"][pk] = association
+    return tags
 
 
 def generate_docket_entries_csv_data(
