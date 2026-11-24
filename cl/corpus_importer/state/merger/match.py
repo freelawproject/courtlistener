@@ -78,6 +78,24 @@ def _settled[T](outcome: T | type[Fail]) -> T | Fail:
     return Fail() if outcome is Fail else cast(T, outcome)
 
 
+def ambiguous_text(model: type[Model], rows: int, items: int) -> str:
+    """Say why one stored row could not be picked.
+
+    Args:
+        model: The model of the rows.
+        rows: How many rows the scraped item could be.
+        items: How many scraped items hold any of those rows, including the
+            one being picked for.
+
+    Returns:
+        The reason a failed lookup gives when it has no message of its own.
+    """
+    return (
+        f"cannot pick one {model.__name__}: {rows} rows for "
+        f"{items} scraped items"
+    )
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class First:
     """Take the first candidate in a given order.
@@ -1023,8 +1041,11 @@ class MatchGroup[M: Model]:
                             tier,
                             entry,
                             outcome,
-                            f"cannot pick one {model}: {len(pks)} rows for "
-                            f"{len(rivals)} scraped items",
+                            ambiguous_text(
+                                self._merger.config.model,
+                                len(pks),
+                                len(rivals),
+                            ),
                         )
         if not isinstance(narrow := stage.ambiguous, BoundNarrow):
             return

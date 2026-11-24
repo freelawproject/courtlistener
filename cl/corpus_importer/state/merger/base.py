@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from collections.abc import (
     Mapping,
-    Sequence,
 )
 from dataclasses import dataclass, field
 from functools import cache, cached_property
@@ -30,8 +29,7 @@ from graphlib import CycleError, TopologicalSorter
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
-from .lookup import NaturalKey
-from .match import BoundMatch, Key, Match, MatchGroup
+from .match import BoundMatch, Key, Match, MatchGroup, ambiguous_text
 from .parameters import (
     Create,
     Existing,
@@ -227,8 +225,6 @@ class MergerConfig[M: Model]:
     """Class-level settings determining a merger's behavior.
 
     :ivar model: The model the merger applies to.
-    :ivar key: A natural key a merger that overrides `lookup` can look objects
-        up by; a merger that does not declares a `Match` instead.
     :ivar reads: Additionaly model fields to load. Useful for situations like
         preventing extra queries from custom `save` methods that inspect fields.
     :ivar registry: The specs declared on the merger. Filled in when the
@@ -239,7 +235,6 @@ class MergerConfig[M: Model]:
     """
 
     model: Final[type[M]]
-    key: Final[tuple[str, ...]] = ()
     reads: Final[tuple[str, ...]] = ()
     registry: MergerSpecRegistry[Any, Any] = field(
         default_factory=MergerSpecRegistry
@@ -279,12 +274,11 @@ class MergerConfig[M: Model]:
                 rows, which are loaded with the fields its specs use.
 
         Returns:
-            The config, with the fields to load worked out from the specs, key,
+            The config, with the fields to load worked out from the specs,
             reads and match columns.
         """
         config = MergerConfig(
             parent.config.model,
-            parent.config.key,
             reads=tuple(
                 {
                     read
@@ -298,7 +292,6 @@ class MergerConfig[M: Model]:
         config.fields = tuple(
             {
                 *registry.attr,
-                *config.key,
                 *config.reads,
                 *columns,
                 *(f for m in registry.all().values() for f in m._db_fields),
@@ -319,8 +312,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     the spec's name, unless the input failed validation.
 
     A spec that reads the database has, until `update` runs, the value it
-    would have with nothing stored, so `lookup` and `resolve` can match on
-    what was scraped.
+    would have with nothing stored, so `lookup` can match on what was scraped.
     """
 
     config: ClassVar[MergerConfig[Model]] = MergerConfig(Model)
@@ -505,32 +497,6 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
         # TODO: This is temporary. In the future, validation should be very detailed about failures
         return True
 
-    def natural_key(
-        self, state: MergerState.Lookup[Scrape, Params, M]
-    ) -> NaturalKey:
-        """The natural key this merger looks its object up by."""
-        attributes = {name: getattr(self, name) for name in self.config.key}
-        relations = state.relation_params
-        return NaturalKey(
-            filters={**attributes, **relations},
-            attnames=(*attributes, *[f"{name}_id" for name in relations]),
-            values=tuple(
-                [str(value) for value in attributes.values()]
-                + [str(obj.pk) for obj in relations.values()]
-            ),
-        )
-
-    @property
-    def stored(self) -> QuerySet[M]:
-        """The objects this merger can merge into, loaded with only the fields it uses. A lookup that evaluates its own query should build it from this rather than from `manager`."""
-        return self.manager.only(*self.config.fields)
-
-    def _key_query(
-        self, state: MergerState.Lookup[Scrape, Params, M]
-    ) -> QuerySet[M]:
-        """The objects matching this merger's natural key."""
-        return self.stored.filter(**self.natural_key(state).filters)
-
     @classmethod
     def pool_errors(cls, pool: Pool) -> list[Exception]:
         """Check this merger's match against the pool its rows are read from.
@@ -574,34 +540,39 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             self.group.join(self, state)
         return self.group.verdict(self, state)
 
-    @override
-    def resolve(
-        self, state: MergerState.Resolve[Scrape, Params, M]
-    ) -> MergerState.ResolveOutput[Scrape, Params, M]:
-        results: Sequence[M]
-        if isinstance(state.candidates, QuerySet):
-            if state.candidates._result_cache is None:
-                qs = state.candidates.only(*self.config.fields)[:2]
-            else:
-                qs = state.candidates
+    def found(
+        self,
+        state: MergerState.Lookup[Scrape, Params, M],
+        query: QuerySet[M],
+    ) -> MergerState.LookupOutput[Scrape, Params, M]:
+        """Turn the rows a query finds into the merger's verdict.
 
-            results = list(qs)
-        else:
-            results = state.candidates
+        For a merger that overrides `lookup` with a query of its own, such as
+        a root merger finding its object by RECAP's rules.
 
-        if len(results) == 0:
-            return state.create()
+        Args:
+            state: The merger's state.
+            query: The rows the object to merge into can only be one of. Unless
+                it has already been evaluated, in which case its rows are
+                used as they are, it is read loading only the fields the
+                merger uses, and no more than two rows are fetched.
 
-        if len(results) == 1:
-            return state.update(results[0])
-
-        logger.error(
-            "Merger %s found multiple objects; skipping merge.",
-            self.__class__.__name__,
-        )
+        Returns:
+            The state the merger moves to: creating a row if the query finds
+            none, updating the one it finds, or failed if it finds several.
+        """
+        if query._result_cache is None:
+            query = query.only(*self.config.fields)[:2]
+        rows = list(query)
+        match rows:
+            case []:
+                return state.create()
+            case [row]:
+                return state.update(row)
+        text = f"{type(self).__name__}: {ambiguous_text(self.config.model, len(rows), 1)}"
+        logger.error("%s", text)
         return state.failed(
-            "Ambiguous query results",
-            MergeResult.failed(self.config.model.__name__),
+            text, MergeResult.failed(self.config.model.__name__)
         )
 
     def merge(self) -> MergeResult:

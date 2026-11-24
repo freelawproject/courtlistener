@@ -1,4 +1,4 @@
-"""Benchmarks for every phase of a merger's life: spec construction, class creation (registry inheritance and validation), instance initialisation (transforms and natural keys), the pure-Python merge paths, and the DB-backed merge paths for each kind of relation.
+"""Benchmarks for every phase of a merger's life: spec construction, class creation (registry inheritance and validation), instance initialisation (transforms), the matcher, the pure-Python merge paths, and the DB-backed merge paths for each kind of relation.
 
 Run with::
 
@@ -7,7 +7,7 @@ Run with::
 The DB-backed benches run inside a single test transaction per bench, so rows
 created by one round stay visible to the next. Each "rescrape" bench therefore
 measures the steady state of re-merging data that is already in the DB, and
-each "create" bench uses a fresh natural key per round.
+each "create" bench uses a fresh match key per round.
 """
 
 from collections.abc import Callable
@@ -37,15 +37,14 @@ from .base import (
     MergerConfig,
     MergerSpecRegistry,
 )
-from .lookup import NaturalKey
-from .match import Key, Match, MatchGroup
+from .match import Key, Match, MatchGroup, Next
 from .parameters import (
     Create,
     RelatedParams,
     ThroughParameters,
     Update,
 )
-from .pool import Global
+from .pool import Global, Siblings
 from .specifications import (
     Constant,
     Database,
@@ -61,6 +60,7 @@ ATTRIBUTE_COUNT = 20
 ENTRY_COUNT = 20
 PARTY_COUNT = 10
 BULK_COUNT = 50
+GROUP_COUNT = 100
 
 # Text fields on `Docket`, used to build mergers with many attributes.
 DOCKET_TEXT_FIELDS = (
@@ -138,6 +138,29 @@ class EntryMerger(
 
     entry_number: int = ScrapeProxy(dict[str, Any])["entry_number"]
     description: str = ScrapeProxy(dict[str, Any])["description"]
+
+
+class TieredEntryMerger(EntryMerger):
+    """An entry matched by its number, then by its description."""
+
+    match: ClassVar[Match] = Match(
+        Key("entry_number"), Key("description", duplicate=Next)
+    )
+
+
+def tiered_entry_scrapes() -> list[dict[str, Any]]:
+    """Scrape `GROUP_COUNT` entries for `TieredEntryMerger` against rows numbered `0` to `GROUP_COUNT - 1`.
+
+    The first half carry their row's number. The second half carry a number no
+    row has, so only their description finds their row.
+    """
+    return [
+        {
+            "entry_number": n if n < GROUP_COUNT // 2 else GROUP_COUNT + n,
+            "description": f"Entry {n}",
+        }
+        for n in range(GROUP_COUNT)
+    ]
 
 
 class OriginMerger(
@@ -456,26 +479,58 @@ class InstanceInitBench:
             ),
         )
 
-    def bench_natural_key(self, benchmark: BenchmarkFixture):
-        merger = PartyTypeMerger(
-            {"name": "Alice", "type": "Plaintiff"},
-            params=ThroughParameters(
-                DocketParams(court_id=STUB_COURT.pk),
-                parent=Docket(pk=1),
-                source=Docket(pk=1),
-                source_name="docket",
-                target=Party(pk=1),
-                target_name="party",
-            ),
+
+class MatchBench:
+    """The matcher's pure-Python work: binding a declaration to a merger, assigning a group of siblings to rows read into memory, and building a keyed pool's filter."""
+
+    def bench_match_bind(self, benchmark: BenchmarkFixture):
+        benchmark(DocketMerger.match.bind, DocketMerger, None)
+
+    def bench_group_assign_whole(self, benchmark: BenchmarkFixture):
+        """Two tiers over a whole pool: half the members match by number in the first, the rest by description in the second."""
+        params = RelatedParams(
+            DocketParams(court_id=STUB_COURT.pk), parent=Docket(pk=1)
         )
+        relation = DocketEntry.objects.all()
+        relation._result_cache = [
+            DocketEntry(
+                pk=n + 1, entry_number=n, description=f"Entry {n}", docket_id=1
+            )
+            for n in range(GROUP_COUNT)
+        ]
 
-        benchmark(merger.natural_key, merger.state)
+        def run():
+            group = MatchGroup.build(
+                TieredEntryMerger,
+                Siblings(),
+                relation=relation,
+                params=params,
+            )
+            mergers = [
+                TieredEntryMerger(scrape, params=params, group=group)
+                for scrape in tiered_entry_scrapes()
+            ]
+            for merger in mergers:
+                merger.step()
 
-    def bench_natural_key_values_of(self, benchmark: BenchmarkFixture):
-        key = NaturalKey({}, ("docket_id", "party_id"), ("1", "1"))
-        obj = PartyType(name="Plaintiff", docket_id=1, party_id=1)
+        benchmark(run)
 
-        benchmark(key.values_of, obj)
+    def bench_group_keyed_where(self, benchmark: BenchmarkFixture):
+        """The filter a keyed pool is queried with: one alternative per member."""
+        params = RelatedParams(
+            DocketParams(court_id=STUB_COURT.pk), parent=Docket(pk=1)
+        )
+        group = MatchGroup.build(
+            TieredEntryMerger, Global(), relation=None, params=params
+        )
+        for scrape in tiered_entry_scrapes():
+            TieredEntryMerger(scrape, params=params, group=group)
+        members = list(group._members.values())
+        for member in members:
+            group._evaluate(member)
+        tier = TieredEntryMerger._bound_match.tiers[0]
+
+        benchmark(group._where, tier, members)
 
 
 class MergeBench:
@@ -507,19 +562,12 @@ class MergeBench:
 
         benchmark(run)
 
-    def bench_query_build(self, benchmark: BenchmarkFixture):
-        merger = DocketMerger(
-            make_scrape("MERGE"), params=DocketParams(court_id=STUB_COURT.pk)
-        )
-
-        benchmark(merger._key_query, merger.state)
-
     def bench_one_to_one_absent(self, benchmark: BenchmarkFixture):
         spec = DocketWithOriginMerger.config.registry.one_to_one[
             "originating_court_information"
         ]
 
-        benchmark(spec.merge, None, {"origin": None}, None)
+        benchmark(spec.merge, None, None, None)
 
     def bench_merge_result_combine(self, benchmark: BenchmarkFixture):
         results = [
@@ -552,7 +600,7 @@ class MergeDBBench:
     """The merge paths that read from and write to the DB."""
 
     def bench_lookup_hit(self, benchmark: BenchmarkFixture, court: Court):
-        """Natural-key lookup that finds the object and has nothing to write."""
+        """Lookup that finds the object and has nothing to write."""
         params = DocketParams(court_id=court.pk)
         scrape = make_scrape("HIT")
         DocketMerger(scrape, params=params).merge()
@@ -580,7 +628,7 @@ class MergeDBBench:
         )
 
     def bench_update(self, benchmark: BenchmarkFixture, court: Court):
-        """Natural-key lookup followed by a save, because the case name differs from the DB every round."""
+        """Lookup followed by a save, because the case name differs from the DB every round."""
         params = DocketParams(court_id=court.pk)
         scrape = make_scrape("UPDATE")
         DocketMerger(scrape, params=params).merge()
@@ -593,7 +641,7 @@ class MergeDBBench:
         benchmark(run)
 
     def bench_sibling_lookup(self, benchmark: BenchmarkFixture, court: Court):
-        """Shared natural-key lookup for `BULK_COUNT` scrapes that are all already in the DB."""
+        """Shared lookup for `BULK_COUNT` scrapes that are all already in the DB."""
         params = DocketParams(court_id=court.pk)
         scrapes = [make_scrape(f"BULK-{n}") for n in range(BULK_COUNT)]
         for scrape in scrapes:

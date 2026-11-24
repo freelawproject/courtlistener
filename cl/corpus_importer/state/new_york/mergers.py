@@ -785,10 +785,11 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
         """The docket this case is, if CourtListener already has it.
 
         Returns:
-            The candidate docket, of which the function returns at most
-            one.
+            The state the merger moves to: updating the docket CourtListener
+            has, creating one, or failed if several match.
         """
-        return state.resolve(
+        return self.found(
+            state,
             async_to_sync(find_docket_object_query)(
                 court_id=NYCOA_COURT_ID,
                 pacer_case_id=None,

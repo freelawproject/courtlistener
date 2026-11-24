@@ -433,7 +433,7 @@ class FloridaDocketMerger(
         )
 
         if court_id == supreme_court_id:
-            return state.resolve(query_narrow)
+            return self.found(state, query_narrow)
 
         if query_narrow.count() == 0:
             query_narrow = async_to_sync(find_docket_object_query)(
@@ -448,7 +448,7 @@ class FloridaDocketMerger(
                 cheap_count=False,
             )
 
-        return state.resolve(query_narrow)
+        return self.found(state, query_narrow)
 
     @staticmethod
     def validator(scrape: FloridaCase) -> bool:

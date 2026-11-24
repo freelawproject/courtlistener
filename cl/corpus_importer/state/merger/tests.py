@@ -238,7 +238,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=docket.pk))
+                return self.found(state, Docket.objects.filter(pk=docket.pk))
 
         return TestMerger
 
@@ -264,7 +264,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
+                return state.create()
 
         r = TestMerger({}, params=None).merge()
 
@@ -313,7 +313,9 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
+                return self.found(
+                    state, Docket.objects.filter(pk=tc.docket.pk)
+                )
 
         r = TestMerger({}, params=None).merge()
 
@@ -394,7 +396,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
+                return state.create()
 
         i = {"mctest": {"sr": "test"}}
         result = TestMerger(i, params=None).merge()
@@ -437,7 +439,9 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
+                return self.found(
+                    state, Docket.objects.filter(pk=tc.docket.pk)
+                )
 
         result = TestMerger({"trial": {"dn": "CR-123"}}, params=None).merge()
 
@@ -445,7 +449,6 @@ class BaseMergerTest(TestCase):
         self.assertIn("TrialCourtData", result.creates)
         created = TrialCourtData.objects.get(docket=self.docket)
         self.assertEqual(created.docket_number_trial, "CR-123")
-
         result = TestMerger({"trial": {"dn": "CR-999"}}, params=None).merge()
 
         self.assertTrue(result.success)
@@ -493,7 +496,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, DocketEntry]
             ) -> MergerState.LookupOutput[Any, Any, DocketEntry]:
-                return state.resolve(DocketEntry.objects.none())
+                return state.create()
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
@@ -510,7 +513,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
+                return state.create()
 
         i = {
             "mctest": [
@@ -561,7 +564,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
+                return state.create()
 
         i = {
             "panel": [
@@ -661,7 +664,9 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
+                return self.found(
+                    state, Docket.objects.filter(pk=tc.docket.pk)
+                )
 
         i = {
             "panel": [
@@ -756,7 +761,9 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
+                return self.found(
+                    state, Docket.objects.filter(pk=tc.docket.pk)
+                )
 
         i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
         result = TestMerger(i, params=None).merge()
@@ -817,7 +824,7 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
+                return state.create()
 
         class TestMerger2(TestMerger):
             court: Court = Constant(self.court)
@@ -883,7 +890,7 @@ class KeyedCourtMerger(Merger[dict[str, Any], None, Court]):
     )
 
 
-class SiblingLookupTest(TestCase):
+class SiblingMatchTest(TestCase):
     """How mergers created together find the objects they merge into."""
 
     @classmethod
@@ -963,8 +970,8 @@ class SiblingLookupTest(TestCase):
             "Another parent's rows are out of scope.",
         )
 
-    def test_duplicate_natural_keys_fail_once(self) -> None:
-        """Does a scrape repeating a natural key fail every member sharing it, one failure each, with nothing created and no row pruned?"""
+    def test_duplicate_keys_fail_once(self) -> None:
+        """Does a scrape repeating a key fail every member sharing it, one failure each, with nothing created and no row pruned?"""
         docket = self.dockets[0]
         result = KeyedDocketMerger(
             self.scrape(docket, "Third", "Third"), params=None
@@ -1093,8 +1100,9 @@ class LoadedFieldsTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(
-                    Docket.objects.filter(docket_number=self.docket_number)
+                return self.found(
+                    state,
+                    Docket.objects.filter(docket_number=self.docket_number),
                 )
 
         docket = self.merged(TestMerger(self.scrape, params=None))
@@ -1103,9 +1111,15 @@ class LoadedFieldsTest(TestCase):
         self.assertIn("case_name", docket.get_deferred_fields())
         self.assertNotIn("docket_number", docket.get_deferred_fields())
 
-    def test_stored_loads_only_used_fields(self) -> None:
-        """Does a query a merger builds for itself leave out the fields no spec uses?"""
-        docket = KeyedDocketMerger(self.scrape, params=None).stored.get()
+    def test_keyed_pool_loads_only_used_fields(self) -> None:
+        """Does a keyed pool read the rows a tier filters for without the fields no spec uses?"""
+        reader = Global().reader(
+            KeyedDocketMerger, relation=None, params=None, ordering=("pk",)
+        )
+
+        [docket] = reader.rows(
+            Q(docket_number=self.docket.docket_number), ("pk",)
+        )
 
         self.assertIn("case_name", docket.get_deferred_fields())
         self.assertNotIn("docket_number", docket.get_deferred_fields())
@@ -1221,6 +1235,58 @@ class MergerSpecOrderTest(SimpleTestCase):
                     PartyMerger,
                     Scrape(dict)["parties"],
                     after=["docket_entries"],
+                )
+
+
+class FoundTest(TestCase):
+    """How a merger that runs its own query turns the rows it finds into a verdict."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory.create()
+        cls.entries = [
+            DocketEntryFactory.create(docket=cls.docket, description=d)
+            for d in ("First", "Second")
+        ]
+
+    def test_found_converts_query_to_verdict(self) -> None:
+        """Does `found` create for no rows, update the one row, and fail naming the ambiguity for two?"""
+        merger = KeyedEntryMerger({"description": "First"}, params=None)
+        state = cast(MergerState.Lookup, merger.state)
+        entries = DocketEntry.objects.filter(docket=self.docket)
+
+        with self.subTest("zero rows"):
+            verdict = merger.found(state, entries.none())
+
+            self.assertIsInstance(verdict, MergerState.Create)
+
+        with self.subTest("one row"):
+            verdict = merger.found(
+                state, entries.filter(pk=self.entries[0].pk)
+            )
+
+            self.assertIsInstance(verdict, MergerState.Update)
+            if isinstance(verdict, MergerState.Update):
+                self.assertEqual(verdict.instance.pk, self.entries[0].pk)
+
+        with self.subTest("two rows"):
+            # The test runner silences logging.
+            logging.disable(logging.NOTSET)
+            self.addCleanup(logging.disable)
+            with self.assertLogs(
+                "cl.corpus_importer.state.merger.base", "ERROR"
+            ):
+                verdict = merger.found(state, entries)
+
+            self.assertIsInstance(verdict, MergerState.Failed)
+            if isinstance(verdict, MergerState.Failed):
+                self.assertEqual(
+                    verdict.reason,
+                    "KeyedEntryMerger: cannot pick one DocketEntry: 2 rows "
+                    "for 1 scraped items",
+                )
+                self.assertEqual(
+                    verdict.result, MergeResult.failed("DocketEntry")
                 )
 
 

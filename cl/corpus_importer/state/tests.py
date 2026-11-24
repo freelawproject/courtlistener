@@ -215,11 +215,12 @@ class LoaderTestCase(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[LoaderScrape, None, Docket]
             ) -> MergerState.LookupOutput[LoaderScrape, None, Docket]:
-                return state.resolve(
+                return self.found(
+                    state,
                     Docket.objects.filter(
                         court=test_court,
                         docket_number=state.scrape.docket_number,
-                    )
+                    ),
                 )
 
         loader: type[JKentScrapeLoader[Any, Any]] = type(
