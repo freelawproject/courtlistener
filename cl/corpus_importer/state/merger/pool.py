@@ -94,9 +94,8 @@ class WholeReader[M: Model](PoolReader[M]):
 
         Args:
             query: The pool's query. It is read on the first request for rows.
-            ordering: The order the query's rows come in. Pass `()` when that
-                is unknown, as for a prefetched relation, so that every other
-                ordering is sorted in memory.
+            ordering: The order the query's rows come in. Requests for any
+                other ordering are sorted in memory.
         """
         self._query: QuerySet[M] = query
         self._ordering: Ordering = ordering
@@ -297,7 +296,8 @@ class Siblings(Pool):
                 "A Siblings pool needs a parent's relation to read"
             )
         if relation._result_cache is not None:
-            return WholeReader(relation, ())
+            # The relation was prefetched with the first tier's ordering.
+            return WholeReader(relation, ordering)
         return WholeReader(self.query(merger, relation, ordering), ordering)
 
 

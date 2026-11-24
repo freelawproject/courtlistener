@@ -7,9 +7,10 @@ from datetime import UTC, datetime
 from itertools import permutations
 from types import SimpleNamespace
 from typing import Any, ClassVar, cast, override
+from unittest import mock
 
 from django.db import connection, transaction
-from django.db.models import F, Model, Q, QuerySet
+from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.signals import post_delete
 from django.test.utils import CaptureQueriesContext
 from juriscraper.state.docket import Document as ScrapeDocument
@@ -3333,6 +3334,46 @@ class MatchGroupTest(TestCase):
         self.assertEqual(
             list(reader.rows(Q(), bound.tiers[0].ordering)), before
         )
+
+    def test_prefetched_siblings_are_not_sorted_again(self) -> None:
+        """Does the first tier pick the same row from a prefetched relation as from one it queries, without sorting the prefetched rows again?"""
+        self.entry("d", number=1)
+        highest = self.entry("d", number=3)
+        self.entry("d", number=2)
+        pool = Siblings()
+        match = Match(
+            Key("description", ambiguous=First("-entry_number")),
+        )
+        ordering = match.bind(MatchEntryMerger, pool).tiers[0].ordering
+        prefetched = Docket.objects.prefetch_related(
+            Prefetch(
+                "docket_entries",
+                pool.query(
+                    MatchEntryMerger, DocketEntry.objects.all(), ordering
+                ),
+            )
+        ).get(pk=self.docket.pk)
+
+        for name, docket in (
+            ("queried", Docket.objects.get(pk=self.docket.pk)),
+            ("prefetched", prefetched),
+        ):
+            with self.subTest(name):
+                group, mergers = self.group(
+                    match, [entry_scrape("d")], pool, docket
+                )
+
+                with mock.patch(
+                    "cl.corpus_importer.state.merger.pool.sort_rows",
+                    wraps=sort_rows,
+                ) as sort:
+                    verdicts = self.verdicts(group, mergers)
+
+                self.assertEqual(
+                    [summarise(v) for v in verdicts],
+                    [("update", highest.pk)],
+                )
+                sort.assert_not_called()
 
     def test_prune_delegates_to_the_reader(self) -> None:
         """Does the group delete the relation's rows that were not kept?"""
