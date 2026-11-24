@@ -193,11 +193,10 @@ class Command(VerboseCommand, CommandUtils):
                 row.append(value)
 
         # Convert to dict with column headers as keys.
-        row_dict = {}
-        for row_value, col_header in zip(row, col_headers):
-            row_dict[col_header] = row_value
-
-        return row_dict
+        return {
+            col_header: row_value
+            for row_value, col_header in zip(row, col_headers)
+        }
 
     def handle(self, *args, **options):
         """Import each line of the file from the start line on.

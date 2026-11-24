@@ -68,8 +68,10 @@ def send_docket_alert_webhook_events(
     )
     docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
     serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+
+    serialized_docket_entries.extend(
+        DocketEntrySerializer(de).data for de in docket_entries
+    )
 
     for webhook in webhooks:
         post_content = {
