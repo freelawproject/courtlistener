@@ -4,7 +4,6 @@ import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -29,11 +28,8 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
-    TexasCourtOfCriminalAppealsDocket,
-    TexasSupremeCourtDocket,
 )
 from juriscraper.state.texas.common import CourtID, CourtType
-from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import RateLimitError
 from pydantic import ValidationError
 
