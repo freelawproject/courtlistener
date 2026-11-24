@@ -469,7 +469,7 @@ class ESCursorPagination(BasePagination):
             or self.results_count_exact is None
         ):
             raise RuntimeError(
-                "paginate_queryset must run before the response is built."
+                "paginate_es_queryset must run before the response is built."
             )
         approximate_count = get_cardinality_count(
             self.results_count_approximate.aggregations

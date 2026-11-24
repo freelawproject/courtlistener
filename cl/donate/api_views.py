@@ -254,7 +254,7 @@ class MembershipWebhookViewSet(
             the NeonWebhookEvent model
 
         Raises:
-            NotImplementedError: If `trigger_event` is unrecognized.
+            AssertionError: If `trigger_event` is unrecognized.
         """
         match trigger_event:
             case "createMembership":
