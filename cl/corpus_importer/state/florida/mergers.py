@@ -53,6 +53,7 @@ from cl.corpus_importer.state.merger import (
     Ancestor,
     Coalesce,
     Constant,
+    Create,
     Database,
     First,
     Fn,
@@ -62,12 +63,12 @@ from cl.corpus_importer.state.merger import (
     Merger,
     MergerConfig,
     MergerState,
+    Next,
     OneToOneRelation,
     Params,
     RelatedParams,
     Scrape,
 )
-from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import (
@@ -140,12 +141,17 @@ class FloridaDocumentMerger(
 ):
     """Merger for a scraped Florida attachment into a ``FloridaDocument``.
 
-    Documents are matched by link UUID, falling back to a uniquely named
-    document whose link UUID is no longer in the scrape.
+    Documents are matched by link UUID, falling back to the one same-named
+    stored document left once every attachment with a stored link UUID has
+    claimed its own.
     """
 
     config: ClassVar[MergerConfig[FloridaDocument]] = MergerConfig(
-        model=FloridaDocument, key=("link_uuid",)
+        model=FloridaDocument
+    )
+    match: ClassVar[Match] = Match(
+        Key("link_uuid"),
+        Key("document_name", ambiguous=Create, duplicate=Next),
     )
 
     document_name: str = Scrape(ScrapeFloridaDocument).document_name
@@ -162,108 +168,6 @@ class FloridaDocumentMerger(
         Database(FloridaDocument.file_size),
     )
     link_uuid: UUID = Scrape(ScrapeFloridaDocument).document_link_uuid
-
-    def scraped_entry(
-        self,
-        state: MergerState.Lookup[
-            ScrapeFloridaDocument,
-            RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-            FloridaDocument,
-        ]
-        | MergerState.Resolve[
-            ScrapeFloridaDocument,
-            RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-            FloridaDocument,
-        ],
-    ) -> ScrapeFloridaDocketEntry | None:
-        """Shorthand to get the scraped docket entry for this attachment."""
-        entry = cast(FloridaDocketEntry, state.params.parent)
-        for scraped_entry in state.params.params.params:
-            if scraped_entry.docket_entry_uuid == entry.docket_entry_uuid:
-                return scraped_entry
-        return None
-
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            ScrapeFloridaDocument,
-            RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-            FloridaDocument,
-        ],
-    ) -> MergerState.LookupOutput[
-        ScrapeFloridaDocument,
-        RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-        FloridaDocument,
-    ]:
-        by_uuid = self.stored.filter(link_uuid=self.link_uuid)[:2]
-        if len(list(by_uuid)) > 0:
-            return state.resolve(by_uuid)
-
-        scraped = self.scraped_entry(state)
-
-        if (
-            not scraped
-            or [
-                attachment.document_name for attachment in scraped.attachments
-            ].count(state.scrape.document_name)
-            != 1
-        ):
-            # This is a potential new document.
-            return state.resolve([])
-
-        # Stored documents whose link UUID is still in the scrape belong to
-        # those attachments (even if they were renamed), so they can't be the
-        # one replaced. Excluding them also keeps the candidates stable while
-        # sibling attachments merge.
-        candidates = self.stored.filter(
-            document_name=state.scrape.document_name
-        ).exclude(
-            link_uuid__in=[
-                attachment.document_link_uuid
-                for attachment in scraped.attachments
-            ]
-        )
-
-        if len(list(candidates)) != 1:
-            return state.resolve([])
-        return state.resolve(candidates)
-
-    @override
-    def resolve(
-        self,
-        state: MergerState.Resolve[
-            ScrapeFloridaDocument,
-            RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-            FloridaDocument,
-        ],
-    ) -> MergerState.ResolveOutput[
-        ScrapeFloridaDocument,
-        RelatedParams[RelatedParams[list[ScrapeFloridaDocketEntry]]],
-        FloridaDocument,
-    ]:
-        scraped = self.scraped_entry(state)
-        if (
-            scraped is not None
-            and [a.document_link_uuid for a in scraped.attachments].count(
-                self.link_uuid
-            )
-            > 1
-        ):
-            de_uuid = cast(
-                FloridaDocketEntry, state.params.parent
-            ).docket_entry_uuid
-            logger.error(
-                "Multiple scraped attachments with link UUID %s in docket entry %s",
-                self.link_uuid,
-                de_uuid,
-            )
-            return state.failed(
-                f"Multiple scraped attachments with link UUID {self.link_uuid} in docket entry {de_uuid}",
-                MergeResult.failed(self.config.model.__name__),
-            )
-
-        return super().resolve(state)
 
 
 # Retrieved 2026-07-29
@@ -389,22 +293,6 @@ class FloridaOriginatingCourtInformationMerger(
 
     docket_number: str = Scrape(FloridaOriginatingCase).case_number
     docket_number_raw: str = Scrape(FloridaOriginatingCase).case_number
-
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            FloridaOriginatingCase,
-            RelatedParams[list[ScrapeFloridaDocketEntry]],
-            OriginatingCourtInformation,
-        ],
-    ) -> MergerState.LookupOutput[
-        FloridaOriginatingCase,
-        RelatedParams[list[ScrapeFloridaDocketEntry]],
-        OriginatingCourtInformation,
-    ]:
-        """Match no existing rows, so a new row is always created."""
-        return state.create()
 
 
 def _originating_case(

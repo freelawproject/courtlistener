@@ -1,5 +1,6 @@
 """Tests for Florida docket and originating-court-information merger."""
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -910,7 +911,7 @@ class FloridaDocumentMergerTest(TestCase):
             entries=[entry],
         )
 
-    @merger_test(expected_query_count=17)
+    @merger_test(expected_query_count=15)
     def test_merge_creates_documents(self):
         """Does merging a case create its entries' documents with the scrape's field values?"""
         document = FloridaDocumentFactory.create(
@@ -939,7 +940,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(merged.file_size, 34567)
         self.assertEqual(merged.url, "https://acis.flcourts.gov/docs/1")
 
-    @merger_test(expected_query_count=34)
+    @merger_test(expected_query_count=30)
     def test_merge_document_missing_optional_text_is_blank(self):
         """Is a scrape document with no document type or no content type merged with a blank string instead of None?"""
         for field in ("document_type", "content_type"):
@@ -954,7 +955,7 @@ class FloridaDocumentMergerTest(TestCase):
                 merged = FloridaDocument.objects.get()
                 self.assertEqual(getattr(merged, field), "")
 
-    @merger_test(expected_query_count=27)
+    @merger_test(expected_query_count=24)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice match the stored document rather than duplicating it, and report it as updated while it has no stored file and no processing error, so a re-ingest retries its failed download?"""
         docket_data = self._make_case(FloridaDocumentFactory.create())
@@ -969,7 +970,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertIn(merged.pk, second.updates["FloridaDocument"])
         self.assertEqual(FloridaDocument.objects.count(), 1)
 
-    @merger_test(expected_query_count=31)
+    @merger_test(expected_query_count=27)
     def test_merge_removes_documents_missing_from_scrape(self):
         """Are DB documents deleted when a later scrape doesn't include them?"""
         docket_data = self._make_case(FloridaDocumentFactory.create())
@@ -1006,7 +1007,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged.save()
         return document, docket_data, merged
 
-    @merger_test(expected_query_count=28)
+    @merger_test(expected_query_count=25)
     def test_remerge_changed_url_resets_download_state(self):
         """Does updating a document clear its bad-URL flag, stored file, and OCR status so it gets downloaded again?"""
         document, docket_data, merged = (
@@ -1024,7 +1025,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertFalse(merged.filepath_local)
         self.assertIsNone(merged.ocr_status)
 
-    @merger_test(expected_query_count=27)
+    @merger_test(expected_query_count=24)
     def test_remerge_unchanged_document_keeps_download_state(self):
         """Is download state (bad-URL flag, stored file, OCR status) left alone when the rescraped document is unchanged?"""
         _document, docket_data, merged = (
@@ -1164,6 +1165,110 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertEqual(
             list(FloridaDocument.objects.values_list("link_uuid", flat=True)),
             [replacement.document_link_uuid],
+        )
+
+    def test_unscraped_uuid_matches_unique_remaining_name(self):
+        """When two scraped documents share a name and only one's link UUID is stored, does the other update the one stored row of that name left over rather than create a document?"""
+        kept = FloridaDocumentFactory.create(document_name="Brief")
+        dropped = FloridaDocumentFactory.create(document_name="Brief")
+        docket_data = self._make_case(kept, dropped)
+        merge_case(docket_data)
+        kept_row = FloridaDocument.objects.get(
+            link_uuid=kept.document_link_uuid
+        )
+        dropped_row = FloridaDocument.objects.get(
+            link_uuid=dropped.document_link_uuid
+        )
+
+        unmatched = FloridaDocumentFactory.create(document_name="Brief")
+        docket_data.entries[0].attachments = [kept, unmatched]
+        result = merge_case(docket_data)
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertIn(dropped_row.pk, result.updates["FloridaDocument"])
+        self.assertEqual(
+            dict(FloridaDocument.objects.values_list("pk", "link_uuid")),
+            {
+                kept_row.pk: kept.document_link_uuid,
+                dropped_row.pk: unmatched.document_link_uuid,
+            },
+        )
+
+    def test_renamed_document_keeps_its_row(self):
+        """When a stored document is renamed and another document takes its old name, is the renamed one still matched by its link UUID, so the other creates a document instead of taking the renamed one's row?"""
+        for newcomer_first in (False, True):
+            with table_row(self, f"newcomer_first={newcomer_first}"):
+                original = FloridaDocumentFactory.create(document_name="Brief")
+                docket_data = self._make_case(original)
+                merge_case(docket_data)
+                stored = FloridaDocument.objects.get(
+                    link_uuid=original.document_link_uuid
+                )
+
+                renamed = original.model_copy(
+                    update={"document_name": "Reply"}
+                )
+                newcomer = FloridaDocumentFactory.create(document_name="Brief")
+                attachments = [renamed, newcomer]
+                if newcomer_first:
+                    attachments.reverse()
+                docket_data.entries[0].attachments = attachments
+                result = merge_case(docket_data)
+
+                self.assertTrue(result.success)
+                self.assertEqual(
+                    result.updates["FloridaDocument"], {stored.pk}
+                )
+                self.assertEqual(len(result.creates["FloridaDocument"]), 1)
+                self.assertEqual(
+                    {
+                        (document.link_uuid, document.document_name)
+                        for document in FloridaDocument.objects.all()
+                    },
+                    {
+                        (original.document_link_uuid, "Reply"),
+                        (newcomer.document_link_uuid, "Brief"),
+                    },
+                )
+                stored.refresh_from_db()
+                self.assertEqual(stored.document_name, "Reply")
+
+    def test_duplicate_link_uuid_fails_every_attachment(self):
+        """When two attachments of an entry share a link UUID, do both fail with the duplicate reason, and are the entry's stored documents left in place rather than pruned?"""
+        first = FloridaDocumentFactory.create(document_name="Brief")
+        second = FloridaDocumentFactory.create(document_name="Reply")
+        docket_data = self._make_case(first, second)
+        merge_case(docket_data)
+        stored = dict(FloridaDocument.objects.values_list("pk", "link_uuid"))
+
+        twin = first.model_copy(update={"document_name": "Brief, again"})
+        docket_data.entries[0].attachments = [first, twin]
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+        with self.assertLogs(
+            "cl.corpus_importer.state.merger.match", "ERROR"
+        ) as logs:
+            result = merge_case(docket_data)
+
+        self.assertEqual(result.failures["FloridaDocument"], [None, None])
+        self.assertNotIn("FloridaDocument", result.creates)
+        self.assertNotIn("FloridaDocument", result.updates)
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn(
+            "FloridaDocumentMerger: 2 scraped items share a key; the key "
+            "needs another term (tier 1, key (",
+            logs.records[0].getMessage(),
+        )
+        self.assertEqual(
+            dict(FloridaDocument.objects.values_list("pk", "link_uuid")),
+            stored,
+        )
+        self.assertEqual(
+            set(
+                FloridaDocument.objects.values_list("document_name", flat=True)
+            ),
+            {"Brief", "Reply"},
         )
 
 
