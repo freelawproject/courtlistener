@@ -220,7 +220,7 @@ class LoaderTestCase(TestCase):
                     Docket.objects.filter(
                         court=test_court,
                         docket_number=state.scrape.docket_number,
-                    ),
+                    ).only(*self.config.fields)[:2],
                 )
 
         loader: type[JKentScrapeLoader[Any, Any]] = type(

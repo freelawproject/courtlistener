@@ -238,7 +238,12 @@ class BaseMergerTest(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return self.found(state, Docket.objects.filter(pk=docket.pk))
+                return self.found(
+                    state,
+                    Docket.objects.filter(pk=docket.pk).only(
+                        *self.config.fields
+                    )[:2],
+                )
 
         return TestMerger
 
@@ -314,7 +319,10 @@ class BaseMergerTest(TestCase):
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
                 return self.found(
-                    state, Docket.objects.filter(pk=tc.docket.pk)
+                    state,
+                    Docket.objects.filter(pk=tc.docket.pk).only(
+                        *self.config.fields
+                    )[:2],
                 )
 
         r = TestMerger({}, params=None).merge()
@@ -440,7 +448,10 @@ class BaseMergerTest(TestCase):
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
                 return self.found(
-                    state, Docket.objects.filter(pk=tc.docket.pk)
+                    state,
+                    Docket.objects.filter(pk=tc.docket.pk).only(
+                        *self.config.fields
+                    )[:2],
                 )
 
         result = TestMerger({"trial": {"dn": "CR-123"}}, params=None).merge()
@@ -665,7 +676,10 @@ class BaseMergerTest(TestCase):
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
                 return self.found(
-                    state, Docket.objects.filter(pk=tc.docket.pk)
+                    state,
+                    Docket.objects.filter(pk=tc.docket.pk).only(
+                        *self.config.fields
+                    )[:2],
                 )
 
         i = {
@@ -762,7 +776,10 @@ class BaseMergerTest(TestCase):
                 self, state: MergerState.Lookup[Any, Any, Docket]
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
                 return self.found(
-                    state, Docket.objects.filter(pk=tc.docket.pk)
+                    state,
+                    Docket.objects.filter(pk=tc.docket.pk).only(
+                        *self.config.fields
+                    )[:2],
                 )
 
         i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
@@ -1102,7 +1119,9 @@ class LoadedFieldsTest(TestCase):
             ) -> MergerState.LookupOutput[Any, Any, Docket]:
                 return self.found(
                     state,
-                    Docket.objects.filter(docket_number=self.docket_number),
+                    Docket.objects.filter(
+                        docket_number=self.docket_number
+                    ).only(*self.config.fields)[:2],
                 )
 
         docket = self.merged(TestMerger(self.scrape, params=None))
@@ -1262,12 +1281,21 @@ class FoundTest(TestCase):
 
         with self.subTest("one row"):
             verdict = merger.found(
-                state, entries.filter(pk=self.entries[0].pk)
+                state, entries.filter(pk=self.entries[0].pk)[:2]
             )
 
             self.assertIsInstance(verdict, MergerState.Update)
             if isinstance(verdict, MergerState.Update):
                 self.assertEqual(verdict.instance.pk, self.entries[0].pk)
+
+        with self.subTest("evaluated queryset"):
+            evaluated = entries.filter(pk=self.entries[0].pk)
+            list(evaluated)
+
+            with self.assertNumQueries(0):
+                verdict = merger.found(state, evaluated)
+
+            self.assertIsInstance(verdict, MergerState.Update)
 
         with self.subTest("two rows"):
             # The test runner silences logging.
@@ -1276,7 +1304,7 @@ class FoundTest(TestCase):
             with self.assertLogs(
                 "cl.corpus_importer.state.merger.base", "ERROR"
             ):
-                verdict = merger.found(state, entries)
+                verdict = merger.found(state, entries[:2])
 
             self.assertIsInstance(verdict, MergerState.Failed)
             if isinstance(verdict, MergerState.Failed):

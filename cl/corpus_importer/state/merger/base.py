@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import (
+    Iterable,
     Mapping,
 )
 from dataclasses import dataclass, field
@@ -543,33 +544,34 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
     def found(
         self,
         state: MergerState.Lookup[Scrape, Params, M],
-        query: QuerySet[M],
+        rows: Iterable[M],
     ) -> MergerState.LookupOutput[Scrape, Params, M]:
-        """Turn the rows a query finds into the merger's verdict.
+        """Turn the rows a lookup found into the merger's verdict.
 
         For a merger that overrides `lookup` with a query of its own, such as
         a root merger finding its object by RECAP's rules.
 
         Args:
             state: The merger's state.
-            query: The rows the object to merge into can only be one of. Unless
-                it has already been evaluated, in which case its rows are
-                used as they are, it is read loading only the fields the
-                merger uses, and no more than two rows are fetched.
+            rows: The rows the object to merge into can only be one of. The
+                caller decides what is loaded of them and caps the read: a
+                query that has not been evaluated is read in full, so it
+                should be sliced to two rows and loaded with
+                `only(*config.fields)`. An evaluated queryset costs nothing
+                to read.
 
         Returns:
-            The state the merger moves to: creating a row if the query finds
-            none, updating the one it finds, or failed if it finds several.
+            The state the merger moves to: creating a row if there are none,
+            updating the one there is, or failed if there are two or more,
+            which is ambiguous.
         """
-        if query._result_cache is None:
-            query = query.only(*self.config.fields)[:2]
-        rows = list(query)
-        match rows:
+        found = list(rows)
+        match found:
             case []:
                 return state.create()
             case [row]:
                 return state.update(row)
-        text = f"{type(self).__name__}: {ambiguous_text(self.config.model, len(rows), 1)}"
+        text = f"{type(self).__name__}: {ambiguous_text(self.config.model, len(found), 1)}"
         logger.error("%s", text)
         return state.failed(
             text, MergeResult.failed(self.config.model.__name__)
