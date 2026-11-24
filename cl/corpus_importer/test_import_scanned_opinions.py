@@ -301,6 +301,23 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "</headmatter>",
             ),
             (
+                # Nor the mark of the syllabus note
+                "<casebody><heading>Syllabus <footnotemark>*</footnotemark>"
+                "</heading><syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<footnotemark>*</footnotemark>\n</headmatter>",
+            ),
+            (
+                # A page that starts inside the syllabus is still marked
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>First point</syllabus>"
+                '<syllabus>Second <page-number label="2">*2</page-number>'
+                "point</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n</headmatter>',
+            ),
+            (
                 # A heading with other words before the syllabus is kept
                 "<casebody><heading>On Motion for Rehearing</heading>"
                 "<syllabus>Shown from its field</syllabus>"

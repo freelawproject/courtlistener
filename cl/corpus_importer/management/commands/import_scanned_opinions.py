@@ -572,7 +572,8 @@ def get_headmatter(soup: BeautifulSoup) -> str:
     can be shown above the opinions. Their values are also stored in their
     own fields. Elements in HEADMATTER_EXCLUDED are left out, and so is the
     heading of the syllabus, since the opinion page titles the syllabus
-    itself. The page numbers inside that heading are kept.
+    itself. Their page numbers are kept in their place, and so is the
+    footnote mark of the heading, since the page links both.
 
     Caveat: call it before `parse_extra_fields`, which removes the page
     numbers from the elements it reads.
@@ -590,10 +591,18 @@ def get_headmatter(soup: BeautifulSoup) -> str:
         if element.name == "opinion":
             break
         if element.name in HEADMATTER_EXCLUDED:
+            # The field of the element has no page numbers, and the pages
+            # that start in it still have to be marked
+            elements.extend(str(p) for p in element.select("page-number"))
             continue
         if is_syllabus_heading(element):
-            # The page that starts at the heading still has to be marked
-            elements.extend(str(p) for p in element.select("page-number"))
+            # Besides its page, keep the mark of the syllabus note: the
+            # note stays in the opinion, and the page only links the notes
+            # when it finds as many marks as notes
+            elements.extend(
+                str(kept)
+                for kept in element.select("page-number, footnotemark")
+            )
             continue
         elements.append(str(element))
     if not elements:
