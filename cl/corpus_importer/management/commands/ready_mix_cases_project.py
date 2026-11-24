@@ -1,13 +1,13 @@
 """Scrape PACER iquery pages for new cases and index the resulting dockets."""
 
 import json
-import os
 import time
 from datetime import date
+from pathlib import Path
 from typing import TypedDict, cast
 
 from django.conf import settings
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from redis import Redis
 from redis.exceptions import ConnectionError
 
@@ -270,16 +270,11 @@ def query_results_in_es(options):
     ]
 
     # Save the json results file to: "ready_mix_cases/extracted_ready_mix_cases.json"
-    json_path = os.path.join(settings.MEDIA_ROOT, "ready_mix_cases")
-    if not os.path.exists(json_path):
-        os.makedirs(json_path)
+    json_path = Path(settings.MEDIA_ROOT) / "ready_mix_cases"
+    json_path.mkdir(parents=True, exist_ok=True)
 
-    json_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "ready_mix_cases",
-        "extracted_ready_mix_cases.json",
-    )
-    with open(json_file, "w", encoding="utf-8") as file:
+    json_file = json_path / "extracted_ready_mix_cases.json"
+    with json_file.open("w", encoding="utf-8") as file:
         json.dump(
             extracted_data,
             file,

@@ -1,6 +1,7 @@
 """Queue financial disclosures from a JSON file for import."""
 
 import json
+from pathlib import Path
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.disclosures.tasks import import_disclosure
@@ -21,7 +22,7 @@ def import_financial_disclosures(
         queue_name: The celery queue name.
     """
     throttle = CeleryThrottle(queue_name=queue_name)
-    with open(filepath) as f:
+    with Path(filepath).open() as f:
         disclosures = json.load(f)
 
     for data in disclosures:

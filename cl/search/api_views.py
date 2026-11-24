@@ -626,7 +626,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         es_list_instance = api_utils.CursorESList(
             main_query, child_docs_query, None, None, cleaned_data, request
         )
-        results_page, cached_response = paginator.paginate_queryset(
+        results_page, cached_response = paginator.paginate_es_list(
             es_list_instance, request
         )
 
@@ -644,7 +644,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Note: this isn't precisely a `list[dict]` it is actually a
         # `ReturnList[ReturnDict]`
         result_list = cast(list[dict], serializer.data)
-        return paginator.get_paginated_response(result_list, cached_response)
+        return paginator.get_es_paginated_response(
+            result_list, cached_response
+        )
 
     def list(self, request, *args, **kwargs):
         """Search and return a page of results, or the form's errors with a 400 status."""
