@@ -682,7 +682,8 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
-def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]]) -> GT | None:
+# TODO: The `| GT` is required by Pyrefly's odd handling of `_id` fields compared to others
+def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]] | GT) -> GT | None:
     """Start an expression from a model field passed to the merger.
 
     For example, `Database(Docket.docket_number)`.
