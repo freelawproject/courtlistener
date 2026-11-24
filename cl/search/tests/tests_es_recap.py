@@ -2,6 +2,7 @@ import datetime
 import math
 import re
 import urllib.parse
+from dataclasses import replace
 from http import HTTPStatus
 from itertools import product
 from typing import Any
@@ -19,6 +20,7 @@ from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.dsl import Q
+from juriscraper.state.texas.common import CourtID
 from lxml import etree, html
 from rest_framework.serializers import CharField
 from waffle.testutils import override_flag
@@ -27,6 +29,7 @@ from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.corpus_importer.tasks import (
     add_scotus_docket_entries,
     enrich_scotus_attachments,
+    merge_texas_docket,
 )
 from cl.favorites.factories import NoteFactory
 from cl.lib.elasticsearch_utils import (
@@ -34,12 +37,15 @@ from cl.lib.elasticsearch_utils import (
     build_search_feed_query,
     clean_count_query,
     compute_lowest_possible_estimate,
+    exclude_courts,
     fetch_es_results,
+    hidden_court_ids,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
 )
 from cl.lib.indexing_utils import log_last_document_indexed
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
@@ -47,6 +53,7 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.search_utils import (
     enrich_search_results,
+    frontend_search_sources,
     get_results_from_paginator,
 )
 from cl.lib.test_helpers import (
@@ -81,6 +88,7 @@ from cl.search.api_views import (
     _ESResultSerializer,
     _ESResultSerializers,
 )
+from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -94,6 +102,7 @@ from cl.search.es_docket_sources import (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
     SOURCE_BY_MODEL,
+    TEXAS_ES_SOURCE,
     recap_search_courts,
 )
 from cl.search.factories import (
@@ -101,6 +110,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -128,12 +138,21 @@ from cl.search.models import (
     SCOTUSDocketEntry,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocketEntry,
+    TexasDocument,
 )
 from cl.search.signals import (
     docket_field_mapping,
     scotus_document_field_mapping,
+    texas_document_field_mapping,
 )
-from cl.search.state.texas.factories import TexasDocumentFactory
+from cl.search.state.texas.factories import (
+    TexasCasePartyDictFactory,
+    TexasCourtOfAppealsDocketDictFactory,
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
+    TexasOriginatingDistrictCourtDictFactory,
+)
 from cl.search.tasks import (
     es_save_document,
     index_docket_parties_in_es,
@@ -6871,7 +6890,7 @@ class ESRECAPDocumentTexasCompatibilityTest(TestCase):
 
 
 class SCOTUSFieldTrackerTest(SimpleTestCase):
-    """Confirm the FieldTrackers added for #8020 track exactly the fields the SCOTUS ES signal mappings depend on."""
+    """Confirm the FieldTrackers added for #8020 and #8484 track exactly the fields the SCOTUS and Texas ES signal mappings depend on."""
 
     def test_trackers_match_the_es_signal_mappings(self) -> None:
         """A mapped field missing from its tracker would never trigger an ES update, and a tracked field missing from the mapping is dead weight."""
@@ -6890,6 +6909,16 @@ class SCOTUSFieldTrackerTest(SimpleTestCase):
                 ScotusDocketMetadata,
                 docket_field_mapping["reverse"][ScotusDocketMetadata][
                     "scotus_metadata"
+                ],
+            ),
+            (
+                TexasDocument,
+                texas_document_field_mapping["save"][TexasDocument]["self"],
+            ),
+            (
+                TexasDocketEntry,
+                texas_document_field_mapping["save"][TexasDocketEntry][
+                    "docket_entry"
                 ],
             ),
         ]
@@ -7005,6 +7034,51 @@ class ESDocketSourcesTest(TestCase):
         docket.refresh_from_db()
         self.assertTrue(SCOTUS_ES_SOURCE.ready_to_index(docket))
 
+    def test_texas_docket_belongs_only_while_merged(self) -> None:
+        """Does a Docket belong to Texas only while merge_texas_docket saves it, in a TAMES court?"""
+        texas_court = CourtFactory(id="txctapp1", jurisdiction="SA")
+        opinion_only_docket = DocketFactory(
+            court=texas_court, source=Docket.SCRAPER
+        )
+        marked_docket = DocketFactory(court=texas_court, source=Docket.SCRAPER)
+        marked_docket._index_in_es = True
+
+        cases = [
+            (opinion_only_docket, False),
+            (marked_docket, True),
+        ]
+        for docket, belongs in cases:
+            with self.subTest(court=docket.court_id, belongs=belongs):
+                self.assertIs(TEXAS_ES_SOURCE.docket_belongs(docket), belongs)
+                self.assertFalse(RECAP_ES_SOURCE.docket_belongs(docket))
+                self.assertFalse(SCOTUS_ES_SOURCE.docket_belongs(docket))
+
+    def test_texas_docket_filter_skips_only_opinion_dockets(self) -> None:
+        """Does bulk indexing pick the TAMES-court Dockets with entries or without opinions, leaving out the opinion-only ones?"""
+        texas_court = CourtFactory(id="tex", jurisdiction="S")
+        with_entries = TexasDocketEntryFactory(
+            docket__court=texas_court, docket__source=Docket.SCRAPER
+        ).docket
+        OpinionClusterFactory(docket=with_entries)
+        without_entries = DocketFactory(
+            court=texas_court, source=Docket.SCRAPER
+        )
+        opinion_only = DocketFactory(court=texas_court, source=Docket.SCRAPER)
+        OpinionClusterFactory(docket=opinion_only)
+
+        selected = set(
+            Docket.objects.filter(
+                TEXAS_ES_SOURCE.docket_filter(),
+                pk__in=[
+                    with_entries.pk,
+                    without_entries.pk,
+                    opinion_only.pk,
+                ],
+            ).values_list("pk", flat=True)
+        )
+
+        self.assertEqual(selected, {with_entries.pk, without_entries.pk})
+
 
 class RECAPSearchCourtsTest(TestCase):
     """recap_search_courts() offers the PACER courts plus the courts the other docket sources add, such as SCOTUS."""
@@ -7023,7 +7097,7 @@ class RECAPSearchCourtsTest(TestCase):
     def test_recap_search_courts_add_source_courts(self) -> None:
         """SCOTUS joins the PACER courts in the search list only when the search can include it, courts that are neither PACER nor claimed by a source stay out, and all_pacer_courts(), used by PACER scrapers and uploads, keeps excluding SCOTUS."""
         search_ids = set(
-            recap_search_courts(include_scotus=True).values_list(
+            recap_search_courts(included_sources=("scotus",)).values_list(
                 "pk", flat=True
             )
         )
@@ -7031,7 +7105,7 @@ class RECAPSearchCourtsTest(TestCase):
         self.assertNotIn("ohio", search_ids)
         self.assertNotIn(
             "scotus",
-            recap_search_courts(include_scotus=False).values_list(
+            recap_search_courts(included_sources=()).values_list(
                 "pk", flat=True
             ),
         )
@@ -7041,6 +7115,89 @@ class RECAPSearchCourtsTest(TestCase):
                 "pk", flat=True
             ),
         )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="GatedSourceSearchTest")
+class GatedSourceSearchTest(TestCase):
+    """Does each gated source stay out of RECAP searches and the court picker until its own frontend_search_flag lets the request see it?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a PACER court and the courts of two gated sources."""
+        for court_id, jurisdiction in [
+            ("ca1", Court.FEDERAL_APPELLATE),
+            ("scotus", Court.FEDERAL_APPELLATE),
+            ("tex", Court.STATE_SUPREME),
+        ]:
+            CourtFactory(id=court_id, jurisdiction=jurisdiction, end_date=None)
+
+    def setUp(self) -> None:
+        """Register a second gated source, standing in for Texas."""
+        texas = replace(
+            SCOTUS_ES_SOURCE,
+            name="texas",
+            court_ids=frozenset({"tex"}),
+            frontend_search_flag="texas_docket_page",
+        )
+        sources = (RECAP_ES_SOURCE, texas, SCOTUS_ES_SOURCE)
+        for target in (
+            "cl.search.es_docket_sources.ALL_ES_SOURCES",
+            "cl.lib.search_utils.ALL_ES_SOURCES",
+        ):
+            patcher = mock.patch(target, sources)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_hidden_court_ids_follow_the_included_sources(self) -> None:
+        """Does a RECAP search hide the courts of every gated source it doesn't include, and other search types none?"""
+        cases = [
+            (SEARCH_TYPES.RECAP, (), ["scotus", "tex"]),
+            (SEARCH_TYPES.RECAP, ("scotus",), ["tex"]),
+            (SEARCH_TYPES.DOCKETS, ("scotus", "texas"), []),
+            (SEARCH_TYPES.OPINION, (), []),
+        ]
+        for search_type, included, hidden in cases:
+            with self.subTest(type=search_type, included=included):
+                cd = {"type": search_type, "include_sources": included}
+                self.assertEqual(hidden_court_ids(cd), hidden)
+
+    def test_exclude_courts_adds_one_clause_per_court(self) -> None:
+        """Does the exclusion leave out every hidden court, appended to a bool query's own must_not?"""
+        query = exclude_courts(
+            Q("bool", must_not=[Q("term", status=1)]), ["scotus", "tex"]
+        )
+        self.assertEqual(
+            query.to_dict()["bool"]["must_not"],
+            [
+                {"term": {"status": 1}},
+                {"term": {"court_id.raw": "scotus"}},
+                {"term": {"court_id.raw": "tex"}},
+            ],
+        )
+
+    def test_court_picker_offers_only_included_sources(self) -> None:
+        """Does the court picker offer SCOTUS when the request includes it, but not the courts of another gated source?"""
+        court_ids = set(
+            recap_search_courts(included_sources=("scotus",)).values_list(
+                "pk", flat=True
+            )
+        )
+        self.assertLessEqual({"ca1", "scotus"}, court_ids)
+        self.assertNotIn("tex", court_ids)
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_flag("texas_docket_page", active=False)
+    def test_frontend_search_sources_follow_each_flag(self) -> None:
+        """Does the search frontend include a source only when that source's own frontend_search_flag is on?"""
+        request = RequestFactory().get("/")
+        self.assertEqual(frontend_search_sources(request), ("scotus",))
+
+    @override_flag("scotus_docket_page", active=True)
+    @override_flag("texas_docket_page", active=True)
+    def test_frontend_search_sources_are_sorted(self) -> None:
+        """Are the included sources sorted by name, so cache keys don't depend on the order of ALL_ES_SOURCES?"""
+        request = RequestFactory().get("/")
+        self.assertEqual(frontend_search_sources(request), ("scotus", "texas"))
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="RECAPSearchCourtPickerTest")
@@ -7660,6 +7817,200 @@ class SCOTUSESIndexingSignalTest(
         self.assertEqual(hit.caseName, "Edited Case Name")
 
 
+@mock.patch("cl.corpus_importer.tasks.download_texas_document.si")
+class TexasESIndexingSignalTest(ESIndexTestCase, TransactionTestCase):
+    """Do the ES signals index, update and delete Texas content in the RECAP index, the way they do SCOTUS content?"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Start every test class run from an empty RECAP index."""
+        super().setUpClass()
+        cls.rebuild_index("search.Docket")
+
+    def setUp(self) -> None:
+        """Create the Court of Appeals the Texas dockets in these tests use."""
+        self.court = CourtFactory(id="txctapp1", jurisdiction="SA")
+        super().setUp()
+
+    def test_texas_document_create_and_delete(
+        self, mock_download: mock.MagicMock
+    ) -> None:
+        """Is a new TexasDocument indexed with its texasd_ _id, its texas_ uids and its entry's fields, and removed from ES when deleted?"""
+        texas_document = TexasDocumentFactory(
+            docket_entry__docket__court=self.court,
+            docket_entry__docket__source=Docket.SCRAPER,
+            docket_entry__description="Relator",
+            docket_entry__disposition="Granted",
+            docket_entry__date_filed=datetime.date(2025, 1, 2),
+            description="Notice of appeal",
+        )
+        es_id = ES_CHILD_ID(texas_document.pk).TEXAS
+
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertEqual(hit.uid, f"texas_{texas_document.pk}")
+        self.assertEqual(
+            hit.docket_entry_uid, f"texas_{texas_document.docket_entry_id}"
+        )
+        self.assertEqual(hit.description, "Relator")
+        self.assertEqual(hit.disposition, "Granted")
+        self.assertEqual(hit.short_description, "Notice of appeal")
+        self.assertIs(hit.is_available, False)
+        self.assertTrue(
+            DocketDocument.exists(texas_document.docket_entry.docket_id)
+        )
+
+        texas_document.delete()
+
+        self.assertFalse(ESRECAPDocument.exists(id=es_id))
+
+    def test_changes_propagate_to_the_document(
+        self, mock_download: mock.MagicMock
+    ) -> None:
+        """Do changes to the document's file, its entry and its Docket, saved the way merge_texas_docket saves it, reach its ES document?"""
+        texas_document = TexasDocumentFactory(
+            docket_entry__docket__court=self.court,
+            docket_entry__docket__source=Docket.SCRAPER,
+            docket_entry__disposition="Pending",
+        )
+        es_id = ES_CHILD_ID(texas_document.pk).TEXAS
+
+        texas_document.filepath_local = "texas/01-25-00011-CV/notice.pdf"
+        texas_document.save()
+        entry = texas_document.docket_entry
+        entry.disposition = "Granted"
+        entry.save()
+        docket = Docket.objects.get(pk=entry.docket_id)
+        docket._index_in_es = True
+        docket.case_name = "Edited Case Name"
+        docket.save()
+
+        hit = ESRECAPDocument.get(id=es_id)
+        self.assertIs(hit.is_available, True)
+        self.assertEqual(hit.disposition, "Granted")
+        self.assertEqual(hit.caseName, "Edited Case Name")
+        self.assertEqual(
+            DocketDocument.get(id=docket.pk).caseName, "Edited Case Name"
+        )
+
+    def test_opinion_only_docket_is_not_indexed(
+        self, mock_download: mock.MagicMock
+    ) -> None:
+        """Does a Docket in a TAMES court that only holds scraped opinions stay out of the RECAP index?"""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        docket.case_name = "Edited Case Name"
+        docket.save()
+
+        self.assertFalse(DocketDocument.exists(docket.pk))
+
+    def test_merged_docket_is_indexed_with_its_parties(
+        self, mock_download: mock.MagicMock
+    ) -> None:
+        """Does merge_texas_docket index a new Docket, and an existing opinion-only one, with the parties it merges?"""
+        CourtFactory(id="texdistct6")
+        existing_number = "01-25-00011-CV"
+        existing_docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            docket_number=existing_number,
+            docket_number_core=make_texas_docket_number_core(existing_number),
+        )
+        for docket_number in ("01-25-00099-CV", existing_number):
+            with self.subTest(docket_number=docket_number):
+                docket_data = TexasCourtOfAppealsDocketDictFactory(
+                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+                    docket_number=docket_number,
+                    originating_court=TexasOriginatingDistrictCourtDictFactory(
+                        district=5
+                    ),
+                    parties=[
+                        TexasCasePartyDictFactory(
+                            name="Lone Star Holdings", representatives=[]
+                        )
+                    ],
+                    case_events=[],
+                    appellate_briefs=[],
+                    transfer_from=None,
+                    transfer_to=None,
+                )
+
+                result = merge_texas_docket(docket_data)
+
+                (docket_pk,) = result.creates.get(
+                    "Docket", set()
+                ) | result.updates.get("Docket", set())
+                if docket_number == existing_number:
+                    self.assertEqual(docket_pk, existing_docket.pk)
+                hit = DocketDocument.get(id=docket_pk)
+                self.assertIn("Lone Star Holdings", hit.party)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="TexasRECAPSearchTest")
+@override_flag("texas_docket_page", active=True)
+class TexasRECAPSearchTest(
+    AuthenticatedClientMixin, ESIndexTestCase, TestCase
+):
+    """Do RECAP searches show indexed Texas content only behind the texas_docket_page flag, and never in the search APIs?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Index one Texas docket and one RECAP docket, each with a document matching "Tied"."""
+        cls.rebuild_index("search.Docket")
+        with cls.captureOnCommitCallbacks(execute=True):
+            texas_document = TexasDocumentFactory(
+                docket_entry__docket__court=CourtFactory(
+                    id="tex", jurisdiction="S"
+                ),
+                docket_entry__docket__source=Docket.SCRAPER,
+                description="Tied",
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry__docket__court=CourtFactory(
+                    id="ca1", jurisdiction="F"
+                ),
+                docket_entry__docket__source=Docket.RECAP,
+                description="Tied",
+            )
+        cls.texas_docket_path = (
+            f"/docket/{texas_document.docket_entry.docket_id}/"
+        )
+        cls.recap_docket_path = (
+            f"/docket/{recap_document.docket_entry.docket_id}/"
+        )
+
+    def test_search_page_shows_texas_only_with_the_flag(self) -> None:
+        """Does the search page show Texas content only to requests with the texas_docket_page flag?"""
+        for q in ["Tied", ""]:
+            with self.subTest(q=q):
+                params = {"type": SEARCH_TYPES.RECAP, "q": q}
+                with override_flag("texas_docket_page", active=False):
+                    hidden = self.client.get(
+                        reverse("show_results"), params
+                    ).content.decode()
+                shown = self.client.get(
+                    reverse("show_results"), params
+                ).content.decode()
+
+                self.assertIn(self.recap_docket_path, hidden)
+                self.assertNotIn(self.texas_docket_path, hidden)
+                self.assertIn(self.texas_docket_path, shown)
+
+    def test_search_apis_never_show_texas(self) -> None:
+        """Do the v3 and v4 search APIs leave Texas out, even for requests with the texas_docket_page flag?"""
+        for version, search_type in [
+            ("v3", SEARCH_TYPES.RECAP),
+            ("v4", SEARCH_TYPES.RECAP),
+            ("v4", SEARCH_TYPES.DOCKETS),
+        ]:
+            with self.subTest(version=version, type=search_type):
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": version}),
+                    {"type": search_type, "q": "Tied"},
+                )
+
+                self.assertIn(self.recap_docket_path, r.content.decode())
+                self.assertNotIn(self.texas_docket_path, r.content.decode())
+
+
 @override_settings(WAFFLE_CACHE_PREFIX="SCOTUSRECAPSearchTest")
 @override_flag("scotus_docket_page", active=True)
 class SCOTUSRECAPSearchTest(
@@ -7853,7 +8204,7 @@ class SCOTUSRECAPSearchTest(
         self.assertEqual(shown["count_case_only"], 2)
 
     def test_count_query_drops_inner_hits_when_hiding_scotus(self) -> None:
-        """clean_count_query still strips the has_child inner_hits from a query that leaves SCOTUS out."""
+        """clean_count_query still strips the has_child inner_hits from a query that leaves SCOTUS and Texas out."""
         search_query, *_ = build_es_main_query(
             DocketDocument.search(),
             {"type": SEARCH_TYPES.RECAP, "q": "Tied"},
@@ -7864,7 +8215,11 @@ class SCOTUSRECAPSearchTest(
         ]
 
         self.assertEqual(
-            count_query["must_not"], [{"term": {"court_id.raw": "scotus"}}]
+            count_query["must_not"],
+            [
+                {"term": {"court_id.raw": court_id}}
+                for court_id in sorted(SCOTUS_COURT_IDS | TAMES_COURT_IDS)
+            ],
         )
         for clause in count_query["should"]:
             self.assertNotIn("inner_hits", clause.get("has_child", {}))
@@ -9070,7 +9425,7 @@ class IndexSCOTUSCommandTest(ESIndexTestCase, TestCase):
     def test_rejects_unsupported_combinations(self) -> None:
         """Unknown sources are rejected, and non-RECAP sources only work with the RECAP search type and without the event-table mode."""
         cases = [
-            {"source": "texas", "search_type": SEARCH_TYPES.RECAP},
+            {"source": "unknown", "search_type": SEARCH_TYPES.RECAP},
             {"source": "scotus", "search_type": SEARCH_TYPES.OPINION},
             {
                 "source": "scotus",

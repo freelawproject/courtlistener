@@ -24,7 +24,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.search_index_utils import null_map
-from cl.lib.search_utils import scotus_frontend_search_enabled
+from cl.lib.search_utils import frontend_search_sources
 from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
@@ -116,8 +116,8 @@ class SearchFeed(Feed):
 
         cd = search_form.cleaned_data
         # obj is the request (see get_object). Also part of the feed's
-        # micro-cache key, so feeds cached with and without SCOTUS stay apart.
-        cd["include_scotus"] = scotus_frontend_search_enabled(obj)
+        # micro-cache key, so feeds cached for different sources stay apart.
+        cd["include_sources"] = frontend_search_sources(obj)
         order_by = "dateFiled"
         match cd["type"]:
             case SEARCH_TYPES.OPINION:

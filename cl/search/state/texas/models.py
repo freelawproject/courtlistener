@@ -5,6 +5,7 @@ from typing import IO
 
 import pghistory
 from django.db import models
+from model_utils import FieldTracker
 
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
@@ -59,6 +60,13 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "disposition",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         # Django can't reliably determine what app a model belongs to if it's
@@ -90,6 +98,15 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "description",
+            "plain_text",
+            "page_count",
+            "filepath_local",
+        ]
+    )
 
     @classmethod
     def tmp_prefix(cls) -> str:

@@ -5409,6 +5409,13 @@ def merge_texas_docket(
         docket.case_name = docket_data["case_name"]
         docket.case_name_full = docket_data["case_name_full"]
         docket.docket_number_raw = docket_number
+        # Marks this as TAMES content for the ES signal processor's
+        # docket_belongs check, since its source=SCRAPER is the same as an
+        # opinion-scraper Docket's.
+        docket._index_in_es = True
+        percolate_parties = set_skip_percolation_if_parties_data(
+            normalize_texas_parties(docket_data["parties"]), docket
+        )
         originating_court_merge_result = merge_texas_docket_originating_court(
             docket, docket_data
         )
@@ -5450,6 +5457,12 @@ def merge_texas_docket(
         trial_court_result = MergeResult.unnecessary()
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
+    if docket_data["parties"]:
+        # Party rows don't trigger ES signals, and the Docket was indexed
+        # before these parties existed.
+        index_docket_parties_in_es.delay(
+            docket.pk, percolate_parties=percolate_parties
+        )
 
     entry_merge_result = merge_texas_docket_entries(
         docket,

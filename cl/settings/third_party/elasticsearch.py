@@ -260,6 +260,11 @@ PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED = env(
     "PERCOLATOR_SCOTUS_SEARCH_ALERTS_ENABLED", default=False
 )
 
+# Same for Texas content.
+PERCOLATOR_TEXAS_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_TEXAS_SEARCH_ALERTS_ENABLED", default=False
+)
+
 # The maximum number of attorneys in parties data allowed for percolating a
 # docket after merging parties.
 MAX_ATTORNEYS_TO_PERCOLATE = env("MAX_ATTORNEYS_TO_PERCOLATE", default=50)

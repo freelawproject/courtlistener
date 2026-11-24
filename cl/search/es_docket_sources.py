@@ -2,7 +2,7 @@
 
 Used by cl.lib.es_signal_processor and the ES indexing tasks in
 cl.search.tasks. Each source's court_ids also feed the RECAP search court
-picker.
+picker and, with its frontend_search_flag, the RECAP search gate.
 """
 
 from collections.abc import Callable
@@ -13,15 +13,17 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
-from cl.search.constants import SCOTUS_COURT_IDS
+from cl.search.constants import SCOTUS_COURT_IDS, TAMES_COURT_IDS
 from cl.search.models import (
     BankruptcyInformation,
     Court,
     Docket,
     FederalCourtsQuerySet,
+    OpinionCluster,
     RECAPDocument,
     ScotusDocketMetadata,
     SCOTUSDocument,
+    TexasDocketEntry,
     TexasDocument,
 )
 
@@ -82,6 +84,12 @@ class ESDocketSource:
     ``in_alerts_sweep`` is whether the daily RECAP alerts sweep
     (cl_send_recap_alerts) covers this source. Sources outside it only
     trigger alerts through the percolator.
+
+    ``frontend_search_flag`` names the waffle flag that decides whether the
+    search frontend shows this source. Where it's off, RECAP searches leave
+    its courts out (see gated_court_ids), and the search APIs always do
+    unless they include the source themselves. None for sources shown
+    everywhere, like RECAP.
     """
 
     name: str
@@ -96,6 +104,7 @@ class ESDocketSource:
     uid_namespace: str | None = None
     court_ids: frozenset[str] = frozenset()
     in_alerts_sweep: bool = True
+    frontend_search_flag: str | None = None
 
     def has_entries(self, docket: Docket) -> bool:
         """Whether the Docket has any docket entries from this source.
@@ -147,6 +156,32 @@ def _scotus_ready_to_index(docket: Docket) -> bool:
     return getattr(docket, "scotus_metadata", None) is not None
 
 
+def _texas_docket_belongs(docket: Docket) -> bool:
+    """True for a TAMES Docket, not one created only to hold a scraped Opinion. Like SCOTUS, merge_texas_docket and the opinion scrapers both use source=SCRAPER, so source alone can't tell the two apart.
+
+    True if the Docket was explicitly marked at save time
+    (merge_texas_docket sets `docket._index_in_es` before its save).
+    """
+    if docket.court_id not in TAMES_COURT_IDS:
+        return False
+    return getattr(docket, "_index_in_es", False)
+
+
+def _texas_docket_filter() -> Q:
+    """Select TAMES-court Dockets with a TexasDocketEntry or without an OpinionCluster, so bulk indexing also picks TAMES Dockets with no entries yet while leaving out the Dockets created only to hold a scraped Opinion.
+
+    The signal processor can't use this rule: opinion scrapers save a new
+    Docket before its OpinionCluster, so at that save the Docket has
+    neither.
+    """
+    # The court filter wraps both branches so the query can use the court
+    # index instead of checking every Docket.
+    return Q(court_id__in=TAMES_COURT_IDS) & (
+        Q(Exists(TexasDocketEntry.objects.filter(docket=OuterRef("pk"))))
+        | ~Q(Exists(OpinionCluster.objects.filter(docket=OuterRef("pk"))))
+    )
+
+
 RECAP_ES_SOURCE = ESDocketSource(
     name="recap",
     docket_entries_related_name="docket_entries",
@@ -169,8 +204,25 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     ready_to_index=_scotus_ready_to_index,
     uid_namespace="scotus",
     court_ids=SCOTUS_COURT_IDS,
+    frontend_search_flag="scotus_docket_page",
     # The sweep reads RECAP's integer ids, which SCOTUS documents leave
     # empty; SCOTUS alerts always go through the percolator.
+    in_alerts_sweep=False,
+)
+TEXAS_ES_SOURCE = ESDocketSource(
+    name="texas",
+    docket_entries_related_name="texasdocketentry_set",
+    document_model=TexasDocument,
+    child_id_property="TEXAS",
+    docket_belongs=_texas_docket_belongs,
+    docket_filter=_texas_docket_filter,
+    metadata_model=None,
+    percolator_setting="PERCOLATOR_TEXAS_SEARCH_ALERTS_ENABLED",
+    uid_namespace="texas",
+    court_ids=TAMES_COURT_IDS,
+    frontend_search_flag="texas_docket_page",
+    # Like SCOTUS, Texas documents leave RECAP's integer ids empty, so
+    # Texas alerts only go through the percolator.
     in_alerts_sweep=False,
 )
 
@@ -179,6 +231,7 @@ SCOTUS_ES_SOURCE = ESDocketSource(
 ALL_ES_SOURCES: tuple[ESDocketSource, ...] = (
     RECAP_ES_SOURCE,
     SCOTUS_ES_SOURCE,
+    TEXAS_ES_SOURCE,
 )
 
 # Each source by name, for callers that only have a string (CLI options,
@@ -233,23 +286,43 @@ def es_uid(model: type[models.Model], pk: int) -> str | None:
     return f"{source.uid_namespace}_{pk}"
 
 
-def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:
+def gated_court_ids(included_sources: tuple[str, ...]) -> list[str]:
+    """Return the courts RECAP searches must leave out: those of the gated sources (with a frontend_search_flag) other than included_sources.
+
+    :param included_sources: Names of the gated sources the request may see
+    (see frontend_search_sources).
+    """
+    return sorted(
+        court_id
+        for source in ALL_ES_SOURCES
+        if source.frontend_search_flag and source.name not in included_sources
+        for court_id in source.court_ids
+    )
+
+
+def recap_search_courts(
+    included_sources: tuple[str, ...],
+) -> QuerySet[Court]:
     """Return the courts offered in the RECAP search court picker: the PACER courts plus the ones every other registered source adds. Use it only for search; PACER-specific code (scrapers, uploads) must keep using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
 
-    :param include_scotus: Whether the search can return SCOTUS content
-    (see scotus_frontend_search_enabled). Without it, only the PACER
-    courts are offered. Temporary: remove once SCOTUS launches.
+    :param included_sources: Names of the gated sources the search can
+    return (see frontend_search_sources). Courts of the other gated sources
+    aren't offered.
     """
     # federal_courts is typed as a plain Manager, which hides the
     # FederalCourtsQuerySet methods from the type checker.
     pacer_courts = cast(
         FederalCourtsQuerySet, Court.federal_courts
     ).all_pacer_courts()
-    if not include_scotus:
-        return pacer_courts
+    gated_ids = gated_court_ids(included_sources)
     source_court_ids = [
-        court_id for source in ALL_ES_SOURCES for court_id in source.court_ids
+        court_id
+        for source in ALL_ES_SOURCES
+        for court_id in source.court_ids
+        if court_id not in gated_ids
     ]
+    if not source_court_ids:
+        return pacer_courts
     return (
         Court.objects.filter(pk__in=source_court_ids, in_use=True)
         | pacer_courts
