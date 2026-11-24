@@ -9,10 +9,10 @@ from cl.lib import widgets
 class NoteForm(V1NoteForm):
     """The v1 note form, with new-stack widgets and labels.
 
-    Validation, saving and prefilling all come from the v1 form, so the two
-    cannot drift apart. The v1 widgets carry Bootstrap classes and hardcoded
-    ids; these leave ids to the template, which sets them per rendered
-    instance. content_type/object_id stay hidden inputs, so callers must
+    Validation, saving and prefilling come from the v1 form, so the two
+    cannot drift apart; the only addition is the hidden default_name field.
+    The v1 widgets carry Bootstrap classes and hardcoded ids; these leave ids
+    to the template, which sets them per rendered instance. content_type/object_id stay hidden inputs, so callers must
     render them with the form.
     """
 
@@ -22,6 +22,8 @@ class NoteForm(V1NoteForm):
     )
 
     class Meta(V1NoteForm.Meta):
+        """Replace the v1 labels and widgets; the model and fields stay."""
+
         labels = {"name": "Name", "notes": "Notes"}
         widgets = {
             "content_type": forms.HiddenInput(),
@@ -47,7 +49,7 @@ class NoteForm(V1NoteForm):
 
     @property
     def has_hidden_field_errors(self) -> bool:
-        """Whether content_type or object_id failed validation.
+        """Whether a hidden field (content_type, object_id, default_name) failed.
 
         Users can't correct those fields, so templates show one fixed notice
         instead of the field messages.

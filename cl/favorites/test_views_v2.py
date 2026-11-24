@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -199,7 +199,9 @@ class SaveNoteHtmxTest(TestCase):
         real_save = Note.save
         failures = []
 
-        def save_once_then_really(note: Note, *args, **kwargs) -> None:
+        def save_once_then_really(
+            note: Note, *args: Any, **kwargs: Any
+        ) -> None:
             """Fail the first save as the unique constraint would."""
             if not failures:
                 failures.append(note)
