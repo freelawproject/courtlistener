@@ -107,6 +107,7 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
+from cl.search.state.texas.factories import TexasDocumentFactory
 from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -1274,6 +1275,44 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 r = self.client.get(reverse("profile_notes"))
 
                 self.assertEqual(r.context["recap_search_url"], expected)
+
+    def test_texas_document_notes_are_listed_but_not_searched(self) -> None:
+        """Are notes on Texas documents listed under Documents with a link to their page, but left out of the "Search Notes" link? Texas documents aren't in ES yet, so their pks would match unrelated RECAP documents by id."""
+        court = CourtFactory(id="tex", jurisdiction="S")
+        texas_document = TexasDocumentFactory(
+            docket_entry__docket__court=court
+        )
+        rd = RECAPDocumentFactory()
+        cases = [
+            ([texas_document], None),
+            ([rd, texas_document], f"/?type=r&q=xxx AND id:({rd.pk})"),
+        ]
+        for noted, expected in cases:
+            with self.subTest(noted=[type(d).__name__ for d in noted]):
+                profile = UserProfileWithParentsFactory()
+                for document in noted:
+                    NoteFactory(content_object=document, user=profile.user)
+                self.assertTrue(
+                    self.client.login(
+                        username=profile.user.username, password="password"
+                    )
+                )
+
+                r = self.client.get(reverse("profile_notes"))
+
+                self.assertEqual(r.context["recap_search_url"], expected)
+                self.assertEqual(
+                    [
+                        target
+                        for _, target in r.context["note_forms"]["Documents"]
+                    ],
+                    noted,
+                )
+                self.assertContains(r, texas_document.get_absolute_url())
+                if expected is None:
+                    self.assertNotContains(r, "Search Notes")
+                else:
+                    self.assertContains(r, "Search Notes")
 
 
 class NotesPageDeadLinkTest(TestCase):
