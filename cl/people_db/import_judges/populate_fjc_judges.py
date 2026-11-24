@@ -437,7 +437,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 )
                 if not testing and save_this_position:
                     prev_politics.affiliation.save()
-                politics = PoliticalAffiliation(
+                prev_politics.affiliation = PoliticalAffiliation(
                     person=person,
                     political_party=party,
                     date_start=date_nominated,
@@ -445,7 +445,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     source="a",
                 )
                 if not testing and save_this_position:
-                    politics.save()
+                    prev_politics.affiliation.save()
         rating = get_aba(item[f"ABA Rating{pos_str}"])
         if rating is not None:
             nom_year = date_nominated.year
