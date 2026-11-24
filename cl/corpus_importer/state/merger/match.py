@@ -52,6 +52,17 @@ class Fail:
 
     message: str | None = None
 
+    def reason(self, default: str) -> str:
+        """Say why the merger failed.
+
+        Args:
+            default: The reason to give when the failure has no message.
+
+        Returns:
+            The failure's message, or `default` if it has none.
+        """
+        return default if self.message is None else self.message
+
 
 type Term = str | Comparison | bool
 """A field name, as shorthand for comparing that stored field with the merger's computed value of it, or an `==` between two expressions.
@@ -62,8 +73,39 @@ type Outcome = Next | Create | Fail
 """What can end a tier's `missing` and `ambiguous` outcomes without a further choice."""
 
 type MissingOutcome = Next | Create | Fail | type[Fail]
+"""What a declaration accepts for a `missing` outcome: an `Outcome`, with `Fail` allowed as a bare class."""
+
 type AmbiguousOutcome = MissingOutcome | First | Narrow
+"""What a declaration accepts for an `ambiguous` outcome: a `MissingOutcome`, or a `First` or `Narrow` to choose among the candidates."""
+
 type DuplicateOutcome = Next | Fail | type[Fail]
+"""What a declaration accepts for a `duplicate` outcome: fall through or fail, with `Fail` allowed as a bare class."""
+
+
+def failure_text(
+    merger: type[Merger],
+    text: str,
+    *,
+    tier: int | None = None,
+    key: tuple[Any, ...] = (),
+) -> str:
+    """Build the reason a merger's lookup failed.
+
+    Args:
+        merger: The class of the merger that failed.
+        text: What went wrong.
+        tier: The tier the failure happened in, counted from 1. Without one,
+            the reason names no tier or key.
+        key: The values the member was told apart by when it failed. Only
+            reported with a tier.
+
+    Returns:
+        The reason, as given to the failed state and the log.
+    """
+    reason = f"{merger.__name__}: {text}"
+    if tier is None:
+        return reason
+    return f"{reason} (tier {tier}, key {key})"
 
 
 def _settled[T](outcome: T | type[Fail]) -> T | Fail:
@@ -899,7 +941,7 @@ class MatchGroup[M: Model]:
                 for tier in self._match.tiers
             )
         except _Rejected as rejected:
-            text = f"{self._merger.__name__}: {rejected} (tier 1, key ())"
+            text = failure_text(self._merger, str(rejected), tier=1)
             logger.error("%s", text)
             member.resolution = _Failure(text)
             return False
@@ -1065,8 +1107,7 @@ class MatchGroup[M: Model]:
             default: The reason a `Fail` without a message gives.
         """
         if isinstance(outcome, Fail):
-            message = default if outcome.message is None else outcome.message
-            self._fail(tier, [entry], message)
+            self._fail(tier, [entry], outcome.reason(default))
             return
         entry.outcome = outcome
 
@@ -1088,8 +1129,7 @@ class MatchGroup[M: Model]:
         default = (
             f"{count} scraped items share a key; the key needs another term"
         )
-        message = default if outcome.message is None else outcome.message
-        self._fail(tier, group, message)
+        self._fail(tier, group, outcome.reason(default))
 
     def _fail(
         self, tier: BoundTier, group: list[_Entry[M]], message: str
@@ -1104,8 +1144,9 @@ class MatchGroup[M: Model]:
             message: What the reason says before the tier and key.
         """
         texts = [
-            f"{self._merger.__name__}: {message} "
-            f"(tier {tier.index}, key {entry.shown_key})"
+            failure_text(
+                self._merger, message, tier=tier.index, key=entry.shown_key
+            )
             for entry in group
         ]
         for entry, text in zip(group, texts, strict=True):

@@ -30,7 +30,14 @@ from graphlib import CycleError, TopologicalSorter
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
-from .match import BoundMatch, Key, Match, MatchGroup, ambiguous_text
+from .match import (
+    BoundMatch,
+    Key,
+    Match,
+    MatchGroup,
+    ambiguous_text,
+    failure_text,
+)
 from .parameters import (
     Create,
     Existing,
@@ -571,11 +578,15 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
                 return state.create()
             case [row]:
                 return state.update(row)
-        text = f"{type(self).__name__}: {ambiguous_text(self.config.model, len(found), 1)}"
-        logger.error("%s", text)
-        return state.failed(
-            text, MergeResult.failed(self.config.model.__name__)
-        )
+            case _:
+                text = failure_text(
+                    type(self),
+                    ambiguous_text(self.config.model, len(found), 1),
+                )
+                logger.error("%s", text)
+                return state.failed(
+                    text, MergeResult.failed(self.config.model.__name__)
+                )
 
     def merge(self) -> MergeResult:
         """Merge scraped data into the DB."""
