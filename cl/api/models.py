@@ -3,6 +3,7 @@
 import re
 import uuid
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.contrib.auth.models import User
@@ -11,6 +12,13 @@ from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    APIThrottleEvent: type[Event]
+    WebhookHistoryEvent: type[Event]
 
 # Pattern: digits, slash, then valid time unit (s/m/h/d or full words)
 RATE_PATTERN = re.compile(r"^\d+/(s|m|h|d|sec|min|second|minute|hour|day)$")

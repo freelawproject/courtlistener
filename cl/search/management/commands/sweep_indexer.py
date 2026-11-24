@@ -126,7 +126,9 @@ def find_starting_model(target_model: str) -> int | None:
         return None
 
 
-def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> int:
+def get_es_doc_id(
+    es_document: type[ESDocumentType], instance_id: int
+) -> int | str:
     """Retrieve the Elasticsearch document ID according to their es_document.
 
     Args:
@@ -134,8 +136,7 @@ def get_es_doc_id(es_document: type[ESDocumentType], instance_id: int) -> int:
         instance_id: The DB instance ID related to the ES document.
 
     Returns:
-        A two-tuple containing the Elasticsearch document ID and the
-        parent ID.
+        The prefixed string ID for child documents, otherwise the instance ID.
     """
     if es_document is ESRECAPDocument:
         doc_id = ES_CHILD_ID(instance_id).RECAP
