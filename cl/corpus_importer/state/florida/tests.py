@@ -449,7 +449,7 @@ class FloridaPartyMergerTest(TestCase):
             ],
         )
 
-    @merger_test(expected_query_count=12)
+    @merger_test(expected_query_count=11)
     def test_merge_creates_all_parties(self):
         """Are multiple parties in a scrape merged as separate objects, each linked to the docket by its own party type?"""
         appellant = FloridaCasePartyFactory.create(
@@ -487,7 +487,7 @@ class FloridaPartyMergerTest(TestCase):
             },
         )
 
-    @merger_test(expected_query_count=16)
+    @merger_test(expected_query_count=15)
     def test_merge_representatives_become_attorneys_with_roles(self):
         """Is each of a party's representatives merged as a separate, named attorney, linked to the party on the merged docket as lead attorney when primary and with the unknown role otherwise?"""
         lead = FloridaRepresentativeFactory.create(
@@ -603,7 +603,7 @@ class FloridaPartyMergerTest(TestCase):
         party_type = PartyType.objects.get(docket=docket)
         self.assertEqual(party_type.name, "Appellee")
 
-    @merger_test(expected_query_count=19)
+    @merger_test(expected_query_count=17)
     def test_remerge_keeps_same_name_parties_distinct(self):
         """When two parties on a docket share a name (e.g. a cross-appellant), does a re-merge match each by its UUID rather than collapsing both onto one party?"""
         appellant = FloridaCasePartyFactory.create(
@@ -653,6 +653,43 @@ class FloridaPartyMergerTest(TestCase):
         self.assertEqual(docket.parties.count(), 1)
         self.assertEqual(PartyType.objects.filter(docket=docket).count(), 1)
         self.assertEqual(Role.objects.filter(docket=docket).count(), 1)
+
+    @merger_test(expected_query_count=22)
+    def test_same_named_attorneys_on_one_party_fail(self):
+        """Do two representatives of one party who share a name both fail, since nothing tells the stored attorneys apart, and are the party's roles left in place rather than pruned?"""
+        lead = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        second_chair = FloridaRepresentativeFactory.create(
+            name="John Counsel", primary_flag=False
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[lead, second_chair],
+        )
+        docket_data = self._make_case(scrape_party)
+        first = merge_case(docket_data)
+        self.assertTrue(first.success)
+        docket = merged_docket(first)
+        roles = set(
+            Role.objects.filter(docket=docket).values_list("pk", flat=True)
+        )
+
+        second_chair.name = "Jane Lawyer"
+        second = merge_case(docket_data)
+
+        self.assertEqual(second.failures["Attorney"], [None, None])
+        self.assertEqual(
+            set(
+                Role.objects.filter(docket=docket).values_list("pk", flat=True)
+            ),
+            roles,
+        )
+        self.assertEqual(
+            set(Attorney.objects.values_list("name", flat=True)),
+            {"Jane Lawyer", "John Counsel"},
+        )
 
 
 class FloridaDocketEntryMergerTest(TestCase):

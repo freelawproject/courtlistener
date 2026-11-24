@@ -848,7 +848,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             "e:appellant-brief:smith:1",
         )
 
-    @merger_test(expected_query_count=30)
+    @merger_test(expected_query_count=32)
     def test_merge_links_filing_to_docket_party(self) -> None:
         """Is a filing's party resolved to a party on the docket, keeping the name the FILINGS table printed?
 
@@ -918,7 +918,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             PartyType.objects.get(name="Respondent").party_id,
         )
 
-    @merger_test(expected_query_count=24)
+    @merger_test(expected_query_count=25)
     def test_remerge_keeps_resolved_filing_party(self) -> None:
         """Does a later scrape that can't resolve the party keep the party a previous scrape resolved?"""
         case = self.case(
@@ -1649,7 +1649,7 @@ class NYCoAPublishFilesTest(NYCoAMergerTestCase):
 class NYCoAPartyMergerTest(NYCoAMergerTestCase):
     """Tests for merging the parties and attorneys of a docket."""
 
-    @merger_test(expected_query_count=16)
+    @merger_test(expected_query_count=17)
     def test_merge_creates_party_with_attorney(self) -> None:
         """Does merging a case create its party, party type, attorney, and the role linking them?"""
         attorney = NYCoAAttorneyFactory.create(
@@ -1684,7 +1684,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         )
         self.assertEqual(role.attorney.phone, "(518) 555-1212")
 
-    @merger_test(expected_query_count=22)
+    @merger_test(expected_query_count=21)
     def test_merge_makes_the_first_attorney_listed_the_lead(self) -> None:
         """Court-PASS states no attorney's role.
 
@@ -1722,7 +1722,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             },
         )
 
-    @merger_test(expected_query_count=32)
+    @merger_test(expected_query_count=34)
     def test_merge_attorney_phone_too_long_for_the_column(self) -> None:
         """Court-PASS writes a direct line as `(516) 222-6200 ext: 284`, which is longer than `Attorney.phone` allows. Is the number kept dialable, with the full phone repeated in the contact field only when shortening it lost something?
 
@@ -1769,7 +1769,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                 self.assertEqual(attorney.phone, phone)
                 self.assertEqual(attorney.contact_raw, contact_raw)
 
-    @merger_test(expected_query_count=16)
+    @merger_test(expected_query_count=17)
     def test_merge_keeps_role_court_pass_prints(self) -> None:
         """The cross-state party vocabulary has no amicus value.
 
@@ -1790,7 +1790,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         self.assertTrue(result.success)
         self.assertEqual(PartyType.objects.get().name, "Amicus Curiae")
 
-    @merger_test(expected_query_count=12)
+    @merger_test(expected_query_count=13)
     def test_merge_party_type_falls_back_to_vocabulary(self) -> None:
         """With no printed role, does the party type come from the normalized vocabulary?"""
         case = self.case(
@@ -1809,7 +1809,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         self.assertTrue(result.success)
         self.assertEqual(PartyType.objects.get().name, "Appellant")
 
-    @merger_test(expected_query_count=40)
+    @merger_test(expected_query_count=36)
     def test_remerge_one_name_under_two_roles(self) -> None:
         """In a family case the Court lists one person twice, as the child and as a party. Both are parties in their own right, and a name is all `PartyMerger` matches on, so re-merging must tell them apart by role rather than finding two and giving up on the docket."""
         case = self.case(parties=self.one_name_under_two_roles())
@@ -1836,7 +1836,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             "Each role must stay on the party row it was first written to.",
         )
 
-    @merger_test(expected_query_count=44)
+    @merger_test(expected_query_count=40)
     def test_refusing_a_party_costs_only_that_party(self) -> None:
         """A shared name the role cannot separate is one the party merger refuses. That refusal is reported in the docket's own result, so does the rest of the case still merge and stay merged -- the docket merger being atomic notwithstanding?"""
         case = self.case(
@@ -1894,7 +1894,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         )
         self.assertEqual(Role.objects.filter(docket=docket).count(), 2)
 
-    @merger_test(expected_query_count=27)
+    @merger_test(expected_query_count=29)
     def test_remerge_party_whose_role_changed(self) -> None:
         """A respondent becomes a respondent-appellant when the other side cross-appeals. Is that the same party under a new role, rather than a second row?"""
         case = self.case(
@@ -1921,3 +1921,137 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
         # than a second set being written on every scrape.
         self.assertEqual(Attorney.objects.count(), 1)
         self.assertEqual(Role.objects.count(), 1)
+
+
+class NYCoAPartyMatchTest(NYCoAMergerTestCase):
+    """Tests for matching scraped parties that share a name on one docket."""
+
+    @classmethod
+    def parties_case(cls, *roles: str) -> NYCoACase:
+        """A case whose parties are all named "A. R.", one per role.
+
+        Args:
+            *roles: The role Court-PASS prints for each party.
+
+        Returns:
+            The scraped case.
+        """
+        return cls.case(
+            parties=[
+                NYCoAPartyFactory.create(
+                    name="A. R.", party_role_raw=role, representatives=[]
+                )
+                for role in roles
+            ],
+            issues=[],
+        )
+
+    @staticmethod
+    def stored_roles() -> dict[str, int]:
+        """The role of each stored "A. R." party row, with the row's pk."""
+        return {
+            pt.name: pt.party_id
+            for pt in PartyType.objects.filter(party__name="A. R.")
+        }
+
+    @merger_test(expected_query_count=20)
+    def test_same_name_unstored_role_updates_last_row(self) -> None:
+        """A party whose role is stored for no party of its name takes the one same-named row the other scraped party left unclaimed."""
+        first = NYCoADocketMerger(
+            self.parties_case("Child", "Respondent"), params=None
+        ).merge()
+        stored = self.stored_roles()
+
+        second = NYCoADocketMerger(
+            self.parties_case("Child", "Appellant"), params=None
+        ).merge()
+
+        self.assertTrue(first.success)
+        self.assertTrue(second.success, second.failures)
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        self.assertEqual(
+            self.stored_roles(),
+            {"Child": stored["Child"], "Appellant": stored["Respondent"]},
+        )
+
+    @merger_test(expected_query_count=18)
+    def test_two_same_name_unstored_roles_are_refused(self) -> None:
+        """Are two parties whose roles are stored for no party of their name, with the same rows left to both, refused and the stored parties left alone?"""
+        first = NYCoADocketMerger(
+            self.parties_case("Child", "Respondent"), params=None
+        ).merge()
+        stored = self.stored_roles()
+
+        second = NYCoADocketMerger(
+            self.parties_case("Appellant", "Appellee"), params=None
+        ).merge()
+
+        self.assertTrue(first.success)
+        self.assertEqual(len(second.failures["Party"]), 2)
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        self.assertEqual(self.stored_roles(), stored)
+
+    @merger_test(expected_query_count=16)
+    def test_two_same_name_parties_with_third_stored_role_are_refused(
+        self,
+    ) -> None:
+        """Are two parties sharing a name refused when the one stored party of that name holds a third role, rather than both updating it?"""
+        first = NYCoADocketMerger(
+            self.parties_case("Child"), params=None
+        ).merge()
+        stored = self.stored_roles()
+
+        second = NYCoADocketMerger(
+            self.parties_case("Appellant", "Respondent"), params=None
+        ).merge()
+
+        self.assertTrue(first.success)
+        self.assertEqual(len(second.failures["Party"]), 2)
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 1)
+        self.assertEqual(self.stored_roles(), stored)
+
+    @merger_test(expected_query_count=19)
+    def test_conflated_party_splits_on_rescrape(self) -> None:
+        """When two scraped parties share a name and the one stored party holds the role of one of them, does the other get a party of its own and the first keep the stored one?"""
+        first = NYCoADocketMerger(
+            self.parties_case("Respondent"), params=None
+        ).merge()
+        stored = self.stored_roles()
+
+        second = NYCoADocketMerger(
+            self.parties_case("Child", "Respondent"), params=None
+        ).merge()
+
+        self.assertTrue(first.success)
+        self.assertTrue(second.success, second.failures)
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        roles = self.stored_roles()
+        self.assertEqual(roles["Respondent"], stored["Respondent"])
+        self.assertNotEqual(roles["Child"], stored["Respondent"])
+        self.assertEqual(set(roles), {"Child", "Respondent"})
+
+    @merger_test(expected_query_count=17)
+    def test_party_with_two_roles_on_docket_is_one_candidate(self) -> None:
+        """Is a party holding two roles on the docket a single candidate for its name, rather than an ambiguity between its two roles?"""
+        first = NYCoADocketMerger(
+            self.parties_case("Respondent"), params=None
+        ).merge()
+        original = Party.objects.get(name="A. R.")
+        PartyType.objects.create(
+            docket=merged_docket(first), party=original, name="Child"
+        )
+
+        second = NYCoADocketMerger(
+            self.parties_case("Appellant"), params=None
+        ).merge()
+
+        # `PartyTypeMerger` keys a through row on the docket and the party
+        # alone, so it cannot choose between the party's two roles; that is
+        # its failure, not the party's.
+        self.assertNotIn("Party", second.failures)
+        self.assertEqual(
+            list(
+                Party.objects.filter(name="A. R.").values_list("pk", flat=True)
+            ),
+            [original.pk],
+        )

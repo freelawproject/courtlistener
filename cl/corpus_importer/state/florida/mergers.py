@@ -54,6 +54,7 @@ from cl.corpus_importer.state.merger import (
     Coalesce,
     Constant,
     Database,
+    First,
     Fn,
     Key,
     ManyStrategy,
@@ -110,37 +111,16 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
     matching by name collapses them onto one `Party`.
     """
 
-    config: ClassVar[MergerConfig[Party]] = MergerConfig(
-        model=Party, key=("extra_info",)
+    # A docket can hold two parties with the same UUID where an earlier
+    # name-based match overwrote one party's UUID with another's; preferring
+    # the oldest keeps those dockets merging instead of failing on the
+    # ambiguity.
+    match: ClassVar[Match] = Match(
+        Key("extra_info", ambiguous=First("date_created"))
     )
 
     attorneys: Sequence[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
     extra_info: str = Fn(str)(Scrape(FloridaParty).party_uuid)
-
-    @override
-    def resolve(
-        self,
-        state: MergerState.Resolve[
-            FloridaParty,
-            RelatedParams[None],
-            Party,
-        ],
-    ) -> MergerState.ResolveOutput[
-        FloridaParty,
-        RelatedParams[None],
-        Party,
-    ]:
-        """Take the oldest match.
-
-        A docket can hold two parties with the same UUID where an earlier
-        name-based match overwrote one party's UUID with another's; preferring
-        the oldest keeps those dockets merging instead of failing on the
-        ambiguity.
-        """
-        results = list(state.candidates)
-        if len(results) == 0:
-            return state.create()
-        return state.update(results[0])
 
 
 def _content_type(document: ScrapeFloridaDocument) -> str:

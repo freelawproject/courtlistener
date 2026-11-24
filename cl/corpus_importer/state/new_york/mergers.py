@@ -35,9 +35,12 @@ from cl.corpus_importer.state.common.party import (
 )
 from cl.corpus_importer.state.merger import (
     Ancestor,
+    Annotation,
     Coalesce,
     Constant,
     Database,
+    Fail,
+    First,
     Fn,
     Key,
     ManyStrategy,
@@ -45,6 +48,7 @@ from cl.corpus_importer.state.merger import (
     Merger,
     MergerConfig,
     MergerState,
+    Next,
     OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
@@ -71,7 +75,6 @@ from cl.corpus_importer.state.new_york.utils import (
     mirrored_code,
 )
 from cl.corpus_importer.state.storage import delete_file
-from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket
@@ -570,7 +573,7 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
     """Merger for a party on a Court-PASS docket.
 
     Identity is `PartyMerger`'s -- the name, within the docket -- with the role
-    breaking a tie; see `resolve`.
+    breaking a tie; see `match`.
     """
 
     attorneys: Sequence[Attorney] = AttorneyRelation(
@@ -579,56 +582,27 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
         transform=_party_attorneys,
     )
 
-    @override
-    def resolve(
-        self,
-        state: MergerState.Resolve[
-            NYCoAParty,
-            RelatedParams[None],
-            Party,
-        ],
-    ) -> MergerState.ResolveOutput[
-        NYCoAParty,
-        RelatedParams[None],
-        Party,
-    ]:
-        """Pick which of the docket's parties this scraped one is.
-
-        A name is not unique on a Court-PASS docket. We make a best effort here
-        to match parties when they have the same name (family cases), and log when
-        we can't disambiguate.
-
-        Args:
-            state: Carries the candidates `PartyMerger.lookup` found. A
-                name no role settles is refused rather than guessed.
-
-        Returns:
-            The state to continue in: creating, updating the row to
-            merge into, or failed.
-        """
-        candidates = list(state.candidates)
-        if len(candidates) == 0:
-            return state.create()
-        if len(candidates) == 1:
-            return state.update(candidates[0])
-
-        docket = cast(Docket, state.params.parent)
-        role = _party_type_name(state.scrape)
-        for candidate in candidates:
-            if candidate.party_types.filter(
-                docket=docket, name__iexact=role
-            ).exists():
-                return state.update(candidate)
-        logger.error(
-            "Docket %s lists %s under several roles and none is %s; refusing "
-            "to guess which party this is.",
-            docket.docket_number,
-            state.scrape.name,
-            role,
-        )
-        return state.failed(
-            "Ambiguous party", MergeResult.failed(Party.__name__)
-        )
+    # Two scraped parties on one docket can share a name and differ in role (a
+    # child and a respondent both named "A. R."), so the first tier tells them
+    # apart by the role they hold on the docket. A party whose role matches no
+    # stored one falls back to the name, and takes the same-named row the other
+    # scraped parties left unclaimed.
+    match: ClassVar[Match] = Match(
+        Key(
+            "name",
+            Annotation("role").lower()
+            == Fn(_party_type_name)(Scrape(NYCoAParty)).lower(),
+            ambiguous=First("date_created"),
+        ),
+        Key(
+            "name",
+            ambiguous=Fail(
+                "the docket lists the name under several roles and none is "
+                "the scraped one"
+            ),
+            duplicate=Next,
+        ),
+    )
 
 
 @dataclass(frozen=True)
