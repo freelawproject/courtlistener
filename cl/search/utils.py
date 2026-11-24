@@ -1,6 +1,7 @@
 """Helpers for gathering homepage statistics."""
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
@@ -14,6 +15,15 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
+
+    def cache_memoize[F: Callable](
+        *args: Any, **kwargs: Any
+    ) -> Callable[[F], F]:
+        """Type check only shadow of the `cache_memoize` decorator to allow correct inference."""
 
 
 def get_redis_stat_sum(
