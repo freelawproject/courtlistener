@@ -612,6 +612,7 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
 @login_required
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
+@sensitive_variables()
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Show the data export page, and download the export on POST.
 

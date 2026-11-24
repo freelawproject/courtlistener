@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.core import serializers
 from django.db.models import Model, QuerySet
 from django.utils.timezone import now
+from django.views.decorators.debug import sensitive_variables
 from redis import ConnectionError
 
 from cl.alerts.models import Alert, DocketAlert
@@ -79,6 +80,7 @@ def _serialize(queryset: QuerySet[Any]) -> list[dict[str, Any]]:
     )
 
 
+@sensitive_variables()
 def build_user_data_export(user: User) -> dict[str, Any]:
     """Gather everything we can give a user about their account.
 
