@@ -78,7 +78,7 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
         # Override create by copying from source so we can throw 403's
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        status = self.perform_create(serializer)
+        status = self.save_and_build(serializer)
         headers = self.get_success_headers(serializer.data)
         if status != "success":
             return Response(
@@ -90,7 +90,7 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
             serializer.data, status=HTTPStatus.CREATED, headers=headers
         )
 
-    def perform_create(self, serializer):
+    def save_and_build(self, serializer):
         """Save the visualization with its endpoints in date order, then build it.
 
         Returns:
