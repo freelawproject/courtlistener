@@ -476,14 +476,30 @@ class _Binder:
                 return outcome
 
     def check_ordering(self, first: First) -> None:
-        """Record a problem for each ordering that is not `pk` or a concrete field, with an optional `-`."""
+        """Record a problem for each ordering that is not `pk` or a concrete, non-relation field, with an optional `-`.
+
+        A relation is rejected because rows sorted in memory would compare
+        model instances, while the database orders a relation by the related
+        model's ordering.
+        """
         for item in first.ordering:
-            if item.removeprefix("-") not in {"pk", *self.fields}:
+            name = item.removeprefix("-")
+            if name == "pk":
+                continue
+            if (field := self.fields.get(name)) is None:
                 self.problem(
                     ValueError(
                         f"cannot order by {item!r}: an ordering is a concrete "
                         f"field of {self.model.__name__} or pk, optionally "
                         "prefixed with '-'"
+                    )
+                )
+            elif field.is_relation:
+                self.problem(
+                    ValueError(
+                        f"cannot order by {item!r}: {name!r} is a relation, "
+                        "which the database orders by the related model's "
+                        "ordering"
                     )
                 )
 
@@ -630,6 +646,8 @@ class Match:
             ExceptionGroup: Of every problem found in the declaration.
         """
         binder = _Binder(merger, pool)
+        if not self.tiers:
+            binder.errors.append(ValueError("a match needs at least one tier"))
         tiers = tuple(
             binder.tier(index, key)
             for index, key in enumerate(self.tiers, start=1)

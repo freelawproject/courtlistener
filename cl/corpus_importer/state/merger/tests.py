@@ -2203,6 +2203,26 @@ class MatchDeclarationTest(SimpleTestCase):
                 ),
                 "description__lower",
             ),
+            "ordering is a relation": (
+                Match(Key("description", ambiguous=First("docket"))),
+                "docket",
+            ),
+            "descending ordering is a relation": (
+                Match(Key("description", ambiguous=First("-docket"))),
+                "-docket",
+            ),
+            "ordering of a narrow is a relation": (
+                Match(
+                    Key(
+                        "description",
+                        ambiguous=Narrow(
+                            "description", ambiguous=First("docket")
+                        ),
+                    )
+                ),
+                "docket",
+            ),
+            "no tiers": (Match(), "at least one tier"),
             "non-term": (Match(Key(False)), "False"),
             "invalid term in a narrow": (
                 Match(Key("description", ambiguous=Narrow("nope"))),
