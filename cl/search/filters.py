@@ -20,6 +20,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
     Tag,
 )
@@ -252,4 +253,23 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
             "sha1": ["exact"],
             "ocr_status": INTEGER_LOOKUPS,
             "is_free_on_pacer": ["exact"],
+        }
+
+
+class OpinionsCitedByRECAPDocumentFilter(NoEmptyFilterSet):
+    # Plain ModelChoiceFilters instead of RelatedFilters, so only exact FK
+    # matches are allowed, blocking traversal into the related filtersets
+    # e.g. ?citing_document__is_available=True
+    citing_document = filters.ModelChoiceFilter(
+        queryset=RECAPDocument.objects.all().only("pk")
+    )
+    cited_opinion = filters.ModelChoiceFilter(
+        queryset=Opinion.objects.all().only("pk")
+    )
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
+        fields = {
+            "id": INTEGER_LOOKUPS,
+            "depth": INTEGER_LOOKUPS,
         }
