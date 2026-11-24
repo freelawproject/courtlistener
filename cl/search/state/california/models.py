@@ -186,12 +186,7 @@ class CaliforniaDocument(AbstractDateTimeModel, AbstractStateDocument):
     @classmethod
     def expected_extensions(cls) -> NonEmptyTuple[str]:
         """File extensions California is known to serve."""
-        raise NotImplementedError
-
-    @classmethod
-    def extractable_extensions(cls) -> NonEmptyTuple[str]:
-        """Extensions that can be sent to text extraction."""
-        raise NotImplementedError
+        return (".pdf",)
 
     class Meta:
         app_label = "search"
