@@ -13,10 +13,12 @@ document.addEventListener('alpine:init', () => {
    * Events, dispatched from the root and bubbling:
    * - `combobox-add` and `combobox-remove`, with `detail.option`, after an
    *   option is selected or deselected. Replacing the single selection
-   *   dispatches one of each.
+   *   dispatches one of each. `detail.undo()` reverts the change without
+   *   dispatching events.
    * - `combobox-create`, with `detail.label`, when the create option is chosen.
    *   Unless a listener cancels it, the typed text becomes a new selected
-   *   option whose value is its label.
+   *   option whose value is its label. A listener that cancels it can call
+   *   `detail.add(option)` later to add and select an option of its own.
    */
   Alpine.data('combobox', () => {
     // Selection as of the last events dispatched.
@@ -115,6 +117,13 @@ document.addEventListener('alpine:init', () => {
         else this.$data.__value = own[0] ?? null;
       },
 
+      /** Selects or deselects an option without dispatching events. */
+      setSelected(option, selected) {
+        const others = previous.filter((other) => other.value !== option.value);
+        previous = selected ? [...(this.multiple ? others : []), option] : others;
+        this.select(previous);
+      },
+
       /**
        * Runs as an effect: reads the selection so any change to it re-runs
        * this, then reports the change once the current update has finished.
@@ -134,8 +143,12 @@ document.addEventListener('alpine:init', () => {
         const added = selection.filter(isMissingFrom(previous));
         const removed = previous.filter(isMissingFrom(selection));
         previous = selection;
-        added.forEach((option) => this.$dispatch('combobox-add', { option }));
-        removed.forEach((option) => this.$dispatch('combobox-remove', { option }));
+        added.forEach((option) =>
+          this.$dispatch('combobox-add', { option, undo: () => this.setSelected(option, false) })
+        );
+        removed.forEach((option) =>
+          this.$dispatch('combobox-remove', { option, undo: () => this.setSelected(option, true) })
+        );
         if (added.length) this.clearQuery();
       },
 
@@ -144,10 +157,12 @@ document.addEventListener('alpine:init', () => {
         const label = typed.trim();
         this.select(previous);
         this.clearQuery();
-        if (!this.$dispatch('combobox-create', { label })) return;
-        const option = { value: label, label };
-        this.options.push(option);
-        this.select(this.multiple ? [...previous, option] : [option]);
+        const add = ({ value, label }) => {
+          const option = { value, label };
+          if (!this.options.some((other) => other.value === value)) this.options.push(option);
+          this.select(this.multiple ? [...previous, option] : [option]);
+        };
+        if (this.$dispatch('combobox-create', { label, add })) add({ value: label, label });
       },
 
       /** Rejects text entered in the input of a combobox that isn't searchable. */
