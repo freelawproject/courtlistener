@@ -882,6 +882,30 @@ class ImportScannedOpinionsTest(TestCase):
                     mock_logger.warning.call_args[0][0],
                 )
 
+    def test_overwrite_cleanup_failure_still_finds_citations(self) -> None:
+        """Does a failed CloudFront invalidation let citation finding run?
+
+        The overwrite already committed, so the failure is only logged.
+        """
+        self.import_scan()
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+
+        with (
+            mock.patch(
+                f"{COMMAND_MODULE}.invalidate_cloudfront",
+                side_effect=ValueError("boom"),
+            ),
+            mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.import_xml(corrected, overwrite=True)
+
+        mock_find_citations.assert_called_once_with([Opinion.objects.get().pk])
+        mock_logger.exception.assert_called_once()
+
     def test_overwrite_deletes_a_previous_file_with_another_name(
         self,
     ) -> None:

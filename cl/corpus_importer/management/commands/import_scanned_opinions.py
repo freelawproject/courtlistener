@@ -1029,10 +1029,26 @@ def store_scan_xml(
     storage = cluster.filepath_xml_scan.storage
 
     def clean_up_previous_file() -> None:
-        """Delete a renamed previous file and invalidate the cached ones."""
-        if previous_name != name:
-            storage.delete(previous_name)
-        invalidate_cloudfront(sorted({f"/{previous_name}", f"/{name}"}))
+        """Delete a renamed previous file and invalidate the cached ones.
+
+        Errors are logged instead of raised: the overwrite already
+        committed, and raising would stop the later commit callbacks, like
+        citation finding. A stale cached copy expires within a day (see
+        `ScanXmlStorage`).
+        """
+        paths = sorted({f"/{previous_name}", f"/{name}"})
+        try:
+            if previous_name != name:
+                storage.delete(previous_name)
+            invalidate_cloudfront(paths)
+        except Exception:
+            logger.exception(
+                "Failed to clean up the previous scan XML of cluster %s. "
+                "Check that %s is deleted if renamed, and invalidate %s",
+                cluster.pk,
+                previous_name,
+                paths,
+            )
 
     # Until the commit, the cluster still points to the previous file
     transaction.on_commit(clean_up_previous_file)
