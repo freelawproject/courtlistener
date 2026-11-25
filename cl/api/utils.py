@@ -696,9 +696,11 @@ class NoFilterCacheListMixin:
         has_pagination = request.query_params.get(
             "cursor"
         ) or request.query_params.get("page")
-        has_dynamic_fields = request.query_params.get(
-            "fields"
-        ) or request.query_params.get("omit")
+        # Check presence, not truthiness: an empty `?fields=` strips every
+        # field, so it must not read from or write to the shared cache key.
+        has_dynamic_fields = (
+            "fields" in request.query_params or "omit" in request.query_params
+        )
         is_v3_request = request.version == "v3"
 
         # Determine the cache key prefix. Uses a custom key if provided,
