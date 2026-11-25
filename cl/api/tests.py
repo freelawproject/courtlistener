@@ -4056,7 +4056,8 @@ class CacheListApiResponseTest(TestCase):
 
         for param in ("fields", "omit"):
             with self.subTest(param=param):
-                self.client.get(path, {param: ""})
+                response = self.client.get(path, {param: ""})
+                self.assertEqual(response.status_code, HTTPStatus.OK)
                 self.assertFalse(self.cache.has_key(fake_cache_key))
 
     def test_empty_fields_does_not_share_cache_with_full_list(
