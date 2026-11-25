@@ -81,6 +81,12 @@ from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 
 # State models are re-exported so Django registers them with the search app.
+from cl.search.state.california.models import (
+    CaliforniaDocketEntry as CaliforniaDocketEntry,
+)
+from cl.search.state.california.models import (
+    CaliforniaDocument as CaliforniaDocument,
+)
 from cl.search.state.florida.models import (
     FloridaDocketEntry as FloridaDocketEntry,
 )
