@@ -97,6 +97,15 @@ document.addEventListener('alpine:init', () => {
         this.query = '';
       },
 
+      /** Runs as an effect on the area holding the chips and the input: after the selection changes, scrolls it to its end, where the input is. */
+      showInput() {
+        const area = this.$el;
+        if (!this.$combobox.value.length) return;
+        this.$nextTick(() => {
+          area.scrollTop = area.scrollHeight;
+        });
+      },
+
       /** The accessible name of a chip's remove button. */
       removeLabel(option) {
         return `Remove ${option.label}`;

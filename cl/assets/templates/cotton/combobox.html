@@ -32,17 +32,20 @@
     {% if searchable %}
       <span x-show="$combobox.isOpen" x-cloak class="flex shrink-0 text-greyscale-500">{% svg "magnifier" class="size-5" aria_hidden="true" %}</span>
     {% endif %}
-    <div class="flex flex-wrap flex-1 items-center gap-1.5 min-w-0">
+    <div
+      {% if multiple %}x-effect="showInput"{% endif %}
+      class="flex flex-wrap flex-1 items-center gap-1.5 min-w-0 {% if multiple %}max-h-28 overflow-y-auto overscroll-contain{% endif %}"
+    >
       {% if multiple %}
         <ul class="contents list-none" aria-label="Selected: {{ label }}">
           <template x-for="option in $combobox.value" x-bind:key="option.value">
-            <li class="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md border border-greyscale-300 bg-white text-sm font-medium text-greyscale-800">
-              <span x-text="option.label"></span>
+            <li class="flex items-center gap-1 max-w-full pl-2 pr-1 py-0.5 rounded-md border border-greyscale-300 bg-white text-sm font-medium text-greyscale-700">
+              <span x-text="option.label" class="truncate"></span>
               <button
                 type="button"
                 x-on:click="remove(option)"
                 x-bind:aria-label="removeLabel(option)"
-                class="flex items-center justify-center size-5 rounded text-greyscale-500 hover:text-greyscale-800 focus-self"
+                class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-500 hover:text-greyscale-800 focus-self"
               >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
             </li>
           </template>
@@ -67,7 +70,7 @@
         type="text"
         autocomplete="off"
         placeholder="{{ placeholder }}"
-        class="flex-1 min-w-24 bg-transparent outline-none placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
+        class="flex-1 min-w-24 bg-transparent outline-none text-sm font-medium text-greyscale-600 placeholder:font-normal placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
       />
     </div>
     <button x-combobox:button aria-label="Show options" class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
@@ -83,16 +86,16 @@
       x-cloak
     {% endif %}
     {% if multiple %}aria-multiselectable="true"{% endif %}
-    class="w-full max-h-80 overflow-y-auto list-none {% if inline %}p-0{% else %}z-20 p-1.5 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
+    class="flex flex-col gap-0.5 w-full max-h-80 overflow-y-auto list-none {% if inline %}p-0 [&>li]:px-3{% else %}z-20 p-1.5 [&>li]:px-2 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
   >
     <template x-for="option in filteredOptions" x-bind:key="option.value">
       <li
         x-combobox:option
         x-bind:value="option"
         x-bind:data-active="$comboboxOption.isActive"
-        class="group flex items-center justify-between gap-2 px-3 py-2 rounded-md text-greyscale-800 cursor-pointer aria-selected:bg-greyscale-50 data-[active]:bg-greyscale-100"
+        class="group flex items-center justify-between gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer aria-selected:bg-greyscale-50 data-[active]:bg-greyscale-100"
       >
-        <span x-text="option.label"></span>
+        <span x-text="option.label" class="min-w-0 break-words"></span>
         {% svg "check" class="size-5 shrink-0 invisible group-aria-selected:visible" aria_hidden="true" %}
       </li>
     </template>
@@ -102,10 +105,10 @@
           x-combobox:option
           x-bind:value="createOption"
           x-bind:data-active="$comboboxOption.isActive"
-          class="flex items-center gap-2 px-3 py-2 rounded-md font-medium text-greyscale-800 cursor-pointer data-[active]:bg-greyscale-100"
-        >{{ create_label }} <span x-text="query"></span></li>
+          class="flex items-center gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer data-[active]:bg-greyscale-100"
+        >{{ create_label }} <span x-text="query" class="min-w-0 break-words"></span></li>
       </template>
     {% endif %}
-    <li x-show="isEmpty" role="presentation" class="px-3 py-2 text-greyscale-500">No results.</li>
+    <li x-show="isEmpty" role="presentation" class="py-2.5 text-sm text-greyscale-500">No results.</li>
   </ul>
 </div>
