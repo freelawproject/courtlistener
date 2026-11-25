@@ -473,7 +473,6 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 ({"docket_entry": self.entry.pk}, 2),
                 ({"docket_entry": self.entry_no_docs.pk}, 0),
                 ({"docket_entry__docket": self.docket.pk}, 2),
-                ({"attachment_number": 2}, 1),
                 ({"document_number__isnull": "true"}, 1),
                 ({"is_available": "true"}, 1),
                 ({"is_available": "false"}, 2),

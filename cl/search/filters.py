@@ -365,5 +365,4 @@ class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
         fields = {
             **BaseSourceDocumentFilter.Meta.fields,
             "document_number": INTEGER_LOOKUPS + ["isnull"],
-            "attachment_number": INTEGER_LOOKUPS + ["isnull"],
         }
