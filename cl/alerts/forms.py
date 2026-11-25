@@ -17,7 +17,6 @@ from cl.alerts.utils import (
 from cl.donate.models import NeonMembershipLevel
 from cl.donate.utils import FLP_MEMBERSHIP_URL, get_membership_upgrade_url
 from cl.search.models import SEARCH_TYPES
-from cl.sso.membership import get_effective_membership
 
 
 class CreateAlertForm(ModelForm):
@@ -94,7 +93,7 @@ class CreateAlertForm(ModelForm):
                     )
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
-                effective = get_effective_membership(self.user)
+                effective = result.membership
                 if effective is not None and effective.is_organization:
                     raise ValidationError(
                         format_html(

@@ -19,7 +19,9 @@ def sync_user_throttles(user: User, clear_cache: bool = True) -> None:
     :param clear_cache: Clear the throttle cache afterwards. Batch callers
     pass False and clear it once at the end.
     """
-    membership = get_effective_membership(user)
+    # Rows are kept current while SSO is off, so turning it on needs no
+    # resync. get_all_throttle_overrides decides whether they apply.
+    membership = get_effective_membership(user, ignore_sso_flag=True)
     if membership is None or not apply_membership_throttles(
         user, membership.level, clear_cache=clear_cache
     ):

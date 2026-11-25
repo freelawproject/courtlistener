@@ -18,7 +18,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import BaseThrottle
 
-from cl.api.utils import apply_membership_throttles
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
     NeonMembership,
@@ -364,7 +363,7 @@ class MembershipWebhookViewSet(
         )
         neon_membership.payment_status = payment_status
         neon_membership.save()
-        apply_membership_throttles(neon_membership.user, membership_level)
+        sync_user_throttles(neon_membership.user)
 
     def _handle_membership_creation(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
@@ -436,7 +435,7 @@ class MembershipWebhookViewSet(
             )
             neon_membership.payment_status = payment_status
             neon_membership.save()
-        apply_membership_throttles(user, membership_level)
+        sync_user_throttles(user)
         tag_zoho_record_for_membership.delay(user.pk, membership_level)
 
     @staticmethod

@@ -82,7 +82,7 @@ from cl.search.types import (
     PercolatorResponses,
     SearchAlertHitType,
 )
-from cl.sso.membership import get_effective_membership
+from cl.sso.membership import EffectiveMembership, get_effective_membership
 
 COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
@@ -981,6 +981,8 @@ class AlertLimitResult:
     violation: AlertLimitViolation | None
     # The free-tier quota for the alert's rate, for building the user message.
     free_quota: int
+    # The membership the quota came from, so callers don't look it up again.
+    membership: EffectiveMembership | None = None
 
 
 def check_alert_limits(
@@ -1062,11 +1064,11 @@ def check_alert_limits(
     if alerts.count() + 1 > allowed:
         violation = (
             AlertLimitViolation.MEMBER_QUOTA_EXCEEDED
-            if profile.is_member
+            if membership
             else AlertLimitViolation.FREE_QUOTA_EXCEEDED
         )
-        return AlertLimitResult(violation, free_quota)
-    return AlertLimitResult(None, free_quota)
+        return AlertLimitResult(violation, free_quota, membership)
+    return AlertLimitResult(None, free_quota, membership)
 
 
 def get_alert_estimation_count(

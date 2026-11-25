@@ -1148,7 +1148,7 @@ class MembershipWebhookConcurrencyTest(TransactionTestCase):
                     "deleteMembership", "12345", "CL Membership - Tier 1"
                 )
             ),
-            (api_views, "apply_membership_throttles"),
+            (api_views, "sync_user_throttles"),
             pause_after=False,
         )
 

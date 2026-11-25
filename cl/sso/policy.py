@@ -14,8 +14,8 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
-from waffle import get_waffle_flag_model
 
+from cl.sso.flags import sso_enabled
 from cl.sso.models import (
     Enforcement,
     Organization,
@@ -23,21 +23,6 @@ from cl.sso.models import (
     SSOConnection,
     SSOEmailException,
 )
-
-SSO_FLAG = "sso"
-
-
-def sso_enabled() -> bool:
-    """Whether SSO is turned on for the site.
-
-    Controlled by the "sso" waffle flag with Everyone set to Yes. Some
-    checks run without a request, so the flag's per-user, group and
-    percentage settings are ignored. While it's off nobody is offered SSO
-    or required to use it.
-
-    :return: True if the flag is on for everyone.
-    """
-    return bool(get_waffle_flag_model().get(SSO_FLAG).everyone)
 
 
 class RequirementReason:

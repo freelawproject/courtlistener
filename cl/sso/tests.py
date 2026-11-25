@@ -34,6 +34,7 @@ from rest_framework.request import Request
 from waffle.testutils import override_flag
 
 from cl.api.authentication import ReplicaRoutingBasicAuthentication
+from cl.api.constants import TIER_3_RATES
 from cl.api.models import APIThrottle, ThrottleType
 from cl.api.utils import get_all_throttle_overrides
 from cl.donate.api_views import MembershipWebhookViewSet
@@ -842,6 +843,59 @@ class EffectiveMembershipTest(TestCase):
             ).exists()
         )
 
+    def test_failed_payment_uses_organization_rates(self) -> None:
+        """Does a failed personal payment fall back to the org's API rates?"""
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1, neon_id="99"
+        )
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        term_end = (timezone.now() + timedelta(days=30)).date().isoformat()
+
+        MembershipWebhookViewSet()._handle_membership_update(
+            {
+                "data": {
+                    "membership": {
+                        "membershipId": "99",
+                        "membershipName": "CL Membership - Tier 1",
+                        "accountId": "1",
+                        "termEndDate": term_end,
+                        "status": "SUCCEEDED",
+                        "payments": [{"paymentStatus": "Failed"}],
+                    }
+                }
+            }
+        )
+
+        clear_tiered_cache()
+        self.assertEqual(
+            sorted(
+                get_all_throttle_overrides(ThrottleType.API)[
+                    self.user.username
+                ]
+            ),
+            sorted(TIER_3_RATES),
+        )
+
+    def test_settings_names_the_source_of_benefits(self) -> None:
+        """Is the organization named as the source only when it is one?"""
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        self.client.force_login(self.user)
+        benefits = "Your membership benefits come from"
+
+        r = self.client.get(reverse("view_settings"))
+        self.assertContains(r, benefits)
+
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1
+        )
+        r = self.client.get(reverse("view_settings"))
+        self.assertContains(r, "single sign-on")
+        self.assertNotContains(r, benefits)
+
     def test_own_membership_wins(self) -> None:
         """Does a person's own Neon membership beat their organization's?"""
         NeonMembershipFactory.create(
@@ -1332,6 +1386,21 @@ class SSOFlagOffTest(SSOFixtureMixin, TestCase):
 
         self.assertIsNone(requirement_for_user(user))
         self.assertEqual(r.status_code, 302)
+
+    def test_no_organization_benefits(self) -> None:
+        """Does a seat give no benefits or API rates while SSO is off?"""
+        user = UserProfileWithParentsFactory.create().user
+        OrganizationMembershipFactory.create(organization=self.org, user=user)
+        sync_user_throttles(user)
+
+        self.assertIsNone(get_effective_membership(user))
+        self.assertFalse(user.profile.is_member)
+        clear_tiered_cache()
+        self.assertNotIn(
+            user.username, get_all_throttle_overrides(ThrottleType.API)
+        )
+        # Kept, so turning SSO on doesn't need a resync.
+        self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
     def test_notify_command_refuses_to_send(self) -> None:
         """Does the notify command refuse to email people?"""

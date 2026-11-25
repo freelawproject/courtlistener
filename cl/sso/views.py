@@ -23,9 +23,10 @@ from cl.lib.url_utils import (
     is_safe_url,
     parse_url_with_ada,
 )
+from cl.sso.flags import sso_enabled
 from cl.sso.forms import SSOStartForm
 from cl.sso.models import SSOConnection
-from cl.sso.policy import email_domain, sso_enabled, sso_option_for_email
+from cl.sso.policy import email_domain, sso_option_for_email
 
 WELL_KNOWN_SUFFIX = "/.well-known/openid-configuration"
 

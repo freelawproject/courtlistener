@@ -13,8 +13,9 @@ from django.db.models.functions import Lower
 
 from cl.lib.command_utils import VerboseCommand
 from cl.sso.emails import emails
+from cl.sso.flags import sso_enabled
 from cl.sso.models import Enforcement, OrganizationDomain
-from cl.sso.policy import enabled_connection, sso_enabled, sso_start_url
+from cl.sso.policy import enabled_connection, sso_start_url
 
 logger = logging.getLogger(__name__)
 
