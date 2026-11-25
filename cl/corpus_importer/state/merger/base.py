@@ -537,7 +537,7 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             TypeError: If the match cannot be queried in the pool.
         """
         if self.group is None:
-            self.group = MatchGroup.build(
+            self.group = MatchGroup(
                 type(self),
                 type(self).pool or Global(),
                 relation=None,

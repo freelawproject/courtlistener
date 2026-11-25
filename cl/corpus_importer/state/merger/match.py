@@ -526,61 +526,37 @@ class MatchGroup[M: Model]:
     def __init__(
         self,
         merger: type[Merger[Any, Any, M]],
-        match: BoundMatch,
-        reader: PoolReader[M],
-    ) -> None:
-        """Start a group.
-
-        Args:
-            merger: The class of the group's mergers.
-            match: The match the group is assigned by.
-            reader: The reader of the pool the group's rows come from, built for the first tier's ordering.
-        """
-        self._merger: type[Merger[Any, Any, M]] = merger
-        self._match: BoundMatch = match
-        self._reader: PoolReader[M] = reader
-        self._members: dict[int, _Member[M]] = {}
-        self._relation_names: list[str] = []
-        self._relation_attnames: list[str] = []
-        self._unavailable: set[Any] = set()
-        self._assigned: bool = False
-
-    @classmethod
-    def build(
-        cls,
-        merger: type[Merger[Any, Any, M]],
         pool: Pool,
         *,
         relation: QuerySet[M] | None,
         params: Any,
-    ) -> MatchGroup[M]:
-        """Start the group of a merger's siblings.
+    ) -> None:
+        """Start a group.
 
         Args:
             merger: The class of the group's mergers.
             pool: The pool the merger's rows are read from.
             relation: What the parent holds in the group's relation, if the group is a relation of another merger.
             params: The params the group's mergers were created with.
-
-        Returns:
-            The group, with no members.
-
-        Raises:
-            TypeError: If the merger matches by its `match` and that cannot be matched in the pool.
         """
-        match = merger._bound_match
         if errors := merger.pool_errors(pool):
             raise TypeError(
                 f"{merger.__name__} cannot be matched in {type(pool).__name__}: "
                 + "; ".join(str(error) for error in errors)
             )
-        reader = pool.reader(
+        self._merger: type[Merger[Any, Any, M]] = merger
+        self._match: BoundMatch = merger._bound_match
+        self._reader: PoolReader[M] = pool.reader(
             merger,
             relation=relation,
             params=params,
-            ordering=match.tiers[0].ordering,
+            ordering=merger._bound_match.tiers[0].ordering,
         )
-        return cls(merger, match, reader)
+        self._members: dict[int, _Member[M]] = {}
+        self._relation_names: list[str] = []
+        self._relation_attnames: list[str] = []
+        self._unavailable: set[Any] = set()
+        self._assigned: bool = False
 
     def join(
         self, merger: Merger[Any, Any, M], state: MergerState.Lookup
@@ -841,10 +817,8 @@ class MatchGroup[M: Model]:
                 entry.outcome = outcome
             return
 
-        texts = [
-            f"{self._merger.__name__}: {count} scraped items share a key (tier {tier.index}, key {entry.shown_key})"
-            for entry in group
-        ]
-        for entry, text in zip(group, texts, strict=True):
-            entry.outcome = _Failure(text)
-        logger.error("%s", texts[0])
+        for entry in group:
+            entry.outcome = _Failure(
+                f"{self._merger.__name__}: {count} scraped items share a key (tier {tier.index}, key {entry.shown_key})"
+            )
+        logger.error("%s", group[0].outcome)

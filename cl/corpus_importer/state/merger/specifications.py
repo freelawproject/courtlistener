@@ -1197,7 +1197,7 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        children = MatchGroup.build(
+        children = MatchGroup(
             self.merger,
             self.pool,
             relation=related_manager.all(),
@@ -1400,7 +1400,7 @@ class ManyToManyMerger[
 
         # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
         # this case
-        children = MatchGroup.build(
+        children = MatchGroup(
             self.merger,
             self.pool,
             relation=related_manager.all(),
@@ -1443,7 +1443,7 @@ class ManyToManyMerger[
                 **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
             ),
         )
-        throughs = MatchGroup.build(
+        throughs = MatchGroup(
             self.through,
             self.through_pool,
             relation=through_relation,
