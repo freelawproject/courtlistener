@@ -1488,7 +1488,7 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
         self.assertIn('x-on:docket-blocked.window="open"', html)
 
 
-class ComboboxComponentTest(SimpleTestCase):
+class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
     """The markup c-combobox renders for each prop, which its script and the Alpine UI plugin read in the browser."""
 
     options = [
@@ -1497,12 +1497,8 @@ class ComboboxComponentTest(SimpleTestCase):
     ]
 
     def render(self, source: str) -> HtmlElement:
-        """Compiles a Cotton snippet, renders it and returns the component's root."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        html = template.render(
-            {"request": RequestFactory().get("/"), "options": self.options}
-        )
+        """Renders a Cotton snippet and returns the component's root."""
+        html = self.render_component(source, {"options": self.options})
         return fromstring(html).xpath("//*[@x-data='combobox']")[0]
 
     def test_options_reach_the_script_as_json(self) -> None:
