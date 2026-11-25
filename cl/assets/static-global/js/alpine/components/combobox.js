@@ -1,26 +1,9 @@
 document.addEventListener('alpine:init', () => {
   /**
-   * Combobox for `cotton/combobox.html`.
-   *
-   * Reads its options from the JSON script the template renders and filters
-   * them by the typed text. Selects one option, shown as the field's text, or
-   * any number with the `multiple` attribute on the root, shown as removable
-   * chips. The selection lives in the Alpine UI combobox on the same element.
-   *
-   * Events, dispatched from the root and bubbling:
-   * - `combobox-add` and `combobox-remove`, with `detail.option`, after an
-   *   option is selected or deselected. Replacing the single selection
-   *   dispatches one of each. `detail.undo()` reverts the change without
-   *   dispatching events.
-   * - `combobox-create`, with `detail.label`, when the create option is chosen.
-   *   Unless a listener cancels it, the typed text becomes a new selected
-   *   option whose value is its label. A listener that cancels it can call
-   *   `detail.add(option)` later to add and select an option of its own.
-   * - `combobox-search`, only with `data-remote` on the root, which leaves
-   *   the filtering to the listener. Carries `detail.query` and `detail.page`.
-   *   The listener answers with `detail.respond(options, { hasMore })` or
-   *   `detail.fail(message)`; answers to a search that a newer one replaced
-   *   are ignored, and `detail.signal` aborts then.
+   * Combobox for `cotton/combobox.html`, on top of the Alpine UI combobox.
+   * Adds chips, a create option, a clear button, a mode without typing and
+   * options searched by the page. Reports changes with events that the
+   * Component Library documents.
    */
   Alpine.data('combobox', () => {
     // Selection as of the last events dispatched.
@@ -29,6 +12,8 @@ document.addEventListener('alpine:init', () => {
     let typed = '';
     // Value of the option that creates the typed text; no real option can carry it.
     const CREATE_VALUE = Symbol('create');
+    /** An option reduced to its value and label. */
+    const plain = ({ value, label }) => ({ value, label });
 
     // Remote
     // Value of the option that asks for the next page.
@@ -61,13 +46,13 @@ document.addEventListener('alpine:init', () => {
       init() {
         const script = this.$el.querySelector(':scope > template[data-options]').content.querySelector('script');
         const options = JSON.parse(script.textContent) ?? [];
-        this.options = options.map(({ value, label }) => ({ value, label }));
+        this.options = options.map(plain);
         this.multiple = this.$el.hasAttribute('multiple');
         this.creatable = 'creatable' in this.$el.dataset;
         this.remote = 'remote' in this.$el.dataset;
         const selected = this.options.filter((_, index) => options[index].selected);
         this.initialSelection = this.multiple ? selected : (selected[0] ?? null);
-        previous = selected.slice(0, this.multiple ? undefined : 1).map(({ value, label }) => ({ value, label }));
+        previous = selected.slice(0, this.multiple ? undefined : 1).map(plain);
       },
 
       // Selection: chips, the clear button, the create option and the events.
@@ -131,7 +116,7 @@ document.addEventListener('alpine:init', () => {
        * this, then reports the change once the current update has finished.
        */
       trackSelection() {
-        const selection = [].concat(this.$combobox.value ?? []).map(({ value, label }) => ({ value, label }));
+        const selection = [].concat(this.$combobox.value ?? []).map(plain);
         queueMicrotask(() => this.reportSelection(selection));
       },
 
@@ -169,9 +154,9 @@ document.addEventListener('alpine:init', () => {
       create() {
         const label = typed.trim();
         this.clearQuery();
-        const add = ({ value, label }) => {
-          const option = { value, label };
-          if (!this.options.some((other) => other.value === value)) this.options.push(option);
+        const add = (given) => {
+          const option = plain(given);
+          if (!this.options.some((other) => other.value === option.value)) this.options.push(option);
           this.select(this.multiple ? [...previous, option] : [option]);
         };
         if (this.$dispatch('combobox-create', { label, add })) add({ value: label, label });
@@ -204,7 +189,7 @@ document.addEventListener('alpine:init', () => {
       /** Follows the input's text however it was entered: filters by it, opens the list and clears the single selection once the text is deleted. */
       followInput() {
         typed = this.query = this.$refs.__input.value;
-        if (!this.$combobox.isOpen) this.$data.__open();
+        this.$data.__open();
         if (!this.multiple && this.query === '') this.select([]);
       },
 
@@ -253,7 +238,7 @@ document.addEventListener('alpine:init', () => {
       /** Highlights the first option starting with the characters typed in quick succession when the combobox isn't searchable. */
       typeahead(event) {
         if (event.key.length !== 1 || event.key === ' ' || event.ctrlKey || event.metaKey || event.altKey) return;
-        if (!this.$combobox.isOpen) this.$data.__open();
+        this.$data.__open();
         const context = this.$data.__context;
         const key = context.searchKey(event.key.toLowerCase());
         if (key) context.activateAndScrollToKey(key, true);
@@ -314,7 +299,7 @@ document.addEventListener('alpine:init', () => {
           page,
           signal: current.signal,
           respond: unlessReplaced((options, { hasMore = false } = {}) => {
-            const fresh = options.map(({ value, label }) => ({ value, label }));
+            const fresh = options.map(plain);
             const kept = page === 1 ? [] : this.options;
             if (page !== 1) this.highlightRow(kept.length);
             this.options = [...kept, ...fresh.filter((option) => !kept.some((other) => other.value === option.value))];
@@ -351,7 +336,7 @@ document.addEventListener('alpine:init', () => {
       loadMore() {
         if (this.loadingMore) return;
         this.$refs.__input.value = this.query = typed;
-        if (!this.$combobox.isOpen) this.$data.__open();
+        this.$data.__open();
         this.search(searchedQuery, this.page + 1);
       },
     };
