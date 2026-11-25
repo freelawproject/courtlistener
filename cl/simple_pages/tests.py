@@ -7,12 +7,10 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.template import engines
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.urls import resolve, reverse
 from django.utils.safestring import mark_safe
-from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import HtmlElement, fromstring
 from waffle.testutils import override_flag
 
@@ -25,7 +23,7 @@ from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import CottonComponentMixin, SimpleTestCase, TestCase
 from cl.tests.utils import parse_csp
 
 if TYPE_CHECKING:
@@ -860,18 +858,91 @@ class ContentSecurityPolicyTest(TestCase):
         self.assertNotIn('nonce=""', html)
 
 
-class DialogComponentTest(SimpleTestCase):
-    """The c-dialog component renders a trigger only when given one."""
+class ButtonComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-button busy state: declared by aria-busy, static or bound."""
 
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
+    def test_a_plain_button_renders_no_busy_markup(self) -> None:
+        """Without aria-busy there is no wrapper, spinner or status region."""
+        for source, tag in (
+            ('<c-button variant="primary">Save</c-button>', "button"),
+            ('<c-button variant="primary" href="/x/">Save</c-button>', "a"),
+            (
+                '<c-button variant="primary" touch_target>Save</c-button>',
+                "button",
+            ),
+        ):
+            with self.subTest(tag=tag, source=source):
+                root = fromstring(self.render_component(source))
+                self.assertEqual(root.tag, tag)
+                self.assertIsNone(root.get("x-busy-button"))
+                self.assertEqual(root.xpath('.//*[local-name()="svg"]'), [])
+                self.assertEqual(root.xpath('.//*[@role="status"]'), [])
+
+    def test_caller_attributes_reach_the_busy_capable_button(self) -> None:
+        """A bound aria-busy adds the busy markup without eating other attributes."""
+        for source, tag in (
+            (
+                '<c-button variant="primary" type="submit" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "button",
+            ),
+            (
+                '<c-button variant="primary" href="/x/" rel="nofollow" x-bind:aria-busy="busy" class="w-full">Save</c-button>',
+                "a",
+            ),
+        ):
+            with self.subTest(tag=tag):
+                root = fromstring(self.render_component(source))
+                self.assertIsNotNone(root.get("x-busy-button"))
+                element = root.find(tag)
+                self.assertIsNotNone(element)
+                self.assertEqual(element.get("x-bind:aria-busy"), "busy")
+                self.assertIn("w-full", element.get("class").split())
+                if tag == "a":
+                    self.assertEqual(element.get("href"), "/x/")
+                    self.assertEqual(element.get("rel"), "nofollow")
+                else:
+                    self.assertEqual(element.get("type"), "submit")
+
+    def test_busy_keeps_the_label_and_hides_the_spinner_from_assistive_technology(
+        self,
+    ) -> None:
+        """The label alone is the accessible name while busy."""
+        for source in (
+            '<c-button variant="primary" aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" touch_target aria-busy="true">Save</c-button>',
+            '<c-button variant="primary" href="#" aria-busy="true">Save</c-button>',
+        ):
+            with self.subTest(source=source):
+                root = fromstring(self.render_component(source))
+                element = root[0]
+                self.assertEqual(element.get("aria-busy"), "true")
+                spinners = element.xpath('.//*[local-name()="svg"]')
+                self.assertEqual(len(spinners), 1)
+                self.assertEqual(spinners[0].get("aria-hidden"), "true")
+                self.assertEqual(element.text_content().strip(), "Save")
+                statuses = root.xpath('./*[@role="status"]')
+                self.assertEqual(len(statuses), 1)
+                self.assertEqual(statuses[0].text_content(), "")
+                self.assertTrue(statuses[0].get("data-busy-text"))
+
+    def test_busy_text_is_what_the_status_region_announces(self) -> None:
+        """busy_text reaches the status region and never the button."""
+        root = fromstring(
+            self.render_component(
+                '<c-button variant="primary" aria-busy="true" busy_text="Saving your changes">Save</c-button>'
+            )
+        )
+        status = root.xpath('./*[@role="status"]')[0]
+        self.assertEqual(status.get("data-busy-text"), "Saving your changes")
+        self.assertIsNone(root[0].get("busy_text"))
+
+
+class DialogComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-dialog component renders a trigger only when given one."""
 
     def test_trigger_slot_renders_a_trigger(self) -> None:
         """Trigger content renders the default trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="button_content">Open</c-slot>'
             '<c-slot name="panel">Body</c-slot></c-dialog>'
         )
@@ -879,30 +950,22 @@ class DialogComponentTest(SimpleTestCase):
 
     def test_without_a_trigger_slot_no_trigger_is_rendered(self) -> None:
         """A dialog opened by other means, such as an event listener, has no trigger button."""
-        html = self.render(
+        html = self.render_component(
             '<c-dialog><c-slot name="panel">Body</c-slot></c-dialog>'
         )
         self.assertNotIn('aria-haspopup="dialog"', html)
         self.assertIn("Body", html)
 
 
-class TooltipComponentTest(SimpleTestCase):
+class TooltipComponentTest(CottonComponentMixin, SimpleTestCase):
     """The c-tooltip component renders a help button and its message."""
-
-    def render(
-        self, source: str, context: dict[str, Any] | None = None
-    ) -> str:
-        """Compiles a Cotton snippet and renders it with an optional context."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render(
-            {"request": RequestFactory().get("/"), **(context or {})}
-        )
 
     def test_button_is_named_after_what_it_explains(self) -> None:
         """The icon-only button gets a name that says what it explains."""
         tree = fromstring(
-            self.render('<c-tooltip label="Last Updated" message="Message" />')
+            self.render_component(
+                '<c-tooltip label="Last Updated" message="Message" />'
+            )
         )
         button = tree.xpath("//button")[0]
         self.assertEqual(button.get("aria-label"), "More about Last Updated")
@@ -910,13 +973,17 @@ class TooltipComponentTest(SimpleTestCase):
 
     def test_button_exposes_whether_the_tooltip_is_open(self) -> None:
         """The button's aria-expanded is bound to the open state."""
-        html = self.render('<c-tooltip label="Item" message="Message" />')
+        html = self.render_component(
+            '<c-tooltip label="Item" message="Message" />'
+        )
         self.assertIn('x-bind:aria-expanded="isOpen"', html)
 
     def test_live_region_starts_empty(self) -> None:
         """The live region is empty until the tooltip opens, so the message is announced as new content."""
         tree = fromstring(
-            self.render('<c-tooltip label="Item" message="Message" />')
+            self.render_component(
+                '<c-tooltip label="Item" message="Message" />'
+            )
         )
         live = tree.xpath("//*[@role='status']")[0]
         self.assertEqual(len(live), 0)
@@ -924,7 +991,7 @@ class TooltipComponentTest(SimpleTestCase):
 
     def test_message_html_is_not_escaped(self) -> None:
         """A safe message, such as the Last Updated <strong>, renders as markup."""
-        html = self.render(
+        html = self.render_component(
             '<c-tooltip label="Item" :message="message" />',
             {"message": mark_safe("Updated by <strong>RECAP</strong>")},
         )
@@ -938,18 +1005,18 @@ class TooltipComponentTest(SimpleTestCase):
         ]
         for source, expected in cases:
             with self.subTest(source=source):
-                tree = fromstring(self.render(source))
+                tree = fromstring(self.render_component(source))
                 self.assertEqual(len(tree.xpath("//*[@data-arrow]")), expected)
 
     def test_description_renders_only_when_given(self) -> None:
         """A description adds supporting text and the roomier padding."""
-        with_description = self.render(
+        with_description = self.render_component(
             '<c-tooltip label="Item" description="Supporting text" message="Message" />'
         )
         self.assertIn("Supporting text", with_description)
         self.assertIn("p-3", with_description)
 
-        without_description = self.render(
+        without_description = self.render_component(
             '<c-tooltip label="Item" message="Message" />'
         )
         self.assertIn("px-3 py-2", without_description)
@@ -969,7 +1036,7 @@ class TooltipComponentTest(SimpleTestCase):
         ]
         for source, background in cases:
             with self.subTest(background=background):
-                self.assertIn(background, self.render(source))
+                self.assertIn(background, self.render_component(source))
 
     def test_position_is_passed_to_the_anchor(self) -> None:
         """The position prop sets the x-anchor placement and its padding axis.
@@ -995,7 +1062,7 @@ class TooltipComponentTest(SimpleTestCase):
         ]
         for source, position, padding in cases:
             with self.subTest(position=position):
-                live = fromstring(self.render(source)).xpath(
+                live = fromstring(self.render_component(source)).xpath(
                     "//*[@role='status']"
                 )[0]
                 self.assertEqual(
@@ -1004,7 +1071,7 @@ class TooltipComponentTest(SimpleTestCase):
                 self.assertIn(padding, live.get("class").split())
 
 
-class TabsComponentTest(SimpleTestCase):
+class TabsComponentTest(CottonComponentMixin, SimpleTestCase):
     """c-tabs renders link tabs or panel tabs, depending on its tab list."""
 
     ROOT_ID = "my-tabs-tabs"
@@ -1035,11 +1102,8 @@ class TabsComponentTest(SimpleTestCase):
         ]
 
     def render(self, source: str, **context: Any) -> HtmlElement:
-        """Compiles a Cotton snippet, renders it and parses the result."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        context["request"] = RequestFactory().get("/")
-        return fromstring(template.render(context))
+        """Renders a Cotton snippet and parses the result."""
+        return fromstring(self.render_component(source, context))
 
     def test_link_tabs_render_a_nav_of_links(self) -> None:
         """Link tabs are links in a nav, and htmx targets the component's root."""
@@ -1206,16 +1270,8 @@ class TabsComponentTest(SimpleTestCase):
                 )
 
 
-class IconComponentTest(SimpleTestCase):
+class IconComponentTest(CottonComponentMixin, SimpleTestCase):
     """Tests sizing, variant selection and accessibility of c-icon."""
-
-    def render(
-        self, source: str, context: dict[str, Any] | None = None
-    ) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render(context or {})
 
     def path_data(self, html: str) -> list[str]:
         """Returns the drawing data of every path in the given SVG markup."""
@@ -1223,21 +1279,23 @@ class IconComponentTest(SimpleTestCase):
 
     def test_icon_is_hidden_from_assistive_technology_by_default(self) -> None:
         """An icon without an aria_label is decorative."""
-        icon = fromstring(self.render('<c-icon name="chevron" />'))
+        icon = fromstring(self.render_component('<c-icon name="chevron" />'))
         self.assertEqual(icon.get("aria-hidden"), "true")
         self.assertIsNone(icon.get("aria-label"))
 
     def test_aria_label_gives_the_icon_an_accessible_name(self) -> None:
         """An icon with an aria_label is named and not hidden."""
         icon = fromstring(
-            self.render('<c-icon name="chevron" aria_label="Next page" />')
+            self.render_component(
+                '<c-icon name="chevron" aria_label="Next page" />'
+            )
         )
         self.assertEqual(icon.get("aria-label"), "Next page")
         self.assertIsNone(icon.get("aria-hidden"))
 
     def test_bound_aria_label_is_escaped(self) -> None:
         """An aria_label bound from the context can't break out of its attribute."""
-        html = self.render(
+        html = self.render_component(
             '<c-icon name="chevron" :aria_label="name" />',
             {"name": 'A "b" <c> & d'},
         )
@@ -1246,14 +1304,14 @@ class IconComponentTest(SimpleTestCase):
 
     def test_renders_without_surrounding_whitespace(self) -> None:
         """The icon can sit inline next to text without adding a space."""
-        html = self.render('<c-icon name="chevron" />')
+        html = self.render_component('<c-icon name="chevron" />')
         self.assertTrue(html.startswith("<svg"), repr(html[:20]))
         self.assertTrue(html.endswith("</svg>"), repr(html[-20:]))
 
     def test_bound_class_is_escaped(self) -> None:
         """A class bound from the context can't add attributes to the icon."""
         icon = fromstring(
-            self.render(
+            self.render_component(
                 '<c-icon name="chevron" :class="classes" />',
                 {"classes": '" onload="alert(1)'},
             )
@@ -1270,7 +1328,7 @@ class IconComponentTest(SimpleTestCase):
         for source, expected_file in cases:
             with self.subTest(source=source):
                 self.assertEqual(
-                    self.path_data(self.render(source)),
+                    self.path_data(self.render_component(source)),
                     self.path_data(svg(expected_file)),
                 )
 
@@ -1286,7 +1344,9 @@ class IconComponentTest(SimpleTestCase):
         for size, expected_class in cases.items():
             with self.subTest(size=size):
                 icon = fromstring(
-                    self.render(f'<c-icon name="chevron" size="{size}" />')
+                    self.render_component(
+                        f'<c-icon name="chevron" size="{size}" />'
+                    )
                 )
                 self.assertEqual(
                     icon.get("class").split(), ["shrink-0", expected_class]
@@ -1295,7 +1355,7 @@ class IconComponentTest(SimpleTestCase):
     def test_class_is_added_after_the_size_class(self) -> None:
         """Extra classes keep the size class and follow it."""
         icon = fromstring(
-            self.render(
+            self.render_component(
                 '<c-icon name="chevron" size="sm" class="rotate-90" />'
             )
         )
@@ -1306,25 +1366,19 @@ class IconComponentTest(SimpleTestCase):
     def test_custom_size_leaves_sizing_to_class(self) -> None:
         """A custom size sets no size class, leaving sizing to `class`."""
         icon = fromstring(
-            self.render(
+            self.render_component(
                 '<c-icon name="chevron" size="custom" class="size-3" />'
             )
         )
         self.assertEqual(icon.get("class").split(), ["shrink-0", "size-3"])
 
 
-class ToastComponentTest(SimpleTestCase):
+class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
     """The c-toast component renders its optional parts only when given."""
-
-    def render(self, source: str) -> str:
-        """Compiles a Cotton snippet and renders it."""
-        compiled = CottonCompiler().process(source)
-        template = engines["django"].from_string(compiled)
-        return template.render({"request": RequestFactory().get("/")})
 
     def test_title_alone_renders_only_the_close_icon(self) -> None:
         """Without a variant, icon or description, the only svg is the close button's."""
-        html = self.render('<c-toast title="Link copied" />')
+        html = self.render_component('<c-toast title="Link copied" />')
         self.assertIn("Link copied", html)
         self.assertEqual(html.count("<svg"), 1)
 
@@ -1342,7 +1396,7 @@ class ToastComponentTest(SimpleTestCase):
         }
         for variant, icon in variant_icons.items():
             with self.subTest(variant=variant):
-                html = self.render(
+                html = self.render_component(
                     f'<c-toast variant="{variant}" title="Docket blocked"'
                     ' description="No longer indexed" />'
                 )
@@ -1352,12 +1406,14 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_unknown_variant_renders_no_icon(self) -> None:
         """A variant outside the presets renders neither an icon nor its slot."""
-        html = self.render('<c-toast variant="error" title="Oops" />')
+        html = self.render_component(
+            '<c-toast variant="error" title="Oops" />'
+        )
         self.assertEqual(html.count("<svg"), 1)
 
     def test_icon_prop_replaces_the_variant_icon(self) -> None:
         """A named icon renders instead of the variant's, as the only icon."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast variant="success" title="Alert created" icon="bell" />'
         )
         self.assertIn(self.icon("bell"), html)
@@ -1365,31 +1421,32 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_trigger_slot_renders_inside_the_root(self) -> None:
         """A trigger slot renders; a toast opened by an event has none."""
-        with_trigger = self.render(
+        with_trigger = self.render_component(
             '<c-toast title="Saved"><c-slot name="trigger">'
             '<button x-on:click="open">Show</button></c-slot></c-toast>'
         )
         self.assertIn('x-on:click="open"', with_trigger)
         self.assertNotIn(
-            'x-on:click="open"', self.render('<c-toast title="Saved" />')
+            'x-on:click="open"',
+            self.render_component('<c-toast title="Saved" />'),
         )
 
     def test_action_container_renders_only_with_content(self) -> None:
         """A trigger slot written on its own lines leaves no empty action box."""
-        with_trigger = self.render(
+        with_trigger = self.render_component(
             '<c-toast title="Saved">\n'
             '  <c-slot name="trigger"><button x-on:click="open">Show</button></c-slot>\n'
             "</c-toast>"
         )
         self.assertNotIn("shrink-0 items-center gap-2", with_trigger)
-        with_action = self.render(
+        with_action = self.render_component(
             '<c-toast title="Saved"><button>Undo</button></c-toast>'
         )
         self.assertIn("shrink-0 items-center gap-2", with_action)
 
     def test_live_region_renders_empty_and_polite(self) -> None:
         """The message column is an empty polite live region at render time."""
-        html = self.render('<c-toast title="Docket blocked" />')
+        html = self.render_component('<c-toast title="Docket blocked" />')
         region = re.search(r'<div[^>]*x-ref="live"[^>]*></div>', html)
         self.assertIsNotNone(region)
         for attribute in (
@@ -1401,7 +1458,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_message_waits_in_a_template(self) -> None:
         """The title and description render inside a template, not in the live region."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Docket blocked" description="No longer indexed" />'
         )
         template = re.search(r"<template[^>]*>(.*?)</template>", html, re.S)
@@ -1411,7 +1468,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_controls_are_hidden_until_open(self) -> None:
         """The action container and the Close button render under an x-show gate."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Docket blocked"><button>Undo</button></c-toast>'
         )
         close_button = re.search(r'<button[^>]*aria-label="Close"[^>]*>', html)
@@ -1425,7 +1482,7 @@ class ToastComponentTest(SimpleTestCase):
 
     def test_undeclared_attributes_land_on_the_root(self) -> None:
         """A listener passed to the component opens the toast from an event."""
-        html = self.render(
+        html = self.render_component(
             '<c-toast title="Saved" x-on:docket-blocked.window="open" />'
         )
         self.assertIn('x-on:docket-blocked.window="open"', html)
