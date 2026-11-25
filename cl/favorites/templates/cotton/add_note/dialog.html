@@ -5,7 +5,7 @@
 <c-vars form/>
 
 <c-dialog
-    panel_class="p-5 banner {% if not request.user.is_authenticated %} max-w-lg items-center{% else %} max-w-xl{% endif %}"
+    panel_class="p-5 banner max-h-dvh overflow-y-auto {% if not request.user.is_authenticated %} max-w-lg items-center{% else %} max-w-xl{% endif %}"
     dialog_class="items-center z-20"
     x-on:note-saved.window="close"
     x-on:note-deleted.window="close"
