@@ -781,18 +781,15 @@ class ViewRecapDocumentTest(TestCase):
         )
         await add_docket_entries(docket, de_data["docket_entries"])
 
-        att_data = cast(
-            dict[str, Any],
-            await sync_to_async(AppellateAttachmentPageFactory)(
-                attachments=[
-                    AppellateAttachmentFactory(
-                        attachment_number=1, pacer_doc_id="288651"
-                    ),
-                    AppellateAttachmentFactory(),
-                ],
-                pacer_doc_id="288651",
-                pacer_case_id="104490",
-            ),
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1, pacer_doc_id="288651"
+                ),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="288651",
+            pacer_case_id="104490",
         )
         await merge_attachment_page_data(
             court,
@@ -5771,6 +5768,12 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(link.get("href"), download_path)
         self.assertEqual(link.get("rel"), "nofollow")
         self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertEqual(link.get("x-bind:aria-busy"), "busy")
+        busy_button = link.xpath("ancestor::*[@x-busy-button]")
+        self.assertEqual(len(busy_button), 1)
+        status = busy_button[0].xpath('./*[@role="status"]')
+        self.assertEqual(len(status), 1)
+        self.assertTrue(status[0].get("data-busy-text"))
         self.assertIsNone(link.get("hx-get"))
         self.assertNotIn("sign in required", link.text_content())
         component = link.xpath('ancestor::*[@x-data="download"]')
