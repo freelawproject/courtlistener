@@ -6577,6 +6577,36 @@ class AlertsViewsContextTest(TestCase):
     def setUp(self) -> None:
         self.client.login(username=self.user.username, password="password")
 
+    def test_alerts_pages_pass_tabs_with_their_own_tab_current(self) -> None:
+        """Each page gets the tabs, and its `page` is the key of its own tab."""
+        for viewname in ("profile_search_alerts", "profile_docket_alerts"):
+            with self.subTest(viewname=viewname):
+                response = self.client.get(reverse(viewname))
+
+                tabs = response.context["tabs"]
+                self.assertEqual(tabs, build_alerts_tabs())
+                own_tab = next(
+                    tab for tab in tabs if tab["url"] == reverse(viewname)
+                )
+                self.assertEqual(own_tab["key"], response.context["page"])
+
+    def test_docket_alerts_rows_follow_the_sorted_alerts(self) -> None:
+        """There's one row per listed alert, in the page's sort order."""
+        DocketAlertWithParentsFactory.create_batch(2, user=self.user)
+
+        response = self.client.get(reverse("profile_docket_alerts"))
+
+        self.assertEqual(
+            [
+                row["case_name"]
+                for row in response.context["docket_alerts_rows"]
+            ],
+            [
+                alert.docket.case_name
+                for alert in response.context["docket_alerts"]
+            ],
+        )
+
     def test_docket_alerts_queries_do_not_grow_with_alerts(self) -> None:
         """Dockets and courts load with the alerts, not once per row."""
         url = reverse("profile_docket_alerts")

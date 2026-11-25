@@ -101,6 +101,8 @@ from cl.users.tasks import (
     update_neon_account,
 )
 from cl.users.utils import (
+    build_alerts_tabs,
+    build_docket_alert_rows,
     convert_to_stub_account,
     delete_user_assets,
     emails,
@@ -141,6 +143,7 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
             "page": "search_alerts",
             "private": True,
             "page_title": "Search Alerts",
+            "tabs": build_alerts_tabs(),
         },
     )
 
@@ -201,10 +204,12 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
         "profile/alerts.html",
         {
             "docket_alerts": docket_alerts,
+            "docket_alerts_rows": build_docket_alert_rows(docket_alerts),
             "page": "docket_alerts",
             "private": True,
             "page_title": "Docket Alerts",
             "sorting_fields": sorting_fields,
+            "tabs": build_alerts_tabs(),
         },
     )
 
