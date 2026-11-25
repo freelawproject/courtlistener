@@ -3,8 +3,10 @@ from http import HTTPStatus
 from unittest import mock
 
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
+from waffle.testutils import override_flag
 
 from cl.search.factories import (
     CourtFactory,
@@ -23,6 +25,11 @@ from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
 BASENAMES = ["scotusdocketmetadata", "scotusdocketentry", "scotusdocument"]
+PREFIXES = [
+    "scotus-docket-metadata",
+    "scotus-docket-entries",
+    "scotus-documents",
+]
 
 # The keys of a serialized SCOTUS docket entry.
 ENTRY_KEYS = {
@@ -68,11 +75,26 @@ LISTED_DOCUMENT_KEYS = DOCUMENT_KEYS - {"plain_text"}
 
 
 class ScotusAPITestCase(TestCase):
-    """Shared SCOTUS data for the API tests.
+    """Shared SCOTUS data for the API tests, with the endpoints' flag on.
+
+    The flag is enabled in setUp, so subclasses that override setUp must
+    call super().setUp().
 
     The entry with documents gets its attachment 2 created before attachment
     1, so tests can tell display order apart from id order.
     """
+
+    def setUp(self) -> None:
+        """Turn on the endpoints' flag in a waffle cache of this test's own.
+
+        Tests run in parallel and share the cache, so a common prefix would
+        let a test that turns the flag off leak its cached value into others.
+        The flag is set here rather than with a decorator because async tests
+        can't write it to the database.
+        """
+        super().setUp()
+        self.enterContext(override_settings(WAFFLE_CACHE_PREFIX=self.id()))
+        self.enterContext(override_flag("scotus-api", active=True))
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -151,6 +173,56 @@ class ScotusAPIRoutingTest(ScotusAPITestCase):
                 self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
 
+class ScotusAPIFlagTest(ScotusAPITestCase):
+    """The SCOTUS endpoints stay hidden until the scotus-api flag is on."""
+
+    def setUp(self) -> None:
+        """Log in as a plain user."""
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def get_root_prefixes(self) -> set[str]:
+        """Return the route prefixes the v4 API root lists."""
+        r = self.client.get(reverse("api-root", kwargs={"version": "v4"}))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return set(r.json())
+
+    def test_endpoints_are_hidden_when_flag_is_off(self) -> None:
+        """Do the endpoints 404 and drop out of the API root?"""
+        detail_pks = {
+            "scotusdocketmetadata": self.metadata.pk,
+            "scotusdocketentry": self.entry.pk,
+            "scotusdocument": self.attachment_1.pk,
+        }
+        with override_flag("scotus-api", active=False):
+            for basename in BASENAMES:
+                with self.subTest(basename=basename):
+                    r = self.client.get(self.list_path(basename))
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    r = self.client.get(
+                        self.detail_path(basename, detail_pks[basename])
+                    )
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+            root_prefixes = self.get_root_prefixes()
+        self.assertTrue(root_prefixes.isdisjoint(PREFIXES), root_prefixes)
+        # Unflagged routes are still listed.
+        self.assertIn("dockets", root_prefixes)
+
+    def test_anonymous_users_get_404_when_flag_is_off(self) -> None:
+        """Does the flag hide the endpoints before asking for credentials?"""
+        self.client.logout()
+        with override_flag("scotus-api", active=False):
+            for basename in BASENAMES:
+                with self.subTest(basename=basename):
+                    r = self.client.get(self.list_path(basename))
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_endpoints_are_listed_when_flag_is_on(self) -> None:
+        """Does the API root list the endpoints once the flag is on?"""
+        root_prefixes = self.get_root_prefixes()
+        self.assertTrue(set(PREFIXES) <= root_prefixes, root_prefixes)
+
+
 class ScotusAPIPermissionTest(ScotusAPITestCase):
     """The SCOTUS endpoints require an account and are read only."""
 
@@ -206,6 +278,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.async_client.force_login(self.user)
 
     @staticmethod
@@ -214,7 +287,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         return f"http://testserver{path}"
 
     async def test_metadata(self) -> None:
-        """Does metadata link its docket and expose its file as a URL?"""
+        """Does metadata link its docket and expose its file's path?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocketmetadata", self.metadata.pk)
         )
@@ -241,7 +314,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertTrue(data["capital_case"])
         self.assertEqual(
             data["questions_presented_file"],
-            self.absolute(self.metadata.questions_presented_file.url),
+            self.metadata.questions_presented_file.name,
         )
 
         r = await self.async_client.get(
@@ -328,6 +401,7 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.async_client.force_login(self.user)
 
     async def assert_filter_counts(
@@ -457,6 +531,7 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.client.force_login(self.user)
 
     def get_documents(

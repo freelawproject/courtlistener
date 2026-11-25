@@ -265,10 +265,6 @@ class ScotusDocketMetadataSerializer(
 ):
     """SCOTUS-specific metadata of a docket."""
 
-    questions_presented_file = serializers.FileField(
-        use_url=True, read_only=True
-    )
-
     class Meta:
         model = ScotusDocketMetadata
         fields = "__all__"

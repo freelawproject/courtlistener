@@ -12,7 +12,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
-from django.http import HttpResponse
 from django.utils.timezone import now
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
@@ -160,6 +159,7 @@ class MembershipWebhookViewSet(
         except User.DoesNotExist:
             client = NeonClient()
             neon_account = client.get_account_by_id(account_id)
+            contact_data = neon_account["primaryContact"]
             if (
                 "accountCustomFields" in neon_account
                 and "cl_user_id" in neon_account["accountCustomFields"]
@@ -167,11 +167,10 @@ class MembershipWebhookViewSet(
                 user_id = neon_account["accountCustomFields"]["cl_user_id"]
                 users = User.objects.filter(id=user_id)
             else:
-                contact_data = neon_account["primaryContact"]
                 users = filter_by_email(
                     User.objects.all(), contact_data["email1"]
                 ).order_by(F("last_login").desc(nulls_last=True))
-            if not users.exists():
+            if (user := users.first()) is None:
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]
                 )
@@ -183,8 +182,6 @@ class MembershipWebhookViewSet(
                     },
                     address,
                 )
-            else:
-                user = users.first()
 
             profile = user.profile
             profile.neon_account_id = neon_account["accountId"]
@@ -255,20 +252,23 @@ class MembershipWebhookViewSet(
         Returns:
             int: The integer value of the trigger event type according to
             the NeonWebhookEvent model
+
+        Raises:
+            AssertionError: If `trigger_event` is unrecognized.
         """
         match trigger_event:
             case "createMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_CREATION
+                return NeonWebhookEvent.MEMBERSHIP_CREATION
             case "updateMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_UPDATE
+                return NeonWebhookEvent.MEMBERSHIP_UPDATE
             case "editMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_EDIT
+                return NeonWebhookEvent.MEMBERSHIP_EDIT
             case "deleteMembership":
-                trigger = NeonWebhookEvent.MEMBERSHIP_DELETE
+                return NeonWebhookEvent.MEMBERSHIP_DELETE
+            case _:
+                raise AssertionError(f"unknown trigger event: {trigger_event}")
 
-        return trigger
-
-    def _store_webhook_payload(self, webhook_data) -> None:
+    def _store_webhook_payload(self, webhook_data: dict[str, Any]) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
         if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
             membership_data = self._get_membership_data(webhook_data)
@@ -451,10 +451,6 @@ class MembershipWebhookViewSet(
             membership_data["membershipId"]
         )
         if neon_membership is None:
-            return HttpResponse(
-                "Error processing webhook, Membership not found",
-                status=HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            return
         clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
-        return None

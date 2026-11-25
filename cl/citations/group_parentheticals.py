@@ -122,17 +122,19 @@ def compute_parenthetical_groups(
     # start the visited_nodes set here to prevent recomputing components, since
     # the same component will be found when starting from any of it's nodes
     visited_nodes: set[str] = set()
-    for node, neighbors in similarity_graph.items():
-        if component := get_graph_component(
-            node, similarity_graph, visited_nodes
-        ):
-            parenthetical_groups.append(
-                get_group_from_component(
-                    component,
-                    parenthetical_objects,
-                    similarity_graph,
-                )
+    parenthetical_groups.extend(
+        get_group_from_component(
+            component,
+            parenthetical_objects,
+            similarity_graph,
+        )
+        for node in similarity_graph.keys()
+        if (
+            component := get_graph_component(
+                node, similarity_graph, visited_nodes
             )
+        )
+    )
     return sorted(
         parenthetical_groups, key=lambda group: group.score, reverse=True
     )

@@ -233,7 +233,8 @@ class GoogleGenAIBatchWrapper:
             The full resource name of the valid cache.
 
         Raises:
-            ValueError: If ``model_name`` was not provided at init.
+            ValueError: If ``model_name`` was not provided at init, or if
+                Google returns a cache without a resource name.
         """
         if not self.model_name:
             raise ValueError(
@@ -241,24 +242,35 @@ class GoogleGenAIBatchWrapper:
                 "Pass it when constructing GoogleGenAIBatchWrapper."
             )
 
-        for cache in self.client.caches.list():
-            if cache.display_name == cache_display_name:
-                logger.info("Found existing cache: %s", cache_display_name)
-                return cache.name
-
-        logger.info("Creating new cache: %s", cache_display_name)
-        cached_content = self.client.caches.create(
-            model=self.model_name,
-            config=types.CreateCachedContentConfig(
-                display_name=cache_display_name,
-                system_instruction=types.Content(
-                    parts=[types.Part(text=system_prompt)]
-                ),
-                ttl=cache_ttl,
+        cache = next(
+            (
+                cache
+                for cache in self.client.caches.list()
+                if cache.display_name == cache_display_name
             ),
+            None,
         )
-        logger.info("Cache created successfully: %s", cache_display_name)
-        return cached_content.name
+        if cache is not None:
+            logger.info("Found existing cache: %s", cache_display_name)
+        else:
+            logger.info("Creating new cache: %s", cache_display_name)
+            cache = self.client.caches.create(
+                model=self.model_name,
+                config=types.CreateCachedContentConfig(
+                    display_name=cache_display_name,
+                    system_instruction=types.Content(
+                        parts=[types.Part(text=system_prompt)]
+                    ),
+                    ttl=cache_ttl,
+                ),
+            )
+            logger.info("Cache created successfully: %s", cache_display_name)
+
+        if cache.name is None:
+            raise ValueError(
+                f"Google returned cache {cache_display_name!r} without a name."
+            )
+        return cache.name
 
     def prepare_batch_requests(
         self, tasks_data: list[BatchTask], user_prompt: str
@@ -338,7 +350,8 @@ class GoogleGenAIBatchWrapper:
             The unique name (ID) of the created batch job.
 
         Raises:
-            ValueError: If ``model_name`` was not provided at init.
+            ValueError: If ``model_name`` was not provided at init, or if
+                Google returns a batch job without a name.
         """
         if not self.model_name:
             raise ValueError(
@@ -376,6 +389,8 @@ class GoogleGenAIBatchWrapper:
             src=jsonl_file.name,
             config=config,
         )
+        if job.name is None:
+            raise ValueError("Google returned a batch job without a name.")
         return job.name
 
     def get_job(self, batch_id: str) -> types.BatchJob:

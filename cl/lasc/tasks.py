@@ -5,6 +5,7 @@ import logging
 import os
 import pickle
 from datetime import date
+from pathlib import Path
 
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
@@ -311,6 +312,10 @@ def update_case(lasc, clean_data):
     Args:
         lasc: A LASCSearch object
         clean_data: A normalized data dictionary
+
+    Raises:
+        DocumentImage.MultipleObjectsReturned: If a document image's doc_id
+            matches more than one existing DocumentImage.
     """
     case_id = make_case_id(clean_data)
     with transaction.atomic():
@@ -352,6 +357,10 @@ def update_case(lasc, clean_data):
             elif dis_count == 0:
                 row["docket"] = docket
                 di = DocumentImage(**row)
+            else:
+                raise DocumentImage.MultipleObjectsReturned(
+                    f"Found {dis_count} DocumentImages for doc_id {row['doc_id']}"
+                )
             di.save()
 
         logger.info("Finished updating lasc case '%s'", case_id)
@@ -372,8 +381,7 @@ def add_case_from_filepath(filepath):
         filepath: Filepath string to where the item is stored
     """
     query = LASCSearch(None)
-    with open(filepath) as f:
-        original_data = f.read()
+    original_data = Path(filepath).read_text()
 
     case_data = query._parse_case_data(json.loads(original_data))
     case_id = make_case_id(case_data)

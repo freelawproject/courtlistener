@@ -152,6 +152,17 @@
   .screenshot {
     @apply rounded-2xl block max-w-full;
   }
+  .tabs-list {
+    @apply flex items-center list-none pl-0 border-b border-greyscale-200;
+  }
+  .tabs-item {
+    @apply -mb-px flex items-center gap-2 pt-1 pb-2.5 px-2.5 border-b-2 border-transparent text-sm text-greyscale-600 focus-self;
+    @apply aria-[current=page]:border-primary-600 aria-[current=page]:font-medium aria-[current=page]:text-greyscale-900;
+    @apply aria-selected:border-primary-600 aria-selected:font-medium aria-selected:text-greyscale-900;
+  }
+  .tabs-count {
+    @apply inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-greyscale-100 text-xs font-normal text-greyscale-600;
+  }
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
   .flatpickr-calendar.animate {
@@ -232,6 +243,7 @@
   .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
     @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
+    @apply [&:has(textarea:focus)]:outline [&:has(textarea:focus)]:outline-2 [&:has(textarea:focus)]:outline-primary-600 flex;
   }
   .focus-self {
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 -outline-offset-2;

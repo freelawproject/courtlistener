@@ -74,13 +74,10 @@
     <span class="self-start px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
   {% endif %}
 
-  {# Action buttons — Note and Tags are placeholders. #}
-  {# TODO: Wire up Add a Note and Tags button interactivity. #}
+  {# Action buttons — Tags is a placeholder. #}
+  {# TODO: Wire up Tags button interactivity. #}
   <div class="flex flex-wrap gap-2">
-    <c-button variant="outline">
-      {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
-      Add a Note
-    </c-button>
+    <c-add-note.dialog :form="note_form"/>
     <c-button variant="outline">
       {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
       Tags
@@ -156,31 +153,32 @@
     <c-docket-source-button :docket="docket" :docket_source="docket_source" />
     {% if user.is_authenticated %}
       <div
-      x-data="download"
-      data-error-message-429="This docket's export limit was reached. Try again later."
-      data-error-message-default="There was a problem. Try again later."
-      class="flex flex-wrap items-center gap-2"
-    >
+        x-data="download"
+        data-error-message-429="This docket's export limit was reached. Try again later."
+        data-error-message-default="There was a problem. Try again later."
+        class="flex flex-wrap items-center gap-2"
+      >
+        <c-button
+          variant="outline"
+          href="{% url 'view_download_docket' docket.id %}"
+          rel="nofollow"
+          x-on:click.prevent="start"
+          x-bind:aria-busy="busy"
+        >
+          {% svg "download" class="w-4 h-4" aria_hidden="true" %}
+          Export entries CSV
+        </c-button>
+        <span x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></span>
+      </div>
+    {% else %}
       <c-button
         variant="outline"
-        href="{% url 'view_download_docket' docket.id %}"
+        href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
         rel="nofollow"
-      x-on:click.prevent="start"
-        x-bind:aria-busy="busy"
       >
         {% svg "download" class="w-4 h-4" aria_hidden="true" %}
-        Export entries CSV</c-button>
-      <span x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></span>
-    </div>
-  {% else %}
-    <c-button
-      variant="outline"
-      href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
-      rel="nofollow"
-    >
-      {% svg "download" class="w-4 h-4" aria_hidden="true" %}
-      Export entries CSV
-      <span class="sr-only">(sign in required)</span>
+        Export entries CSV
+        <span class="sr-only">(sign in required)</span>
       </c-button>
     {% endif %}
   </div>
@@ -255,7 +253,7 @@
     </nav>
 
     {# Tab content — always render #}
-    <section id="{{ tab_content_id }}" aria-labelledby="{{ tab_content_id }}-heading" class="bg-white rounded-b-2xl max-md:rounded-t-2xl md:rounded-tr-2xl p-4">
+    <section id="{{ tab_content_id }}" aria-labelledby="{{ tab_content_id }}-heading" class="bg-white rounded-b-2xl max-md:rounded-t-2xl md:rounded-tr-2xl p-6">
       {# Names the section at every width. It's only visible on mobile with a single tab, where no tab bar or dropdown shows the label. #}
       <h2 id="{{ tab_content_id }}-heading" class="{% if tabs|length > 1 %}sr-only{% else %}md:sr-only text-md font-medium text-greyscale-900{% endif %}">
         {% for tab in tabs %}{% if tab.key == active_tab %}{{ tab.label }}{% endif %}{% endfor %}

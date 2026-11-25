@@ -105,10 +105,10 @@ class PodcastTest(ESIndexTestCase, TestCase):
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
         first_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text
         )
         second_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text
         )
         first_item_pub_date_dt = datetime.datetime.strptime(
             first_item_pub_date_str, pub_date_format
@@ -162,7 +162,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
         xml_tree = etree.fromstring(response.content)
-        node_count = len(xml_tree.xpath("//channel/item"))  # type: ignore
+        node_count = len(xml_tree.xpath("//channel/item"))
         expected_item_count = 2
         self.assertEqual(
             node_count,
@@ -179,10 +179,10 @@ class PodcastTest(ESIndexTestCase, TestCase):
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
         first_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text
         )
         second_item_pub_date_str = str(
-            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text
         )
         first_item_pub_date_dt = datetime.datetime.strptime(
             first_item_pub_date_str, pub_date_format
@@ -229,12 +229,12 @@ class PodcastTest(ESIndexTestCase, TestCase):
         xml_tree = etree.fromstring(response.content)
 
         # Title should contain the query and CourtListener branding
-        title = xml_tree.xpath("//channel/title")[0].text  # type: ignore
+        title = xml_tree.xpath("//channel/title")[0].text
         self.assertIn("magnitsky", title)
         self.assertIn("CourtListener", title)
 
         # Description should contain the query
-        description = xml_tree.xpath("//channel/description")[0].text  # type: ignore
+        description = xml_tree.xpath("//channel/description")[0].text
         self.assertIn("magnitsky", description)
 
         # iTunes subtitle should also contain the query
@@ -243,7 +243,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             namespaces={
                 "itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
             },
-        )[0].text  # type: ignore
+        )[0].text
         self.assertIn("magnitsky", subtitle)
 
     def test_podcast_excludes_audios_without_processed_mp3(self) -> None:

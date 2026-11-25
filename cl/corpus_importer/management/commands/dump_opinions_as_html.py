@@ -1,6 +1,5 @@
 """Write opinions to disk as HTML files."""
 
-import os
 from pathlib import Path
 
 from asgiref.sync import async_to_sync
@@ -41,13 +40,13 @@ class Command(VerboseCommand):
                 "simple_opinion.html",
                 {"caption": async_to_sync(op.cluster.acaption)(), "o": op},
             )
-            output_dir = os.path.join(
-                options["output_directory"],
-                str(op.cluster.date_filed.year),
-                str(op.cluster.date_filed.month),
-                str(op.cluster.date_filed.day),
+            output_dir = (
+                Path(options["output_directory"])
+                / str(op.cluster.date_filed.year)
+                / str(op.cluster.date_filed.month)
+                / str(op.cluster.date_filed.day)
             )
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-            output_path = os.path.join(output_dir, f"{op.pk}.html")
-            with open(output_path, "w") as f:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{op.pk}.html"
+            with output_path.open("w") as f:
                 f.write(content.encode())

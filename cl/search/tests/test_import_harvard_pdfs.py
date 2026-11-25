@@ -1,8 +1,9 @@
 import json
 import logging
-import os
+import tempfile
 from concurrent.futures import Future
-from unittest.mock import MagicMock, mock_open, patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 from django.test import override_settings
@@ -66,26 +67,20 @@ class TestImportHarvardPDFs(TestCase):
         "cl.search.management.commands.import_harvard_pdfs.HarvardPDFStorage"
     )
     @patch("cl.search.management.commands.import_harvard_pdfs.boto3.client")
-    @patch("cl.search.management.commands.import_harvard_pdfs.os.listdir")
-    @patch("cl.search.management.commands.import_harvard_pdfs.os.path.exists")
     def test_import_harvard_pdfs(
         self,
-        mock_exists,
-        mock_listdir,
         mock_boto3_client,
         mock_harvard_storage,
         mock_opinion_cluster_get,
         mock_executor,
         mock_as_completed,
     ):
-        # Setup mocks
-        mock_listdir.return_value = ["test_crosswalk.json"]
-        mock_exists.side_effect = lambda path: (
-            path in ["/mocked_path/crosswalk_dir"]
-        )
-
-        # Mock S3 client
+        # Mock S3 client; "downloading" writes the PDF bytes to the
+        # destination path it's given.
         mock_s3 = MagicMock()
+        mock_s3.download_file.side_effect = lambda bucket, key, destination: (
+            Path(destination).write_bytes(b"%PDF-1.4")
+        )
         mock_boto3_client.return_value = mock_s3
 
         # Mock storage and its save method
@@ -104,16 +99,11 @@ class TestImportHarvardPDFs(TestCase):
             }
         ]
 
-        # Mock file operations
-        m = mock_open(read_data=json.dumps(crosswalk_data))
-
-        # Mock crosswalk_dir
-        crosswalk_dir = "/mocked_path/crosswalk_dir"
-
-        # Verify crosswalk_dir exists
-        self.assertTrue(
-            os.path.exists(crosswalk_dir),
-            f"Crosswalk directory does not exist: {crosswalk_dir}",
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        crosswalk_dir = Path(temp_dir.name)
+        (crosswalk_dir / "test_crosswalk.json").write_text(
+            json.dumps(crosswalk_data)
         )
 
         # Mock the ThreadPoolExecutor to call process_entry directly
@@ -141,8 +131,7 @@ class TestImportHarvardPDFs(TestCase):
             mock_future
         ]  # Simulate that it's completed
 
-        with patch("builtins.open", m):
-            call_command("import_harvard_pdfs", crosswalk_dir=crosswalk_dir)
+        call_command("import_harvard_pdfs", crosswalk_dir=str(crosswalk_dir))
 
         # Assert expected behavior
         # 1. Downloading the PDF from CAP

@@ -11,7 +11,7 @@ from elasticsearch.dsl import MultiSearch, Q
 from elasticsearch.dsl.response import Response
 from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import APIException, ParseError
 
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -151,20 +151,21 @@ class ESList:
             self.offset : self.offset + self.page_size
         ]
 
-        error_to_raise = None
+        results = None
+        error_to_raise: type[APIException] = ElasticServerError
         duration = None
         try:
             start_time = time.perf_counter()
             results = self.main_query.execute()
             duration = time.perf_counter() - start_time
-        except (TransportError, ConnectionError, RequestError):
-            error_to_raise = ElasticServerError
+        except TransportError, ConnectionError, RequestError:
+            # Raised below as the default ElasticServerError.
+            pass
         except ApiError as e:
             if "Failed to parse query" in str(e):
                 error_to_raise = ElasticBadRequestError
             else:
                 logger.error("Multi-search API Error: %s", e)
-                error_to_raise = ElasticServerError
 
         # Record search duration metric (v3 API doesn't support semantic search)
         if duration is not None:
@@ -175,12 +176,12 @@ class ESList:
         # Store search query.
         store_search_api_query(
             request=self.request,
-            failed=bool(error_to_raise),
-            query_time=results.took if not error_to_raise else None,
+            failed=results is None,
+            query_time=results.took if results is not None else None,
             engine=SearchQuery.ELASTICSEARCH,
         )
 
-        if error_to_raise:
+        if results is None:
             raise error_to_raise()
 
         # Merge unavailable fields in ES by pulling data from the DB to make
@@ -332,7 +333,7 @@ class CursorESList:
             cardinality_count_response = responses[1]
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
-        except (TransportError, ConnectionError, RequestError):
+        except TransportError, ConnectionError, RequestError:
             error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
@@ -432,10 +433,14 @@ class CursorESList:
 
         self.process_results(self.results)
 
-        es_results_items = [
-            defaultdict(lambda: None, result.to_dict(skip_empty=False))
-            for result in self.results
-        ]
+        es_results_items = (
+            [
+                defaultdict(lambda: None, result.to_dict(skip_empty=False))
+                for result in self.results
+            ]
+            if self.results
+            else []
+        )
         return (
             es_results_items,
             main_query_hits,
