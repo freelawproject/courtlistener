@@ -35,33 +35,8 @@ logger = logging.getLogger(__name__)
 Next = Sentinel("Next")
 """Fall through to the next tier. After the last tier, a merger that matched nothing creates and one that is a duplicate is judged by its candidates."""
 
-STORED_SOURCES = Source.DATABASE | Source.ANNOTATION
-"""What marks an expression as reading the stored row."""
-
-ALLOWED_STORED_SOURCES = STORED_SOURCES | Source.CONSTANT
-"""What the stored side of a term may read, so that a row has one value for every member of a group."""
-
-
-@dataclass(slots=True)
-class Fail:
-    """Fail the merger, or as a `duplicate` outcome every merger sharing the key.
-
-    Attributes:
-        message: The reason given for the failure, used verbatim. Without one, the failure is described by the outcome it stands in for.
-    """
-
-    message: Final[str | None] = None
-
-    def reason(self, default: str) -> str:
-        """Say why the merger failed.
-
-        Args:
-            default: The reason to give when the failure has no message.
-
-        Returns:
-            The failure's message, or `default` if it has none.
-        """
-        return default if self.message is None else self.message
+Fail = Sentinel("Fail")
+"""Fail the merger, or as a `duplicate` outcome every merger sharing the key."""
 
 
 type Term = str | Comparison | bool
@@ -116,8 +91,8 @@ class Narrow:
     def __init__(
         self,
         *terms: Term,
-        missing: MissingOutcome = Fail(),
-        ambiguous: AmbiguousOutcome = Fail(),
+        missing: MissingOutcome = Fail,
+        ambiguous: AmbiguousOutcome = Fail,
     ) -> None:
         """Declare a narrowing.
 
@@ -147,8 +122,8 @@ class Key:
         self,
         *terms: Term,
         missing: MissingOutcome = Next,
-        ambiguous: AmbiguousOutcome = Fail(),
-        duplicate: DuplicateOutcome = Fail(),
+        ambiguous: AmbiguousOutcome = Fail,
+        duplicate: DuplicateOutcome = Fail,
     ) -> None:
         """Declare a tier.
 
@@ -443,7 +418,7 @@ class _Binder:
                 stored_sides = [
                     side
                     for side in (term.left, term.right)
-                    if side._sources & STORED_SOURCES
+                    if side._sources & Source.DATABASE
                 ]
                 if len(stored_sides) != 1:
                     self.errors.append(
@@ -455,7 +430,7 @@ class _Binder:
                 stored = stored_sides[0]
                 scraped = term.right if stored is term.left else term.left
                 valid = True
-                if disallowed := stored._sources & ~ALLOWED_STORED_SOURCES:
+                if disallowed := stored._sources & Source.MERGE:
                     self.errors.append(
                         ValueError(
                             f"tier {self.tier_index}: the stored side of a term may only read Database, Annotation and Constant, not {disallowed}"
@@ -942,8 +917,8 @@ class MatchGroup[M: Model]:
         for entry in entries:
             pks = entry.pks
             if not pks:
-                if isinstance(stage.missing, Fail):
-                    err = f"{self._merger.__name__}: {stage.missing.reason('no matches')} (tier {tier.index}, key {entry.shown_key})"
+                if stage.missing is Fail:
+                    err = f"{self._merger.__name__}: No matches (tier {tier.index}, key {entry.shown_key})"
                     entry.outcome = _Failure(err)
                     logger.error("%s", err)
                     continue
@@ -958,7 +933,7 @@ class MatchGroup[M: Model]:
                         entry.outcome = Update(entry.candidates[0])
                     case outcome:
                         rivals = {id(h) for pk in pks for h in holders[pk]}
-                        if isinstance(outcome, Fail):
+                        if outcome is Fail:
                             err = f"{self._merger.__name__}: {len(pks)} rows for {len(rivals)} scraped items (tier {tier.index}, key {entry.shown_key})"
                             entry.outcome = _Failure(err)
                             logger.error("%s", err)
@@ -982,16 +957,13 @@ class MatchGroup[M: Model]:
             count: How many scraped items share the key.
         """
         outcome = tier.duplicate
-        if not isinstance(outcome, Fail):
+        if outcome is not Fail:
             for entry in group:
                 entry.outcome = outcome
             return
-        default = (
-            f"{count} scraped items share a key; the key needs another term"
-        )
 
         texts = [
-            f"{self._merger.__name__}: {outcome.reason(default)} (tier {tier.index}, key {entry.shown_key})"
+            f"{self._merger.__name__}: {count} scraped items share a key (tier {tier.index}, key {entry.shown_key})"
             for entry in group
         ]
         for entry, text in zip(group, texts, strict=True):

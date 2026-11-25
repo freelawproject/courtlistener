@@ -595,10 +595,7 @@ class NYCoAPartyMerger(PartyMerger[NYCoAParty, RelatedParams[None]]):
         ),
         Key(
             "name",
-            ambiguous=Fail(
-                "the docket lists the name under several roles and none is "
-                "the scraped one"
-            ),
+            ambiguous=Fail,
             duplicate=Next,
         ),
     )

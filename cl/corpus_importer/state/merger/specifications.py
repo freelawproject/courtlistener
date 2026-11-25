@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import Enum, Flag, auto
 from typing import (
     Any,
+    Final,
     cast,
     final,
     overload,
@@ -70,11 +71,8 @@ class Source(Flag):
     """
 
     NONE = 0
-    SCRAPE = auto()
-    PARAMS = auto()
-    ANCESTOR = auto()
+    MERGE = auto()
     DATABASE = auto()
-    ANNOTATION = auto()
     CONSTANT = auto()
 
 
@@ -253,22 +251,16 @@ class AttributeMerger[Scrape, Params, Transform](
         """
         return _CallProxy(self, args, kwargs)
 
-    # `==` between expressions declares a term instead of testing equality, so
-    # the result is not a bool.
     # pyrefly: ignore[bad-override]
     def __eq__(self, other: object) -> Comparison:
         """Build a comparison of this expression with another one.
-
-        The result is meant to be declared in a `Key`; it has no truth value.
-        Only `==` is overloaded, so `!=` is not a comparison.
 
         Args:
             other: The expression to compare with.
 
         Returns:
             The comparison of this expression (left) with `other` (right), or
-            `NotImplemented` when `other` is not an expression, leaving Python
-            to fall back to its default equality.
+            `NotImplemented` when `other` is not an expression.
         """
         if not isinstance(other, AttributeMerger):
             return NotImplemented
@@ -296,30 +288,12 @@ class AttributeMerger[Scrape, Params, Transform](
         return self._transform(scrape, params, database)
 
 
-@dataclass(frozen=True, slots=True, eq=False)
+@dataclass(slots=True)
 class Comparison:
-    """A term declaring that two expressions must evaluate to equal values.
+    """A term declaring that two expressions must evaluate to equal values."""
 
-    Built by `==` between two expressions. It only describes the term: it has
-    no truth value, so it fails loudly if used in an `if` or `assert` instead
-    of being declared in a `Key`.
-
-    Comparisons are equal only to themselves: a field-wise comparison would
-    apply the overloaded `==` to the sides, which has no truth value.
-    """
-
-    left: AttributeMerger
-    right: AttributeMerger
-
-    def __bool__(self) -> bool:
-        """Refuse to be used as a condition.
-
-        Raises:
-            TypeError: Always.
-        """
-        raise TypeError(
-            "A merger term has no truth value; declare it in a Key"
-        )
+    left: Final[AttributeMerger]
+    right: Final[AttributeMerger]
 
 
 class _AncestorProxy[M: Model](AttributeMerger):
@@ -332,7 +306,7 @@ class _AncestorProxy[M: Model](AttributeMerger):
             model: The model class of the ancestor to look up.
         """
         super().__init__()
-        self._sources = Source.ANCESTOR
+        self._sources = Source.MERGE
         self._transform = functools.partial(_ancestor, model)
 
 
@@ -385,7 +359,7 @@ class _ScrapeProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the scrape."""
         super().__init__()
-        self._sources = Source.SCRAPE
+        self._sources = Source.MERGE
         self._transform = lambda s, p, m: s
 
 
@@ -395,7 +369,7 @@ class _ParamsProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the params."""
         super().__init__()
-        self._sources = Source.PARAMS
+        self._sources = Source.MERGE
         self._transform = lambda s, p, m: p
 
 
@@ -461,7 +435,7 @@ class _AnnotationProxy(AttributeMerger):
         super().__init__()
         # An annotation is not a column, so it adds nothing to `_db_fields`,
         # which feeds the columns a pool loads.
-        self._sources = Source.ANNOTATION
+        self._sources = Source.DATABASE
         self._annotations = (key,)
         getter = operator.attrgetter(key)
         self._transform = lambda s, p, m: getter(m)
