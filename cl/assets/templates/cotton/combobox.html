@@ -15,6 +15,7 @@
   clearable
   name=""
   disabled
+  remote
   class=""
 />
 
@@ -27,6 +28,11 @@
   x-bind:default-value="initialSelection"
   x-effect="trackSelection"
   {% if creatable and searchable %}data-creatable{% endif %}
+  {% if remote %}
+    data-remote
+    x-on:focusin="focusEntered"
+    x-on:focusout="focusLeft"
+  {% endif %}
   class="relative flex flex-col gap-1.5 {{ class }}"
   {{ attrs }}
 >
@@ -111,6 +117,10 @@
       x-cloak
     {% endif %}
     {% if multiple %}aria-multiselectable="true"{% endif %}
+    {% if remote %}
+      x-effect="searchWhenNeeded"
+      x-bind:aria-busy="loading"
+    {% endif %}
     class="flex flex-col gap-0.5 w-full max-h-80 overflow-y-auto list-none {% if disabled %}pointer-events-none{% endif %} {% if inline %}p-0 [&>li]:px-3{% else %}z-20 p-1.5 [&>li]:px-2 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
   >
     <template x-for="option in filteredOptions" x-bind:key="option.value">
@@ -133,6 +143,19 @@
           class="flex items-center gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer data-[active]:bg-greyscale-100"
         >{{ create_label }} <span x-text="query" class="min-w-0 break-words"></span></li>
       </template>
+    {% endif %}
+    {% if remote %}
+      <template x-if="canLoadMore">
+        <li
+          x-combobox:option
+          x-bind:value="moreOption"
+          x-bind:data-active="$comboboxOption.isActive"
+          x-text="moreLabel"
+          class="flex items-center gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer data-[active]:bg-greyscale-100"
+        ></li>
+      </template>
+      <li x-show="isSearching" x-cloak role="presentation" class="py-2.5 text-sm text-greyscale-500">Loading…</li>
+      <li x-show="searchError" x-text="searchError" x-cloak role="presentation" class="py-2.5 text-sm text-red-600"></li>
     {% endif %}
     <li x-show="isEmpty" role="presentation" class="py-2.5 text-sm text-greyscale-500">No results.</li>
   </ul>
