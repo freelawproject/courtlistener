@@ -46,7 +46,7 @@ from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
-from lxml.html import fragments_fromstring, fromstring
+from lxml.html import HtmlElement, fragments_fromstring, fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
 
@@ -58,9 +58,9 @@ from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
 from cl.favorites import forms_v2 as favorites_forms_v2
-from cl.favorites.factories import NoteFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.favorites.forms import NoteForm
-from cl.favorites.models import GenericCount
+from cl.favorites.models import DocketTag, GenericCount
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
     file_too_large_message,
@@ -99,6 +99,7 @@ from cl.opinion_page.utils import (
     es_get_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     make_docket_title,
+    user_docket_tags,
 )
 from cl.opinion_page.views import (
     fetch_docket_entries,
@@ -6491,3 +6492,211 @@ class DocketNoteFormV1Test(TestCase):
         self.assertTemplateUsed(r, "docket.html")
         self.assertTemplateNotUsed(r, "v2_docket.html")
         self.assertIs(type(r.context["note_form"]), NoteForm)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_tags_button_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketTagsButtonV2Test(TestCase):
+    """The Tags button of the v2 docket page and the tag data behind it.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's flag cache namespace from
+    parallel test workers, as DocketPageV2TemplateTest explains.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            idb_data=FjcIntegratedDatabaseFactory(),
+        )
+        cls.user = UserProfileWithParentsFactory().user
+        # Created out of name order, so the order asserted isn't the insertion order.
+        cls.zoning = UserTagFactory(user=cls.user, name="zoning")
+        cls.appeals = UserTagFactory(user=cls.user, name="appeals")
+        cls.bankruptcy = UserTagFactory(user=cls.user, name="Bankruptcy")
+        cls.association = DocketTag.objects.create(
+            docket=cls.docket, tag=cls.bankruptcy
+        )
+        # Applied to another docket only, so it must not count as applied here.
+        DocketTag.objects.create(
+            docket=DocketFactory(court=cls.court), tag=cls.zoning
+        )
+        # Another user's tag on the same docket, published, which stays out.
+        cls.foreign = UserTagFactory(
+            user=UserFactory(), name="foreign", published=True
+        )
+        DocketTag.objects.create(docket=cls.docket, tag=cls.foreign)
+
+    async def page(self, url_name: str = "view_docket") -> HtmlElement:
+        """Loads a tab of the v2 docket page and returns its parsed document."""
+        r = await self.async_client.get(
+            reverse(url_name, args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return fromstring(r.content.decode())
+
+    async def button(self, url_name: str = "view_docket") -> HtmlElement:
+        """Loads a tab as the fixture user and returns the Tags button's root."""
+        await self.async_client.aforce_login(self.user)
+        tree = await self.page(url_name)
+        return tree.xpath("//*[@x-data='docketTagsButton']")[0]
+
+    def render_logged_out(self, path: str) -> HtmlElement:
+        """Renders the component alone for a visitor at a path and returns its markup."""
+        request = RequestFactory().get(path)
+        request.user = AnonymousUser()
+        compiled = CottonCompiler().process(
+            '<c-docket-tags-button :docket="docket" :docket_tags="docket_tags" />'
+        )
+        html = (
+            engines["django"]
+            .from_string(compiled)
+            .render(
+                {
+                    "docket": self.docket,
+                    "docket_tags": {"options": [], "associations": {}},
+                },
+                request,
+            )
+        )
+        return fromstring(f"<div>{html}</div>")
+
+    async def test_options_are_ordered_by_name_ignoring_case(self) -> None:
+        """The user's tags come back alphabetically whatever their case or creation order."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertEqual(
+            [option["label"] for option in tags["options"]],
+            ["appeals", "Bankruptcy", "zoning"],
+        )
+
+    async def test_options_carry_the_tag_ids(self) -> None:
+        """Each option's value is the id of its tag."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertEqual(
+            [option["value"] for option in tags["options"]],
+            [self.appeals.pk, self.bankruptcy.pk, self.zoning.pk],
+        )
+
+    async def test_only_tags_on_the_docket_are_selected(self) -> None:
+        """An option is selected when its tag is applied to this docket."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertEqual(
+            [option["selected"] for option in tags["options"]],
+            [False, True, False],
+        )
+
+    async def test_associations_map_applied_tags_to_their_docket_tag(
+        self,
+    ) -> None:
+        """Each applied tag points at the row that applies it, the one a detach deletes."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertEqual(
+            tags["associations"], {self.bankruptcy.pk: self.association.pk}
+        )
+
+    async def test_other_users_tags_stay_out(self) -> None:
+        """A tag another user applied to the docket is not among the options."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertNotIn(
+            self.foreign.pk, [option["value"] for option in tags["options"]]
+        )
+
+    def test_tags_take_one_query(self) -> None:
+        """The options and the associations come from a single query."""
+        with self.assertNumQueries(1):
+            async_to_sync(user_docket_tags)(self.user, self.docket)
+
+    async def test_anonymous_users_have_no_tags(self) -> None:
+        """A visitor gets empty tag data."""
+        tags = await user_docket_tags(AnonymousUser(), self.docket)
+        self.assertEqual(tags, {"options": [], "associations": {}})
+
+    @override_flag("use_new_design", active=False)
+    def test_legacy_page_gathers_no_tags(self) -> None:
+        """Without the new design, the page's context holds no tags for a user who has some."""
+        self.client.force_login(self.user)
+        r = self.client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(
+            r.context["docket_tags"], {"options": [], "associations": {}}
+        )
+
+    def test_logged_out_button_links_to_sign_in(self) -> None:
+        """A visitor's button is a link that returns to the current page after signing in."""
+        path = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        link = self.render_logged_out(path).xpath("./a")[0]
+        self.assertEqual(link.get("href"), f"{reverse('sign-in')}?next={path}")
+
+    def test_logged_out_button_has_no_popover(self) -> None:
+        """A visitor gets none of the markup that edits tags."""
+        root = self.render_logged_out("/")
+        self.assertEqual(len(root.xpath(".//*[@x-data or @popover]")), 0)
+
+    async def test_every_tab_embeds_the_users_tags(self) -> None:
+        """Each docket tab hands the combobox the user's tags as its options."""
+        for url_name in ("view_docket", "docket_idb_data"):
+            with self.subTest(url_name=url_name):
+                root = await self.button(url_name)
+                script = root.xpath(
+                    ".//*[@x-data='combobox']/script[@type='application/json']"
+                )[0]
+                self.assertEqual(
+                    [option["label"] for option in json.loads(script.text)],
+                    ["appeals", "Bankruptcy", "zoning"],
+                )
+
+    async def test_button_embeds_the_associations(self) -> None:
+        """The button's root holds the associations as JSON, keyed by tag id."""
+        root = await self.button()
+        script = root.xpath("./script[@type='application/json']")[0]
+        self.assertEqual(
+            json.loads(script.text),
+            {str(self.bankruptcy.pk): self.association.pk},
+        )
+
+    async def test_button_toggles_its_popover(self) -> None:
+        """The button names the popover it opens."""
+        root = await self.button()
+        target = root.xpath(".//button[@popovertarget]")[0].get(
+            "popovertarget"
+        )
+        self.assertEqual(
+            len(root.xpath(".//*[@popover][@id=$id]", id=target)), 1
+        )
+
+    async def test_button_points_at_the_v4_endpoints(self) -> None:
+        """The root carries the v4 API URLs the script saves through."""
+        root = await self.button()
+        self.assertEqual(
+            (root.get("data-tags-url"), root.get("data-docket-tags-url")),
+            (
+                reverse("UserTag-list", kwargs={"version": "v4"}),
+                reverse("DocketTag-list", kwargs={"version": "v4"}),
+            ),
+        )
+
+    async def test_button_names_the_docket_to_tag(self) -> None:
+        """The root carries the id of the docket the script applies tags to."""
+        root = await self.button()
+        self.assertEqual(root.get("data-docket"), str(self.docket.pk))
+
+    async def test_button_carries_a_csrf_token(self) -> None:
+        """The root carries the CSRF token the API requires from a session."""
+        root = await self.button()
+        self.assertTrue(root.get("data-csrf-token"))
+
+    async def test_popover_links_to_the_users_tag_list(self) -> None:
+        """The popover links to the page listing all the user's tags."""
+        root = await self.button()
+        self.assertEqual(
+            len(
+                root.xpath(
+                    ".//*[@popover]//a[@href=$href]",
+                    href=reverse("tag_list", args=[self.user.username]),
+                )
+            ),
+            1,
+        )
