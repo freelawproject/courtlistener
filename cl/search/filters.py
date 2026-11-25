@@ -282,7 +282,11 @@ class BaseSourceDocketEntryFilter(BaseSourceFilter):
     there, date_filed=2025-01-01 only matches entries filed at midnight.
     """
 
-    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookup reads just the id.
+    docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
 
     class Meta(BaseSourceFilter.Meta):
         fields = {
@@ -323,7 +327,11 @@ class BaseSourceDocumentFilter(BaseSourceFilter):
 class ScotusDocketMetadataFilter(BaseSourceFilter):
     """Filters for SCOTUS docket metadata."""
 
-    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookup reads just the id.
+    docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
 
     class Meta(BaseSourceFilter.Meta):
         model = ScotusDocketMetadata
@@ -341,7 +349,7 @@ class SCOTUSDocketEntryFilter(BaseSourceDocketEntryFilter):
     # don't count as documents.
     scotus_documents = filters.RelatedFilter(
         "cl.search.filters.SCOTUSDocumentFilter",
-        queryset=SCOTUSDocument.objects.exclude(url=""),
+        queryset=SCOTUSDocument.objects.exclude(url="").only("id"),
         distinct=True,
     )
 
@@ -357,7 +365,8 @@ class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
     """Filters for SCOTUS documents."""
 
     docket_entry = filters.RelatedFilter(
-        SCOTUSDocketEntryFilter, queryset=SCOTUSDocketEntry.objects.all()
+        SCOTUSDocketEntryFilter,
+        queryset=SCOTUSDocketEntry.objects.only("id"),
     )
 
     class Meta(BaseSourceDocumentFilter.Meta):

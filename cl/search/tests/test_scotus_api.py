@@ -648,6 +648,48 @@ class ScotusAPIRelatedColumnsTest(ScotusAPITestCase):
                 )
                 self.assertEqual(selected, {"id", "slug"})
 
+    def test_related_filter_lookups_read_only_ids(self) -> None:
+        """Do related filters look up their object by reading only its id?
+
+        A related filter's exact value is checked by fetching that object,
+        and only its pk is used afterwards.
+        """
+        cases = [
+            ("scotusdocument", {"docket_entry": self.entry.pk}, 2),
+            ("scotusdocketentry", {"docket": self.docket.pk}, 2),
+            (
+                "scotusdocketentry",
+                {"scotus_documents": self.attachment_1.pk},
+                1,
+            ),
+            ("scotusdocketmetadata", {"docket": self.docket.pk}, 1),
+        ]
+        tables = {
+            "docket_entry": "search_scotusdocketentry",
+            "docket": "search_docket",
+            "scotus_documents": "search_scotusdocument",
+        }
+        for basename, params, expected_count in cases:
+            with self.subTest(endpoint=basename, params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(self.list_path(basename), params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertEqual(len(r.json()["results"]), expected_count)
+
+                table = tables[next(iter(params))]
+                lookups = [
+                    q["sql"]
+                    for q in ctx.captured_queries
+                    if re.search(rf'"{table}"\."id" = \d+\)? LIMIT', q["sql"])
+                ]
+                self.assertEqual(len(lookups), 1, lookups)
+                selected = set(
+                    re.findall(
+                        rf'"{table}"\."(\w+)"', lookups[0].split(" FROM ")[0]
+                    )
+                )
+                self.assertEqual(selected, {"id"})
+
 
 class ScotusAPIPlainTextTest(ScotusAPITestCase):
     """Only the document detail endpoint returns, or reads, plain_text.
