@@ -35,8 +35,6 @@ from .match import (
     Key,
     Match,
     MatchGroup,
-    ambiguous_text,
-    failure_text,
 )
 from .parameters import (
     Create,
@@ -579,13 +577,14 @@ class Merger[Scrape, Params, M: Model](MergerState.Machine[Scrape, Params, M]):
             case [row]:
                 return state.update(row)
             case _:
-                text = failure_text(
-                    type(self),
-                    ambiguous_text(self.config.model, len(found), 1),
+                logger.error(
+                    "%s: Found %d rows for 1 scraped item",
+                    type(self).__name__,
+                    len(found),
                 )
-                logger.error("%s", text)
                 return state.failed(
-                    text, MergeResult.failed(self.config.model.__name__)
+                    f"Found {len(found)} rows matching 1 scraped item",
+                    MergeResult.failed(self.config.model.__name__),
                 )
 
     def merge(self) -> MergeResult:

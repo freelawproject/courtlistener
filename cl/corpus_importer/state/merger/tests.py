@@ -2280,7 +2280,7 @@ class MatchDeclarationTest(SimpleTestCase):
 
     def test_outcomes(self) -> None:
         """Do tiers and narrows default to the outcomes the declaration documents, with `Fail` passed as a class turned into an instance wherever it is an outcome?"""
-        bare = Key(missing=Fail, duplicate=Fail)
+        bare = Key(missing=Fail(), duplicate=Fail())
         cases: dict[str, tuple[Any, Any]] = {
             "tier missing": (Key().missing, Next),
             "tier ambiguous": (Key().ambiguous, Fail()),
@@ -2588,7 +2588,7 @@ class MatchGroupTest(TestCase):
     def test_missing_fail_default_text(self) -> None:
         """Does a bare `Fail` for `missing` say that no row matches?"""
         self.assertVerdicts(
-            Match(Key("description", missing=Fail)),
+            Match(Key("description", missing=Fail())),
             [entry_scrape("absent")],
             [("failed", "no DocketEntry matches (tier 1, key ('absent',))")],
         )

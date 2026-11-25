@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, cast
+from typing import Any, Final, cast
 
 from django.core.exceptions import ValidationError
 from django.db.models import Field, Model, Q, QuerySet
@@ -42,15 +42,15 @@ ALLOWED_STORED_SOURCES = STORED_SOURCES | Source.CONSTANT
 """What the stored side of a term may read, so that a row has one value for every member of a group."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Fail:
     """Fail the merger, or as a `duplicate` outcome every merger sharing the key.
 
-    :ivar message: The reason given for the failure, used verbatim. Without
-        one, the failure is described by the outcome it stands in for.
+    Attributes:
+        message: The reason given for the failure, used verbatim. Without one, the failure is described by the outcome it stands in for.
     """
 
-    message: str | None = None
+    message: Final[str | None] = None
 
     def reason(self, default: str) -> str:
         """Say why the merger failed.
@@ -72,13 +72,13 @@ Expressions are typed as the value they evaluate to, so a type checker sees `==`
 type Outcome = Next | Create | Fail
 """What can end a tier's `missing` and `ambiguous` outcomes without a further choice."""
 
-type MissingOutcome = Next | Create | Fail | type[Fail]
+type MissingOutcome = Next | Create | Fail
 """What a declaration accepts for a `missing` outcome: an `Outcome`, with `Fail` allowed as a bare class."""
 
 type AmbiguousOutcome = MissingOutcome | First | Narrow
 """What a declaration accepts for an `ambiguous` outcome: a `MissingOutcome`, or a `First` or `Narrow` to choose among the candidates."""
 
-type DuplicateOutcome = Next | Fail | type[Fail]
+type DuplicateOutcome = Next | Fail
 """What a declaration accepts for a `duplicate` outcome: fall through or fail, with `Fail` allowed as a bare class."""
 
 
@@ -86,7 +86,7 @@ def failure_text(
     merger: type[Merger],
     text: str,
     *,
-    tier: int | None = None,
+    tier: int,
     key: tuple[Any, ...] = (),
 ) -> str:
     """Build the reason a merger's lookup failed.
@@ -94,30 +94,13 @@ def failure_text(
     Args:
         merger: The class of the merger that failed.
         text: What went wrong.
-        tier: The tier the failure happened in, counted from 1. Without one,
-            the reason names no tier or key.
-        key: The values the member was told apart by when it failed. Only
-            reported with a tier.
+        tier: The tier the failure happened in, counted from 1.
+        key: The values the member was told apart by when it failed.
 
     Returns:
         The reason, as given to the failed state and the log.
     """
-    reason = f"{merger.__name__}: {text}"
-    if tier is None:
-        return reason
-    return f"{reason} (tier {tier}, key {key})"
-
-
-def _settled[T](outcome: T | type[Fail]) -> T | Fail:
-    """Turn `Fail` passed as a class into an instance.
-
-    Args:
-        outcome: An outcome as declared.
-
-    Returns:
-        The outcome, with a bare `Fail` replaced by `Fail()`.
-    """
-    return Fail() if outcome is Fail else cast(T, outcome)
+    return f"{merger.__name__}: {text} (tier {tier}, key {key})"
 
 
 def ambiguous_text(model: type[Model], rows: int, items: int) -> str:
@@ -126,60 +109,51 @@ def ambiguous_text(model: type[Model], rows: int, items: int) -> str:
     Args:
         model: The model of the rows.
         rows: How many rows the scraped item could be.
-        items: How many scraped items hold any of those rows, including the
-            one being picked for.
+        items: How many scraped items hold any of those rows, including the one being picked for.
 
     Returns:
         The reason a failed lookup gives when it has no message of its own.
     """
-    return (
-        f"cannot pick one {model.__name__}: {rows} rows for "
-        f"{items} scraped items"
-    )
+    return f"cannot pick one {model.__name__}: {rows} rows for {items} scraped items"
 
 
-@dataclass(frozen=True, slots=True, init=False)
 class First:
     """Take the first candidate in a given order.
 
-    :ivar ordering: The fields to order candidates by, each a concrete field
-        name or `pk` with an optional leading `-` for descending. A tier's
-        ordering always ends in ascending `pk`, appended when not named.
+    Attributes:
+        ordering: The fields to order candidates by, each a concrete field name or `pk` with an optional leading `-` for descending. A tier's ordering always ends in ascending `pk`, appended when not named.
     """
 
-    ordering: Ordering
+    __slots__ = ("ordering",)
 
     def __init__(self, *ordering: str) -> None:
         """Declare the order to take the first candidate in.
 
         Args:
-            *ordering: The fields to order by. Nothing is checked until the
-                declaration is bound to a merger.
+            *ordering: The fields to order by. Nothing is checked until the declaration is bound to a merger.
         """
-        object.__setattr__(self, "ordering", ordering)
+        self.ordering: Final[Ordering] = ordering
 
 
-@dataclass(frozen=True, slots=True, init=False, eq=False)
 class Narrow:
     """Filter an ambiguous member's candidates on more terms, then apply outcomes of its own.
 
     A `Narrow` separates scraped items sharing a key as well as stored rows
     sharing one.
 
-    :ivar terms: The terms the candidates are filtered on.
-    :ivar missing: What happens when the filter leaves no candidates.
-    :ivar ambiguous: What happens when more than one candidate remains.
+    Attributes:
+        terms: The terms the candidates are filtered on.
+        missing: What happens when the filter leaves no candidates.
+        ambiguous: What happens when more than one candidate remains.
     """
 
-    terms: tuple[Term, ...]
-    missing: Outcome
-    ambiguous: Outcome | First | Narrow
+    __slots__ = ("terms", "missing", "ambiguous")
 
     def __init__(
         self,
         *terms: Term,
-        missing: MissingOutcome = Fail,
-        ambiguous: AmbiguousOutcome = Fail,
+        missing: MissingOutcome = Fail(),
+        ambiguous: AmbiguousOutcome = Fail(),
     ) -> None:
         """Declare a narrowing.
 
@@ -188,76 +162,67 @@ class Narrow:
             missing: The outcome when no candidate satisfies the terms.
             ambiguous: The outcome when several still do.
         """
-        object.__setattr__(self, "terms", terms)
-        object.__setattr__(self, "missing", _settled(missing))
-        object.__setattr__(self, "ambiguous", _settled(ambiguous))
+        self.terms: Final[tuple[Term, ...]] = terms
+        self.missing: Final[Outcome] = missing
+        self.ambiguous: Final[Outcome | First | Narrow] = ambiguous
 
 
-@dataclass(frozen=True, slots=True, init=False, eq=False)
 class Key:
     """A match tier: the terms that find a member's candidate rows, and what to do when it finds none, several, or shares them.
 
-    :ivar terms: The terms the stored rows must equal the member on.
-    :ivar missing: What happens when no available row matches.
-    :ivar ambiguous: What happens when the match is not one member to one row.
-    :ivar duplicate: What happens when another member has equal values for
-        every term of the tier, `Narrow` chain included.
+    Attributes:
+        terms: The terms the stored rows must equal the member on.
+        missing: What happens when no available row matches.
+        ambiguous: What happens when the match is not one member to one row.
+        duplicate: What happens when another member has equal values for every term of the tier.
     """
 
-    terms: tuple[Term, ...]
-    missing: Outcome
-    ambiguous: Outcome | First | Narrow
-    duplicate: Next | Fail
+    __slots__ = ("terms", "missing", "ambiguous", "duplicate")
 
     def __init__(
         self,
         *terms: Term,
         missing: MissingOutcome = Next,
-        ambiguous: AmbiguousOutcome = Fail,
-        duplicate: DuplicateOutcome = Fail,
+        ambiguous: AmbiguousOutcome = Fail(),
+        duplicate: DuplicateOutcome = Fail(),
     ) -> None:
         """Declare a tier.
 
         Args:
             *terms: The terms the stored rows must equal the member on.
             missing: The outcome when no available row matches.
-            ambiguous: The outcome when several rows match, or when members
-                that are not duplicates share a candidate.
-            duplicate: The outcome for members that nothing in the tier can
-                tell apart.
+            ambiguous: The outcome when several rows match, or when members that are not duplicates share a candidate.
+            duplicate: The outcome for members that nothing in the tier can tell apart.
         """
-        object.__setattr__(self, "terms", terms)
-        object.__setattr__(self, "missing", _settled(missing))
-        object.__setattr__(self, "ambiguous", _settled(ambiguous))
-        object.__setattr__(self, "duplicate", _settled(duplicate))
+        self.terms: Final[tuple[Term, ...]] = terms
+        self.missing: Final[Outcome] = missing
+        self.ambiguous: Final[Outcome | First | Narrow] = ambiguous
+        self.duplicate: Final[Next | Fail] = duplicate
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(slots=True)
 class BoundTerm:
     """A term checked against its merger, ready to evaluate on either side.
 
     Compared by identity: expressions overload `==`.
 
-    :ivar stored: The side that reads the stored row.
-    :ivar field: The stored field, set when `stored` is a bare `Database`.
-        The scraped value is converted by it before it is compared.
-    :ivar attribute: The merger attribute holding the scraped value, set for
-        the string shorthand.
-    :ivar scraped: The expression for the scraped value, set for an explicit
-        term.
+    Attributes:
+        stored: The side that reads the stored row.
+        field: The stored field, set when `stored` is a bare `Database`. The scraped value is converted by it before it is compared.
+        attribute: The merger attribute holding the scraped value, set for the string shorthand.
+        scraped: The expression for the scraped value, set for an explicit term.
     """
 
-    stored: AttributeMerger
-    field: Field | None = None
-    attribute: str | None = None
-    scraped: AttributeMerger | None = None
+    stored: Final[AttributeMerger]
+    field: Final[Field | None] = None
+    attribute: Final[str | None] = None
+    scraped: Final[AttributeMerger | None] = None
 
     def stored_value(self, row: Model) -> Any:
         """Evaluate the stored side on a row.
 
         Args:
-            row: A stored row, loaded with the pool's annotations if the term
-                reads any.
+            row: A stored row, loaded with the pool's annotations if the term reads any.
 
         Returns:
             The row's value for the term.
@@ -270,10 +235,8 @@ class BoundTerm:
         """Evaluate the scraped side for a merger, before the stored field converts it.
 
         Args:
-            merger: The merger being matched; the shorthand reads the value it
-                computed for its attribute.
-            state: The merger's state, whose scrape and params an explicit
-                term is evaluated against.
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
 
         Returns:
             The scraped value as the merger has it.
@@ -290,18 +253,14 @@ class BoundTerm:
         """Evaluate the scraped side for a merger.
 
         Args:
-            merger: The merger being matched; the shorthand reads the value it
-                computed for its attribute.
-            state: The merger's state, whose scrape and params an explicit
-                term is evaluated against.
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
 
         Returns:
-            The value to compare with `stored_value`, converted by the stored
-            field when there is one.
+            The value to compare with `stored_value`, converted by the stored field when there is one.
 
         Raises:
-            django.core.exceptions.ValidationError: If the stored field
-                rejects the scraped value.
+            django.core.exceptions.ValidationError: If the stored field rejects the scraped value.
         """
         value = self.scraped_raw(merger, state)
         if self.field is None:
@@ -309,43 +268,44 @@ class BoundTerm:
         return self.field.to_python(value)
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class BoundNarrow:
     """A `Narrow` whose terms are bound.
 
-    :ivar terms: The bound terms the candidates are filtered on.
-    :ivar missing: What happens when the filter leaves no candidates.
-    :ivar ambiguous: What happens when more than one candidate remains.
+    Attributes:
+        terms: The bound terms the candidates are filtered on.
+        missing: What happens when the filter leaves no candidates.
+        ambiguous: What happens when more than one candidate remains.
     """
 
-    terms: tuple[BoundTerm, ...]
-    missing: Outcome
-    ambiguous: AmbiguousBound
+    terms: Final[tuple[BoundTerm, ...]]
+    missing: Final[Outcome]
+    ambiguous: Final[AmbiguousBound]
 
 
 type AmbiguousBound = Outcome | First | BoundNarrow
 """What a bound `ambiguous` outcome can be: an `Outcome`, or a `First` or `BoundNarrow` to choose among the candidates."""
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class BoundTier:
     """A `Key` checked against its merger.
 
-    :ivar index: The tier's position in the match, counted from 1.
-    :ivar terms: The tier's bound key terms.
-    :ivar missing: What happens when no available row matches.
-    :ivar ambiguous: What happens when the match is not one member to one row.
-    :ivar duplicate: What happens to members the tier cannot tell apart.
-    :ivar ordering: The order candidates are taken in, always ending in `pk`
-        so the pick is deterministic.
+    Attributes:
+        index: The tier's position in the match, counted from 1.
+        terms: The tier's bound key terms.
+        missing: What happens when no available row matches.
+        ambiguous: What happens when the match is not one member to one row.
+        duplicate: What happens to members the tier cannot tell apart.
+        ordering: The order candidates are taken in, always ending in `pk` so the pick is deterministic.
     """
 
-    index: int
-    terms: tuple[BoundTerm, ...]
-    missing: Outcome
-    ambiguous: AmbiguousBound
-    duplicate: Next | Fail
-    ordering: Ordering
+    index: Final[int]
+    terms: Final[tuple[BoundTerm, ...]]
+    missing: Final[Outcome]
+    ambiguous: Final[AmbiguousBound]
+    duplicate: Final[Next | Fail]
+    ordering: Final[Ordering]
 
     @property
     def chain_terms(self) -> tuple[BoundTerm, ...]:
@@ -358,17 +318,17 @@ class BoundTier:
         return tuple(terms)
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class BoundMatch:
     """A `Match` checked against its merger.
 
-    :ivar tiers: The bound tiers, in priority order.
-    :ivar columns: The model fields the match reads from stored rows: every
-        stored side's database fields and every ordering field.
+    Attributes:
+        tiers: The bound tiers, in priority order.
+        columns: The model fields the match reads from stored rows: every stored side's database fields and every ordering field.
     """
 
-    tiers: tuple[BoundTier, ...]
-    columns: frozenset[str]
+    tiers: Final[tuple[BoundTier, ...]]
+    columns: Final[frozenset[str]]
 
     def check_pool(self, pool: Pool) -> list[Exception]:
         """Check the match against the pool its rows are read from.
@@ -420,11 +380,6 @@ class _Binder:
         self.errors: list[Exception] = []
         self.tier_index: int = 0
 
-    def problem(self, error: Exception) -> None:
-        """Record a problem, naming the tier being bound."""
-        error.args = (f"tier {self.tier_index}: {error}",)
-        self.errors.append(error)
-
     def tier(self, index: int, key: Key) -> BoundTier:
         """Bind a tier.
 
@@ -436,7 +391,8 @@ class _Binder:
             The bound tier.
         """
         self.tier_index = index
-        terms = self.terms(key.terms)
+        bound = (self.term(term) for term in key.terms)
+        terms = tuple(b for b in bound if b is not None)
         ambiguous = self.ambiguous(key.ambiguous)
         first = ambiguous
         while isinstance(first, BoundNarrow):
@@ -464,49 +420,32 @@ class _Binder:
         """
         match outcome:
             case Narrow():
+                bound = (self.term(term) for term in outcome.terms)
                 return BoundNarrow(
-                    terms=self.terms(outcome.terms),
+                    terms=tuple(b for b in bound if b is not None),
                     missing=outcome.missing,
                     ambiguous=self.ambiguous(outcome.ambiguous),
                 )
             case First():
-                self.check_ordering(outcome)
+                for item in outcome.ordering:
+                    name = item.removeprefix("-")
+                    if name == "pk":
+                        continue
+                    if (field := self.fields.get(name)) is None:
+                        self.errors.append(
+                            ValueError(
+                                f"tier {self.tier_index}: cannot order by {item!r}: an ordering is a concrete field of {self.model.__name__} or pk, optionally prefixed with '-'"
+                            )
+                        )
+                    elif field.is_relation:
+                        self.errors.append(
+                            ValueError(
+                                f"tier {self.tier_index}: cannot order by {item!r}: {name!r} is a relation, which the database orders by the related model's ordering"
+                            )
+                        )
                 return outcome
             case _:
                 return outcome
-
-    def check_ordering(self, first: First) -> None:
-        """Record a problem for each ordering that is not `pk` or a concrete, non-relation field, with an optional `-`.
-
-        A relation is rejected because rows sorted in memory would compare
-        model instances, while the database orders a relation by the related
-        model's ordering.
-        """
-        for item in first.ordering:
-            name = item.removeprefix("-")
-            if name == "pk":
-                continue
-            if (field := self.fields.get(name)) is None:
-                self.problem(
-                    ValueError(
-                        f"cannot order by {item!r}: an ordering is a concrete "
-                        f"field of {self.model.__name__} or pk, optionally "
-                        "prefixed with '-'"
-                    )
-                )
-            elif field.is_relation:
-                self.problem(
-                    ValueError(
-                        f"cannot order by {item!r}: {name!r} is a relation, "
-                        "which the database orders by the related model's "
-                        "ordering"
-                    )
-                )
-
-    def terms(self, terms: tuple[Term, ...]) -> tuple[BoundTerm, ...]:
-        """Bind terms, recording the problems of those that are invalid."""
-        bound = (self.term(term) for term in terms)
-        return tuple(b for b in bound if b is not None)
 
     def term(self, term: object) -> BoundTerm | None:
         """Bind one term.
@@ -519,109 +458,80 @@ class _Binder:
         """
         match term:
             case str():
-                return self.shorthand(term)
+                if (field := self.named_fields.get(term)) is None:
+                    self.errors.append(
+                        ValueError(
+                            f"tier {self.tier_index}: {term!r} is not a concrete field of {self.model.__name__}"
+                        )
+                    )
+                    return None
+                if term not in self.merger.config.registry.attr:
+                    self.errors.append(
+                        ValueError(
+                            f"tier {self.tier_index}: {self.merger.__name__} does not compute {term!r}, so the shorthand term has no scraped value"
+                        )
+                    )
+                    return None
+                return BoundTerm(
+                    stored=_DatabaseProxy(field), field=field, attribute=term
+                )
             case Comparison():
-                return self.comparison(term)
+                stored_sides = [
+                    side
+                    for side in (term.left, term.right)
+                    if side._sources & STORED_SOURCES
+                ]
+                if len(stored_sides) != 1:
+                    self.errors.append(
+                        ValueError(
+                            f"tier {self.tier_index}: exactly one side of a term must read the stored row (Database or Annotation)"
+                        )
+                    )
+                    return None
+                stored = stored_sides[0]
+                scraped = term.right if stored is term.left else term.left
+                valid = True
+                if disallowed := stored._sources & ~ALLOWED_STORED_SOURCES:
+                    self.errors.append(
+                        ValueError(
+                            f"tier {self.tier_index}: the stored side of a term may only read Database, Annotation and Constant, not {disallowed}"
+                        )
+                    )
+                    valid = False
+                for key in stored._annotations:
+                    if key not in self.annotations:
+                        self.errors.append(
+                            ValueError(
+                                f"tier {self.tier_index}: annotation {key!r} is not annotated by the pool of {self.merger.__name__}"
+                            )
+                        )
+                        valid = False
+                if not valid:
+                    return None
+                return BoundTerm(
+                    stored=stored,
+                    field=stored._field
+                    if isinstance(stored, _DatabaseProxy)
+                    else None,
+                    scraped=scraped,
+                )
             case _:
-                self.problem(
+                self.errors.append(
                     TypeError(
-                        f"{term!r} is not a term: use a field name or an "
-                        "== between two expressions"
+                        f"tier {self.tier_index}: {term!r} is not a term: use a field name or an == between two expressions"
                     )
                 )
                 return None
 
-    def shorthand(self, name: str) -> BoundTerm | None:
-        """Bind a field name as a comparison of that stored field with the merger's computed value.
 
-        The name is a concrete field's name or, for a foreign key, its attname;
-        the merger must compute it under the name as written.
-
-        Returns:
-            The bound term, or `None` if the name is not a concrete field of the
-            model that the merger computes, which is recorded.
-        """
-        if (field := self.named_fields.get(name)) is None:
-            self.problem(
-                ValueError(
-                    f"{name!r} is not a concrete field of {self.model.__name__}"
-                )
-            )
-            return None
-        if name not in self.merger.config.registry.attr:
-            self.problem(
-                ValueError(
-                    f"{self.merger.__name__} does not compute {name!r}, so "
-                    "the shorthand term has no scraped value"
-                )
-            )
-            return None
-        return BoundTerm(
-            stored=_DatabaseProxy(field), field=field, attribute=name
-        )
-
-    def comparison(self, term: Comparison) -> BoundTerm | None:
-        """Bind an `==` between two expressions.
-
-        Exactly one side must read the stored row, built only from `Database`,
-        annotations of the pool and constants.
-
-        Returns:
-            The bound term, or `None` if it breaks those rules, which is
-            recorded.
-        """
-        stored_sides = [
-            side
-            for side in (term.left, term.right)
-            if side._sources & STORED_SOURCES
-        ]
-        if len(stored_sides) != 1:
-            self.problem(
-                ValueError(
-                    "exactly one side of a term must read the stored row "
-                    "(Database or Annotation)"
-                )
-            )
-            return None
-        stored = stored_sides[0]
-        scraped = term.right if stored is term.left else term.left
-        valid = True
-        if disallowed := stored._sources & ~ALLOWED_STORED_SOURCES:
-            self.problem(
-                ValueError(
-                    "the stored side of a term may only read Database, "
-                    f"Annotation and Constant, not {disallowed}"
-                )
-            )
-            valid = False
-        for key in stored._annotations:
-            if key not in self.annotations:
-                self.problem(
-                    ValueError(
-                        f"annotation {key!r} is not annotated by the "
-                        f"pool of {self.merger.__name__}"
-                    )
-                )
-                valid = False
-        if not valid:
-            return None
-        return BoundTerm(
-            stored=stored,
-            field=stored._field
-            if isinstance(stored, _DatabaseProxy)
-            else None,
-            scraped=scraped,
-        )
-
-
-@dataclass(frozen=True, slots=True, init=False, eq=False)
 class Match:
     """An ordered list of tiers that picks the stored row a merger merges into.
 
-    :ivar tiers: The tiers, in priority order.
+    Attributes:
+        tiers: The tiers, in priority order.
     """
 
-    tiers: tuple[Key, ...]
+    __slots__ = ("tiers",)
 
     def __init__(self, *tiers: Key) -> None:
         """Declare a match. Nothing is checked until `bind`.
@@ -629,15 +539,14 @@ class Match:
         Args:
             *tiers: The tiers, in priority order.
         """
-        object.__setattr__(self, "tiers", tiers)
+        self.tiers: Final[tuple[Key, ...]] = tiers
 
     def bind(self, merger: type[Merger], pool: Pool | None) -> BoundMatch:
         """Check the declaration against a merger and produce what the matcher consumes.
 
         Args:
             merger: The merger class the match is declared on.
-            pool: The merger's declared pool. Annotations a term reads must be
-                ones it adds.
+            pool: The merger's declared pool. Annotations a term reads must be ones it adds.
 
         Returns:
             The bound match.
@@ -683,34 +592,34 @@ class _Rejected(Exception):
     """A scraped value that the stored field it is compared with cannot hold; its message says which."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _Failure:
     """How a member's lookup ended in failure.
 
-    :ivar text: The reason, as given to the failed state and the log.
+    Attributes:
+        text: The reason, as given to the failed state and the log.
     """
 
-    text: str
+    text: Final[str]
 
 
 type Resolution[M: Model] = Update[M] | Create | _Failure
 """How a member's lookup ended: the row it merges into, a new row, or a failure."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _TierKey:
     """What a member is told apart by in one tier.
 
-    :ivar relations: The primary keys of the member's relation params, in
-        sorted param-name order.
-    :ivar values: The scraped values of the tier's key terms.
-    :ivar chain: The scraped values of the terms of every `Narrow` the tier
-        chains through.
+    Attributes:
+        relations: The primary keys of the member's relation params, in sorted param-name order.
+        values: The scraped values of the tier's key terms.
+        chain: The scraped values of the terms of every `Narrow` the tier chains through.
     """
 
-    relations: tuple[Any, ...]
-    values: tuple[Any, ...]
-    chain: tuple[Any, ...]
+    relations: Final[tuple[Any, ...]]
+    values: Final[tuple[Any, ...]]
+    chain: Final[tuple[Any, ...]]
 
     @property
     def key(self) -> tuple[Any, ...]:
@@ -723,16 +632,15 @@ class _TierKey:
         return (*self.key, *self.chain)
 
 
-@dataclass(eq=False)
+@dataclass(slots=True)
 class _Member[M: Model]:
     """A merger in a group and how its lookup is going.
 
-    :ivar merger: The merger.
-    :ivar state: The merger's state, which its scrape and params are read from.
-    :ivar keys: The member's `_TierKey` for each tier. Empty until the group is
-        assigned.
-    :ivar resolution: How the member's lookup ended, or `None` while it is
-        still looking.
+    Attributes:
+        merger: The merger.
+        state: The merger's state, which its scrape and params are read from.
+        keys: The member's `_TierKey` for each tier. Empty until the group is assigned.
+        resolution: How the member's lookup ended, or `None` while it is still looking.
     """
 
     merger: Merger[Any, Any, M]
@@ -741,20 +649,17 @@ class _Member[M: Model]:
     resolution: Resolution[M] | None = None
 
 
-@dataclass(eq=False)
+@dataclass(slots=True)
 class _Entry[M: Model]:
     """A member's progress through one tier.
 
-    :ivar member: The member.
-    :ivar key: The member's key in the tier.
-    :ivar candidates: The available rows still matching the member, in the
-        order the pool handed them out. A pool that reads one row for each
-        join may list a primary key more than once.
-    :ivar last: The candidates before the last filter that emptied them, or
-        the current ones while there are some.
-    :ivar depth: How many terms of the tier's `Narrow` chain have filtered the
-        candidates.
-    :ivar outcome: What the tier decided for the member so far.
+    Attributes:
+        member: The member.
+        key: The member's key in the tier.
+        candidates: The available rows still matching the member, in the order the pool handed them out. A pool that reads one row for each join may list a primary key more than once.
+        last: The candidates before the last filter that emptied them, or the current ones while there are some.
+        depth: How many terms of the tier's `Narrow` chain have filtered the candidates.
+        outcome: What the tier decided for the member so far.
     """
 
     member: _Member[M]
@@ -778,8 +683,7 @@ class _Entry[M: Model]:
         """Keep the candidates equal to the member on the next terms of its `Narrow` chain.
 
         Args:
-            terms: The terms of the `Narrow` being applied, which must be the
-                ones following those already applied.
+            terms: The terms of the `Narrow` being applied, which must be the ones following those already applied.
         """
         values = self.key.chain[self.depth : self.depth + len(terms)]
         self.depth += len(terms)
@@ -798,11 +702,7 @@ class _Entry[M: Model]:
 class MatchGroup[M: Model]:
     """Assigns the stored rows of a pool to the mergers of a sibling group, tier by tier.
 
-    Every merger of the group has to be joined before any asks for its
-    verdict: the first verdict assigns every joined merger, so that a tier is
-    a priority across the group and the result does not depend on the order
-    the mergers were created in. Rows created while the group merges are not
-    seen.
+    Every merger of the group has to be joined before any asks for its verdict: the first verdict assigns every joined merger, so that a tier is a priority across the group and the result does not depend on the order the mergers were created in. Rows created while the group merges are not seen.
     """
 
     def __init__(
@@ -816,8 +716,7 @@ class MatchGroup[M: Model]:
         Args:
             merger: The class of the group's mergers.
             match: The match the group is assigned by.
-            reader: The reader of the pool the group's rows come from, built
-                for the first tier's ordering.
+            reader: The reader of the pool the group's rows come from, built for the first tier's ordering.
         """
         self._merger: type[Merger[Any, Any, M]] = merger
         self._match: BoundMatch = match
@@ -842,16 +741,14 @@ class MatchGroup[M: Model]:
         Args:
             merger: The class of the group's mergers.
             pool: The pool the merger's rows are read from.
-            relation: What the parent holds in the group's relation, if the
-                group is a relation of another merger.
+            relation: What the parent holds in the group's relation, if the group is a relation of another merger.
             params: The params the group's mergers were created with.
 
         Returns:
             The group, with no members.
 
         Raises:
-            TypeError: If the merger matches by its `match` and that cannot be
-                matched in the pool.
+            TypeError: If the merger matches by its `match` and that cannot be matched in the pool.
         """
         match = merger._bound_match
         if errors := merger.pool_errors(pool):
@@ -873,9 +770,7 @@ class MatchGroup[M: Model]:
         """Make a merger a member of the group.
 
         Args:
-            merger: A merger of the group's class with its values computed.
-                Mergers that fail validation or are not looking for their row
-                are not members.
+            merger: A merger of the group's class with its values computed. Mergers that fail validation or are not looking for their row are not members.
             state: The merger's state.
         """
         self._members[id(merger)] = _Member(merger, state)
@@ -896,8 +791,7 @@ class MatchGroup[M: Model]:
             state: The merger's state.
 
         Returns:
-            The state the merger moves to: creating a row, updating the row it
-            was assigned, or failed.
+            The state the merger moves to: creating a row, updating the row it was assigned, or failed.
         """
         if not self._assigned:
             self._assign()
@@ -934,8 +828,87 @@ class MatchGroup[M: Model]:
         ]
         live = [m for m in self._members.values() if self._evaluate(m)]
         tiers = self._match.tiers
+
         for position, tier in enumerate(tiers):
-            self._run_tier(tier, live, final=position == len(tiers) - 1)
+            position = tier.index - 1
+            looking = [m for m in live if m.resolution is None]
+            if not looking:
+                continue
+
+            position = tier.index - 1
+            alternatives: dict[tuple[Any, ...], Q] = {}
+            for member in looking:
+                key = member.keys[position]
+                if key.key in alternatives:
+                    continue
+                terms = [
+                    Q(**{f"{term.field.name}__isnull": True})
+                    if value is None
+                    else Q(**{term.field.name: value})
+                    for term, value in zip(tier.terms, key.values, strict=True)
+                    if term.field is not None
+                ]
+                alternatives[key.key] = Q(
+                    **member.state.relation_params
+                ) & reduce(operator.and_, terms, Q())
+
+            rows = self._reader.rows(
+                reduce(operator.or_, alternatives.values()), tier.ordering
+            )
+            index: dict[tuple[Any, ...], list[M]] = defaultdict(list)
+            for row in rows:
+                if row.pk not in self._unavailable:
+                    row_key = (
+                        *(
+                            getattr(row, attname)
+                            for attname in self._relation_attnames
+                        ),
+                        *(term.stored_value(row) for term in tier.terms),
+                    )
+                    index[row_key].append(row)
+            entries = []
+            for member in looking:
+                key = member.keys[position]
+                candidates = index.get(key.key, [])
+                entries.append(_Entry(member, key, candidates, candidates))
+            # A member that an earlier tier assigned still shares its key.
+            sharing = Counter(m.keys[position].duplicate for m in live)
+            # On a last tier that lets duplicates through, they are judged by their
+            # candidates like any other member.
+            checks_duplicates = not (
+                position == len(tiers) - 1 and tier.duplicate is Next
+            )
+            duplicates: list[_Entry[M]] = []
+            deciding: list[_Entry[M]] = []
+            for entry in entries:
+                if checks_duplicates and sharing[entry.key.duplicate] > 1:
+                    duplicates.append(entry)
+                else:
+                    deciding.append(entry)
+            self._settle(tier, tier, deciding, duplicates)
+            sets: dict[tuple[Any, ...], list[_Entry[M]]] = defaultdict(list)
+            for entry in duplicates:
+                sets[entry.key.duplicate].append(entry)
+            for shared, group in sets.items():
+                self._duplicate(tier, group, sharing[shared])
+
+            claims: dict[Any, list[_Entry[M]]] = defaultdict(list)
+            for entry in entries:
+                if isinstance(entry.outcome, Update):
+                    claims[entry.outcome.instance.pk].append(entry)
+            for group in claims.values():
+                if len(group) > 1:
+                    self._duplicate(tier, group, len(group))
+
+            for entry in entries:
+                outcome = entry.outcome
+                if isinstance(outcome, Update):
+                    self._unavailable.add(outcome.instance.pk)
+                elif isinstance(outcome, _Failure):
+                    self._unavailable.update(row.pk for row in entry.last)
+                if outcome is not None and outcome is not Next:
+                    entry.member.resolution = outcome
+
         for member in live:
             if member.resolution is None:
                 member.resolution = Create
@@ -980,84 +953,6 @@ class MatchGroup[M: Model]:
                 f"{term.scraped_raw(member.merger, member.state)!r}"
             ) from None
 
-    def _run_tier(
-        self, tier: BoundTier, members: list[_Member[M]], *, final: bool
-    ) -> None:
-        """Assign the members still looking from the rows a tier matches them with.
-
-        Args:
-            tier: The tier.
-            members: Every member that can be matched, assigned or not.
-            final: Whether the tier is the last one.
-        """
-        position = tier.index - 1
-        looking = [m for m in members if m.resolution is None]
-        if not looking:
-            return
-        rows = self._reader.rows(self._where(tier, looking), tier.ordering)
-        index: dict[tuple[Any, ...], list[M]] = defaultdict(list)
-        for row in rows:
-            if row.pk not in self._unavailable:
-                index[self._row_key(row, tier)].append(row)
-        entries = []
-        for member in looking:
-            key = member.keys[position]
-            candidates = index.get(key.key, [])
-            entries.append(_Entry(member, key, candidates, candidates))
-        # A member that an earlier tier assigned still shares its key.
-        sharing = Counter(m.keys[position].duplicate for m in members)
-        # On a last tier that lets duplicates through, they are judged by their
-        # candidates like any other member.
-        checks_duplicates = not (final and tier.duplicate is Next)
-        duplicates: list[_Entry[M]] = []
-        deciding: list[_Entry[M]] = []
-        for entry in entries:
-            if checks_duplicates and sharing[entry.key.duplicate] > 1:
-                duplicates.append(entry)
-            else:
-                deciding.append(entry)
-        self._settle(tier, tier, deciding, duplicates)
-        sets: dict[tuple[Any, ...], list[_Entry[M]]] = defaultdict(list)
-        for entry in duplicates:
-            sets[entry.key.duplicate].append(entry)
-        for shared, group in sets.items():
-            self._duplicate(tier, group, sharing[shared])
-        self._collide(tier, entries)
-        self._close(entries)
-
-    def _where(self, tier: BoundTier, members: list[_Member[M]]) -> Q:
-        """The filter that finds every row a tier could match the members with.
-
-        Returns:
-            One alternative for each distinct key: the member's relation params
-            and the values of its terms comparing a stored field directly,
-            null as a null check.
-        """
-        position = tier.index - 1
-        alternatives: dict[tuple[Any, ...], Q] = {}
-        for member in members:
-            key = member.keys[position]
-            if key.key in alternatives:
-                continue
-            terms = [
-                Q(**{f"{term.field.name}__isnull": True})
-                if value is None
-                else Q(**{term.field.name: value})
-                for term, value in zip(tier.terms, key.values, strict=True)
-                if term.field is not None
-            ]
-            alternatives[key.key] = Q(**member.state.relation_params) & reduce(
-                operator.and_, terms, Q()
-            )
-        return reduce(operator.or_, alternatives.values())
-
-    def _row_key(self, row: M, tier: BoundTier) -> tuple[Any, ...]:
-        """The values of a stored row that members are matched on in a tier."""
-        return (
-            *(getattr(row, attname) for attname in self._relation_attnames),
-            *(term.stored_value(row) for term in tier.terms),
-        )
-
     def _settle(
         self,
         tier: BoundTier,
@@ -1069,12 +964,9 @@ class MatchGroup[M: Model]:
 
         Args:
             tier: The tier being assigned.
-            stage: The tier itself, or a `Narrow` its `ambiguous` outcome
-                chains to, whose outcomes decide the entries.
+            stage: The tier itself, or a `Narrow` its `ambiguous` outcome chains to, whose outcomes decide the entries.
             entries: The entries that `stage` decides.
-            bystanders: Entries that are not decided here but still hold the
-                rows they match, so that they contest them: duplicates, which
-                the chain narrows along with the entries.
+            bystanders: Entries that are not decided here but still hold the rows they match, so that they contest them: duplicates, which the chain narrows along with the entries.
         """
         if not entries and not bystanders:
             return
@@ -1157,9 +1049,7 @@ class MatchGroup[M: Model]:
 
         Args:
             tier: The tier being assigned.
-            group: The entries to fail: one entry, or a set of duplicates.
-                Each carries the reason with its own key; the log line is the
-                first entry's.
+            group: The entries to fail: one entry, or a set of duplicates. Each carries the reason with its own key; the log line is the first entry's.
             message: What the reason says before the tier and key.
         """
         texts = [
@@ -1171,28 +1061,3 @@ class MatchGroup[M: Model]:
         for entry, text in zip(group, texts, strict=True):
             entry.outcome = _Failure(text)
         logger.error("%s", texts[0])
-
-    def _collide(self, tier: BoundTier, entries: list[_Entry[M]]) -> None:
-        """Apply the tier's `duplicate` outcome to entries that took the same row."""
-        claims: dict[Any, list[_Entry[M]]] = defaultdict(list)
-        for entry in entries:
-            if isinstance(entry.outcome, Update):
-                claims[entry.outcome.instance.pk].append(entry)
-        for group in claims.values():
-            if len(group) > 1:
-                self._duplicate(tier, group, len(group))
-
-    def _close(self, entries: list[_Entry[M]]) -> None:
-        """Record the tier's outcomes on its members and take rows out of reach of later tiers.
-
-        A claimed row is taken, and so are the candidates a failed member last
-        had. Those of a member that falls through stay.
-        """
-        for entry in entries:
-            outcome = entry.outcome
-            if isinstance(outcome, Update):
-                self._unavailable.add(outcome.instance.pk)
-            elif isinstance(outcome, _Failure):
-                self._unavailable.update(row.pk for row in entry.last)
-            if outcome is not None and outcome is not Next:
-                entry.member.resolution = outcome

@@ -515,23 +515,6 @@ class MatchBench:
 
         benchmark(run)
 
-    def bench_group_keyed_where(self, benchmark: BenchmarkFixture):
-        """The filter a keyed pool is queried with: one alternative per member."""
-        params = RelatedParams(
-            DocketParams(court_id=STUB_COURT.pk), parent=Docket(pk=1)
-        )
-        group = MatchGroup.build(
-            TieredEntryMerger, Global(), relation=None, params=params
-        )
-        for scrape in tiered_entry_scrapes():
-            TieredEntryMerger(scrape, params=params, group=group)
-        members = list(group._members.values())
-        for member in members:
-            group._evaluate(member)
-        tier = TieredEntryMerger._bound_match.tiers[0]
-
-        benchmark(group._where, tier, members)
-
 
 class MergeBench:
     """The merge paths that never touch the DB."""
