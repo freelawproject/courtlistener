@@ -348,7 +348,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertEqual(r.json()["scotus_documents"], [])
 
     async def test_document(self) -> None:
-        """Does a document link its entry and expose its file and page?"""
+        """Does a document link its entry and expose its file's path and page?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocument", self.attachment_1.pk)
         )
@@ -374,8 +374,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         )
         self.assertTrue(data["is_available"])
         self.assertEqual(
-            data["filepath_local"],
-            self.absolute(self.attachment_1.filepath_local.url),
+            data["filepath_local"], self.attachment_1.filepath_local.name
         )
 
     async def test_document_without_file_or_page(self) -> None:

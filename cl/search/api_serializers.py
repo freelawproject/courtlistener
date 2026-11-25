@@ -239,7 +239,6 @@ class BaseSourceDocumentSerializer(
     and get_absolute_url().
     """
 
-    filepath_local = serializers.FileField(use_url=True, read_only=True)
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )

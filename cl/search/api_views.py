@@ -289,9 +289,13 @@ class ScotusDocketMetadataViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
     queryset = ScotusDocketMetadata.objects.order_by("-id")
 
 
-class SCOTUSDocketEntryViewSet(BaseSourceReadOnlyViewSet):
-    """SCOTUS docket entries, with their documents nested."""
+class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS docket entries, hidden until their flag is enabled.
 
+    Each entry nests its documents.
+    """
+
+    waffle_flag = "scotus-api"
     serializer_class = SCOTUSDocketEntrySerializer
     filterset_class = SCOTUSDocketEntryFilter
     ordering_fields = (
@@ -311,9 +315,10 @@ class SCOTUSDocketEntryViewSet(BaseSourceReadOnlyViewSet):
     )
 
 
-class SCOTUSDocumentViewSet(BaseSourceReadOnlyViewSet):
-    """Documents filed in SCOTUS docket entries."""
+class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS documents, hidden until their flag is enabled."""
 
+    waffle_flag = "scotus-api"
     serializer_class = SCOTUSDocumentSerializer
     filterset_class = SCOTUSDocumentFilter
     ordering_fields = (

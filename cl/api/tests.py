@@ -2875,11 +2875,15 @@ class V4DRFPaginationTest(TestCase):
             viewset=ScotusDocketMetadataViewSet,
         )
 
+    @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_entries_v4_pagination")
     async def test_scotus_docket_entries_endpoint(self) -> None:
         """Test the V4 SCOTUS docket entries endpoint pagination.
 
         Confirms that its cursor and page number pagination works properly.
         """
+        await sync_to_async(self.enterContext)(
+            override_flag("scotus-api", active=True)
+        )
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocketentry-list",
             default_ordering="-id",
@@ -2888,11 +2892,17 @@ class V4DRFPaginationTest(TestCase):
             viewset=SCOTUSDocketEntryViewSet,
         )
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_documents_v4_pagination"
+    )
     async def test_scotus_documents_endpoint(self) -> None:
         """Test the V4 SCOTUS documents endpoint pagination.
 
         Confirms that its cursor and page number pagination works properly.
         """
+        await sync_to_async(self.enterContext)(
+            override_flag("scotus-api", active=True)
+        )
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocument-list",
             default_ordering="-id",
