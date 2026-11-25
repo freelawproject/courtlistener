@@ -25,10 +25,6 @@ from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
-from juriscraper.state.texas import (
-    TexasOriginatingAppellateCourt,
-    TexasOriginatingDistrictCourt,
-)
 from juriscraper.state.texas.common import (
     CourtID,
     CourtType,
@@ -1504,32 +1500,26 @@ def texas_originating_court_to_court_id(
     Returns:
         The matching Court ID or None if no court could be found.
     """
-    court_type = court_data["court_type"]
-    match court_type:
-        case CourtType.APPELLATE.value:
-            # Given `CourtType.APPELLATE`, we can safely narrow the type
-            appellate_court_data = cast(
-                TexasOriginatingAppellateCourt, court_data
-            )
-            return texas_js_court_id_to_court_id(
-                appellate_court_data["court_id"]
-            )
-        case CourtType.DISTRICT.value:
-            # Given `CourtType.DISTRICT`, we can safely narrow the type
-            district_court_data = cast(
-                TexasOriginatingDistrictCourt, court_data
-            )
-            district_number = district_court_data["district"]
+    match court_data["court_type"]:
+        case CourtType.APPELLATE:
+            return texas_js_court_id_to_court_id(court_data["court_id"])
+        case CourtType.DISTRICT:
+            district_number = court_data["district"]
             if district_number:
                 if district_number > 1:
                     district_number = district_number + 1
                 return f"texdistct{district_number}"
             return "texdistct"
-        case CourtType.BUSINESS.value:
+        case CourtType.BUSINESS:
             return "texbizct"
-        case CourtType.MUNICIPAL.value:
+        case CourtType.MUNICIPAL:
             return "texctyct"
-        case CourtType.PROBATE.value:
+        case CourtType.PROBATE:
             return "texprobct"
-    # County, justice, and unknown court types
-    return None
+        case (
+            CourtType.COUNTY
+            | CourtType.JUSTICE
+            | CourtType.SUPREME
+            | CourtType.UNKNOWN
+        ):
+            return None

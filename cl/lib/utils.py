@@ -15,7 +15,7 @@ from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
-from cl.lib.types import CleanData
+from cl.lib.types import CleanData, TabItem
 from cl.search.exception import (
     DisallowedWildcardPattern,
     InvalidRelativeDateSyntax,
@@ -714,3 +714,26 @@ def create_selenium_driver(keep_alive: bool = True) -> RemoteWebDriver:
             keep_alive=keep_alive,
         )
     return webdriver.Chrome(options=options, keep_alive=keep_alive)
+
+
+def resolve_active_tab(tabs: list[TabItem], active_tab: str | None) -> str:
+    """Pick the key of the tab a c-tabs component opens on.
+
+    Use it in views that read the requested tab from the query string, so a
+    missing or unknown value opens the first tab instead of an empty section.
+    Panel-mode views need it for `?tab=`. Link-mode views usually don't, since
+    each page already knows its own tab; the component library is the
+    exception, because all its demo tabs are the same page.
+
+    Args:
+        tabs: The entries passed to the component. Must not be empty.
+        active_tab: The key asked for, usually from the query string.
+
+    Returns:
+        `active_tab` when it matches a tab's key, else the first tab's key.
+    """
+    for tab in tabs:
+        if tab["key"] == active_tab:
+            return tab["key"]
+
+    return tabs[0]["key"]

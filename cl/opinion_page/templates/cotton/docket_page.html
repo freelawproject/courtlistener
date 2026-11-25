@@ -256,7 +256,7 @@
     </nav>
 
     {# Tab content — always render #}
-    <section id="{{ tab_content_id }}" aria-labelledby="{{ tab_content_id }}-heading" class="bg-white rounded-b-2xl max-md:rounded-t-2xl md:rounded-tr-2xl p-4">
+    <section id="{{ tab_content_id }}" aria-labelledby="{{ tab_content_id }}-heading" class="bg-white rounded-b-2xl max-md:rounded-t-2xl md:rounded-tr-2xl p-6">
       {# Names the section at every width. It's only visible on mobile with a single tab, where no tab bar or dropdown shows the label. #}
       <h2 id="{{ tab_content_id }}-heading" class="{% if tabs|length > 1 %}sr-only{% else %}md:sr-only text-md font-medium text-greyscale-900{% endif %}">
         {% for tab in tabs %}{% if tab.key == active_tab %}{{ tab.label }}{% endif %}{% endfor %}
