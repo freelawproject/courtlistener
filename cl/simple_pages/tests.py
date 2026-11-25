@@ -1655,6 +1655,30 @@ class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
             len(root.xpath("descendant-or-self::*[@disabled]")), 0
         )
 
+    def test_remote_leaves_the_search_to_the_page(self) -> None:
+        """With `remote`, the root tells the script not to filter and the list asks for its options."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" remote />'
+        )
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNotNone(root.get("data-remote"))
+        self.assertEqual(listbox.get("x-effect"), "searchWhenNeeded")
+
+    def test_only_remote_offers_more_pages(self) -> None:
+        """The option that asks for the next page exists only with `remote`."""
+        more = ".//template[@x-if='canLoadMore']"
+        local = self.render('<c-combobox label="Tags" :options="options" />')
+        remote = self.render(
+            '<c-combobox label="Tags" :options="options" remote />'
+        )
+        self.assertEqual(len(local.xpath(more)), 0)
+        self.assertEqual(len(remote.xpath(more)), 1)
+
+    def test_local_filtering_is_the_default(self) -> None:
+        """Without `remote`, the script filters the options it was given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.get("data-remote"))
+
     def test_list_is_a_popup_by_default(self) -> None:
         """Without `inline`, the plugin opens and closes the list."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
@@ -1676,6 +1700,52 @@ class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
         )
         buttons = root.xpath(".//button[@*[name()='x-combobox:button']]")
         self.assertEqual(len(buttons), 1)
+
+
+class ComponentsComboboxDemoTest(SimpleTestCase):
+    """The components view answers the searches of the remote combobox demo."""
+
+    def search(self, **params: str) -> _MonkeyPatchedWSGIResponse:
+        """Requests a page of options the way the demo's script does."""
+        return self.client.get(
+            reverse("components"), {"combobox": "search", **params}
+        )
+
+    def test_first_page_holds_twenty_options_and_announces_more(self) -> None:
+        """An empty search returns the first twenty dockets and says more follow."""
+        page = self.search().json()
+        self.assertEqual(
+            [option["label"] for option in page["results"]],
+            [f"docket-{number:03d}" for number in range(1, 21)],
+        )
+        self.assertTrue(page["has_more"])
+
+    def test_later_pages_continue_where_the_previous_ended(self) -> None:
+        """Page 2 starts at the twenty-first docket."""
+        page = self.search(page="2").json()
+        self.assertEqual(
+            page["results"][0], {"value": 21, "label": "docket-021"}
+        )
+
+    def test_last_page_announces_no_more(self) -> None:
+        """The page that reaches the last docket says nothing follows."""
+        page = self.search(page="5").json()
+        self.assertEqual(page["results"][-1]["label"], "docket-095")
+        self.assertFalse(page["has_more"])
+
+    def test_search_matches_the_start_of_the_name(self) -> None:
+        """Only the dockets whose name starts with the text are returned, whatever its case."""
+        page = self.search(q="DOCKET-09").json()
+        self.assertEqual(
+            [option["label"] for option in page["results"]],
+            [f"docket-{number:03d}" for number in range(90, 96)],
+        )
+
+    def test_error_fails_on_purpose(self) -> None:
+        """Searching for "error" answers with a failure the demo can show."""
+        self.assertEqual(
+            self.search(q="error").status_code, HTTPStatus.SERVICE_UNAVAILABLE
+        )
 
 
 class ComponentsToastDemoTest(TestCase):
