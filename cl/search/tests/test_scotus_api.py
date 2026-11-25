@@ -190,7 +190,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         return f"http://testserver{path}"
 
     async def test_metadata(self) -> None:
-        """Does metadata link its docket and expose its file as a URL?"""
+        """Does metadata link its docket and expose its file's path?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocketmetadata", self.metadata.pk)
         )
@@ -217,7 +217,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertTrue(data["capital_case"])
         self.assertEqual(
             data["questions_presented_file"],
-            self.absolute(self.metadata.questions_presented_file.url),
+            self.metadata.questions_presented_file.name,
         )
 
         r = await self.async_client.get(
