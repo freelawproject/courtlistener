@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.timezone import localtime
 from rest_framework.authtoken.models import Token
@@ -25,7 +26,7 @@ from cl.favorites.models import (
 )
 from cl.lib.crypto import md5
 from cl.lib.decorators import tiered_cache
-from cl.lib.types import EmailType
+from cl.lib.types import EmailType, TabItem
 from cl.users.models import (
     UserGroupsEvent,
     UserPermissionsEvent,
@@ -523,3 +524,25 @@ def build_docket_alert_rows(
             }
         )
     return docket_rows
+
+
+def build_alerts_tabs() -> list[TabItem]:
+    """Build the entries of the tabs on the user's alerts pages.
+
+    Entries are in display order. Each key matches the `page` value its view
+    passes, so the template can use `page` as the tabs' `active_tab`.
+    """
+    return [
+        {
+            "key": "search_alerts",
+            "label": "Search Alerts",
+            "url": reverse("profile_search_alerts"),
+            "icon": "magnifier",
+        },
+        {
+            "key": "docket_alerts",
+            "label": "Docket Alerts",
+            "url": reverse("profile_docket_alerts"),
+            "icon": "file_text",
+        },
+    ]

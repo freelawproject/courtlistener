@@ -158,6 +158,7 @@ from cl.users.models import (
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 from cl.users.utils import (
+    build_alerts_tabs,
     build_docket_alert_rows,
     create_stub_account,
     message_dict,
@@ -6540,3 +6541,27 @@ class DocketAlertRowsTest(SimpleTestCase):
     def test_no_alerts_give_no_rows(self) -> None:
         """An empty list in gives an empty list out."""
         self.assertEqual(build_docket_alert_rows([]), [])
+
+
+class AlertsTabsTest(SimpleTestCase):
+    """build_alerts_tabs lists the tabs of the user's alerts pages."""
+
+    def test_tabs_link_to_the_alerts_pages_in_display_order(self) -> None:
+        """Search Alerts comes first, then Docket Alerts, each with its page."""
+        self.assertEqual(
+            build_alerts_tabs(),
+            [
+                {
+                    "key": "search_alerts",
+                    "label": "Search Alerts",
+                    "url": reverse("profile_search_alerts"),
+                    "icon": "magnifier",
+                },
+                {
+                    "key": "docket_alerts",
+                    "label": "Docket Alerts",
+                    "url": reverse("profile_docket_alerts"),
+                    "icon": "file_text",
+                },
+            ],
+        )
