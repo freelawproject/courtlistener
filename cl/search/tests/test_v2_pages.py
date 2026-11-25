@@ -373,6 +373,73 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Expected at least one input with name='filed_before'",
         )
 
+    def test_calendar_date_inputs_have_matching_labels(self):
+        """Every date input has a visible or placeholder-based name."""
+        expected_labels = {
+            "argued_after": "Argued After",
+            "argued_before": "Argued Before",
+            "born_after": "Born After",
+            "born_before": "Born Before",
+            "filed_after": "Filed After",
+            "filed_before": "Filed Before",
+            "entry_date_filed_after": "Filed After",
+            "entry_date_filed_before": "Filed Before",
+        }
+        selectors = self.tree.xpath('//*[@*[name()="x-data"]="dateSelector"]')
+        self.assertTrue(selectors)
+        seen = set()
+        for selector in selectors:
+            inputs = selector.xpath('.//input[@data-type="calendar"]')
+            self.assertEqual(len(inputs), 2)
+            for date_input in inputs:
+                name = date_input.get("name")
+                seen.add(name)
+                with self.subTest(name=name):
+                    binding = date_input.get("x-bind:id")
+                    self.assertTrue(binding)
+                    labels = selector.xpath(
+                        './/label[@*[name()="x-bind:for"]=$binding]',
+                        binding=binding,
+                    )
+                    self.assertEqual(len(labels), 1)
+                    self.assertIn(
+                        expected_labels[name], labels[0].text_content()
+                    )
+                    self.assertIn("MM/DD/YYYY", labels[0].text_content())
+                    self.assertIsNone(date_input.get("aria-label"))
+                    button = date_input.getparent().find("button")
+                    self.assertIsNotNone(button)
+                    self.assertEqual(button.get("tabindex"), "-1")
+                    self.assertEqual(button.get("aria-hidden"), "true")
+        self.assertEqual(seen, set(expected_labels))
+
+    def test_date_selector_groups_relative_controls_without_landmarks(self):
+        """Only the relative-mode widgets need a shared group label."""
+        selectors = self.tree.xpath('//*[@*[name()="x-data"]="dateSelector"]')
+        relative_groups = 0
+        for selector in selectors:
+            self.assertNotEqual(selector.tag, "section")
+            relative_inputs = selector.xpath(
+                './/input[@data-type="relative"][@type="text"]'
+            )
+            if relative_inputs:
+                relative_groups += 1
+                self.assertEqual(selector.get("role"), "group")
+                self.assertEqual(
+                    selector.get("x-bind:aria-labelledby"), "labelId"
+                )
+                labels = selector.xpath(
+                    './/*[@*[name()="x-bind:id"]="labelId"]'
+                )
+                self.assertEqual(len(labels), 1)
+                self.assertIn(
+                    labels[0].text_content().strip(),
+                    ("Docket Date", "Entry Date"),
+                )
+            else:
+                self.assertIsNone(selector.get("role"))
+        self.assertGreater(relative_groups, 0)
+
     def test_corpus_search_tabs_are_server_rendered(self):
         """Corpus search tab labels appear in HTML before Alpine runs.
 

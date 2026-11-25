@@ -1,0 +1,94 @@
+{% load svg_tags %}
+
+<c-vars label field_name />
+
+<div
+  data-type="relative"
+  class="w-full"
+  x-show="isSelectedType"
+  x-cloak
+  x-on:click.outside="closeDropdownMenu"
+>
+  <div class="flex w-full relative">
+    {#   Relative date input   #}
+    <div x-on:keydown.down.stop.prevent="enterDropdownFocus" class="focus-container input-text flex justify-stretch items-stretch gap-2 w-full">
+      <label x-bind:for="relativeInputId" class="sr-only">Enter a relative date, for example '1d ago'</label>
+      <input
+        type="text"
+        x-bind:value="dateAfterRelative"
+        x-on:focusin="openDropdownMenu"
+        x-on:input="updateDateAfterRelative"
+        x-bind:id="relativeInputId"
+        x-bind:disabled="disabled"
+        x-on:keyup.esc.stop.prevent="onComboboxEscape"
+        x-on:keydown.shift.tab="closeDropdownMenu"
+        name="{{ field_name }}"
+        data-type="relative"
+        placeholder="Enter a Relative date"
+        class="focus:ring-0 focus:outline-none w-full"
+        autocomplete="off"
+        role="combobox"
+        x-bind:aria-expanded="dropdownMenuOpen"
+      >
+      {#    Toggle button for relative dates menu    #}
+      <button
+        x-on:click="toggleDropdownMenu"
+        type="button"
+        class="rounded-md text-sm font-medium text-greyscale-900 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none"
+        aria-haspopup="listbox"
+        x-bind:aria-controls="relativeDatesMenuId"
+        x-bind:disabled="disabled"
+        data-type="relative"
+        aria-label="Toggle relative dates menu to autofill the input with common values"
+        x-bind:aria-expanded="dropdownMenuOpen"
+        tabindex="-1"
+      >
+        {% svg "chevron" aria_hidden="true" class="text-greyscale-400" %}
+      </button>
+    </div>
+
+    {#   Relative date menu   #}
+    <ul
+      x-bind:id="relativeDatesMenuId"
+      x-show="dropdownMenuOpen"
+      x-cloak
+      x-on:keyup.esc.stop.prevent="focusRelativeInput"
+      x-on:keydown.down.stop.prevent="focusNext"
+      x-on:keydown.up.stop.prevent="focusPrevious"
+      x-on:keydown.home.stop.prevent="focusFirst"
+      x-on:keydown.end.stop.prevent="focusLast"
+      class="absolute z-20 top-11 w-full overflow-auto rounded-lg bg-white py-1 shadow-lg border border-greyscale-200 focus:outline-hidden list-none pl-0 flex flex-col justify-stretch"
+      tabindex="-1"
+      role="listbox"
+      aria-label="Options to autofill {{ label }} with common Relative Dates"
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-100"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+    >
+      <c-corpus-search.date-selector.relative-date-option only value="1d ago">
+        Past Day
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="7d ago">
+        Past Week
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="14d ago">
+        Past 2 Weeks
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="1m ago">
+        Past Month
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="3m ago">
+        Past 3 Months
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="6m ago">
+        Past 6 Months
+      </c-corpus-search.date-selector.relative-date-option>
+      <c-corpus-search.date-selector.relative-date-option only value="1y ago">
+        Past Year
+      </c-corpus-search.date-selector.relative-date-option>
+    </ul>
+  </div>
+</div>

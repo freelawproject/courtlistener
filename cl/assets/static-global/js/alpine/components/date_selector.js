@@ -214,22 +214,20 @@ document.addEventListener('alpine:init', () => {
 
       // Initialize flatpickr on next tick so all data is available
       this.$nextTick(() => {
-        // DESKTOP
-        // Bind flatpickr widget to hidden input to enable confirmation, but position relative to actual input
-        const calendarAfterEl = document.getElementById(this.calendarAfterInputId);
-        this.calendar.after = flatpickr(this.flatpickrAfterInputEl, {
-          ...flatpickrConfig,
-          ...desktopFlatpickrConfig,
-          positionElement: calendarAfterEl,
-        });
-        this.flatpickrAfterInputEl.setAttribute('type', 'hidden');
-        const calendarBeforeEl = document.getElementById(this.calendarBeforeInputId);
-        this.calendar.before = flatpickr(this.flatpickrBeforeInputEl, {
-          ...flatpickrConfig,
-          ...desktopFlatpickrConfig,
-          positionElement: calendarBeforeEl,
-        });
-        this.flatpickrBeforeInputEl.setAttribute('type', 'hidden');
+        // Bind each picker to a hidden input for confirmation, but position it
+        // relative to its visible input.
+        const inputs = [
+          ['after', this.flatpickrAfterInputEl, this.calendarAfterInputEl],
+          ['before', this.flatpickrBeforeInputEl, this.calendarBeforeInputEl],
+        ];
+        for (const [direction, hiddenInput, positionElement] of inputs) {
+          this.calendar[direction] = flatpickr(hiddenInput, {
+            ...flatpickrConfig,
+            ...desktopFlatpickrConfig,
+            positionElement,
+          });
+          hiddenInput.setAttribute('type', 'hidden');
+        }
       });
     },
   }));
