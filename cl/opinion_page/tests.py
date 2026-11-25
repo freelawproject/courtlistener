@@ -2522,6 +2522,35 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
                 r = self.client.get(docket.get_absolute_url())
                 self.assertIn(f'href="{link}"', r.content.decode())
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="NewDocketAlertTest.test_share_link_on_the_v2_docket_page"
+    )
+    @override_flag("scotus_docket_page", active=True)
+    @override_flag("use_new_design", active=True)
+    def test_share_link_on_the_v2_docket_page(self) -> None:
+        """The v2 docket page shares dockets without a PACER case ID by ID.
+
+        The Cotton component has its own copy of the toolbar, so it needs the
+        same condition as the legacy template: a docket without a PACER case
+        ID would otherwise link to a page that cannot find it.
+        """
+        self.client.login(username="pandora", password="password")
+        recap_link = (
+            f"{reverse('new_docket_alert')}?pacer_case_id=666666&court_id=test"
+        )
+        scotus_link = reverse(
+            "new_docket_alert_by_id", args=[self.scotus_docket.pk]
+        )
+        for docket, link in (
+            (self.recap_docket, recap_link),
+            (self.scotus_docket, scotus_link),
+        ):
+            with self.subTest(court=docket.court_id):
+                r = self.client.get(docket.get_absolute_url())
+                self.assertTemplateUsed(r, "v2_docket.html")
+                self.assertIn(f'href="{link}"', r.content.decode())
+                self.assertNotIn("pacer_case_id=None", r.content.decode())
+
 
 class OpinionSitemapTest(SitemapTest):
     @classmethod
