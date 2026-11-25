@@ -66,6 +66,11 @@ document.addEventListener('alpine:init', () => {
         return this.filteredOptions.length === 0 && !this.canCreate;
       },
 
+      /** The value a form submits for the single selection; empty when there is none. */
+      get formValue() {
+        return this.$combobox.value?.value ?? '';
+      },
+
       /** The text the field shows for the single selection. */
       displayLabel(option) {
         return option?.label ?? '';

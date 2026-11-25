@@ -1590,6 +1590,62 @@ class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
         buttons = root.xpath(".//button[@*[name()='x-on:click']='clear']")
         self.assertEqual(len(buttons), 0)
 
+    def test_name_submits_the_single_selection(self) -> None:
+        """With `name`, a hidden input of that name carries the selected option's value."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" />'
+        )
+        hidden = root.xpath("./input[@type='hidden'][@name='tag']")
+        self.assertEqual(len(hidden), 1)
+        self.assertEqual(hidden[0].get("x-bind:value"), "formValue")
+
+    def test_name_submits_each_of_multiple_selections(self) -> None:
+        """With `name` and `multiple`, one hidden input of that name is rendered per selected option."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" multiple />'
+        )
+        hidden = root.xpath(
+            "./template[@x-for='option in $combobox.value']/input[@type='hidden'][@name='tag']"
+        )
+        self.assertEqual(len(hidden), 1)
+
+    def test_without_name_nothing_is_submitted(self) -> None:
+        """Without `name`, the combobox renders no form input for its selection."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertEqual(len(root.xpath(".//input[@type='hidden']")), 0)
+
+    def test_name_stays_off_the_root(self) -> None:
+        """The root carries no `name`, which the plugin would turn into inputs of its own."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" />'
+        )
+        self.assertIsNone(root.get("name"))
+
+    def test_disabled_disables_every_control(self) -> None:
+        """With `disabled`, the root, the text input, the buttons and the form input are all disabled."""
+        for flags in ("multiple", "clearable"):
+            with self.subTest(flags=flags):
+                root = self.render(
+                    f'<c-combobox label="Tags" :options="options" name="tag" {flags} disabled />'
+                )
+                controls = [root, *root.xpath(".//input | .//button")]
+                self.assertEqual(
+                    [
+                        control.get("disabled") is not None
+                        for control in controls
+                    ],
+                    [True] * len(controls),
+                )
+
+    def test_enabled_is_the_default(self) -> None:
+        """Without `disabled`, no control of the combobox is disabled."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" multiple />'
+        )
+        self.assertEqual(
+            len(root.xpath("descendant-or-self::*[@disabled]")), 0
+        )
+
     def test_list_is_a_popup_by_default(self) -> None:
         """Without `inline`, the plugin opens and closes the list."""
         root = self.render('<c-combobox label="Tags" :options="options" />')

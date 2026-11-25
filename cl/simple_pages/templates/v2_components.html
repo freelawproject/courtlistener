@@ -1956,6 +1956,7 @@ Sample code here.
         <p class="text-sm text-greyscale-500">Single selection (default)</p>
         <c-combobox
           label="Court"
+          name="court"
           placeholder="Search courts"
           :options="[
             {'value': 'scotus', 'label': 'Supreme Court'},
@@ -1983,6 +1984,7 @@ Sample code here.
         <p class="text-sm text-greyscale-500"><code>multiple</code></p>
         <c-combobox
           label="Courts"
+          name="courts"
           placeholder="Search courts"
           multiple
           :options="[
@@ -2019,6 +2021,20 @@ Sample code here.
             {'value': 1, 'label': 'appeals'},
             {'value': 2, 'label': 'bankruptcy', 'selected': True},
             {'value': 3, 'label': 'patents'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>disabled</code></p>
+        <c-combobox
+          label="Courts"
+          placeholder="Search courts"
+          multiple
+          disabled
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
+            {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
           ]"
         />
       </div>
@@ -2082,6 +2098,14 @@ Sample code here.
         <c-slot name="description">Adds a button to the field that empties the single selection, shown while an option is selected. For optional fields. Has no effect with <code>multiple</code>, where each chip has its own remove button. Clearing dispatches <code>combobox-remove</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
+        <c-slot name="label"><code>name</code></c-slot>
+        <c-slot name="description">Submits the selection with the surrounding form under this name: the selected option's <code>value</code>, or one value per selected option with <code>multiple</code>. A single-select with nothing selected submits an empty value. Without it the selection only reaches the page through the events.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>disabled</code></c-slot>
+        <c-slot name="description">Shows the selection without letting the user change it or open the list. A disabled combobox submits nothing, as a disabled form control.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
         <c-slot name="label"><code>inline</code></c-slot>
         <c-slot name="description">Renders the list below the field, in the page flow and always visible, instead of opening it as a popup. For a combobox inside a popover or a dialog, which does the opening and closing. Escape pressed in the field does not close a native popover; close it from a <code>keydown.escape</code> listener in the capture phase.</c-slot>
       </c-library.item>
@@ -2112,9 +2136,10 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;!-- Single selection, filtered by typing --&gt;
+&lt;!-- Single selection, filtered by typing, submitted with its form as "court" --&gt;
 &lt;c-combobox
   label="Court"
+  name="court"
   placeholder="Search courts"
   :options="[
     {'value': 'scotus', 'label': 'Supreme Court'},
@@ -2124,6 +2149,9 @@ Sample code here.
 
 &lt;!-- Single selection with a button that empties it, for optional fields --&gt;
 &lt;c-combobox label="Jurisdiction" placeholder="Search jurisdictions" clearable :options="jurisdiction_options" /&gt;
+
+&lt;!-- Selection shown but not editable --&gt;
+&lt;c-combobox label="Courts" multiple disabled :options="court_options" /&gt;
 
 &lt;!-- Single selection without typing --&gt;
 &lt;c-combobox label="Status" placeholder="Choose an option" :searchable="False" :options="status_options" /&gt;

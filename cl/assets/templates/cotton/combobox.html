@@ -13,6 +13,8 @@
   create_label="Create:"
   inline
   clearable
+  name=""
+  disabled
   class=""
 />
 
@@ -20,6 +22,7 @@
   x-data="combobox"
   x-combobox
   {% if multiple %}multiple{% endif %}
+  {% if disabled %}disabled{% endif %}
   by="value"
   x-bind:default-value="initialSelection"
   x-effect="trackSelection"
@@ -28,8 +31,15 @@
   {{ attrs }}
 >
   {{ options|json_script }}
+  {% if name and multiple %}
+    <template x-for="option in $combobox.value" x-bind:key="option.value">
+      <input type="hidden" name="{{ name }}" x-bind:value="option.value" {% if disabled %}disabled{% endif %} />
+    </template>
+  {% elif name %}
+    <input type="hidden" name="{{ name }}" x-bind:value="formValue" {% if disabled %}disabled{% endif %} />
+  {% endif %}
   <label x-combobox:label class="text-sm font-medium text-greyscale-600">{{ label }}</label>
-  <div x-ref="field" x-effect="clearQueryWhenClosed" class="focus-container items-center gap-1.5 min-h-10 py-1.5 px-3 border border-greyscale-200 rounded-lg bg-white">
+  <div x-ref="field" x-effect="clearQueryWhenClosed" class="focus-container items-center gap-1.5 min-h-10 py-1.5 px-3 border border-greyscale-200 rounded-lg bg-white has-[input:disabled]:bg-greyscale-50">
     {% if searchable %}
       <span x-show="$combobox.isOpen" x-cloak class="flex shrink-0 text-greyscale-500">{% svg "magnifier" class="size-5" aria_hidden="true" %}</span>
     {% endif %}
@@ -46,6 +56,7 @@
                 type="button"
                 x-on:click="remove(option)"
                 x-bind:aria-label="removeLabel(option)"
+                {% if disabled %}disabled{% endif %}
                 class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-500 hover:text-greyscale-800 focus-self"
               >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
             </li>
@@ -70,6 +81,7 @@
         {% endif %}
         type="text"
         autocomplete="off"
+        {% if disabled %}disabled{% endif %}
         placeholder="{{ placeholder }}"
         class="flex-1 min-w-24 bg-transparent outline-none text-sm font-medium text-greyscale-600 placeholder:font-normal placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
       />
@@ -81,10 +93,11 @@
         x-cloak
         x-on:click="clear"
         aria-label="Clear selection"
+        {% if disabled %}disabled{% endif %}
         class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-400 hover:text-greyscale-800 focus-self"
       >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
     {% endif %}
-    <button x-combobox:button aria-label="Show options" class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
+    <button x-combobox:button aria-label="Show options" {% if disabled %}disabled{% endif %} class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
       {% svg "chevron" class="size-full" aria_hidden="true" %}
     </button>
   </div>
@@ -97,7 +110,7 @@
       x-cloak
     {% endif %}
     {% if multiple %}aria-multiselectable="true"{% endif %}
-    class="flex flex-col gap-0.5 w-full max-h-80 overflow-y-auto list-none {% if inline %}p-0 [&>li]:px-3{% else %}z-20 p-1.5 [&>li]:px-2 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
+    class="flex flex-col gap-0.5 w-full max-h-80 overflow-y-auto list-none {% if disabled %}pointer-events-none{% endif %} {% if inline %}p-0 [&>li]:px-3{% else %}z-20 p-1.5 [&>li]:px-2 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
   >
     <template x-for="option in filteredOptions" x-bind:key="option.value">
       <li
