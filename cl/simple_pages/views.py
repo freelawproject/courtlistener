@@ -13,6 +13,8 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
 
+from cl.favorites.forms_v2 import NoteForm as NoteFormV2
+from cl.favorites.models import Note
 from cl.lib.types import TabItem
 from cl.lib.utils import resolve_active_tab
 from cl.opinion_page import docket_entry_sources
@@ -362,6 +364,10 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": DocketEntryFilterForm(),
+            "demo_note_form": NoteFormV2(),
+            "demo_saved_note_form": NoteFormV2(
+                instance=Note(pk=1, content_type_id=1, object_id=12345)
+            ),
             "demo_invalid_filter_form": demo_invalid_filter_form,
             "demo_disabled_filter_form": demo_disabled_filter_form,
             "demo_panel_tabs": demo_panel_tabs,

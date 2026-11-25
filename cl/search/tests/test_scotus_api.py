@@ -80,12 +80,13 @@ LISTED_DOCUMENT_KEYS = DOCUMENT_KEYS - {"plain_text"}
 class ScotusAPITestCase(TestCase):
     """Shared SCOTUS data for the API tests, with the endpoints' flag on.
 
+    The flag is enabled in setUp, so subclasses that override setUp must
+    call super().setUp().
+
     The entry with documents gets its attachment 2 created before attachment
     1, so tests can tell display order apart from id order. The entry
     without documents gets the empty placeholder document production gives
-    such entries, which the API must hide. The flag is
-    enabled in setUp, so subclasses that override setUp must call
-    super().setUp().
+    such entries, which the API must hide.
     """
 
     def setUp(self) -> None:
@@ -197,13 +198,18 @@ class ScotusAPIFlagTest(ScotusAPITestCase):
 
     def test_endpoints_are_hidden_when_flag_is_off(self) -> None:
         """Do the endpoints 404 and drop out of the API root?"""
+        detail_pks = {
+            "scotusdocketmetadata": self.metadata.pk,
+            "scotusdocketentry": self.entry.pk,
+            "scotusdocument": self.attachment_1.pk,
+        }
         with override_flag("scotus-api", active=False):
             for basename in BASENAMES:
                 with self.subTest(basename=basename):
                     r = self.client.get(self.list_path(basename))
                     self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
                     r = self.client.get(
-                        self.detail_path(basename, self.metadata.pk)
+                        self.detail_path(basename, detail_pks[basename])
                     )
                     self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
             root_prefixes = self.get_root_prefixes()
@@ -351,7 +357,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertEqual(r.json()["scotus_documents"], [])
 
     async def test_document(self) -> None:
-        """Does a document link its entry and expose its file and page?"""
+        """Does a document link its entry and expose its file's path and page?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocument", self.attachment_1.pk)
         )
