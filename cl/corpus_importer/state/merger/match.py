@@ -82,41 +82,6 @@ type DuplicateOutcome = Next | Fail
 """What a declaration accepts for a `duplicate` outcome: fall through or fail, with `Fail` allowed as a bare class."""
 
 
-def failure_text(
-    merger: type[Merger],
-    text: str,
-    *,
-    tier: int,
-    key: tuple[Any, ...] = (),
-) -> str:
-    """Build the reason a merger's lookup failed.
-
-    Args:
-        merger: The class of the merger that failed.
-        text: What went wrong.
-        tier: The tier the failure happened in, counted from 1.
-        key: The values the member was told apart by when it failed.
-
-    Returns:
-        The reason, as given to the failed state and the log.
-    """
-    return f"{merger.__name__}: {text} (tier {tier}, key {key})"
-
-
-def ambiguous_text(model: type[Model], rows: int, items: int) -> str:
-    """Say why one stored row could not be picked.
-
-    Args:
-        model: The model of the rows.
-        rows: How many rows the scraped item could be.
-        items: How many scraped items hold any of those rows, including the one being picked for.
-
-    Returns:
-        The reason a failed lookup gives when it has no message of its own.
-    """
-    return f"cannot pick one {model.__name__}: {rows} rows for {items} scraped items"
-
-
 class First:
     """Take the first candidate in a given order.
 
@@ -138,8 +103,7 @@ class First:
 class Narrow:
     """Filter an ambiguous member's candidates on more terms, then apply outcomes of its own.
 
-    A `Narrow` separates scraped items sharing a key as well as stored rows
-    sharing one.
+    A `Narrow` separates scraped items sharing a key as well as stored rows sharing one.
 
     Attributes:
         terms: The terms the candidates are filtered on.
@@ -933,7 +897,7 @@ class MatchGroup[M: Model]:
                 for tier in self._match.tiers
             )
         except _Rejected as rejected:
-            text = failure_text(self._merger, str(rejected), tier=1)
+            text = f"{self._merger.__name__}: {rejected} (tier {1}, key ())"
             logger.error("%s", text)
             member.resolution = _Failure(text)
             return False
@@ -949,8 +913,7 @@ class MatchGroup[M: Model]:
             return term.scraped_value(member.merger, member.state)
         except ValidationError:
             raise _Rejected(
-                f"{cast(Field, term.field).name} cannot hold scraped value "
-                f"{term.scraped_raw(member.merger, member.state)!r}"
+                f"{cast(Field, term.field).name} cannot hold scraped value {term.scraped_raw(member.merger, member.state)!r}"
             ) from None
 
     def _settle(
@@ -974,12 +937,17 @@ class MatchGroup[M: Model]:
         for entry in (*entries, *bystanders):
             for pk in entry.pks:
                 holders[pk].append(entry)
-        model = self._merger.config.model.__name__
+
         narrowing: list[_Entry[M]] = []
         for entry in entries:
             pks = entry.pks
             if not pks:
-                self._decide(tier, entry, stage.missing, f"no {model} matches")
+                if isinstance(stage.missing, Fail):
+                    err = f"{self._merger.__name__}: {stage.missing.reason('no matches')} (tier {tier.index}, key {entry.shown_key})"
+                    entry.outcome = _Failure(err)
+                    logger.error("%s", err)
+                    continue
+                entry.outcome = stage.missing
             elif len(pks) == 1 and len(holders[pks[0]]) == 1:
                 entry.outcome = Update(entry.candidates[0])
             else:
@@ -990,37 +958,18 @@ class MatchGroup[M: Model]:
                         entry.outcome = Update(entry.candidates[0])
                     case outcome:
                         rivals = {id(h) for pk in pks for h in holders[pk]}
-                        self._decide(
-                            tier,
-                            entry,
-                            outcome,
-                            ambiguous_text(
-                                self._merger.config.model,
-                                len(pks),
-                                len(rivals),
-                            ),
-                        )
+                        if isinstance(outcome, Fail):
+                            err = f"{self._merger.__name__}: {len(pks)} rows for {len(rivals)} scraped items (tier {tier.index}, key {entry.shown_key})"
+                            entry.outcome = _Failure(err)
+                            logger.error("%s", err)
+                            continue
+                        entry.outcome = outcome
+
         if not isinstance(narrow := stage.ambiguous, BoundNarrow):
             return
         for entry in (*narrowing, *bystanders):
             entry.narrow(narrow.terms)
         self._settle(tier, narrow, narrowing, bystanders)
-
-    def _decide(
-        self, tier: BoundTier, entry: _Entry[M], outcome: Outcome, default: str
-    ) -> None:
-        """Apply an outcome that ends an entry's tier without taking a row.
-
-        Args:
-            tier: The tier being assigned.
-            entry: The entry the outcome is for.
-            outcome: The outcome declared.
-            default: The reason a `Fail` without a message gives.
-        """
-        if isinstance(outcome, Fail):
-            self._fail(tier, [entry], outcome.reason(default))
-            return
-        entry.outcome = outcome
 
     def _duplicate(
         self, tier: BoundTier, group: list[_Entry[M]], count: int
@@ -1040,22 +989,9 @@ class MatchGroup[M: Model]:
         default = (
             f"{count} scraped items share a key; the key needs another term"
         )
-        self._fail(tier, group, outcome.reason(default))
 
-    def _fail(
-        self, tier: BoundTier, group: list[_Entry[M]], message: str
-    ) -> None:
-        """Fail entries with a reason, logging the failure once however many entries it fails.
-
-        Args:
-            tier: The tier being assigned.
-            group: The entries to fail: one entry, or a set of duplicates. Each carries the reason with its own key; the log line is the first entry's.
-            message: What the reason says before the tier and key.
-        """
         texts = [
-            failure_text(
-                self._merger, message, tier=tier.index, key=entry.shown_key
-            )
+            f"{self._merger.__name__}: {outcome.reason(default)} (tier {tier.index}, key {entry.shown_key})"
             for entry in group
         ]
         for entry, text in zip(group, texts, strict=True):
