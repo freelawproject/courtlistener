@@ -19,6 +19,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, connection
+from django.db.models import Prefetch
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
@@ -4384,6 +4385,78 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertEqual(len(prefetches), 3)
         self.assertIn("recap_documents__tags", prefetches)
         self.assertIn("tags", prefetches)
+
+
+class DeclaredPrefetchDocketEntryViewSet(DocketEntryViewSet):
+    """Docket entries whose view declares a filtered, ordered Prefetch."""
+
+    queryset = DocketEntry.objects.prefetch_related(
+        Prefetch(
+            "recap_documents",
+            queryset=RECAPDocument.objects.exclude(
+                attachment_number=2
+            ).order_by("-attachment_number"),
+        )
+    ).order_by("-id")
+
+
+class DeferredFieldsDeclaredPrefetchTest(TestCase):
+    """DeferredFieldsMixin keeps a view's declared Prefetch querysets."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create an entry with three attachments and a token to read it."""
+        cls.view = DeclaredPrefetchDocketEntryViewSet.as_view({"get": "list"})
+        cls.token, _ = Token.objects.get_or_create(user=UserFactory())
+        entry = DocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(), source=Docket.RECAP)
+        )
+        cls.attachments = {
+            number: RECAPDocumentFactory(
+                docket_entry=entry,
+                document_number="1",
+                attachment_number=number,
+                document_type=RECAPDocument.ATTACHMENT,
+            )
+            for number in (1, 2, 3)
+        }
+
+    def test_fields_and_omit_keep_declared_prefetch(self) -> None:
+        """Do fields and omit keep the declared filter and order?
+
+        The mixin used to add a second Prefetch of the same relation, which
+        Django rejects, so any nested fields or omit param errored.
+        """
+        expected_ids = [self.attachments[3].pk, self.attachments[1].pk]
+        cases = [
+            ({}, None),
+            ({"fields": "id,recap_documents__id"}, {"id"}),
+            ({"omit": "recap_documents__description"}, None),
+        ]
+        for params, document_keys in cases:
+            with self.subTest(params=params):
+                request = RequestFactory().get(
+                    "/", params, HTTP_AUTHORIZATION=f"Token {self.token.key}"
+                )
+                with CaptureQueriesContext(connection) as ctx:
+                    response = self.view(request)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                documents = response.data["results"][0]["recap_documents"]
+                self.assertEqual([d["id"] for d in documents], expected_ids)
+                if "omit" in params:
+                    self.assertNotIn("description", documents[0])
+                if document_keys is None:
+                    continue
+                self.assertEqual(set(documents[0]), document_keys)
+                # The fields param's deferral applies to the declared
+                # queryset: unrequested columns aren't read.
+                document_sql = [
+                    q["sql"]
+                    for q in ctx.captured_queries
+                    if 'FROM "search_recapdocument"' in q["sql"]
+                ]
+                self.assertEqual(len(document_sql), 1, document_sql)
+                self.assertNotIn('"plain_text"', document_sql[0])
 
 
 class ClusterRedirectionTest(TestCase):
