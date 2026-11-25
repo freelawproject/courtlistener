@@ -6,6 +6,7 @@
  * the events the note views send.
  */
 document.addEventListener("alpine:init", () => {
+  const ANNOUNCE_DELAY_MS = 150;
   const CLEAR_AFTER_MS = 5000;
 
   Alpine.data("noteStatus", () => ({
@@ -20,12 +21,18 @@ document.addEventListener("alpine:init", () => {
     },
 
     announcesAction(text) {
-      this.message = text;
-      // A live region only speaks when its text changes, so clear it to let
-      // the same message be announced again later.
+      // The event that calls this also closes the dialog, and the dialog's
+      // focus trap keeps this region aria-hidden until it has closed. Wait
+      // for the region to be exposed and for focus to be back on the note
+      // button, so the text changes in a region screen readers can see.
       setTimeout(() => {
-        this.message = "";
-      }, CLEAR_AFTER_MS);
+        this.message = text;
+        // A live region only speaks when its text changes, so clear it to
+        // let the same message be announced again later.
+        setTimeout(() => {
+          this.message = "";
+        }, CLEAR_AFTER_MS);
+      }, ANNOUNCE_DELAY_MS);
     },
   }));
 });
