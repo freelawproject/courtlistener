@@ -1,0 +1,45 @@
+{% extends "new_base.html" %}
+{% block title %}{{ page_title }} &ndash; CourtListener.com{% endblock %}
+
+
+{% block content_wrapper %}
+  <div class="capped-width py-4 md:pt-6 md:pb-15">
+    <c-profile-section-shell
+      active_section="alerts"
+      :request="request"
+      :csrf_token="csrf_token"
+      only>
+      <c-tabs label="Alert types" :tabs="tabs" :active_tab="page">
+        {% if page == "docket_alerts" %}
+            <h2>RECAP Docket Alerts for PACER Cases</h2>
+            <p>YOUR EMAIL ADDRESS PROVIDES YOU UNLIMITED DOCKET ALERTS</p>
+            <c-flex-table
+                caption="Docket Alerts table"
+                align="data-center"
+                :columns="[
+                    {'label': 'Case Name'},
+                    {'label': 'Court'},
+                    {'label': 'Docket Number'},
+                    {'label': 'Date Filed'},
+                    {'label': 'Last Hit'},
+                    {'label': 'Enable/disable Alerts'},
+                ]"
+            >
+            {% for row in docket_alerts_rows %}
+              <tr>
+                <c-flex-cell header><a href={{row.url}}>{{ row.case_name }}</a></c-flex-cell>
+                <c-flex-cell>{{ row.court }}</c-flex-cell>
+                <c-flex-cell>{{ row.docket_number }}</c-flex-cell>
+                <c-flex-cell>{{ row.date_filed }}</c-flex-cell>
+                <c-flex-cell>{{ row.last_hit }}</c-flex-cell>
+                <c-flex-cell></c-flex-cell>
+              </tr>
+            {% endfor %}
+            </c-flex-table>
+        {% else %}
+            <h2>Here comes Search page</h2>
+        {% endif %}
+      </c-tabs>
+    </c-profile-section-shell>
+  </div>
+{% endblock %}

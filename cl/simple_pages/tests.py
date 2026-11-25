@@ -457,6 +457,8 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     # WIP pages that redirect anonymous visitors to sign in
     AUTHENTICATED_WIP_PAGES: list[tuple[dict[str, Any], str]] = [
         ({"viewname": "view_api"}, "wip_profile/api.html"),
+        ({"viewname": "profile_search_alerts"}, "wip_profile/alerts.html"),
+        ({"viewname": "profile_docket_alerts"}, "wip_profile/alerts.html"),
     ]
 
     @staticmethod
