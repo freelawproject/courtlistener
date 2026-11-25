@@ -12,7 +12,18 @@
       <c-tabs label="Alert types" :tabs="tabs" :active_tab="page">
         {% if page == "docket_alerts" %}
             <h2>RECAP Docket Alerts for PACER Cases</h2>
-            <p>YOUR EMAIL ADDRESS PROVIDES YOU UNLIMITED DOCKET ALERTS</p>
+            {% if user.profile.unlimited_docket_alerts %}
+              <p>Your account has unlimited docket alerts</p>
+            {% elif user.profile.email_grants_unlimited_docket_alerts %}
+              <p>Your email address provides you unlimited docket alerts</p>
+            {% elif user.profile.is_member %}
+              <p>As a member you get unlimited docket alerts. Thanks!</p>
+            {% else %}
+              <p>
+                Members get unlimited docket alerts.
+                <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer">Join FLP</a>
+              </p>
+            {% endif %}
             <c-flex-table
                 caption="Docket Alerts table"
                 align="data-center"
