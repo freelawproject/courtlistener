@@ -40,7 +40,7 @@ class SafeXMLRenderer(XMLRenderer):
         are saved to a Redis set before the cleaned data is rendered.
         """
         if data is None:
-            return b""
+            return ""
 
         try:
             return super().render(data, accepted_media_type, renderer_context)

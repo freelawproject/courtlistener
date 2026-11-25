@@ -12,7 +12,6 @@ applications it created live on with ``registration_source="dcr"``.
 """
 
 import json
-from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -72,9 +71,9 @@ class OAuthMetadataView(APIView):
     other host in ``ALLOWED_HOSTS``.
     """
 
-    authentication_classes: list[Any] = []
-    permission_classes: list[Any] = []
-    throttle_classes: list[Any] = []
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = []
 
     def get(self, request: Request) -> Response:
         """Return the server's OAuth metadata."""
