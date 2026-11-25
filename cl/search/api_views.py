@@ -24,6 +24,7 @@ from cl.api.utils import (
     DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
+    WaffleFlagMixin,
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
@@ -272,9 +273,10 @@ class BaseSourceReadOnlyViewSet(
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
 
 
-class ScotusDocketMetadataViewSet(BaseSourceReadOnlyViewSet):
-    """SCOTUS-specific docket metadata."""
+class ScotusDocketMetadataViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS-specific docket metadata, hidden until its flag is enabled."""
 
+    waffle_flag = "scotus-api"
     serializer_class = ScotusDocketMetadataSerializer
     filterset_class = ScotusDocketMetadataFilter
     queryset = ScotusDocketMetadata.objects.order_by("-id")

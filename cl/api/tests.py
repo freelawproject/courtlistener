@@ -2855,8 +2855,16 @@ class V4DRFPaginationTest(TestCase):
             viewset=RECAPDocumentViewSet,
         )
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_scotus_metadata_v4_pagination"
+    )
     async def test_scotus_docket_metadata_endpoint(self) -> None:
         """Test that the V4 SCOTUS docket metadata endpoint's cursor pagination works properly."""
+        # override_flag writes to the database, which async code can't do
+        # directly.
+        await sync_to_async(self.enterContext)(
+            override_flag("scotus-api", active=True)
+        )
         await self._base_test_for_v4_endpoints(
             endpoint="scotusdocketmetadata-list",
             default_ordering="-id",
