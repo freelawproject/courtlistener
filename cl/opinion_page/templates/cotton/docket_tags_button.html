@@ -1,0 +1,62 @@
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/components/docket_tags_button.js" %}
+{% require_script "js/alpine/plugins/anchor" defer=True %}
+
+<c-vars docket docket_tags />
+
+{% if user.is_authenticated %}
+  <div
+    x-data="docketTagsButton"
+    x-on:combobox-add="attach"
+    x-on:combobox-remove="detach"
+    x-on:combobox-create.prevent="create"
+    data-docket="{{ docket.pk }}"
+    data-tags-url="{% url 'UserTag-list' version='v4' %}"
+    data-docket-tags-url="{% url 'DocketTag-list' version='v4' %}"
+    data-csrf-token="{{ csrf_token }}"
+    data-error-message-invalid-name="Only lowercase letters, numbers, and '-' allowed"
+    data-error-message-default="There was a problem. Try again later."
+  >
+    {{ docket_tags.associations|json_script }}
+    <c-button variant="outline" popovertarget="docket-tags-{{ docket.pk }}" x-ref="trigger">
+      {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+      Tags
+    </c-button>
+    <div
+      id="docket-tags-{{ docket.pk }}"
+      popover
+      role="dialog"
+      aria-label="Tags"
+      x-anchor.bottom-start.offset.8="$refs.trigger"
+      x-on:toggle="focusSearch"
+      x-on:keydown.escape.capture="close"
+      class="m-0 w-80 max-w-[calc(100vw-2rem)] p-4 border border-greyscale-200 rounded-lg bg-white shadow-lg"
+    >
+      <div class="flex flex-col gap-3">
+        <c-combobox
+          label="Apply tags to this item"
+          placeholder="Search tags…"
+          :options="docket_tags.options"
+          multiple
+          creatable
+          create_label="Create tag:"
+          inline
+        />
+        <p x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></p>
+        <div class="pt-3 border-t border-greyscale-200">
+          <c-button variant="ghost" size="sm" href="{% url 'tag_list' user.username %}">View All Tags</c-button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <c-button
+    variant="outline"
+    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+    rel="nofollow"
+  >
+    {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+    Tags
+    <span class="sr-only">(sign in required)</span>
+  </c-button>
+{% endif %}
