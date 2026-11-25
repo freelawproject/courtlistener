@@ -1504,8 +1504,17 @@ class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
     def test_options_reach_the_script_as_json(self) -> None:
         """The JSON script the component's script loads parses back to the options given, HTML in a label included."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
-        script = root.xpath("./script[@type='application/json']")[0]
+        script = root.xpath(
+            "./template[@data-options]/script[@type='application/json']"
+        )[0]
         self.assertEqual(json.loads(script.text), self.options)
+
+    def test_search_results_are_announced(self) -> None:
+        """The root holds a polite live region for the outcome of a search."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        status = root.xpath("./*[@role='status'][@aria-live='polite']")
+        self.assertEqual(len(status), 1)
+        self.assertEqual(status[0].get("x-text"), "searchResultsMessage")
 
     def test_listeners_land_on_the_root(self) -> None:
         """A listener written on the component tag sits on the element that dispatches the component's events."""
