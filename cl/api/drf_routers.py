@@ -13,6 +13,10 @@ from waffle import flag_is_active
 class WaffleFlaggedAPIRootView(APIRootView):
     """API root that leaves out routes whose waffle flag is off."""
 
+    # Keep the title and description DRF's root shows in the browsable API,
+    # which would otherwise come from this class's name and docstring.
+    name = "Api Root"
+    description = APIRootView.__doc__
     # Maps route prefixes to the waffle flag that must be on to list them.
     route_flags: dict[str, str] = {}
 
