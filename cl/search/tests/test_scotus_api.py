@@ -8,6 +8,8 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
 from waffle.testutils import override_flag
 
+from cl.api.utils import LoggingMixin
+from cl.corpus_importer.tasks import add_scotus_placeholder_document
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -78,7 +80,9 @@ class ScotusAPITestCase(TestCase):
     """Shared SCOTUS data for the API tests, with the endpoints' flag on.
 
     The entry with documents gets its attachment 2 created before attachment
-    1, so tests can tell display order apart from id order. The flag is
+    1, so tests can tell display order apart from id order. The entry
+    without documents gets the empty placeholder document production gives
+    such entries, which the API must hide. The flag is
     enabled in setUp, so subclasses that override setUp must call
     super().setUp().
     """
@@ -143,6 +147,10 @@ class ScotusAPITestCase(TestCase):
             docket_entry=cls.entry_no_number,
             document_number=None,
             attachment_number=1,
+        )
+        add_scotus_placeholder_document(cls.entry_no_docs)
+        cls.placeholder = SCOTUSDocument.objects.get(
+            docket_entry=cls.entry_no_docs
         )
 
     @staticmethod
@@ -317,7 +325,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertIsNone(r.json()["questions_presented_file"])
 
     async def test_docket_entry(self) -> None:
-        """Does an entry nest its documents in display order?"""
+        """Does an entry nest its documents in display order, but not its placeholder?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocketentry", self.entry.pk)
         )
@@ -369,7 +377,18 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertTrue(data["is_available"])
         self.assertEqual(
             data["filepath_local"],
-            self.absolute(self.attachment_1.filepath_local.url),
+            self.attachment_1.filepath_local.name,
+        )
+
+    async def test_placeholders_are_hidden(self) -> None:
+        """Are placeholder documents missing from the document endpoints?"""
+        r = await self.async_client.get(
+            self.detail_path("scotusdocument", self.placeholder.pk)
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        r = await self.async_client.get(self.list_path("scotusdocument"))
+        self.assertNotIn(
+            self.placeholder.pk, [doc["id"] for doc in r.json()["results"]]
         )
 
     async def test_document_without_file_or_page(self) -> None:
@@ -441,6 +460,8 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 ({"date_filed__range": "2025-01-01,2025-01-31"}, 2),
                 ({"scotus_documents__id": self.attachment_2.pk}, 1),
                 ({"scotus_documents__document_number": 1}, 1),
+                # Only entry_no_number's real document, not the placeholder.
+                ({"scotus_documents__document_number__isnull": "true"}, 1),
             ],
         )
 
@@ -450,6 +471,7 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
             "scotusdocument",
             [
                 ({"docket_entry": self.entry.pk}, 2),
+                ({"docket_entry": self.entry_no_docs.pk}, 0),
                 ({"docket_entry__docket": self.docket.pk}, 2),
                 ({"attachment_number": 2}, 1),
                 ({"document_number__isnull": "true"}, 1),
@@ -491,9 +513,15 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
     """The fields and omit params work on the nested documents."""
 
     async def test_nested_fields_and_omit(self) -> None:
-        """Do fields and omit trim the nested documents?"""
+        """Do fields and omit trim the nested documents?
+
+        They must keep leaving out placeholders and keep their display order.
+        """
         await self.async_client.aforce_login(self.user)
-        path = self.detail_path("scotusdocketentry", self.entry.pk)
+        expected_ids = {
+            self.entry.pk: [self.attachment_1.pk, self.attachment_2.pk],
+            self.entry_no_docs.pk: [],
+        }
         cases = [
             (
                 {"fields": "id,scotus_documents__id"},
@@ -507,13 +535,19 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
             ),
         ]
         for params, entry_keys, document_keys in cases:
-            with self.subTest(params=params):
-                r = await self.async_client.get(path, params)
-                self.assertEqual(r.status_code, HTTPStatus.OK)
-                data = r.json()
-                self.assertEqual(set(data), entry_keys)
-                for doc in data["scotus_documents"]:
-                    self.assertEqual(set(doc), document_keys)
+            for entry_pk, ids in expected_ids.items():
+                with self.subTest(params=params, entry=entry_pk):
+                    r = await self.async_client.get(
+                        self.detail_path("scotusdocketentry", entry_pk),
+                        params,
+                    )
+                    self.assertEqual(r.status_code, HTTPStatus.OK)
+                    data = r.json()
+                    self.assertEqual(set(data), entry_keys)
+                    nested = data["scotus_documents"]
+                    self.assertEqual([doc["id"] for doc in nested], ids)
+                    for doc in nested:
+                        self.assertEqual(set(doc), document_keys)
 
 
 class ScotusAPIPlainTextTest(ScotusAPITestCase):
@@ -594,6 +628,10 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
         )
 
 
+# The usage stats write milestone events when their request counters reach
+# certain values. Those counters live in Redis and other tests reset them, so
+# the events are turned off to keep them from adding queries at random.
+@mock.patch.object(LoggingMixin, "_handle_events")
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
@@ -614,7 +652,9 @@ class ScotusAPIQueryCountTest(ScotusAPITestCase):
         return len(ctx.captured_queries)
 
     def test_queries_are_flat(
-        self, mock_logging_prefix: mock.MagicMock
+        self,
+        mock_logging_prefix: mock.MagicMock,
+        mock_handle_events: mock.MagicMock,
     ) -> None:
         """Does adding entries with documents add no queries?"""
         # Warm up process-level caches that other tests may have cleared,

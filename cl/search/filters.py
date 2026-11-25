@@ -337,9 +337,11 @@ class ScotusDocketMetadataFilter(BaseSourceFilter):
 class SCOTUSDocketEntryFilter(BaseSourceDocketEntryFilter):
     """Filters for SCOTUS docket entries."""
 
+    # Placeholders, the empty documents of entries without attachments,
+    # don't count as documents.
     scotus_documents = filters.RelatedFilter(
         "cl.search.filters.SCOTUSDocumentFilter",
-        queryset=SCOTUSDocument.objects.all(),
+        queryset=SCOTUSDocument.objects.exclude(url=""),
         distinct=True,
     )
 

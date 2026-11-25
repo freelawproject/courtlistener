@@ -301,13 +301,19 @@ class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
         "entry_number",
         "sequence_number",
     )
-    # Prefetch by name, not with a Prefetch object: DeferredFieldsMixin adds
-    # its own Prefetch for the fields and omit params, and Django rejects two
-    # Prefetches of one relation with different querysets. The serializer
-    # has the mixin always defer the documents' plain_text.
+    # Entries without attachments keep an empty placeholder document for ES,
+    # which isn't a real document, so it's left out. The nested documents
+    # never include plain_text, so it isn't read either.
     queryset = (
         SCOTUSDocketEntry.objects.select_related("docket")
-        .prefetch_related("scotus_documents")
+        .prefetch_related(
+            Prefetch(
+                "scotus_documents",
+                queryset=SCOTUSDocument.objects.exclude(url="").defer(
+                    "plain_text"
+                ),
+            )
+        )
         .order_by("-id")
     )
 
@@ -322,10 +328,13 @@ class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
         *BaseSourceReadOnlyViewSet.ordering_fields,
         "document_number",
     )
-    # The docket is needed to build absolute_url.
-    queryset = SCOTUSDocument.objects.select_related(
-        "docket_entry__docket"
-    ).order_by("-id")
+    # The docket is needed to build absolute_url. Placeholders, the empty
+    # documents of entries without attachments, are left out.
+    queryset = (
+        SCOTUSDocument.objects.exclude(url="")
+        .select_related("docket_entry__docket")
+        .order_by("-id")
+    )
 
     def get_serializer_class(self) -> type[SCOTUSDocumentSerializer]:
         """Return a serializer without plain_text for list pages."""
