@@ -2094,8 +2094,8 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">The button's two states: no note yet, and a saved note. The dialog isn't shown here because its form saves to the real note endpoint.</p>
     <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-1"><c-add-note.button_content :form="demo_note_form" /></span>
-      <span class="flex items-center gap-1"><c-add-note.button_content :form="demo_saved_note_form" /></span>
+      <span class="flex items-center gap-1"><c-add-note.button-content :form="demo_note_form" /></span>
+      <span class="flex items-center gap-1"><c-add-note.button-content :form="demo_saved_note_form" /></span>
     </div>
 
     <c-library.list title="Props" only>
@@ -2115,7 +2115,7 @@ Sample code here.
         <c-slot name="description">The note form: name, notes with a character counter, and Cancel, Save and Delete buttons. Takes <code>:form</code> and an optional <code>form_prefix</code> for its input ids (default <code>note</code>).</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>c-add-note.button_content</code></c-slot>
+        <c-slot name="label"><code>c-add-note.button-content</code></c-slot>
         <c-slot name="description">The icon and label of the trigger button for one state. Takes <code>:form</code></c-slot>
       </c-library.item>
     </c-library.list>

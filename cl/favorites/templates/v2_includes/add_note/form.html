@@ -6,6 +6,6 @@
 {% if update_trigger %}
     {# Out-of-band: refreshes the note button's icon and label in place. #}
     <span id="note-trigger-{{ form.content_type.value }}-{{ form.object_id.value }}" hx-swap-oob="innerHTML">
-        <c-add-note.button_content :form="form" />
+        <c-add-note.button-content :form="form" />
     </span>
 {% endif %}
