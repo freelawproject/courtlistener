@@ -295,12 +295,6 @@ class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
     waffle_flag = "scotus-api"
     serializer_class = SCOTUSDocketEntrySerializer
     filterset_class = SCOTUSDocketEntryFilter
-    ordering_fields = (
-        *BaseSourceReadOnlyViewSet.ordering_fields,
-        "date_filed",
-        "entry_number",
-        "sequence_number",
-    )
     # The nested documents' absolute_url needs the docket's slug, so only it
     # is read from the docket; the entry's own columns are left to
     # DeferredFieldsMixin. Entries without attachments keep an empty

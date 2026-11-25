@@ -2891,7 +2891,7 @@ class V4DRFPaginationTest(TestCase):
             endpoint="scotusdocketentry-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
-            non_cursor_key="sequence_number",
+            non_cursor_key=None,
             viewset=SCOTUSDocketEntryViewSet,
         )
 

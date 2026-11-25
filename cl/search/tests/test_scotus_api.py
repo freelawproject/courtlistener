@@ -498,12 +498,14 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
                 self.assertEqual(r.json()["unknown_params"], ["bogus"])
 
-    async def test_docket_entry_ordering(self) -> None:
-        """Can entries be ordered by their SCOTUS sequence number?"""
-        for order_by, expected in (
-            ("sequence_number", [self.entry_no_docs, self.entry]),
-            ("-sequence_number", [self.entry, self.entry_no_docs]),
-        ):
+    async def test_unindexed_sort_keys_are_ignored(self) -> None:
+        """Do entries ignore sort keys their table has no index for?
+
+        Sorting the whole table on them would be slow, so the view doesn't
+        offer them and the default -id order applies. Each key here would put
+        self.entry first if it were honored.
+        """
+        for order_by in ("-sequence_number", "entry_number", "date_filed"):
             with self.subTest(order_by=order_by):
                 r = await self.async_client.get(
                     self.list_path("scotusdocketentry"),
@@ -511,7 +513,7 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 )
                 self.assertEqual(
                     [entry["id"] for entry in r.json()["results"]],
-                    [entry.pk for entry in expected],
+                    [self.entry_no_docs.pk, self.entry.pk],
                 )
 
 
