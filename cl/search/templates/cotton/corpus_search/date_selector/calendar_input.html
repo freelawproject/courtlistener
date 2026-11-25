@@ -1,7 +1,7 @@
 {% load svg_tags %}
 
 {# IDs are Alpine getter names from the surrounding dateSelector scope. #}
-<c-vars direction input_id picker_id label relative field_name placeholder />
+<c-vars input_id label relative field_name placeholder />
 
 <div class="flex flex-col gap-1.5">
   {% if label and not relative %}
@@ -9,8 +9,8 @@
   {% else %}
     <label x-bind:for="{{ input_id }}" class="sr-only">{{ placeholder }} in format MM/DD/YYYY</label>
   {% endif %}
-  <div class="focus-container input-text flex justify-stretch items-stretch gap-2">
-    <input x-bind:id="{{ picker_id }}" type="hidden" data-ignore-input="true">
+  <div x-data="confirmedDatePicker" class="focus-container input-text flex justify-stretch items-stretch gap-2">
+    <input type="hidden" data-confirmed-date-picker data-ignore-input="true">
     <button type="button" tabindex="-1" aria-hidden="true" x-on:mousedown.prevent>
       {% svg "calendar" class="w-5 h-5 shrink-0" aria_hidden="true" %}
     </button>
@@ -18,7 +18,6 @@
       type="text"
       name="{{ field_name }}"
       data-type="calendar"
-      data-date="{{ direction }}"
       x-bind:disabled="disabled"
       x-bind:id="{{ input_id }}"
       placeholder="{{ placeholder }}"

@@ -1,7 +1,6 @@
 {% load component_tags %}
 {% require_script "js/third_party/flatpickr/flatpickr" %}
-{% require_script "js/third_party/flatpickr/plugins/confirmDate" %}
-{% require_script "js/alpine/composables/confirmed_date_picker.js" %}
+{% require_script "js/alpine/components/confirmed_date_picker.js" %}
 {% require_script "js/alpine/components/date_selector.js" %}
 {% require_script "js/alpine/plugins/focus" defer=True %}
 
@@ -43,9 +42,7 @@
     x-show="isSelectedType"
   >
     <c-corpus-search.date-selector.calendar-input
-      direction="after"
       input_id="calendarAfterInputId"
-      picker_id="flatpickrAfterInputId"
       :label="label"
       :relative="relative"
       :field_name="date_after_field_name"
@@ -53,9 +50,7 @@
       only
     />
     <c-corpus-search.date-selector.calendar-input
-      direction="before"
       input_id="calendarBeforeInputId"
-      picker_id="flatpickrBeforeInputId"
       :label="second_label"
       :relative="relative"
       :field_name="date_before_field_name"

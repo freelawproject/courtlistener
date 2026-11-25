@@ -1,15 +1,7 @@
 document.addEventListener("alpine:init", () => {
   Alpine.data("docketFilter", () => ({
-    datePickers: [],
     init() {
       this.$nextTick(() => {
-        for (const hidden of this.$el.querySelectorAll('[data-confirmed-date-picker]')) {
-          const input = hidden.parentElement.querySelector('input[data-flatpickr-after], input[data-flatpickr-before]');
-          if (!input) continue;
-          // Docket filters have historically allowed future dates.
-          this.datePickers.push(createConfirmedDatePicker(hidden, input, { allowFuture: true }));
-        }
-
         // If the filter form was submitted with errors, open the mobile
         // dialog so the filters are in view. Only below the mobile
         // breakpoint: above it the dialog is hidden, and opening it would
@@ -22,9 +14,6 @@ document.addEventListener("alpine:init", () => {
           window.dispatchEvent(new CustomEvent("open-filter-dialog"));
         }
       });
-    },
-    destroy() {
-      for (const picker of this.datePickers) picker.destroy();
     },
     submitForm(event) {
       const form = event.target.closest("form");

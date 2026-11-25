@@ -1387,12 +1387,12 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <p>Each of the two calendar fields above uses the same component; when there is no visible label, its placeholder supplies a visually hidden label.</p>
     <h4 class="mt-3">Props</h4>
-    <p><code>direction</code> (after/before), <code>input_id</code> and <code>picker_id</code> (Alpine getter names), <code>field_name</code>, <code>placeholder</code>, optional <code>label</code> and <code>relative</code>.</p>
+    <p><code>input_id</code> (an Alpine getter name), <code>field_name</code>, <code>placeholder</code>, optional <code>label</code> and <code>relative</code>.</p>
     <h4 class="mt-3">Slots</h4>
     <p>None.</p>
     <h4 class="mt-3">Code</h4>
     <c-code>
-&lt;c-corpus-search.date-selector.calendar-input direction="after" input_id="calendarAfterInputId" picker_id="flatpickrAfterInputId" label="Filed After" field_name="filed_after" placeholder="mm/dd/yyyy" only /&gt;
+&lt;c-corpus-search.date-selector.calendar-input input_id="calendarAfterInputId" label="Filed After" field_name="filed_after" placeholder="mm/dd/yyyy" only /&gt;
     </c-code>
     <h3 class="mt-6">Mode selector</h3>
     <h4 class="mt-3">Demo</h4>
