@@ -479,6 +479,8 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
             [
                 ({"docket_entry": self.entry.pk}, 2),
                 ({"docket_entry": self.entry_no_docs.pk}, 0),
+                # Both documents of the entry that has an available one.
+                ({"docket_entry__scotus_documents__is_available": "true"}, 2),
                 ({"docket_entry__docket": self.docket.pk}, 2),
                 ({"document_number__isnull": "true"}, 1),
                 ({"is_available": "true"}, 1),
@@ -487,6 +489,15 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 ({"ocr_status": SCOTUSDocument.OCR_COMPLETE}, 1),
             ],
         )
+
+    async def test_invalid_document_filter_values_are_rejected(self) -> None:
+        """Do bad values in document filters on entries return a 400?"""
+        r = await self.async_client.get(
+            self.list_path("scotusdocketentry"),
+            {"scotus_documents__document_number": "abc"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("scotus_documents__document_number", r.json())
 
     async def test_unknown_params_are_rejected(self) -> None:
         """Do typos in filter names return a 400 instead of everything?"""
