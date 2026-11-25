@@ -60,6 +60,10 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
 
     Returns:
         The court ID as a string.
+
+    Raises:
+        ValueError: If the fetch queue has no recap document, docket, or
+            court.
     """
     # Convert PacerFetchQueue to dictionary if necessary.  This allows us to
     # handle both types consistently.
@@ -89,6 +93,10 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
             else attrs["court"].pk
         )
 
+    if court_id is None:
+        raise ValueError(
+            "Fetch queue has no recap document, docket, or court."
+        )
     return court_id
 
 

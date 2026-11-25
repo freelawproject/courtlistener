@@ -1,5 +1,7 @@
 """Models for notes, tags, prayers, and event counts."""
 
+from typing import TYPE_CHECKING
+
 import pghistory
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -10,6 +12,15 @@ from django.utils import timezone
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Docket, RECAPDocument
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    DocketTagEvent: type[Event]
+    NoteEvent: type[Event]
+    PrayerEvent: type[Event]
+    UserTagEvent: type[Event]
 
 
 @pghistory.track()
