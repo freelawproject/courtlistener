@@ -5881,6 +5881,42 @@ class DocketFilterRenderTestCase(TestCase):
         )
 
 
+class DocketFilterDatePickerTest(DocketFilterRenderTestCase):
+    def test_calendar_controls_preserve_form_fields_and_labels(self) -> None:
+        request = RequestFactory().get("/?filed_after=01/15/2025")
+        request.user = AnonymousUser()
+        form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        tree = fromstring(self._render(form))
+        for layout in ("desktop", "mobile"):
+            for direction in ("after", "before"):
+                with self.subTest(layout=layout, direction=direction):
+                    field_id = f"{layout}_filed_{direction}"
+                    fields = tree.xpath(f'//input[@id="{field_id}"]')
+                    self.assertEqual(len(fields), 1)
+                    field = fields[0]
+                    self.assertEqual(field.get("name"), f"filed_{direction}")
+                    self.assertEqual(
+                        field.get("placeholder"), "mm/dd/yyyy"
+                    )
+                    if direction == "after":
+                        self.assertEqual(field.get("value"), "01/15/2025")
+                    parent = field.getparent()
+                    hidden = parent.xpath(
+                        './input[@data-confirmed-date-picker]'
+                    )
+                    self.assertEqual(len(hidden), 1)
+                    self.assertIsNone(hidden[0].get("name"))
+                    button = parent.xpath("./button")[0]
+                    self.assertEqual(button.get("tabindex"), "-1")
+                    self.assertEqual(button.get("aria-hidden"), "true")
+                    labels = tree.xpath(f'//label[@for="{field_id}"]')
+                    self.assertEqual(len(labels), 1)
+                    self.assertIn(
+                        f"Filed {direction.title()}", labels[0].text_content()
+                    )
+                    self.assertIn("MM/DD/YYYY", labels[0].text_content())
+
+
 class DocketFilterErrorDialogTest(DocketFilterRenderTestCase):
     """The mobile filter dialog auto-opens when a filter submission fails validation.
 

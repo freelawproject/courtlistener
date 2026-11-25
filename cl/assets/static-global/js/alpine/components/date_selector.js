@@ -118,100 +118,15 @@ document.addEventListener('alpine:init', () => {
     selectDateType() {
       this.selectedType = this.$el.value;
     },
-    openDatePicker() {
-      const instance = this.calendar[this.$el.dataset.date];
-      if (!instance) return;
-      instance.open();
-    },
-    closeDatePicker() {
-      const instance = this.calendar[this.$el.dataset.date];
-      if (!instance) return;
-      instance.close();
-    },
     dispatchEvent() {
       this.$dispatch(this.$el.dataset.event);
-    },
-    commitPickerDate(targetEl, instance) {
-      targetEl.setAttribute('value', instance.input.value || '');
-      targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-      targetEl.dispatchEvent(new Event('change', { bubbles: true }));
-      instance.close();
     },
     focusFirstInput() {
       const elId = this.$el.dataset.type === 'calendar' ? this.calendarAfterInputId : this.relativeInputId;
       this.moveFocus(elId);
     },
 
-    /**
-     *  Patches the actions section of the desktop calendar card.
-     *  Adds two buttons (Cancel/Apply) with their handlers.
-     *  */
-    _patchConfirm(instance) {
-      const confirmEl = instance.calendarContainer.querySelector('.flatpickr-confirm');
-      if (!confirmEl || confirmEl.dataset.patched) return;
-
-      confirmEl.innerHTML = `
-        <div class="flex gap-3 px-6 w-full pt-4 border-t border-greyscale-200">
-          <button type="button" class="btn-outline flex-grow justify-center" data-action="cancel">Cancel</button>
-          <button type="button" class="btn-primary flex-grow justify-center" data-action="apply">Apply</button>
-        </div>
-      `;
-      confirmEl.dataset.patched = 'true';
-
-      const applyBtn = confirmEl.querySelector('[data-action="apply"]');
-      const cancelBtn = confirmEl.querySelector('[data-action="cancel"]');
-      const targetEl = instance.config.positionElement;
-      if (applyBtn) {
-        applyBtn.addEventListener('click', () => this.commitPickerDate(targetEl, instance));
-      }
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          instance.close();
-        });
-      }
-    },
-
     init() {
-      const flatpickrConfig = {
-        dateFormat: 'm/d/Y',
-        enable: [
-          function (date) {
-            return date <= new Date();
-          },
-        ],
-        allowInput: true,
-        ariaDateFormat: 'F j, Y',
-        locale: { firstDayOfWeek: 1 },
-        clickOpens: false,
-        closeOnSelect: false,
-        disableMobile: true,
-        plugins: [
-          confirmDatePlugin({
-            showAlways: true,
-            confirmText: '',
-            confirmIcon: '',
-          }),
-        ],
-        onOpen: [
-          (selectedDates, dateStr, instance) => {
-            const date = instance.input.dataset?.date;
-            const liveInput = date === 'after' ? this.calendarAfterInputEl : this.calendarBeforeInputEl;
-            if (!liveInput.value) return;
-            const liveValue = (liveInput?.value || '').trim();
-            instance.setDate(liveValue, true, 'm/d/Y');
-          },
-        ],
-      };
-
-      const desktopFlatpickrConfig = {
-        onReady: [(selectedDates, dateStr, instance) => this._patchConfirm(instance)],
-        onClose: (selectedDates, dateStr, instance) => {
-          instance.clear();
-          instance.config.positionElement.focus();
-        },
-      };
-
       // Initialize flatpickr on next tick so all data is available
       this.$nextTick(() => {
         // Bind each picker to a hidden input for confirmation, but position it
@@ -221,14 +136,12 @@ document.addEventListener('alpine:init', () => {
           ['before', this.flatpickrBeforeInputEl, this.calendarBeforeInputEl],
         ];
         for (const [direction, hiddenInput, positionElement] of inputs) {
-          this.calendar[direction] = flatpickr(hiddenInput, {
-            ...flatpickrConfig,
-            ...desktopFlatpickrConfig,
-            positionElement,
-          });
-          hiddenInput.setAttribute('type', 'hidden');
+          this.calendar[direction] = createConfirmedDatePicker(hiddenInput, positionElement);
         }
       });
+    },
+    destroy() {
+      for (const picker of Object.values(this.calendar)) picker?.destroy();
     },
   }));
 });
