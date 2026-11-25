@@ -2024,6 +2024,23 @@ Sample code here.
           ]"
         />
       </div>
+      {% require_script "js/alpine/components/combobox_remote_demo.js" %}
+      <div
+        x-data="comboboxRemoteDemo"
+        x-on:combobox-search="answer"
+        data-search-url="{% url 'components' %}"
+        data-error-message="There was a problem. Try again later."
+        class="flex flex-col gap-2"
+      >
+        <p class="text-sm text-greyscale-500"><code>remote</code>, searched and paginated by this page's view. Type <code>error</code> to see a failed search.</p>
+        <c-combobox
+          label="Dockets"
+          placeholder="Search dockets"
+          multiple
+          remote
+          :options="[{'value': 7, 'label': 'docket-007', 'selected': True}]"
+        />
+      </div>
       <div class="flex flex-col gap-2">
         <p class="text-sm text-greyscale-500"><code>disabled</code></p>
         <c-combobox
@@ -2106,6 +2123,10 @@ Sample code here.
         <c-slot name="description">Shows the selection without letting the user change it or open the list. A disabled combobox submits nothing, as a disabled form control.</c-slot>
       </c-library.item>
       <c-library.item optional only>
+        <c-slot name="label"><code>remote</code></c-slot>
+        <c-slot name="description">Leaves the search to the page: the component filters nothing and asks for its options with <code>combobox-search</code>, so a server can search and paginate them. <code>options</code> then only needs the options selected on load. The list shows a loading row while it waits, the message of a failed search, and a "Load more" row while there are further pages.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
         <c-slot name="label"><code>inline</code></c-slot>
         <c-slot name="description">Renders the list below the field, in the page flow and always visible, instead of opening it as a popup. For a combobox inside a popover or a dialog, which does the opening and closing. Escape pressed in the field does not close a native popover; close it from a <code>keydown.escape</code> listener in the capture phase.</c-slot>
       </c-library.item>
@@ -2132,6 +2153,10 @@ Sample code here.
         <c-slot name="label"><code>combobox-create</code></c-slot>
         <c-slot name="description">The create option was chosen. <code>detail.label</code> holds the typed text. Unless a listener calls <code>preventDefault()</code>, the text becomes a new selected option whose value is its label, and <code>combobox-add</code> follows. A listener that cancels the event can call <code>detail.add({value, label})</code> later, for instance once the server has given the new option its id; the option is then added and selected, and <code>combobox-add</code> follows.</c-slot>
       </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-search</code></c-slot>
+        <c-slot name="description">Only with <code>remote</code>. Asks for the options matching <code>detail.query</code>, the typed text, which the listener is free to match as its source does. Dispatched when the combobox is first used and, after a pause in typing, when the text changes, with <code>detail.page</code> 1; choosing "Load more" dispatches it for the next page. Answer with <code>detail.respond(options, {hasMore})</code>, which replaces the list for page 1 and extends it for later pages, or with <code>detail.fail(message)</code>. An answer to a search that a newer one replaced is ignored; pass <code>detail.signal</code> to <code>fetch</code> to cancel its request too.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
@@ -2149,6 +2174,16 @@ Sample code here.
 
 &lt;!-- Single selection with a button that empties it, for optional fields --&gt;
 &lt;c-combobox label="Jurisdiction" placeholder="Search jurisdictions" clearable :options="jurisdiction_options" /&gt;
+
+&lt;!-- Options searched and paginated by the page; searchDockets fetches them and answers the event --&gt;
+&lt;c-combobox
+  label="Dockets"
+  placeholder="Search dockets"
+  multiple
+  remote
+  :options="selected_docket_options"
+  x-on:combobox-search="searchDockets"
+/&gt;
 
 &lt;!-- Selection shown but not editable --&gt;
 &lt;c-combobox label="Courts" multiple disabled :options="court_options" /&gt;
