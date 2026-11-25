@@ -12,6 +12,7 @@
   creatable
   create_label="Create:"
   inline
+  clearable
   class=""
 />
 
@@ -73,6 +74,16 @@
         class="flex-1 min-w-24 bg-transparent outline-none text-sm font-medium text-greyscale-600 placeholder:font-normal placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
       />
     </div>
+    {% if clearable and not multiple %}
+      <button
+        type="button"
+        x-show="$combobox.value"
+        x-cloak
+        x-on:click="clear"
+        aria-label="Clear selection"
+        class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-400 hover:text-greyscale-800 focus-self"
+      >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
+    {% endif %}
     <button x-combobox:button aria-label="Show options" class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
       {% svg "chevron" class="size-full" aria_hidden="true" %}
     </button>

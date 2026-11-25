@@ -81,6 +81,14 @@ document.addEventListener('alpine:init', () => {
         if (this.$refs.__input.value === '') this.select([]);
       },
 
+      /** Empties the single selection and the input from the clear button, and moves focus to the input. */
+      clear() {
+        this.select([]);
+        this.$refs.__input.value = '';
+        this.query = '';
+        this.$refs.__input.focus();
+      },
+
       /** Puts back the input's own text, discarding what an input method composed in a combobox that isn't searchable. */
       restoreInput() {
         this.$refs.__input.value = this.multiple ? '' : this.displayLabel(this.$combobox.value);

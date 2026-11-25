@@ -1967,6 +1967,19 @@ Sample code here.
         />
       </div>
       <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>clearable</code></p>
+        <c-combobox
+          label="Jurisdiction"
+          placeholder="Search jurisdictions"
+          clearable
+          :options="[
+            {'value': 'federal', 'label': 'Federal', 'selected': True},
+            {'value': 'state', 'label': 'State'},
+            {'value': 'tribal', 'label': 'Tribal'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
         <p class="text-sm text-greyscale-500"><code>multiple</code></p>
         <c-combobox
           label="Courts"
@@ -2054,7 +2067,7 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>searchable</code></c-slot>
-        <c-slot name="description">Whether typing in the field filters the list. Defaults to <code>True</code>. Pass <code>:searchable="False"</code> for short lists: the field then only opens the list, and letter keys jump to the first option starting with them. Without search, <code>creatable</code> has no effect and the single selection cannot be cleared.</c-slot>
+        <c-slot name="description">Whether typing in the field filters the list. Defaults to <code>True</code>. Pass <code>:searchable="False"</code> for short lists: the field then only opens the list, and letter keys jump to the first option starting with them. Without search, <code>creatable</code> has no effect and the single selection can only be cleared with <code>clearable</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>creatable</code></c-slot>
@@ -2063,6 +2076,10 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>create_label</code></c-slot>
         <c-slot name="description">Text shown before the typed text in the create option. Defaults to <code>Create:</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>clearable</code></c-slot>
+        <c-slot name="description">Adds a button to the field that empties the single selection, shown while an option is selected. For optional fields. Has no effect with <code>multiple</code>, where each chip has its own remove button. Clearing dispatches <code>combobox-remove</code>.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>inline</code></c-slot>
@@ -2104,6 +2121,9 @@ Sample code here.
     {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
   ]"
 /&gt;
+
+&lt;!-- Single selection with a button that empties it, for optional fields --&gt;
+&lt;c-combobox label="Jurisdiction" placeholder="Search jurisdictions" clearable :options="jurisdiction_options" /&gt;
 
 &lt;!-- Single selection without typing --&gt;
 &lt;c-combobox label="Status" placeholder="Choose an option" :searchable="False" :options="status_options" /&gt;

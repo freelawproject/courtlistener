@@ -1572,6 +1572,24 @@ class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
             root.xpath(".//input")[0].get("x-on:beforeinput"), "blockTyping"
         )
 
+    def test_only_clearable_adds_the_clear_button(self) -> None:
+        """The button that empties the single selection exists only with `clearable`."""
+        button = ".//button[@*[name()='x-on:click']='clear']"
+        plain = self.render('<c-combobox label="Tags" :options="options" />')
+        clearable = self.render(
+            '<c-combobox label="Tags" :options="options" clearable />'
+        )
+        self.assertEqual(len(plain.xpath(button)), 0)
+        self.assertEqual(len(clearable.xpath(button)), 1)
+
+    def test_clearable_has_no_effect_with_multiple(self) -> None:
+        """A combobox with chips, each with its own remove button, gets no clear button."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" multiple clearable />'
+        )
+        buttons = root.xpath(".//button[@*[name()='x-on:click']='clear']")
+        self.assertEqual(len(buttons), 0)
+
     def test_list_is_a_popup_by_default(self) -> None:
         """Without `inline`, the plugin opens and closes the list."""
         root = self.render('<c-combobox label="Tags" :options="options" />')
