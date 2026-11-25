@@ -6,6 +6,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 
 from cl.donate.models import NeonMembershipLevel
+from cl.sso.flags import sso_enabled
 from cl.sso.models import Organization, OrganizationMembership
 
 
@@ -36,6 +37,8 @@ class EffectiveMembership:
 
 def get_effective_membership(
     user: AbstractBaseUser | AnonymousUser,
+    *,
+    ignore_sso_flag: bool = False,
 ) -> EffectiveMembership | None:
     """Work out which membership, if any, gives a person their benefits.
 
@@ -47,12 +50,15 @@ def get_effective_membership(
        and quotas they bought.
     2. Otherwise, an active organization in which they hold a seat. If
        there are several (rare), the one they joined first, so the answer
-       doesn't change from one request to the next.
+       doesn't change from one request to the next. Only while the sso flag
+       is on, unless ``ignore_sso_flag`` is set.
 
     For people without an active Neon membership this costs one query per
     call, so callers checking several things should call it once.
 
     :param user: Who to check.
+    :param ignore_sso_flag: Count organization seats even while SSO is off.
+        For keeping stored API rates current, not for granting benefits.
     :return: The membership in effect, or None for free users.
     """
     if not user.is_authenticated:
@@ -61,6 +67,8 @@ def get_effective_membership(
     own = getattr(user, "membership", None)
     if own is not None and own.is_active:
         return EffectiveMembership(level=own.level, neon_id=own.neon_id)
+    if not (ignore_sso_flag or sso_enabled()):
+        return None
 
     org_membership = (
         OrganizationMembership.objects.filter(

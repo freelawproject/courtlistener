@@ -4,7 +4,7 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.contrib import messages
@@ -76,6 +76,9 @@ from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.es_docket_sources import es_uid
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.tasks import create_zoho_desk_ticket
+from cl.sso.flags import sso_enabled
+from cl.sso.membership import get_effective_membership
+from cl.sso.models import MembershipSource, OrganizationMembership
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
     CustomPasswordChangeForm,
@@ -530,12 +533,24 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
         return HttpResponseRedirect(reverse("view_settings"))
 
+    effective = get_effective_membership(user)
     return TemplateResponse(
         request,
         "profile/settings.html",
         {
             "profile_form": profile_form,
             "user_form": user_form,
+            "sso_memberships": (
+                OrganizationMembership.objects.filter(
+                    user=user, source=MembershipSource.SSO
+                ).select_related("organization")
+                if sso_enabled()
+                else []
+            ),
+            # Only this organization's banner says it supplies the benefits.
+            "benefits_organization": effective.organization
+            if effective
+            else None,
             "page": "profile_settings",
             "private": True,
         },
@@ -969,7 +984,13 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_10_per_m
 @ratelimiter_unsafe_2000_per_h
 def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Change the user's password, keeping them logged in."""
+    """Change the user's password, keeping them logged in.
+
+    Accounts made through SSO have no password to change, so they're sent to
+    their settings instead.
+    """
+    if not request.user.has_usable_password():
+        return HttpResponseRedirect(reverse("view_settings"))
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
@@ -1123,3 +1144,7 @@ class SafeRedirectLoginView(auth_views.LoginView):
         logging in, even if they attempt to provide one.
         """
         return get_redirect_or_abort(self.request, self.redirect_field_name)
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        """Add ``sso_enabled`` so the page only links to SSO while it's on."""
+        return super().get_context_data(sso_enabled=sso_enabled(), **kwargs)

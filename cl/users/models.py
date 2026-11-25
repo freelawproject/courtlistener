@@ -9,7 +9,7 @@ import pghistory
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import FieldError, ObjectDoesNotExist
+from django.core.exceptions import FieldError
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, UniqueConstraint
@@ -20,6 +20,7 @@ from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
+from cl.sso.membership import EffectiveMembership, get_effective_membership
 
 if TYPE_CHECKING:
     from pghistory.models import Event
@@ -170,17 +171,24 @@ class UserProfile(models.Model):
     )
 
     @property
+    def effective_membership(self) -> EffectiveMembership | None:
+        """The membership whose benefits the user gets, if any.
+
+        :return: See ``get_effective_membership``.
+        """
+        return get_effective_membership(self.user)
+
+    @property
     def is_member(self) -> bool:
-        """Does the user have an active membership?
+        """Does the user get membership benefits?
+
+        True for an active Neon membership of their own, or a seat in an
+        active organization (see ``effective_membership``).
 
         Returns:
             bool: True if so, False if not.
         """
-        try:
-            membership = self.user.membership
-            return membership.is_active
-        except ObjectDoesNotExist:
-            return False
+        return self.effective_membership is not None
 
     @property
     def is_eligible_for_rt_search_alerts(self) -> bool:

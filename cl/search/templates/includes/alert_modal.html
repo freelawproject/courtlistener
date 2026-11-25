@@ -115,6 +115,10 @@
                   You've used all of the alerts included with your membership.
                   To create this alert, upgrade your membership or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
                 </p>
+                <p id="msg-quota-member-organization" class="hidden">
+                  You've used all of the alerts included with your organization's membership.
+                  Ask your organization's administrator about a higher tier, or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
+                </p>
                 <p id="msg-quota-member-legacy" class="hidden">
                   You've used all of the alerts included with your legacy membership.
                   Legacy memberships can't be upgraded online, but <a href="{{ alerts_context.legacyHelpUrl }}" target="_blank" rel="noopener noreferrer">here's how to get more features</a>, or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.

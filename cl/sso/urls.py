@@ -25,6 +25,22 @@ def without_saml_logout(
     return patterns
 
 
+def sso_only(
+    patterns: list[URLPattern | URLResolver],
+) -> list[URLPattern | URLResolver]:
+    """Make every view in a list of URL patterns 404 while SSO is off.
+
+    :param patterns: URL patterns, nested includes too. Changed in place.
+    :return: The same patterns.
+    """
+    for pattern in patterns:
+        if isinstance(pattern, URLResolver):
+            sso_only(pattern.url_patterns)
+        else:
+            pattern.callback = views.require_sso_enabled(pattern.callback)
+    return patterns
+
+
 def rate_limited(
     patterns: list[URLPattern | URLResolver],
 ) -> list[URLPattern | URLResolver]:
@@ -89,7 +105,7 @@ urlpatterns = [
                     name="sso_oidc_initiate",
                 ),
                 *rate_limited(
-                    without_saml_logout(build_provider_urlpatterns())
+                    without_saml_logout(sso_only(build_provider_urlpatterns()))
                 ),
             ]
         ),

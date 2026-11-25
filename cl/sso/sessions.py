@@ -17,3 +17,19 @@ def mark_sso_session(request: HttpRequest, organization_id: int) -> None:
     """
     request.session[SSO_ORGANIZATION_KEY] = organization_id
     request.session[SSO_AUTHENTICATED_AT_KEY] = int(time.time())
+
+
+def sso_authenticated_within(request: HttpRequest, seconds: int) -> bool:
+    """Whether the person signed in through their IdP recently.
+
+    Used in place of a password re-prompt for accounts that have no
+    password.
+
+    :param request: The current request.
+    :param seconds: How recent counts.
+    :return: True if the last SSO login was within that many seconds.
+    """
+    signed_in_at = request.session.get(SSO_AUTHENTICATED_AT_KEY)
+    if not isinstance(signed_in_at, int):
+        return False
+    return time.time() - signed_in_at <= seconds

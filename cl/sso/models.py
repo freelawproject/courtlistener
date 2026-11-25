@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from cl.donate.models import NeonMembership, NeonMembershipLevel
@@ -332,6 +332,20 @@ class SSOConnection(AbstractDateTimeModel):
                     "provider ID. Give each IdP its own."
                 }
             )
+        # The ID goes in this site's SSO URLs, and staff often paste a SAML
+        # entity ID (a URL) into client_id.
+        if self.get_login_url() is None:
+            field = (
+                "client ID"
+                if self.social_app.provider == "saml"
+                else "provider ID"
+            )
+            raise ValidationError(
+                {
+                    "social_app": f"Give the SocialApp a {field} with no "
+                    "slashes, e.g. 'acme-law'."
+                }
+            )
         # allauth doesn't require signed assertions by default. A signed
         # response alone leaves room for assertion-wrapping attacks.
         advanced = (self.social_app.settings or {}).get("advanced", {})
@@ -359,22 +373,27 @@ class SSOConnection(AbstractDateTimeModel):
                 }
             )
 
-    def get_login_url(self) -> str:
+    def get_login_url(self) -> str | None:
         """Return the URL that starts a login through this IdP.
 
         The URL must be POSTed to (SOCIALACCOUNT_LOGIN_ON_GET is off).
 
-        :return: A path on this site.
+        :return: A path on this site, or None if the SocialApp's ID can't be
+        put in a URL. ``clean`` refuses those, but SocialApp admin edits
+        skip it.
         """
-        if self.social_app.provider == "saml":
+        try:
+            if self.social_app.provider == "saml":
+                return reverse(
+                    "saml_login",
+                    kwargs={"organization_slug": self.social_app.client_id},
+                )
             return reverse(
-                "saml_login",
-                kwargs={"organization_slug": self.social_app.client_id},
+                "openid_connect_login",
+                kwargs={"provider_id": self.social_app.provider_id},
             )
-        return reverse(
-            "openid_connect_login",
-            kwargs={"provider_id": self.social_app.provider_id},
-        )
+        except NoReverseMatch:
+            return None
 
     def get_idp_settings(self) -> dict[str, str]:
         """List the URLs the organization's IdP admin enters for this app.
@@ -383,8 +402,11 @@ class SSOConnection(AbstractDateTimeModel):
         connection, so staff can send them without working them out.
 
         :return: {setting name as IdPs label it: absolute URL}, in the order
-        an IdP's setup screens ask for them.
+        an IdP's setup screens ask for them. Empty if the SocialApp's ID
+        can't be put in a URL (see ``get_login_url``).
         """
+        if self.get_login_url() is None:
+            return {}
         if self.social_app.provider == "saml":
             slug = {"organization_slug": self.social_app.client_id}
             return {

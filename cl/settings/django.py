@@ -162,6 +162,7 @@ MIDDLEWARE = [
     "cl.api.middleware.ReplicaRoutingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "cl.sso.middleware.SSOSessionMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",

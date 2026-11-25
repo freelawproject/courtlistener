@@ -1,8 +1,10 @@
+import base64
 import json
 import secrets
 import time
 from datetime import timedelta
 from io import StringIO
+from smtplib import SMTPException
 from typing import Any, cast
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
@@ -17,7 +19,7 @@ from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 from django.db import connection
 from django.http import HttpResponse
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import (
     NoReverseMatch,
@@ -27,10 +29,18 @@ from django.urls import (
     reverse,
 )
 from django.utils import timezone
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.request import Request
+from waffle.testutils import override_flag
 
-from cl.api.models import APIThrottle
+from cl.api.authentication import ReplicaRoutingBasicAuthentication
+from cl.api.constants import TIER_3_RATES
+from cl.api.models import APIThrottle, ThrottleType
+from cl.api.utils import get_all_throttle_overrides
+from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import NeonMembershipLevel
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.url_utils import BASE_URL
 from cl.sso.adapters import SocialAccountAdapter
 from cl.sso.factories import (
@@ -58,10 +68,17 @@ from cl.sso.policy import (
     SSORequirement,
     requirement_for_user,
 )
-from cl.sso.sessions import SSO_ORGANIZATION_KEY
+from cl.sso.sessions import SSO_AUTHENTICATED_AT_KEY, SSO_ORGANIZATION_KEY
 from cl.sso.throttles import sync_user_throttles
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.forms import (
+    CustomPasswordResetForm,
+    PasswordConfirmForm,
+    UserCreationFormExtended,
+    UserForm,
+)
+from cl.users.utils import delete_user_assets
 
 ISSUER = "https://idp.acme.test"
 CLIENT_ID = "courtlistener-test-client"
@@ -114,14 +131,6 @@ class AllauthRoutingTest(SimpleTestCase):
             msg=f"Unexpected allauth routes: {routes}",
         )
 
-    def test_saml_logout_is_refused(self) -> None:
-        """Does the SAML logout URL refuse requests but still reverse?"""
-        url = reverse("saml_sls", kwargs={"organization_slug": "acme"})
-        for method in ("get", "post"):
-            with self.subTest(method=method):
-                r = getattr(self.client, method)(url)
-                self.assertEqual(r.status_code, 404)
-
     def test_local_account_url_names_do_not_resolve(self) -> None:
         """Do allauth's local-account URL names fail to reverse?"""
         for name in (
@@ -151,6 +160,20 @@ class AllauthRoutingTest(SimpleTestCase):
         )
 
 
+class SAMLLogoutTest(TestCase):
+    """The SAML logout URL, which renders a 404 page that reads the DB."""
+
+    def test_saml_logout_is_refused(self) -> None:
+        """Does the SAML logout URL refuse requests but still reverse?"""
+        url = reverse("saml_sls", kwargs={"organization_slug": "acme"})
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = getattr(self.client, method)(url)
+                self.assertEqual(r.status_code, 404)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class SSORateLimitTest(TestCase):
     """The unauthenticated SSO URLs are rate limited."""
 
@@ -179,6 +202,8 @@ class SSORateLimitTest(TestCase):
                 self.assertEqual(r.status_code, 429)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class AllauthAliasTest(TestCase):
     """The allauth URL names its SSO flow redirects to."""
 
@@ -316,6 +341,8 @@ class SSOFixtureMixin:
         self.domain.save()
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class OIDCLoginTest(SSOFixtureMixin, TestCase):
     """End-to-end OIDC logins against a fake IdP."""
 
@@ -457,6 +484,10 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
             APIThrottle.objects.filter(
                 user=user, source=APIThrottle.Source.MEMBERSHIP
             ).exists()
+        )
+        clear_tiered_cache()
+        self.assertIn(
+            user.username, get_all_throttle_overrides(ThrottleType.API)
         )
 
     def test_new_person_gets_an_account(self) -> None:
@@ -634,6 +665,32 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         notice = next(m for m in mail.outbox if "seat" in m.subject.lower())
         self.assertIn(f"{reverse('contact')}?issue_type=support", notice.body)
 
+    def test_mail_failure_does_not_fail_the_sign_in(self) -> None:
+        """Does a first SSO sign-in still work when mail can't be sent?"""
+        error = SMTPException("SES is down")
+        with (
+            self.subTest("linked email"),
+            mock.patch("cl.sso.linking.send_mail", side_effect=error),
+            mock.patch("cl.sso.signals.logger") as logger,
+        ):
+            user = self._confirmed_user()
+            r = self._log_in_via_idp(FakeIdP(sub="s-1", email=user.email))
+            self.assertRedirects(r, "/alerts/", fetch_redirect_response=False)
+            self.assertSignedInAs(user)
+            logger.exception.assert_called_once()
+
+        self.client.logout()
+        self.org.seat_limit = 1
+        self.org.save()
+        with (
+            self.subTest("seat limit notice"),
+            mock.patch("cl.sso.linking.mail_managers", side_effect=error),
+        ):
+            user = self._confirmed_user(user__email=f"bob@{DOMAIN}")
+            r = self._log_in_via_idp(FakeIdP(sub="s-2", email=user.email))
+            self.assertRedirects(r, "/alerts/", fetch_redirect_response=False)
+            self.assertSignedInAs(user)
+
     def test_seat_check_locks_the_organization(self) -> None:
         """Is the organization locked while a limited seat is handed out?"""
         self.org.seat_limit = 1
@@ -693,6 +750,8 @@ class OIDCLoginTest(SSOFixtureMixin, TestCase):
         self.assertNotSignedIn()
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class SAMLEmailTest(TestCase):
     """The address a SAML response carries."""
 
@@ -727,6 +786,8 @@ class SAMLEmailTest(TestCase):
                 self.assertEqual(asserted_email(sociallogin), "ada@acme.test")
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class EffectiveMembershipTest(TestCase):
     """Which membership's benefits a person gets."""
 
@@ -753,6 +814,7 @@ class EffectiveMembershipTest(TestCase):
         self.assertTrue(membership.is_organization)
         self.assertEqual(membership.neon_id, "")
         self.assertEqual(membership.level_display, "CL Membership - Tier 3")
+        self.assertTrue(self.user.profile.is_member)
 
     def test_membership_without_seat_does_not_count(self) -> None:
         """Does joining without a seat give nothing?"""
@@ -760,6 +822,79 @@ class EffectiveMembershipTest(TestCase):
             organization=self.org, user=self.user, has_seat=False
         )
         self.assertIsNone(get_effective_membership(self.user))
+
+    def test_neon_deletion_keeps_organization_rates(self) -> None:
+        """Does losing a Neon membership fall back to the org's API rates?"""
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1, neon_id="99"
+        )
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        sync_user_throttles(self.user)
+
+        MembershipWebhookViewSet._handle_membership_deletion(
+            {"data": {"membership": {"membershipId": "99"}}}
+        )
+
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=self.user, source=APIThrottle.Source.MEMBERSHIP
+            ).exists()
+        )
+
+    def test_failed_payment_uses_organization_rates(self) -> None:
+        """Does a failed personal payment fall back to the org's API rates?"""
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1, neon_id="99"
+        )
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        term_end = (timezone.now() + timedelta(days=30)).date().isoformat()
+
+        MembershipWebhookViewSet()._handle_membership_update(
+            {
+                "data": {
+                    "membership": {
+                        "membershipId": "99",
+                        "membershipName": "CL Membership - Tier 1",
+                        "accountId": "1",
+                        "termEndDate": term_end,
+                        "status": "SUCCEEDED",
+                        "payments": [{"paymentStatus": "Failed"}],
+                    }
+                }
+            }
+        )
+
+        clear_tiered_cache()
+        self.assertEqual(
+            sorted(
+                get_all_throttle_overrides(ThrottleType.API)[
+                    self.user.username
+                ]
+            ),
+            sorted(TIER_3_RATES),
+        )
+
+    def test_settings_names_the_source_of_benefits(self) -> None:
+        """Is the organization named as the source only when it is one?"""
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        self.client.force_login(self.user)
+        benefits = "Your membership benefits come from"
+
+        r = self.client.get(reverse("view_settings"))
+        self.assertContains(r, benefits)
+
+        NeonMembershipFactory.create(
+            user=self.user, level=NeonMembershipLevel.TIER_1
+        )
+        r = self.client.get(reverse("view_settings"))
+        self.assertContains(r, "single sign-on")
+        self.assertNotContains(r, benefits)
 
     def test_own_membership_wins(self) -> None:
         """Does a person's own Neon membership beat their organization's?"""
@@ -806,6 +941,20 @@ class EffectiveMembershipTest(TestCase):
             ).exists()
         )
 
+    def test_deleting_the_account_skips_the_sync(self) -> None:
+        """Is nothing synced when the membership goes with its account?"""
+        other = UserProfileWithParentsFactory.create().user
+        for user in (self.user, other):
+            OrganizationMembershipFactory.create(
+                organization=self.org, user=user
+            )
+
+        with mock.patch("cl.sso.signals.sync_user_throttles") as sync:
+            self.user.delete()
+            User.objects.filter(pk=other.pk).delete()
+
+        sync.assert_not_called()
+
     def test_unmapped_level_clears_throttles(self) -> None:
         """Does a level without API rates drop the old level's rates?"""
         OrganizationMembershipFactory.create(
@@ -825,6 +974,333 @@ class EffectiveMembershipTest(TestCase):
         )
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
+class EnforcementTest(SSOFixtureMixin, TestCase):
+    """Password sign-in, registration and resets on SSO-required domains."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user = UserProfileWithParentsFactory.create(
+            user__email=f"ada@{DOMAIN}"
+        ).user
+
+    def _sign_in_with_password(self, user: User):
+        """Post the sign-in form with the factory's password."""
+        return self.client.post(
+            reverse("sign-in"),
+            {"username": user.username, "password": "password"},
+        )
+
+    def test_optional_domain_allows_passwords(self) -> None:
+        """Can people still use passwords while SSO is only offered?"""
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+        self.assertIsNone(requirement_for_user(self.user))
+        r = self._sign_in_with_password(self.user)
+        self.assertEqual(r.status_code, 302)
+
+    def test_password_sign_in_refused(self) -> None:
+        """Is a correct password refused once SSO is required?"""
+        self.require_sso()
+
+        r = self._sign_in_with_password(self.user)
+
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "requires single sign-on")
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertTrue(
+            AuthEvent.objects.filter(
+                user=self.user,
+                method=AuthMethod.PASSWORD,
+                outcome=AuthOutcome.REFUSED,
+            ).exists()
+        )
+
+    def test_email_exception_keeps_password(self) -> None:
+        """Can a listed address keep signing in with a password?"""
+        self.require_sso()
+        SSOEmailException.objects.create(
+            organization=self.org, email=self.user.email.upper()
+        )
+        r = self._sign_in_with_password(self.user)
+        self.assertEqual(r.status_code, 302)
+
+    def test_linked_account_elsewhere_still_required(self) -> None:
+        """Can a linked person get around the policy by changing address?"""
+        self.require_sso()
+        SocialAccount.objects.create(
+            user=self.user, provider="acme", uid="s-1"
+        )
+        self.user.email = "ada@personal.test"
+        self.user.save()
+
+        requirement = requirement_for_user(self.user)
+
+        self.assertIsNotNone(requirement)
+        self.assertEqual(
+            cast(SSORequirement, requirement).reason, RequirementReason.LINKED
+        )
+
+    def test_staff_requirement(self) -> None:
+        """Must staff use the staff organization's IdP when switched on?"""
+        staff = UserProfileWithParentsFactory.create(
+            user__is_staff=True, user__email="staff@free.law.test"
+        ).user
+        self.org.is_staff_organization = True
+        self.org.save()
+
+        with self.subTest("off"):
+            self.assertIsNone(requirement_for_user(staff))
+        with (
+            self.subTest("on"),
+            override_settings(SSO_REQUIRED_FOR_STAFF=True),
+        ):
+            requirement = requirement_for_user(staff)
+            self.assertIsNotNone(requirement)
+            self.assertEqual(
+                cast(SSORequirement, requirement).reason,
+                RequirementReason.STAFF,
+            )
+
+    def test_registration_refused(self) -> None:
+        """Is a new password account on a required domain refused?"""
+        self.require_sso()
+        form = UserCreationFormExtended(
+            {
+                "username": "newperson",
+                "email": f"new@{DOMAIN}",
+                "password1": "a-long-Unusual-passw0rd",
+                "password2": "a-long-Unusual-passw0rd",
+            }
+        )
+        form.is_valid()
+        self.assertIn("email", form.errors)
+        self.assertIn("requires single sign-on", str(form.errors["email"]))
+
+    def test_email_change_refused(self) -> None:
+        """Can't somebody move their account onto a required domain?"""
+        self.require_sso()
+        outsider = UserProfileWithParentsFactory.create().user
+        form = UserForm(
+            {
+                "email": f"outsider@{DOMAIN}",
+                "first_name": "Out",
+                "last_name": "Sider",
+            },
+            instance=outsider,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_email_change_allowed_for_linked_member(self) -> None:
+        """Can a linked member switch between their organization's addresses?"""
+        self.require_sso()
+        OrganizationMembershipFactory.create(
+            organization=self.org, user=self.user
+        )
+        form = UserForm(
+            {
+                "email": f"ada.lovelace@{DOMAIN}",
+                "first_name": "Ada",
+                "last_name": "Lovelace",
+            },
+            instance=self.user,
+        )
+        self.assertNotIn("email", form.errors)
+
+    def test_password_reset_sends_sso_note(self) -> None:
+        """Does a reset request get a "use SSO" note instead of a link?"""
+        self.require_sso()
+        form = CustomPasswordResetForm({"email": self.user.email})
+        self.assertTrue(form.is_valid())
+
+        form.save(
+            domain_override="courtlistener.test",
+            email_template_name="register/password_reset_email.html",
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("single sign-on", mail.outbox[0].body)
+        self.assertNotIn("confirm-password/", mail.outbox[0].body)
+        self.assertIn(
+            f"{reverse('contact')}?issue_type=support", mail.outbox[0].body
+        )
+        self.assertTrue(
+            AuthEvent.objects.filter(
+                method=AuthMethod.PASSWORD_RESET,
+                outcome=AuthOutcome.REFUSED,
+            ).exists()
+        )
+
+    def test_password_reset_for_email_exception(self) -> None:
+        """Does an exempt account on a required domain still get a link?"""
+        self.require_sso()
+        SSOEmailException.objects.create(
+            organization=self.org, email=self.user.email
+        )
+        form = CustomPasswordResetForm({"email": self.user.email})
+        self.assertTrue(form.is_valid())
+        form.save(
+            domain_override="courtlistener.test",
+            email_template_name="register/password_reset_email.html",
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertNotIn("single sign-on", mail.outbox[0].body)
+
+    def test_password_reset_for_sso_created_account(self) -> None:
+        """Can an SSO-made account set a password once SSO no longer applies?
+
+        Support moves a departed employee's account to a personal address;
+        the account has no password, so a reset is how they get one.
+        """
+        user = UserProfileWithParentsFactory.create(
+            user__email="ada@personal.test"
+        ).user
+        user.set_unusable_password()
+        user.save()
+        AuthEvent.objects.create(
+            user=user, method=AuthMethod.SSO, outcome=AuthOutcome.CREATED
+        )
+        bot = UserProfileWithParentsFactory.create(
+            user__email="bot@personal.test"
+        ).user
+        bot.set_unusable_password()
+        bot.save()
+
+        for account, expect_link in ((user, True), (bot, False)):
+            with self.subTest(account=account.email):
+                mail.outbox = []
+                form = CustomPasswordResetForm({"email": account.email})
+                self.assertTrue(form.is_valid())
+                form.save(
+                    domain_override="courtlistener.test",
+                    email_template_name="register/password_reset_email.html",
+                )
+                self.assertEqual(len(mail.outbox), 1)
+                self.assertEqual(
+                    "confirm-password/" in mail.outbox[0].body, expect_link
+                )
+
+    def test_basic_auth_refused(self) -> None:
+        """Is HTTP Basic auth refused for SSO-required accounts?"""
+        self.require_sso()
+        credentials = base64.b64encode(
+            f"{self.user.username}:password".encode()
+        ).decode()
+        request = Request(
+            RequestFactory().get(
+                "/api/rest/v4/", HTTP_AUTHORIZATION=f"Basic {credentials}"
+            )
+        )
+        with self.assertRaises(AuthenticationFailed):
+            ReplicaRoutingBasicAuthentication().authenticate(request)
+        self.assertTrue(
+            AuthEvent.objects.filter(
+                method=AuthMethod.BASIC_AUTH, outcome=AuthOutcome.REFUSED
+            ).exists()
+        )
+
+    def test_middleware_ends_password_sessions(self) -> None:
+        """Is a password session ended once SSO becomes required?"""
+        self.client.force_login(self.user)
+        self.require_sso()
+
+        r = self.client.get(reverse("view_settings"))
+
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(r["Location"].startswith(reverse("sso_start")))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_middleware_keeps_sso_sessions(self) -> None:
+        """Does a session from the organization's IdP survive?"""
+        self.require_sso()
+        self.client.force_login(self.user)
+        session = self.client.session
+        session[SSO_ORGANIZATION_KEY] = self.org.pk
+        session.save()
+
+        r = self.client.get(reverse("view_settings"))
+
+        self.assertEqual(r.status_code, 200)
+
+    def test_failed_password_sign_in_is_logged(self) -> None:
+        """Are wrong passwords recorded, without the identifier in clear?"""
+        self.client.post(
+            reverse("sign-in"),
+            {"username": self.user.username, "password": "wrong"},
+        )
+        event = AuthEvent.objects.get(outcome=AuthOutcome.FAILURE)
+        self.assertEqual(event.method, AuthMethod.PASSWORD)
+        self.assertNotIn(self.user.username, event.identifier_hash)
+        self.assertTrue(event.identifier_hash)
+
+
+class PasswordTabTest(TestCase):
+    """SSO accounts have no password, so they get no Password tab."""
+
+    def test_no_password_no_tab(self) -> None:
+        """Is the tab hidden, and the page redirected, without a password?"""
+        user = UserProfileWithParentsFactory.create().user
+        user.set_unusable_password()
+        user.save()
+        self.client.force_login(user)
+
+        r = self.client.get(reverse("view_settings"))
+        self.assertNotContains(r, reverse("password_change"))
+        r = self.client.get(reverse("password_change"))
+        self.assertRedirects(r, reverse("view_settings"))
+
+    def test_password_shows_tab(self) -> None:
+        """Do accounts with a password still see the tab?"""
+        user = UserProfileWithParentsFactory.create().user
+        self.client.force_login(user)
+
+        r = self.client.get(reverse("view_settings"))
+        self.assertContains(r, reverse("password_change"))
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
+class PasswordConfirmFormTest(SSOFixtureMixin, TestCase):
+    """Confirming sensitive actions without a password."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user = UserProfileWithParentsFactory.create(
+            user__email=f"ada@{DOMAIN}"
+        ).user
+        self.user.set_unusable_password()
+        self.user.save()
+
+    def _request(self, signed_in_ago: int | None):
+        """Build a request from the SSO user, signed in some seconds ago."""
+        request = RequestFactory().post(reverse("delete_account"))
+        request.user = self.user
+        request.session = {}  # type: ignore[assignment]
+        if signed_in_ago is not None:
+            request.session[SSO_AUTHENTICATED_AT_KEY] = (
+                int(time.time()) - signed_in_ago
+            )
+        return request
+
+    def test_recent_sso_login_confirms(self) -> None:
+        """Does a recent IdP sign-in stand in for the password?"""
+        form = PasswordConfirmForm(self._request(signed_in_ago=60), {})
+        self.assertTrue(form.uses_sso)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_stale_sso_login_asks_to_sign_in_again(self) -> None:
+        """Is somebody who signed in long ago sent back to their IdP?"""
+        for ago in (None, 3600):
+            with self.subTest(ago=ago):
+                form = PasswordConfirmForm(self._request(ago), {})
+                self.assertFalse(form.is_valid())
+                self.assertIn("sign in again", str(form.errors))
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class SSOStartViewTest(SSOFixtureMixin, TestCase):
     """The "sign in with SSO" page."""
 
@@ -832,6 +1308,11 @@ class SSOStartViewTest(SSOFixtureMixin, TestCase):
         """Does the page show the address form?"""
         r = self.client.get(reverse("sso_start"))
         self.assertContains(r, "Continue with SSO")
+
+    def test_sign_in_page_links_here(self) -> None:
+        """Does the password sign-in page offer SSO?"""
+        r = self.client.get(reverse("sign-in"))
+        self.assertContains(r, reverse("sso_start"))
 
     def test_known_domain_continues_to_idp(self) -> None:
         """Does an SSO domain lead to a button that POSTs to the IdP login?"""
@@ -843,6 +1324,18 @@ class SSOStartViewTest(SSOFixtureMixin, TestCase):
         self.assertTemplateUsed(r, "sso/continue.html")
         self.assertContains(r, self.connection.get_login_url())
         self.assertContains(r, f'{reverse("sso_start")}?next=/"')
+
+    def test_id_with_a_slash_is_an_error_page(self) -> None:
+        """Does a SocialApp ID that can't go in a URL avoid a 500?"""
+        self.domain.enforcement = Enforcement.OPTIONAL
+        self.domain.save()
+        self.app.provider_id = "acme/law"
+        self.app.save()
+
+        r = self.client.post(reverse("sso_start"), {"email": f"ada@{DOMAIN}"})
+
+        self.assertEqual(r.status_code, 503)
+        self.assertTemplateUsed(r, "sso/error.html")
 
     def test_domain_with_enforcement_off_is_not_offered(self) -> None:
         """Are domains still being tested kept off the page?"""
@@ -858,6 +1351,65 @@ class SSOStartViewTest(SSOFixtureMixin, TestCase):
         self.assertContains(r, "nowhere.test")
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_flag_off")
+@override_flag("sso", active=False)
+class SSOFlagOffTest(SSOFixtureMixin, TestCase):
+    """With the sso flag off, SSO is neither offered nor required."""
+
+    def test_pages_404(self) -> None:
+        """Do the SSO pages and IdP URLs 404?"""
+        urls = [
+            reverse("sso_start"),
+            reverse("sso_oidc_initiate", args=["acme"]),
+            self.connection.get_login_url(),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_sign_in_page_has_no_link(self) -> None:
+        """Is the SSO link left off the sign-in page?"""
+        r = self.client.get(reverse("sign-in"))
+        self.assertNotContains(r, reverse("sso_start"))
+
+    def test_passwords_allowed(self) -> None:
+        """Can people on a required domain still use a password?"""
+        self.require_sso()
+        user = UserProfileWithParentsFactory.create(
+            user__email=f"ada@{DOMAIN}"
+        ).user
+
+        r = self.client.post(
+            reverse("sign-in"),
+            {"username": user.username, "password": "password"},
+        )
+
+        self.assertIsNone(requirement_for_user(user))
+        self.assertEqual(r.status_code, 302)
+
+    def test_no_organization_benefits(self) -> None:
+        """Does a seat give no benefits or API rates while SSO is off?"""
+        user = UserProfileWithParentsFactory.create().user
+        OrganizationMembershipFactory.create(organization=self.org, user=user)
+        sync_user_throttles(user)
+
+        self.assertIsNone(get_effective_membership(user))
+        self.assertFalse(user.profile.is_member)
+        clear_tiered_cache()
+        self.assertNotIn(
+            user.username, get_all_throttle_overrides(ThrottleType.API)
+        )
+        # Kept, so turning SSO on doesn't need a resync.
+        self.assertTrue(APIThrottle.objects.filter(user=user).exists())
+
+    def test_notify_command_refuses_to_send(self) -> None:
+        """Does the notify command refuse to email people?"""
+        with self.assertRaises(CommandError):
+            call_command("notify_sso_domain_users", DOMAIN, "--send")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class AllauthPagePrivacyTest(SSOFixtureMixin, TestCase):
     """Pages that allauth's own views render."""
 
@@ -885,6 +1437,8 @@ class AllauthPagePrivacyTest(SSOFixtureMixin, TestCase):
         self.assertNotContains(r, 'name="robots" content="noindex')
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class TileSignInTest(SSOFixtureMixin, TestCase):
     """Sign-ins started by the IdP, such as a click on an Okta tile."""
 
@@ -1032,6 +1586,8 @@ class TileSignInTest(SSOFixtureMixin, TestCase):
         )
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class DomainTest(TestCase):
     """Domain records."""
 
@@ -1065,6 +1621,8 @@ class DomainTest(TestCase):
         self.assertEqual(domain.domain, "acme.test")
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class SSOConnectionTest(TestCase):
     """Validation of IdP connections."""
 
@@ -1108,6 +1666,29 @@ class SSOConnectionTest(TestCase):
                     with self.assertRaises(ValidationError):
                         connection.clean()
 
+    def test_id_with_a_slash_rejected(self) -> None:
+        """Is a SocialApp ID that can't go in this site's URLs rejected?"""
+        for provider, field in (
+            ("saml", "client_id"),
+            ("openid_connect", "provider_id"),
+        ):
+            with self.subTest(provider=provider):
+                app = SocialAppFactory.create(
+                    provider=provider,
+                    settings={
+                        "idp": {},
+                        "advanced": {"want_assertion_signed": True},
+                    },
+                    **{field: "https://idp.firm.test/app"},
+                )
+                connection = SSOConnectionFactory.build(
+                    organization=OrganizationFactory.create(), social_app=app
+                )
+                with self.assertRaises(ValidationError):
+                    connection.clean()
+                self.assertIsNone(connection.get_login_url())
+                self.assertEqual(connection.get_idp_settings(), {})
+
     def test_provider_id_required(self) -> None:
         """Must every connection have its own provider ID?"""
         connection = SSOConnectionFactory.build(
@@ -1150,6 +1731,8 @@ class SSOConnectionTest(TestCase):
         self.assertIsNone(get_connection(sociallogin))
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class RequirementForUserTest(SSOFixtureMixin, TestCase):
     """requirement_for_user's rule for linked accounts."""
 
@@ -1171,6 +1754,8 @@ class RequirementForUserTest(SSOFixtureMixin, TestCase):
         self.assertEqual(requirement.reason, RequirementReason.LINKED)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
     """The notify_sso_domain_users command."""
 
@@ -1262,6 +1847,41 @@ class NotifyDomainUsersTest(SSOFixtureMixin, TestCase):
         self.assertIn(f"Failed: ada@{DOMAIN}", out.getvalue())
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
+class AccountDeletionTest(SSOFixtureMixin, TestCase):
+    """Deleting an account removes its SSO links."""
+
+    def test_delete_user_assets(self) -> None:
+        """Are the identity link and organization membership deleted?"""
+        user = UserProfileWithParentsFactory.create().user
+        SocialAccount.objects.create(user=user, provider="acme", uid="s-1")
+        OrganizationMembershipFactory.create(organization=self.org, user=user)
+
+        delete_user_assets(user)
+
+        self.assertFalse(SocialAccount.objects.filter(user=user).exists())
+        self.assertFalse(
+            OrganizationMembership.objects.filter(user=user).exists()
+        )
+
+    def test_delete_leaves_no_membership_throttles(self) -> None:
+        """Are API throttles gone for a member who also holds a seat?"""
+        user = UserProfileWithParentsFactory.create().user
+        NeonMembershipFactory.create(
+            user=user, level=NeonMembershipLevel.TIER_1
+        )
+        OrganizationMembershipFactory.create(organization=self.org, user=user)
+        sync_user_throttles(user)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            delete_user_assets(user)
+
+        self.assertFalse(APIThrottle.objects.filter(user=user).exists())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="sso_tests")
+@override_flag("sso", active=True)
 class AdminTest(SSOFixtureMixin, TestCase):
     """The SSO admin pages."""
 
@@ -1345,6 +1965,8 @@ class AdminTest(SSOFixtureMixin, TestCase):
             )
 
         add_event()
+        # The SSO middleware checks the session's policy on its first request.
+        self.client.get(url)
         with CaptureQueriesContext(connection) as one_row:
             self.client.get(url)
         for _ in range(3):

@@ -1,5 +1,7 @@
 """Helpers for stub accounts, deleting users' data, and account emails."""
 
+from allauth.socialaccount.models import SocialAccount
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -20,6 +22,7 @@ from cl.favorites.models import (
 from cl.lib.crypto import md5
 from cl.lib.decorators import tiered_cache
 from cl.lib.types import EmailType
+from cl.sso.models import OrganizationMembership
 from cl.users.models import (
     UserGroupsEvent,
     UserPermissionsEvent,
@@ -132,6 +135,10 @@ def delete_user_assets(user: User) -> None:
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
 
+    # First, because removing a seat re-syncs API throttles, which the
+    # throttle delete below then clears.
+    SocialAccount.objects.filter(user=user).delete()
+    OrganizationMembership.objects.filter(user=user).delete()
     user.alerts.all().delete()
     user.api_throttles.all().delete()
     user.docket_alerts.all().delete()
@@ -160,6 +167,11 @@ def delete_user_assets(user: User) -> None:
     UserPermissionsEvent.objects.filter(user_id=user.pk).delete()
     UserTagEvent.objects.filter(user_id=user.pk).delete()
     WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
+    # pghistory builds this event model at runtime, so the type checker
+    # can't see it if it's imported by name.
+    apps.get_model(
+        "sso", "OrganizationMembershipEvent"
+    )._default_manager.filter(user_id=user.pk).delete()
 
 
 emails: dict[str, EmailType] = {

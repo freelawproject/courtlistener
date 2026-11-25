@@ -15,6 +15,7 @@ from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
 
+from cl.sso.flags import sso_enabled
 from cl.sso.models import (
     Enforcement,
     Organization,
@@ -110,6 +111,8 @@ def sso_option_for_email(
     :param email: The address the person typed.
     :return: The domain and the connection to send them to, or None.
     """
+    if not sso_enabled():
+        return None
     domain = verified_domain_for_email(email)
     if domain is None or domain.enforcement == Enforcement.OFF:
         return None
@@ -128,6 +131,8 @@ def requirement_for_email(email: str) -> SSORequirement | None:
     :param email: The address.
     :return: The requirement, or None if passwords are allowed.
     """
+    if not sso_enabled():
+        return None
     domain = verified_domain_for_email(email)
     if domain is None or domain.enforcement != Enforcement.REQUIRED:
         return None
@@ -156,6 +161,8 @@ def requirement_for_user(user: User) -> SSORequirement | None:
     :param user: The account.
     :return: The first requirement that applies, or None.
     """
+    if not sso_enabled():
+        return None
     if settings.SSO_REQUIRED_FOR_STAFF and (
         user.is_staff or user.is_superuser
     ):

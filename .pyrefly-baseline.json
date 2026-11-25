@@ -3348,13 +3348,6 @@
       "severity": "error"
     },
     {
-      "column": 26,
-      "path": "cl/users/models.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `membership`",
-      "severity": "error"
-    },
-    {
       "column": 17,
       "path": "cl/users/models.py",
       "name": "missing-attribute",

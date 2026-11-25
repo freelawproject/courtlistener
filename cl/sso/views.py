@@ -1,5 +1,9 @@
 """Views for starting single sign-on."""
 
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 from allauth.socialaccount.adapter import get_adapter
 from allauth.socialaccount.providers.base.constants import AuthProcess
 from django.conf import settings
@@ -19,11 +23,33 @@ from cl.lib.url_utils import (
     is_safe_url,
     parse_url_with_ada,
 )
+from cl.sso.flags import sso_enabled
 from cl.sso.forms import SSOStartForm
 from cl.sso.models import SSOConnection
 from cl.sso.policy import email_domain, sso_option_for_email
 
 WELL_KNOWN_SUFFIX = "/.well-known/openid-configuration"
+
+
+def require_sso_enabled(
+    view: Callable[..., HttpResponse],
+) -> Callable[..., HttpResponse]:
+    """Answer 404 from a view while SSO is turned off.
+
+    :param view: An SSO view.
+    :return: The view, wrapped.
+    """
+
+    @wraps(view)
+    def wrapper(
+        request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponse:
+        """Raise 404 unless SSO is on, then call the view."""
+        if not sso_enabled():
+            raise Http404
+        return view(request, *args, **kwargs)
+
+    return wrapper
 
 
 def saml_logout_not_supported(
@@ -43,6 +69,7 @@ def saml_logout_not_supported(
     raise Http404
 
 
+@require_sso_enabled
 @never_cache
 @ratelimiter_unsafe_10_per_m
 def sso_start(request: HttpRequest) -> HttpResponse:
@@ -67,12 +94,23 @@ def sso_start(request: HttpRequest) -> HttpResponse:
         email = form.cleaned_data["email"]
         if option := sso_option_for_email(email):
             domain, connection = option
+            if (login_url := connection.get_login_url()) is None:
+                return TemplateResponse(
+                    request,
+                    "sso/error.html",
+                    {
+                        "reason": "Your organization's single sign-on isn't "
+                        "set up correctly yet.",
+                        "private": True,
+                    },
+                    status=503,
+                )
             return TemplateResponse(
                 request,
                 "sso/continue.html",
                 {
                     "organization": domain.organization,
-                    "login_url": connection.get_login_url(),
+                    "login_url": login_url,
                     "next": next_url,
                     "private": False,
                 },
@@ -98,6 +136,7 @@ def normalize_issuer(url: str) -> str:
 # the state this view stores, so there's nothing for CSRF to protect.
 # nosemgrep: python.django.security.audit.csrf-exempt.no-csrf-exempt
 @csrf_exempt
+@require_sso_enabled
 @never_cache
 @ratelimiter_all_10_per_m
 @require_http_methods(["GET", "POST"])

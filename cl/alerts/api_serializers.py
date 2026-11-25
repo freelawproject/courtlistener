@@ -202,6 +202,14 @@ class SearchAlertSerializer(
                     f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
+                effective = result.membership
+                if effective is not None and effective.is_organization:
+                    raise PermissionDenied(
+                        "You've used all of the alerts included with your "
+                        "organization's membership. Ask your organization's "
+                        "administrator about a higher tier, or disable a "
+                        "RECAP Alert."
+                    )
                 membership = user.membership
                 upgrade_url = get_membership_upgrade_url(membership)
                 if membership.level == NeonMembershipLevel.LEGACY:
