@@ -165,7 +165,12 @@ from cl.search.models import (
     SCOTUSDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import (
+    CottonComponentMixin,
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+)
 from cl.tests.providers import fake
 from cl.users.factories import (
     UserFactory,
@@ -6496,7 +6501,7 @@ class DocketNoteFormV1Test(TestCase):
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_tags_button_v2_waffle")
 @override_flag("use_new_design", active=True)
-class DocketTagsButtonV2Test(TestCase):
+class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
     """The Tags button of the v2 docket page and the tag data behind it.
 
     `WAFFLE_CACHE_PREFIX` isolates this class's flag cache namespace from
@@ -6545,21 +6550,14 @@ class DocketTagsButtonV2Test(TestCase):
 
     def render_logged_out(self, path: str) -> HtmlElement:
         """Renders the component alone for a visitor at a path and returns its markup."""
-        request = RequestFactory().get(path)
-        request.user = AnonymousUser()
-        compiled = CottonCompiler().process(
-            '<c-docket-tags-button :docket="docket" :docket_tags="docket_tags" />'
-        )
-        html = (
-            engines["django"]
-            .from_string(compiled)
-            .render(
-                {
-                    "docket": self.docket,
-                    "docket_tags": {"options": [], "associations": {}},
-                },
-                request,
-            )
+        html = self.render_component(
+            '<c-docket-tags-button :docket="docket" :docket_tags="docket_tags" />',
+            {
+                "request": RequestFactory().get(path),
+                "user": AnonymousUser(),
+                "docket": self.docket,
+                "docket_tags": {"options": [], "associations": {}},
+            },
         )
         return fromstring(f"<div>{html}</div>")
 
