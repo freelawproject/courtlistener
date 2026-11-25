@@ -63,6 +63,7 @@ from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    Citation,
     Court,
     Docket,
     Opinion,
@@ -820,8 +821,11 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     """Find the id of the cluster this scanned opinion was imported into.
 
     The stored XML file name starts with the scan and opinion ids, so it is
-    looked for in the clusters with one of the opinion's citations, which
-    are indexed, unlike the file path.
+    looked for in the clusters with the volume and reporter of one of the
+    opinion's citations, which are indexed, unlike the file path. The page
+    is left out, since a correction in the portal can change it. The
+    cluster's citations aren't updated then, so a warning is logged for
+    review.
 
     Caveat: a merged cluster that didn't get any of the scan's citations
     isn't found here; `find_existing_cluster` matches it again, and the
@@ -837,17 +841,17 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     Returns:
         The cluster id, or None if it was not imported yet.
     """
-    citations = Q()
+    volumes, citations = Q(), Q()
     for cite in scan_case.parsed_citations:
+        volume, reporter = cite.groups["volume"], cite.corrected_reporter()
+        volumes |= Q(citations__volume=volume, citations__reporter=reporter)
         citations |= Q(
-            citations__volume=cite.groups["volume"],
-            citations__reporter=cite.corrected_reporter(),
-            citations__page=cite.groups["page"],
+            volume=volume, reporter=reporter, page=cite.groups["page"]
         )
     # The citations join returns a cluster once per matching citation
     cluster_ids = list(
         OpinionCluster.objects.filter(
-            citations,
+            volumes,
             filepath_xml_scan__contains=f"/{scan_case.file_name_prefix}",
         )
         .order_by("pk")
@@ -860,7 +864,20 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
             scan_case.file_name_prefix,
             cluster_ids,
         )
-    return cluster_ids[0] if cluster_ids else None
+    if not cluster_ids:
+        return None
+    cluster_id = cluster_ids[0]
+    if not Citation.objects.filter(citations, cluster_id=cluster_id).exists():
+        logger.warning(
+            "The citation of scanned opinion %s (%s) changed since its "
+            "import into cluster %s. Review it: %s%s",
+            scan_case.file_name_prefix,
+            scan_case.citation.corrected_citation(),
+            cluster_id,
+            BASE_URL,
+            OpinionCluster.objects.get(pk=cluster_id).get_absolute_url(),
+        )
+    return cluster_id
 
 
 def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:

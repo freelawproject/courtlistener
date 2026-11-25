@@ -855,6 +855,33 @@ class ImportScannedOpinionsTest(TestCase):
                     )
                 transaction.set_rollback(True)
 
+    def test_overwrite_finds_the_scan_after_a_citation_correction(
+        self,
+    ) -> None:
+        """Is a scan whose citation page was corrected found, not added?
+
+        The cluster's citation isn't updated, so a warning asks for review.
+        """
+        self.import_scan()
+        corrected = self.scan_xml.replace(
+            "<citation>388 So. 3d 1</citation>",
+            "<citation>388 So. 3d 2</citation>",
+        )
+        for overwrite in [False, True]:
+            with (
+                self.subTest(overwrite=overwrite),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                mock.patch(f"{COMMAND_MODULE}.invalidate_cloudfront"),
+            ):
+                self.import_xml(corrected, overwrite=overwrite)
+
+                self.assertEqual(OpinionCluster.objects.count(), 1)
+                self.assertEqual(str(Citation.objects.get()), "388 So. 3d 1")
+                self.assertIn(
+                    "changed since its import",
+                    mock_logger.warning.call_args[0][0],
+                )
+
     def test_overwrite_deletes_a_previous_file_with_another_name(
         self,
     ) -> None:
