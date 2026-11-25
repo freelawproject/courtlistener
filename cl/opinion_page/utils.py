@@ -14,7 +14,7 @@ import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import QuerySet
 from django.db.models.functions import Lower
 from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404
@@ -34,7 +34,7 @@ from zoneinfo import ZoneInfo
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm, get_note_form_for
-from cl.favorites.models import DocketTag, UserTag
+from cl.favorites.models import DocketTag
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
@@ -1039,7 +1039,7 @@ class TagOption(TypedDict):
 
 
 class DocketTagsDict(TypedDict):
-    """A user's tags as the docket page's Tags button takes them."""
+    """The tags a user applied to a docket, as the docket page's Tags button takes them."""
 
     options: list[TagOption]
     associations: dict[int, int]
@@ -1189,34 +1189,24 @@ async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
 async def user_docket_tags(
     user: AnonymousUser | User, docket: Docket
 ) -> DocketTagsDict:
-    """Gather the user's tags for the docket page's Tags button.
+    """Gather the tags a user applied to a docket, for the docket page's Tags button.
 
-    ``options`` lists every tag the user owns by name, ignoring case, with the
-    ones applied to the docket selected. ``associations`` maps the id of each
-    applied tag to the id of the DocketTag applying it. Both are empty for
+    ``options`` lists them by name, ignoring case, all selected: the user's
+    other tags reach the button through its searches. ``associations`` maps the
+    id of each tag to the id of the DocketTag applying it. Both are empty for
     anonymous users.
     """
     tags: DocketTagsDict = {"options": [], "associations": {}}
     if not user.is_authenticated:
         return tags
     rows = (
-        UserTag.objects.filter(user=user)
-        .annotate(
-            association=Subquery(
-                DocketTag.objects.filter(
-                    tag=OuterRef("pk"), docket=docket
-                ).values("pk")[:1]
-            )
-        )
-        .order_by(Lower("name"))
-        .values_list("pk", "name", "association")
+        DocketTag.objects.filter(docket=docket, tag__user=user)
+        .order_by(Lower("tag__name"))
+        .values_list("tag_id", "tag__name", "pk")
     )
-    async for pk, name, association in rows:
-        tags["options"].append(
-            {"value": pk, "label": name, "selected": association is not None}
-        )
-        if association is not None:
-            tags["associations"][pk] = association
+    async for tag, name, association in rows:
+        tags["options"].append({"value": tag, "label": name, "selected": True})
+        tags["associations"][tag] = association
     return tags
 
 

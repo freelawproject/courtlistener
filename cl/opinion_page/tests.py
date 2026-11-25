@@ -6517,16 +6517,17 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
             idb_data=FjcIntegratedDatabaseFactory(),
         )
         cls.user = UserProfileWithParentsFactory().user
-        # Created out of name order, so the order asserted isn't the insertion order.
+        # Applied out of name order, so the order asserted isn't the insertion order.
         cls.zoning = UserTagFactory(user=cls.user, name="zoning")
-        cls.appeals = UserTagFactory(user=cls.user, name="appeals")
         cls.bankruptcy = UserTagFactory(user=cls.user, name="Bankruptcy")
-        cls.association = DocketTag.objects.create(
-            docket=cls.docket, tag=cls.bankruptcy
-        )
-        # Applied to another docket only, so it must not count as applied here.
+        cls.associations = {
+            tag.pk: DocketTag.objects.create(docket=cls.docket, tag=tag).pk
+            for tag in (cls.zoning, cls.bankruptcy)
+        }
+        # Applied to another docket only, so it must stay out of this one's tags.
+        cls.appeals = UserTagFactory(user=cls.user, name="appeals")
         DocketTag.objects.create(
-            docket=DocketFactory(court=cls.court), tag=cls.zoning
+            docket=DocketFactory(court=cls.court), tag=cls.appeals
         )
         # Another user's tag on the same docket, published, which stays out.
         cls.foreign = UserTagFactory(
@@ -6562,11 +6563,11 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
         return fromstring(f"<div>{html}</div>")
 
     async def test_options_are_ordered_by_name_ignoring_case(self) -> None:
-        """The user's tags come back alphabetically whatever their case or creation order."""
+        """The applied tags come back alphabetically whatever their case or the order they were applied in."""
         tags = await user_docket_tags(self.user, self.docket)
         self.assertEqual(
             [option["label"] for option in tags["options"]],
-            ["appeals", "Bankruptcy", "zoning"],
+            ["Bankruptcy", "zoning"],
         )
 
     async def test_options_carry_the_tag_ids(self) -> None:
@@ -6574,15 +6575,21 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
         tags = await user_docket_tags(self.user, self.docket)
         self.assertEqual(
             [option["value"] for option in tags["options"]],
-            [self.appeals.pk, self.bankruptcy.pk, self.zoning.pk],
+            [self.bankruptcy.pk, self.zoning.pk],
         )
 
-    async def test_only_tags_on_the_docket_are_selected(self) -> None:
-        """An option is selected when its tag is applied to this docket."""
+    async def test_only_tags_on_the_docket_are_options(self) -> None:
+        """A tag of the user that is applied elsewhere, or nowhere, is left for the search to find."""
+        tags = await user_docket_tags(self.user, self.docket)
+        self.assertNotIn(
+            self.appeals.pk, [option["value"] for option in tags["options"]]
+        )
+
+    async def test_every_option_is_selected(self) -> None:
+        """The options are the combobox's selection on load."""
         tags = await user_docket_tags(self.user, self.docket)
         self.assertEqual(
-            [option["selected"] for option in tags["options"]],
-            [False, True, False],
+            [option["selected"] for option in tags["options"]], [True, True]
         )
 
     async def test_associations_map_applied_tags_to_their_docket_tag(
@@ -6590,9 +6597,7 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
     ) -> None:
         """Each applied tag points at the row that applies it, the one a detach deletes."""
         tags = await user_docket_tags(self.user, self.docket)
-        self.assertEqual(
-            tags["associations"], {self.bankruptcy.pk: self.association.pk}
-        )
+        self.assertEqual(tags["associations"], self.associations)
 
     async def test_other_users_tags_stay_out(self) -> None:
         """A tag another user applied to the docket is not among the options."""
@@ -6634,26 +6639,38 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
         self.assertEqual(len(root.xpath(".//*[@x-data or @popover]")), 0)
 
     async def test_every_tab_embeds_the_users_tags(self) -> None:
-        """Each docket tab hands the combobox the user's tags as its options."""
+        """Each docket tab hands the combobox the tags applied to the docket as its options."""
         for url_name in ("view_docket", "docket_idb_data"):
             with self.subTest(url_name=url_name):
                 root = await self.button(url_name)
                 script = root.xpath(
-                    ".//*[@x-data='combobox']/script[@type='application/json']"
+                    ".//*[@x-data='combobox']/template[@data-options]/script"
                 )[0]
                 self.assertEqual(
                     [option["label"] for option in json.loads(script.text)],
-                    ["appeals", "Bankruptcy", "zoning"],
+                    ["Bankruptcy", "zoning"],
                 )
 
     async def test_button_embeds_the_associations(self) -> None:
         """The button's root holds the associations as JSON, keyed by tag id."""
         root = await self.button()
-        script = root.xpath("./script[@type='application/json']")[0]
+        script = root.xpath("./template[@data-associations]/script")[0]
         self.assertEqual(
             json.loads(script.text),
-            {str(self.bankruptcy.pk): self.association.pk},
+            {str(tag): pk for tag, pk in self.associations.items()},
         )
+
+    async def test_combobox_searches_through_the_button(self) -> None:
+        """The combobox leaves its options to the button, which listens for its searches."""
+        root = await self.button()
+        combobox = root.xpath(".//*[@x-data='combobox']")[0]
+        self.assertIsNotNone(combobox.get("data-remote"))
+        self.assertEqual(root.get("x-on:combobox-search"), "search")
+
+    async def test_button_names_the_user_to_search_for(self) -> None:
+        """The root carries the id of the user whose tags the script searches."""
+        root = await self.button()
+        self.assertEqual(root.get("data-user"), str(self.user.pk))
 
     async def test_button_toggles_its_popover(self) -> None:
         """The button names the popover it opens."""

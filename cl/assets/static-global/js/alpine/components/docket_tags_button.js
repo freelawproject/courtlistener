@@ -2,22 +2,23 @@ document.addEventListener('alpine:init', () => {
   /**
    * Tags button of the docket page, for `cotton/docket_tags_button.html`.
    *
-   * Saves what the user does in the combobox through the REST API: applies and
-   * removes tags on the docket named by `data-docket`, and creates the tags
-   * that don't exist yet. A choice that can't be saved is undone and its error
-   * shown.
+   * Connects the combobox to the REST API: searches the user's tags for it,
+   * applies and removes them on the docket named by `data-docket`, and creates
+   * the ones that don't exist yet. A choice that can't be saved is undone and
+   * its error shown.
    */
   Alpine.data('docketTagsButton', () => {
     const TAG_NAME = /^[a-z0-9-]+$/;
     // Settles when every request made so far has finished.
     let queue = Promise.resolve();
 
-    /** Sends JSON to the API and returns the parsed response. Throws on failure, with the HTTP `status` and, when the API gave one, its answer in `body`. */
-    const sendJson = async (method, url, csrfToken, body) => {
+    /** Calls the API and returns the parsed response. Throws on failure, with the HTTP `status` and, when the API gave one, its answer in `body`. */
+    const callApi = async (url, { method = 'GET', csrfToken, body, signal } = {}) => {
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        headers: csrfToken && { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
         body: body && JSON.stringify(body),
+        signal,
       });
       if (response.status === 204) return null;
       const data = await response.json().catch(() => null);
@@ -35,7 +36,7 @@ document.addEventListener('alpine:init', () => {
 
       /** Loads the associations the template rendered. */
       init() {
-        const script = this.$el.querySelector(':scope > script[type="application/json"]');
+        const script = this.$el.querySelector(':scope > template[data-associations]').content.querySelector('script');
         this.associations = JSON.parse(script.textContent);
       },
 
@@ -50,13 +51,32 @@ document.addEventListener('alpine:init', () => {
         if (!event.isComposing) this.$el.hidePopover();
       },
 
+      /** Answers the combobox's search with a page of the user's tags whose name starts with the typed text. */
+      async search({ detail }) {
+        const { tagsUrl, user, errorMessageDefault } = this.$root.dataset;
+        const params = new URLSearchParams({
+          user,
+          name__istartswith: detail.query,
+          order_by: 'name',
+          fields: 'id,name',
+          page: detail.page,
+        });
+        try {
+          const page = await callApi(`${tagsUrl}?${params}`, { signal: detail.signal });
+          const options = page.results.map((tag) => ({ value: tag.id, label: tag.name }));
+          detail.respond(options, { hasMore: Boolean(page.next) });
+        } catch (error) {
+          if (error.name !== 'AbortError') detail.fail(error.body?.detail ?? errorMessageDefault);
+        }
+      },
+
       /** Applies the selected tag to the docket. */
       attach({ detail }) {
         const { docket, docketTagsUrl, csrfToken } = this.$root.dataset;
         const tag = detail.option.value;
         this.errorMessage = '';
         this.save(async () => {
-          const association = await sendJson('POST', docketTagsUrl, csrfToken, { tag, docket: Number(docket) });
+          const association = await callApi(docketTagsUrl, { method: 'POST', csrfToken, body: { tag, docket: Number(docket) } });
           this.associations[tag] = association.id;
         }, detail.undo);
       },
@@ -70,7 +90,7 @@ document.addEventListener('alpine:init', () => {
           const association = this.associations[tag];
           if (association === undefined) return;
           try {
-            await sendJson('DELETE', `${docketTagsUrl}${association}/`, csrfToken);
+            await callApi(`${docketTagsUrl}${association}/`, { method: 'DELETE', csrfToken });
           } catch (error) {
             if (error.status !== 404) throw error;
           }
@@ -87,7 +107,7 @@ document.addEventListener('alpine:init', () => {
           return;
         }
         this.save(async () => {
-          const tag = await sendJson('POST', tagsUrl, csrfToken, { name: detail.label });
+          const tag = await callApi(tagsUrl, { method: 'POST', csrfToken, body: { name: detail.label } });
           detail.add({ value: tag.id, label: tag.name });
         });
       },

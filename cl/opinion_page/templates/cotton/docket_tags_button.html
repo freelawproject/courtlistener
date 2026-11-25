@@ -10,14 +10,17 @@
     x-on:combobox-add="attach"
     x-on:combobox-remove="detach"
     x-on:combobox-create.prevent="create"
+    x-on:combobox-search="search"
     data-docket="{{ docket.pk }}"
+    data-user="{{ user.pk }}"
     data-tags-url="{% url 'UserTag-list' version='v4' %}"
     data-docket-tags-url="{% url 'DocketTag-list' version='v4' %}"
     data-csrf-token="{{ csrf_token }}"
     data-error-message-invalid-name="Only lowercase letters, numbers, and '-' allowed"
     data-error-message-default="There was a problem. Try again later."
   >
-    {{ docket_tags.associations|json_script }}
+    {# Inside a template because htmx removes script tags from the content it swaps in. #}
+    <template data-associations>{{ docket_tags.associations|json_script }}</template>
     <c-button variant="outline" popovertarget="docket-tags-{{ docket.pk }}" x-ref="trigger">
       {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
       Tags
@@ -41,6 +44,7 @@
           creatable
           create_label="Create tag:"
           inline
+          remote
         />
         <p x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></p>
         <div class="pt-3 border-t border-greyscale-200">
