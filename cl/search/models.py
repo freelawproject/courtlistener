@@ -76,9 +76,9 @@ from cl.lib.recap_utils import (
     scotus_document_number_segments,
 )
 from cl.lib.storage import (
-    AWSMediaStorage,
     IncrementingAWSMediaStorage,
     S3PrivateUUIDStorage,
+    ScanXmlStorage,
 )
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
@@ -2684,7 +2684,7 @@ class OpinionCluster(AbstractDateTimeModel):
         upload_to=make_upload_path,
         # Overwritten when the scan is imported again: the file name has
         # the scan and opinion ids, so it is unique to the scanned opinion
-        storage=AWSMediaStorage(),
+        storage=ScanXmlStorage(),
         blank=True,
     )
     filepath_pdf_scan = models.FileField(

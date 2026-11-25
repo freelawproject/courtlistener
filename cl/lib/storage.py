@@ -105,6 +105,21 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
         return get_name_by_incrementing(self, name, max_length)
 
 
+class ScanXmlStorage(AWSMediaStorage):
+    """Media storage for scan XML files, which are corrected in place.
+
+    A corrected scan overwrites its file under the same URL, so caches keep
+    it for a day instead of years. That also bounds how long a stale copy
+    lasts if a CloudFront invalidation fails.
+    """
+
+    def get_object_parameters(self, name: str) -> dict[str, str]:
+        """Get the object parameters with a one-day cache header added."""
+        params = self.object_parameters.copy()
+        params["CacheControl"] = "max-age=86400"
+        return params
+
+
 class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
     """Static file storage under ``static`` that tolerates files missing from the manifest."""
 
