@@ -145,6 +145,7 @@
       </template>
     {% endif %}
     {% if remote %}
+      <li x-show="canLoadMore" x-cloak role="presentation" class="shrink-0 h-1 my-1 bg-greyscale-100"></li>
       <template x-if="canLoadMore">
         <li
           x-combobox:option
