@@ -1555,7 +1555,7 @@ def read_stored_scan_xml(cluster: OpinionCluster) -> str:
 
 
 def get_overwrite_changes(
-    cluster: OpinionCluster, scan_case: ScanCase
+    cluster: OpinionCluster, scanned: list[Opinion], scan_case: ScanCase
 ) -> tuple[list[tuple[Opinion, str]], str] | None:
     """Get what changed in a scan imported before, to overwrite it.
 
@@ -1567,6 +1567,7 @@ def get_overwrite_changes(
 
     Args:
         cluster: The cluster the scan was imported into.
+        scanned: The cluster's scanned opinions, in order.
         scan_case: The parsed scanned opinion.
 
     Returns:
@@ -1574,11 +1575,6 @@ def get_overwrite_changes(
         matter, or an empty string if it's unchanged or not the scan's. None
         if the number of opinions changed, which needs a review.
     """
-    scanned = list(
-        cluster.sub_opinions.filter(main_version__isnull=True)
-        .exclude(xml_scan="")
-        .order_by("ordering_key", "pk")
-    )
     new_xmls = [str(op) for op in scan_case.opinions]
     if len(scanned) != len(new_xmls):
         return None
@@ -1638,16 +1634,19 @@ def overwrite_scan(
         dry_run: Only log what would be overwritten.
     """
     citation = scan_case.citation.corrected_citation()
-    if (changes := get_overwrite_changes(cluster, scan_case)) is None:
+    scanned = list(
+        cluster.sub_opinions.filter(main_version__isnull=True)
+        .exclude(xml_scan="")
+        .order_by("ordering_key", "pk")
+    )
+    if (changes := get_overwrite_changes(cluster, scanned, scan_case)) is None:
         logger.warning(
             "Not overwriting %s (%s): cluster %s has %s scanned opinions "
             "and the scan has %s. Skipping it for review: %s%s",
             file_path,
             citation,
             cluster.pk,
-            cluster.sub_opinions.filter(main_version__isnull=True)
-            .exclude(xml_scan="")
-            .count(),
+            len(scanned),
             len(scan_case.opinions),
             BASE_URL,
             cluster.get_absolute_url(),
