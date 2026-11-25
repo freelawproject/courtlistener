@@ -1,9 +1,12 @@
+"""Export counts of judge names on RECAP dockets by court, title, and year."""
+
+import pickle
 from collections import Counter, OrderedDict
+from pathlib import Path
 
 import pandas
 from django.db.models import Q
 from juriscraper.lib.judge_parsers import normalize_judge_string
-from pandas import to_pickle
 from unidecode import unidecode
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -11,9 +14,12 @@ from cl.search.models import Court, Docket
 
 
 class Command(VerboseCommand):
+    """Export the judges named on federal RECAP dockets."""
+
     help = "Export a CSV of RECAP judges."
 
     def add_arguments(self, parser):
+        """Add the debug flag."""
         parser.add_argument(
             "--debug",
             action="store_true",
@@ -22,6 +28,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Generate and export the judge data."""
         super().handle(*args, **options)
         self.debug = options["debug"]
         self.options = options
@@ -90,7 +97,9 @@ class Command(VerboseCommand):
 
     @staticmethod
     def export_files(out):
-        to_pickle(out, "recap_export.pkl")
+        """Write the judge data to ``recap_export.pkl`` and ``recap_export.csv``."""
+        with Path("recap_export.pkl").open("wb") as f:
+            pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
         out_csv = []
         for court, v in out.items():
             for judge_name, data in v.items():

@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
@@ -8,11 +8,13 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.apps import apps
 from django.contrib.staticfiles import testing
-from django.test import SimpleTestCase
+from django.template import engines
+from django.test import RequestFactory, SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
 from django.utils.timezone import localtime, now
+from django_cotton.compiler_regex import CottonCompiler
 from django_elasticsearch_dsl.registries import registry
 from elasticsearch.dsl.connections import connections
 from elasticsearch.helpers import bulk, scan
@@ -112,6 +114,26 @@ class RestartSentEmailQuotaMixin:
         super().tearDown()
 
 
+class CottonComponentMixin:
+    """Render Cotton components the way templates write them.
+
+    ``render_component`` compiles a snippet such as
+    ``<c-button variant="primary">Save</c-button>`` and renders it with a GET
+    request in the context, which components that read ``request`` need.
+    Values in ``context`` are added to it and may replace the request.
+    """
+
+    def render_component(
+        self, source: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Returns the HTML a Cotton snippet renders to."""
+        compiled = CottonCompiler().process(source)
+        template = engines["django"].from_string(compiled)
+        return template.render(
+            {"request": RequestFactory().get("/"), **(context or {})}
+        )
+
+
 class TestCase(
     RestartRateLimitMixin,
     test.TestCase,
@@ -170,8 +192,7 @@ class ESIndexTestCase(SimpleTestCase):
     @staticmethod
     def _get_model_classes(model):
         models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        return model_classes
+        return [apps.get_model(m) for m in models]
 
     @staticmethod
     def _get_indices(model):
@@ -295,7 +316,7 @@ class ESIndexTestCase(SimpleTestCase):
             with self.subTest(test_content=test_content):
                 node_count = len(
                     xml_tree.xpath(test_content, namespaces=namespaces)
-                )  # type: ignore
+                )
                 self.assertEqual(
                     node_count,
                     count,
@@ -329,8 +350,8 @@ class CountESTasksTestCase(SimpleTestCase):
         # Call the task
         if immutable_signature:
             return task.s(*args, **kwargs)
-        else:
-            task.apply_async(args=args, kwargs=kwargs)
+        task.apply_async(args=args, kwargs=kwargs)
+        return None
 
     def reset_and_assert_task_count(self, expected) -> None:
         """Resets the task call count and asserts the expected number of calls."""
@@ -597,8 +618,7 @@ class SearchAlertsAssertions:
         if len(parts) > 1:
             case_title = parts[1].strip()
         # Remove everything from the first open parenthesis to the end
-        case_title = re.split(r"\s*\(", case_title)[0].strip()
-        return case_title
+        return re.split(r"\s*\(", case_title)[0].strip()
 
     def _count_alert_hits_and_child_hits(
         self,
@@ -890,11 +910,10 @@ class SearchAlertsAssertions:
         percolator_index, es_document_index, documents_to_percolate = (
             prepare_percolator_content(app_label, document_id)
         )
-        responses = percolate_es_document(
+        return percolate_es_document(
             str(document_id),
             percolator_index,
             es_document_index,
             documents_to_percolate,
             app_label=app_label,
         )
-        return responses

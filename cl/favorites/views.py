@@ -1,3 +1,5 @@
+"""Views for notes, tags, and prayers."""
+
 from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -18,6 +20,7 @@ from django.utils.datastructures import MultiValueDictKeyError
 from django.views.decorators.http import require_http_methods
 
 from cl.favorites.forms import NoteForm
+from cl.favorites.forms_v2 import NoteForm as NoteFormV2
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.selectors import prayer_eligible
 from cl.favorites.utils import (
@@ -75,6 +78,18 @@ def get_note(request: HttpRequest) -> Note | None:
 
 @login_required
 def save_or_update_note(request: HttpRequest) -> HttpResponse:
+    """Save or update a note.
+
+    Routes on the request type: htmx requests from the v2 pages get the form
+    fragment to swap in place, legacy AJAX requests get a plain text message.
+    """
+    if request.headers.get("HX-Request"):
+        return _save_or_update_note_htmx(request)
+
+    return _save_or_update_note_ajax(request)
+
+
+def _save_or_update_note_ajax(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a note.
 
     Receives a request as an argument, and then uses that plus POST data to
@@ -103,14 +118,96 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
             return HttpResponseServerError("Failure. Form invalid")
 
         return HttpResponse("It worked")
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"}, content="Not an ajax request."
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"}, content="Not an ajax request."
+    )
+
+
+def _note_form_response(
+    request: HttpRequest, form: NoteFormV2, event: str | None = None
+) -> TemplateResponse:
+    """Render the v2 note form fragment for htmx.
+
+    Args:
+        request: The request being answered.
+        form: The form to render, with its errors if any.
+        event: The event to announce once the fragment is swapped in, set
+            only when the note was saved or deleted. It also updates the
+            note button on the page and, through the dialog's listeners,
+            closes the dialog. A response that carries errors must leave it
+            unset so the dialog stays open.
+
+    Returns:
+        The fragment response.
+    """
+    if event is None:
+        return TemplateResponse(
+            request, "v2_includes/add_note/form.html", {"form": form}
         )
+    return TemplateResponse(
+        request,
+        "v2_includes/add_note/form.html",
+        {"form": form, "update_trigger": True},
+        headers={"HX-Trigger-After-Swap": event},
+    )
+
+
+def _save_or_update_note_htmx(request: HttpRequest) -> HttpResponse:
+    """Save or update the user's note for an object and return the v2 form.
+
+    Every outcome except a non-POST request is a 200 with the form fragment,
+    because htmx does not swap error responses. Invalid input comes back as
+    the form with its errors. A request that doesn't name a noteable object
+    comes back with an error on object_id, since the form accepts blank ids
+    and would otherwise save a note attached to nothing.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(
+            permitted_methods={"POST"}, content="Not a POST request."
+        )
+
+    note = get_note(request)
+    form = NoteFormV2(request.POST, instance=note)
+    is_valid = form.is_valid()
+    if note is None:
+        form.add_error("object_id", "No such object exists.")
+    elif is_valid:
+        new_note = form.save(commit=False)
+        new_note.user = request.user
+        try:
+            new_note.save()
+        except IntegrityError:
+            # A concurrent request created this user's note first. Update
+            # that note instead of dropping this edit.
+            existing = get_note(request)
+            if existing is not None and existing.pk:
+                existing.name = form.cleaned_data["name"]
+                existing.notes = form.cleaned_data["notes"]
+                existing.save()
+                new_note = existing
+        saved_form = NoteFormV2(
+            instance=new_note,
+            initial={"default_name": form.cleaned_data["default_name"]},
+        )
+        return _note_form_response(request, saved_form, "note-saved")
+
+    return _note_form_response(request, form)
 
 
 @login_required
 def delete_note(request: HttpRequest) -> HttpResponse:
+    """Delete a user's note.
+
+    Routes on the request type: htmx requests from the v2 pages get the form
+    fragment to swap in place, legacy AJAX requests get a plain text message.
+    """
+    if request.headers.get("HX-Request"):
+        return _delete_note_htmx(request)
+
+    return _delete_note_ajax(request)
+
+
+def _delete_note_ajax(request: HttpRequest) -> HttpResponse:
     """Delete a user's note.
 
     Deletes a note for a user using an ajax call and post data.
@@ -137,13 +234,57 @@ def delete_note(request: HttpRequest) -> HttpResponse:
 
         return HttpResponse("It worked.")
 
-    else:
+    return HttpResponseNotAllowed(
+        permitted_methods=["POST"], content="Not an ajax request."
+    )
+
+
+def _delete_note_htmx(request: HttpRequest) -> HttpResponse:
+    """Delete the user's note for an object and return the v2 form.
+
+    Every outcome except a non-POST request is a 200 with the form fragment,
+    because htmx does not swap error responses. A request that names no
+    noteable object comes back with the form and an error on object_id. A
+    request for a note that is already gone counts as deleted, since the user
+    wanted it gone and a second click or another tab can race this one.
+    """
+    if request.method != "POST":
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request."
+            permitted_methods={"POST"}, content="Not a POST request."
         )
+
+    note = get_note(request)
+    if note is None:
+        form = NoteFormV2(request.POST)
+        form.is_valid()
+        form.add_error("object_id", "No such object exists.")
+    else:
+        # get_note() returns an unsaved Note when the user has none.
+        if note.pk:
+            note.delete()
+        # The page's suggested name, sent back by the form, restores the
+        # prefill the page had before the note existed.
+        default_name = request.POST.get("default_name", "")[:100]
+        empty_form = NoteFormV2(
+            initial={
+                "content_type": request.POST.get("content_type"),
+                "object_id": request.POST.get("object_id"),
+                "name": default_name,
+                "default_name": default_name,
+            }
+        )
+        return _note_form_response(request, empty_form, "note-deleted")
+
+    return _note_form_response(request, form)
 
 
 async def view_tag(request, username, tag_name):
+    """Show a user's tag and its dockets.
+
+    Raises:
+        Http404: If the tag doesn't exist, or is unpublished and the viewer
+            isn't its owner.
+    """
     tag = await aget_object_or_404(
         UserTag, name=tag_name, user__username=username
     )
@@ -240,6 +381,11 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 async def create_prayer_view(
     request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
+    """Create the user's prayer for a document.
+
+    htmx requests get an updated prayer button. Other requests get a plain
+    response, or a server error if the user has reached their daily limit.
+    """
     user = request.user
     is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
@@ -311,6 +457,11 @@ async def create_prayer_view(
 async def delete_prayer_view(
     request: AuthenticatedHttpRequest, recap_document: int
 ) -> HttpResponse:
+    """Delete the user's waiting prayer for a document.
+
+    htmx requests get an updated prayer button. Other requests get a plain
+    response.
+    """
     user = request.user
     recap_document_obj = await RECAPDocument.objects.aget(id=recap_document)
 
@@ -354,6 +505,11 @@ async def delete_prayer_view(
 async def user_prayers_view(
     request: HttpRequest, username: str
 ) -> HttpResponse:
+    """Show a user's waiting prayers, paginated, with their prayer stats.
+
+    Visitors other than the user are redirected to the top prayers unless
+    the user's prayers are public.
+    """
     queryset = User.objects.prefetch_related("profile")
     requested_user = await aget_object_or_404(queryset, username=username)
     is_page_owner = await request.auser() == requested_user
@@ -403,6 +559,10 @@ async def user_prayers_view(
 async def user_prayers_view_granted(
     request: HttpRequest, username: str
 ) -> HttpResponse:
+    """Show a user's granted prayers, paginated, with their prayer stats.
+
+    Visitors other than the user are redirected to the top prayers.
+    """
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 

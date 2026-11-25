@@ -746,7 +746,7 @@ class SendGeminiBatchesTest(TestCase):
 
         return mock_s3_client
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -829,7 +829,7 @@ class SendGeminiBatchesTest(TestCase):
         # Verify temp file cleanup
         self.assertEqual(mock_remove.call_count, 3)
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -966,7 +966,7 @@ class SendGeminiBatchesTest(TestCase):
                 "Invalid system or user prompt", str(context.exception)
             )
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1009,7 +1009,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("No .pdf files found", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1099,7 +1099,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("Access denied", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
@@ -1139,7 +1139,7 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("not in allowed list", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.Path.unlink")
     @patch(
         "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )

@@ -1,6 +1,9 @@
+"""Index existing parent and child documents into Elasticsearch."""
+
 from collections.abc import Iterable
 from datetime import date
 from itertools import batched
+from typing import Literal
 
 from django.conf import settings
 from django.core.management import CommandError
@@ -241,13 +244,17 @@ def get_documents_to_update_or_remove(
 
 
 class Command(VerboseCommand):
+    """Queue indexing of a search type's parent documents, child documents, or both."""
+
     help = "Index existing Parent and Children docs into Elasticsearch."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with empty options."""
         super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
+        """Add the search type, source, offset, queue, chunking, resume, testing, document type, event table, date range, and field filter options."""
         parser.add_argument(
             "--search-type",
             type=str,
@@ -341,6 +348,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Select the documents to index for the search type and queue them.
+
+        Raises:
+            CommandError: If the source is unknown, or a non-RECAP source is
+                used with another search type or with
+                ``--update-from-event-tables``.
+        """
         super().handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
@@ -403,7 +417,7 @@ class Command(VerboseCommand):
                         queryset, SEARCH_TYPES.RECAP
                     )
                     return
-                elif document_type == "child":
+                if document_type == "child":
                     # Get the source's documents by pk_offset.
                     queryset = (
                         source.document_model.objects.filter(pk__gte=pk_offset)
@@ -469,7 +483,12 @@ class Command(VerboseCommand):
         count: int,
         search_type: str,
         chunk_size: int,
-        task_to_use: str,
+        task_to_use: Literal[
+            "index_parent_and_child_docs",
+            "index_parent_or_child_docs_in_es",
+            "remove_parent_and_child_docs_by_query",
+            "update_children_docs_by_query",
+        ],
         es_document: type[ESDocumentType] | None = None,
     ) -> None:
         """Process a queryset and execute tasks based on the specified celery task_to_use.

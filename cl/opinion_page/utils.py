@@ -1,11 +1,14 @@
+"""Helpers for building opinion cluster and docket pages."""
+
 import csv
+import html
 import logging
 import traceback
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from io import StringIO
 from typing import Any, NotRequired, TypedDict, cast
-from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -25,6 +28,7 @@ from elasticsearch.dsl import Q
 from elasticsearch.dsl.response import Response
 from elasticsearch.dsl.response.hit import Hit
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
+from zoneinfo import ZoneInfo
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -46,7 +50,13 @@ from cl.opinion_page.docket_entry_sources import (
     MetadataSection,
     SourceDocketEntry,
 )
-from cl.people_db.models import Person
+from cl.people_db.models import (
+    AttorneyOrganization,
+    Party,
+    PartyType,
+    Person,
+    Role,
+)
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
@@ -693,6 +703,204 @@ def build_idb_rows(idb_data: FjcIntegratedDatabase) -> list[IdbRow]:
     ]
 
 
+class PartyFirm(TypedDict):
+    """One firm of an attorney on the Parties tab.
+
+    address_lines holds one line per address part that is set. label names
+    the firm in its edit link: the name, or "firm <pk>" for a firm stored
+    without one.
+    """
+
+    pk: int
+    name: str
+    label: str
+    address_lines: list[str]
+
+
+class PartyAttorney(TypedDict):
+    """One attorney of a party on the Parties tab.
+
+    roles are display-ready lines, the raw PACER role when known and the
+    choice label otherwise, each followed by its action date in parentheses.
+    A role with neither reads "None". Roles of unknown type are left out.
+    """
+
+    pk: int
+    name: str
+    phone: str
+    fax: str
+    roles: list[str]
+    firms: list[PartyFirm]
+
+
+class CriminalRow(TypedDict):
+    """One count or complaint row of a party's criminal table."""
+
+    label: str
+    name: str
+    disposition: str
+
+
+class PartyCriminalInfo(TypedDict):
+    """The criminal table of a party.
+
+    Counts and complaints come as rows, with a "None" placeholder row for
+    each kind without records, plus the highest offense levels.
+    """
+
+    rows: list[CriminalRow]
+    highest_offense_level_opening: str
+    highest_offense_level_terminated: str
+
+
+class PartyItem(TypedDict):
+    """One party on the Parties tab.
+
+    pk is the Party; party_type_pk is the PartyType row, unique per party
+    and type on the docket, so a party listed under two types gets distinct
+    element ids. date_terminated is in the site's date format and empty
+    when unset. criminal is only present for parties with criminal data.
+    """
+
+    pk: int
+    party_type_pk: int
+    name: str
+    date_terminated: str
+    attorneys: list[PartyAttorney]
+    criminal: NotRequired[PartyCriminalInfo]
+
+
+class PartyGroup(TypedDict):
+    """The parties sharing one party type (Plaintiff, Defendant, ...)."""
+
+    name: str
+    parties: list[PartyItem]
+
+
+def build_party_groups(party_types: Iterable[PartyType]) -> list[PartyGroup]:
+    """Build the party groups of the Parties and Attorneys tab.
+
+    party_types must be ordered by type name and carry the view's prefetches:
+    the party's roles on this docket with their attorney and the attorney's
+    firms_in_docket, plus the criminal counts and complaints. Attorneys are
+    listed by name; parties keep the order they come in. Party, attorney and
+    firm names are HTML-unescaped, since PACER stores entities such as &amp;
+    in them.
+    """
+    none = "None"
+
+    def address_lines(firm: AttorneyOrganization) -> list[str]:
+        """Lists the set parts of the firm's mailing address."""
+        locality = " ".join(
+            part for part in (firm.state, firm.zip_code) if part
+        )
+        city_line = ", ".join(part for part in (firm.city, locality) if part)
+        return [
+            line for line in (firm.address1, firm.address2, city_line) if line
+        ]
+
+    def role_line(role: Role) -> str:
+        """Formats a role as its name followed by the action date, if any."""
+        name = role.role_raw or role.get_role_display() or none
+        if role.date_action:
+            return f"{name} ({date_format(role.date_action)})"
+        return name
+
+    def attorneys(party: Party) -> list[PartyAttorney]:
+        """Groups the party's roles by attorney, attorneys sorted by name."""
+        by_attorney: dict[int, PartyAttorney] = {}
+        roles = sorted(party.roles.all(), key=lambda role: role.attorney.name)
+        for role in roles:
+            attorney = role.attorney
+            if attorney.pk not in by_attorney:
+                by_attorney[attorney.pk] = {
+                    "pk": attorney.pk,
+                    "name": html.unescape(attorney.name),
+                    "phone": attorney.phone,
+                    "fax": attorney.fax,
+                    "roles": [],
+                    "firms": [
+                        {
+                            "pk": firm.pk,
+                            "name": html.unescape(firm.name),
+                            "label": html.unescape(firm.name)
+                            or f"firm {firm.pk}",
+                            "address_lines": address_lines(firm),
+                        }
+                        # Set by the view's prefetch to_attr.
+                        for firm in attorney.firms_in_docket  # pyrefly:ignore[missing-attribute]
+                    ],
+                }
+            if role.role != Role.UNKNOWN:
+                by_attorney[attorney.pk]["roles"].append(role_line(role))
+        return list(by_attorney.values())
+
+    def criminal_info(party_type: PartyType) -> PartyCriminalInfo | None:
+        """Builds the criminal table.
+
+        Returns None when the party has no criminal data at all.
+        """
+        counts = list(party_type.criminal_counts.all())
+        complaints = list(party_type.criminal_complaints.all())
+        if not (
+            counts
+            or complaints
+            or party_type.highest_offense_level_opening
+            or party_type.highest_offense_level_terminated
+        ):
+            return None
+        rows: list[CriminalRow] = [
+            {
+                "label": f"{count.get_status_display()} Count",
+                "name": count.name,
+                "disposition": count.disposition or none,
+            }
+            for count in counts
+        ] or [
+            {"label": "Pending Count", "name": none, "disposition": none},
+            {"label": "Terminated Count", "name": none, "disposition": none},
+        ]
+        rows += [
+            {
+                "label": "Complaint",
+                "name": complaint.name,
+                "disposition": complaint.disposition or none,
+            }
+            for complaint in complaints
+        ] or [{"label": "Complaint", "name": none, "disposition": none}]
+        return {
+            "rows": rows,
+            "highest_offense_level_opening": (
+                party_type.highest_offense_level_opening or none
+            ),
+            "highest_offense_level_terminated": (
+                party_type.highest_offense_level_terminated or none
+            ),
+        }
+
+    groups: dict[str, PartyGroup] = {}
+    for party_type in party_types:
+        party = party_type.party
+        item: PartyItem = {
+            "pk": party.pk,
+            "party_type_pk": party_type.pk,
+            "name": html.unescape(party.name),
+            "date_terminated": (
+                date_format(party_type.date_terminated)
+                if party_type.date_terminated
+                else ""
+            ),
+            "attorneys": attorneys(party),
+        }
+        if criminal := criminal_info(party_type):
+            item["criminal"] = criminal
+        group = groups.setdefault(
+            party_type.name, {"name": party_type.name, "parties": []}
+        )
+        group["parties"].append(item)
+    return list(groups.values())
+
+
 def build_docket_tabs(
     docket: Docket,
     parties: bool,
@@ -726,7 +934,7 @@ def build_docket_tabs(
                     },
                 ),
                 "key": "parties",
-                "icon": "group",
+                "icon": "people",
             }
         )
 
@@ -785,11 +993,16 @@ def separate_syllabus(cluster: OpinionCluster) -> bool:
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:
+    """Title a cluster with its case name, truncated to 100 characters, and its citations."""
     return f"{trunc(best_case_name(cluster), 100)}, {await cluster.acitation_string()}"
 
 
 def make_docket_title(docket: Docket) -> str:
-    title = ", ".join(
+    """Title a docket with its case name, truncated to 100 characters, and its docket number.
+
+    Blank parts are left out.
+    """
+    return ", ".join(
         [
             s
             for s in [
@@ -799,7 +1012,6 @@ def make_docket_title(docket: Docket) -> str:
             if s and s.strip()
         ]
     )
-    return title
 
 
 async def _common_metadata_sections(
@@ -817,6 +1029,8 @@ async def _common_metadata_sections(
 
 
 class CoreDocketDataDict(TypedDict):
+    """Template context shared by every tab view of a docket."""
+
     docket: Docket
     title: str
     note_form: NoteForm
@@ -832,13 +1046,22 @@ class CoreDocketDataDict(TypedDict):
 
 
 async def core_docket_data(
-    request: HttpRequest,
-    pk: int,
+    request: HttpRequest, pk: int, note_form_class: type[NoteForm] = NoteForm
 ) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data shared by every tab view of a docket.
 
     The tab navigation is built here so every tab lists the same set,
     whichever one is active.
+
+    Args:
+        request: The request, used for the user and feature flags.
+        pk: The primary key of the docket.
+        note_form_class: The NoteForm subclass to build the note form
+            with. Only pages that render the form with the matching widgets
+            should change it; the legacy modal depends on the default's ids.
+
+    Returns:
+        The docket and a dict of the data shared by docket pages.
     """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
@@ -858,6 +1081,7 @@ async def core_docket_data(
         docket,
         await request.auser(),  # type: ignore[arg-type]
         trunc(best_case_name(docket), 100, ellipsis="..."),
+        form_class=note_form_class,
     )
 
     has_alert = await user_has_alert(
@@ -925,6 +1149,7 @@ async def core_docket_data(
 
 
 async def user_has_alert(user: AnonymousUser | User, docket: Docket) -> bool:
+    """Check if the user is subscribed to the docket's alerts."""
     has_alert = False
     if user.is_authenticated:
         has_alert = await DocketAlert.objects.filter(
@@ -988,11 +1213,11 @@ async def build_cites_clusters_query(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)
-    search_query = (
+    return (
         cluster_cites_query.sort({"citeCount": {"order": "desc"}})
         .source(
             includes=[
@@ -1009,7 +1234,6 @@ async def build_cites_clusters_query(
         .extra(size=20, track_total_hits=True)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 async def build_related_clusters_query(
@@ -1040,7 +1264,7 @@ async def build_related_clusters_query(
     )
 
     cluster_related_query = cluster_search.query(main_query)
-    search_query = (
+    return (
         cluster_related_query.sort({"_score": {"order": "desc"}})
         .source(
             includes=[
@@ -1057,11 +1281,12 @@ async def build_related_clusters_query(
         .extra(size=20)
         .collapse(field="cluster_id")
     )
-    return search_query
 
 
 @dataclass
 class RelatedCitingResults:
+    """Clusters citing a cluster, with the search parameters used to find them."""
+
     related_clusters: list[OpinionClusterDocument] = field(
         default_factory=list
     )
@@ -1074,6 +1299,8 @@ class RelatedCitingResults:
 
 @dataclass
 class RelatedClusterResults:
+    """Clusters related to a cluster, with the search parameters used to find them."""
+
     related_clusters: Response | list[OpinionClusterDocument] = field(
         default_factory=list
     )
@@ -1312,7 +1539,7 @@ async def es_cited_case_count(
         "bool",
         filter=[
             Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": sub_opinion_pks}),
+            Q("terms", cites=sub_opinion_pks),
         ],
     )
     cluster_cites_query = cluster_search.query(cites_query)

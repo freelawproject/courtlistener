@@ -1,3 +1,5 @@
+"""Django app configuration for search, including dev index creation."""
+
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.management import call_command
@@ -10,9 +12,16 @@ from cl.lib.decorators import retry
 
 
 class SearchConfig(AppConfig):
+    """App config for search."""
+
     name = "cl.search"
 
     def ready(self):
+        """Connect the search signal handlers.
+
+        In development, outside of tests, also create the search indices
+        after migrations run.
+        """
         # Implicitly connect a signal handlers decorated with @receiver.
         from cl.search import signals  # noqa: F401
 

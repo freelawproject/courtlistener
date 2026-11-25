@@ -1,0 +1,15 @@
+<c-vars key tabs_label="" active_tab="" />
+
+{% with tabs_id=tabs_label|slugify|add:"-tabs" %}
+  <div
+    id="{{ tabs_id }}-panel-{{ key }}"
+    role="tabpanel"
+    aria-labelledby="{{ tabs_id }}-tab-{{ key }}"
+    tabindex="0"
+    data-tab-key="{{ key }}"
+    {% if key != active_tab %}hidden{% endif %}
+    x-bind:hidden="isInactive"
+  >
+    {{ slot }}
+  </div>
+{% endwith %}

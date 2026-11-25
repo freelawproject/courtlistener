@@ -1,9 +1,9 @@
 import asyncio
+import copy
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import assert_type, cast
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -28,11 +28,8 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
-    TexasCourtOfCriminalAppealsDocket,
-    TexasSupremeCourtDocket,
 )
 from juriscraper.state.texas.common import CourtID, CourtType
-from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -40,6 +37,8 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.corpus_importer.centralia import (
+    StructuredExtractionStatus,
+    compare_structured_extraction,
     merge_structured_opinion_into_cl_opinion,
     should_ingest,
 )
@@ -56,6 +55,9 @@ from cl.corpus_importer.management.commands.claims_activity_project import (
 )
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
+)
+from cl.corpus_importer.management.commands.extract_structured_opinions import (
+    extract_structured_opinion,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
@@ -108,8 +110,6 @@ from cl.corpus_importer.tasks import (
     get_and_process_free_pdf,
     get_and_save_free_document_report,
     get_document_number_for_appellate,
-    is_texas_appellate_docket,
-    is_texas_supreme_docket,
     merge_texas_case_transfers,
     merge_texas_docket,
     merge_texas_docket_entry,
@@ -1125,12 +1125,11 @@ class HarvardTests(TestCase):
         cites = eyecite.get_citations(
             case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
         )
-        cite = Citation.objects.get(
+        return Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
             page=cites[0].groups["page"],
         )
-        return cite
 
     def assertSuccessfulParse(self, expected_count_diff, bankruptcy=False):
         pre_install_count = OpinionCluster.objects.all().count()
@@ -3362,7 +3361,7 @@ class TexasMergerTest(TestCase):
         def get_test_wpd(
             request: requests.Request,
         ) -> tuple[int, dict[str, str], bytes]:
-            with open(wpd_path, "rb") as f:
+            with wpd_path.open("rb") as f:
                 return (
                     200,
                     {"Content-Type": "application/octet-stream"},
@@ -3379,7 +3378,7 @@ class TexasMergerTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_document(docket_entry, input_document)
         document = TexasDocument.objects.get(
-            pk=list(result.creates["TexasDocument"])[0]
+            pk=next(iter(result.creates["TexasDocument"]))
         )
 
         self.assertEqual(response.call_count, 1)
@@ -3452,108 +3451,6 @@ class TexasMergerTest(TestCase):
         self.assertNotIn("<", texas_document.plain_text)
         self.assertIn("Hello", texas_document.plain_text)
         self.assertIn("world", texas_document.plain_text)
-
-    def test_is_texas_appellate_docket(self):
-        appeals_docket_data = cast(
-            TexasCourtOfAppealsDocket
-            | TexasCourtOfCriminalAppealsDocket
-            | TexasSupremeCourtDocket,
-            cast(
-                object,  # cast to `object` suppresses checker warning
-                TexasCourtOfAppealsDocketDictFactory(
-                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-                    docket_number=self.docket_number_coa1,
-                    originating_court=TexasOriginatingDistrictCourtDictFactory(
-                        district=5,
-                    ),
-                ),
-            ),
-        )
-        supreme_docket_data = cast(
-            TexasCourtOfAppealsDocket
-            | TexasCourtOfCriminalAppealsDocket
-            | TexasSupremeCourtDocket,
-            cast(
-                object,  # cast to `object` suppresses checker warning
-                TexasFinalCourtDocketDictFactory(
-                    court_id=CourtID.SUPREME_COURT.value,
-                    docket_number=DocketFactory.create(
-                        court=self.texas_cca
-                    ).docket_number,
-                    appeals_court=TexasAppellateCourtInfoDictFactory(
-                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-                    ),
-                ),
-            ),
-        )
-
-        self.assertTrue(is_texas_appellate_docket(appeals_docket_data))
-        self.assertFalse(is_texas_appellate_docket(supreme_docket_data))
-
-        # Here we make sure that narrowing is legible to analyzer with
-        # `assert_type`
-        if is_texas_appellate_docket(appeals_docket_data):
-            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
-        else:
-            self.fail()
-        if not is_texas_appellate_docket(supreme_docket_data):
-            assert_type(
-                supreme_docket_data,
-                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
-            )
-        else:
-            self.fail()
-
-    def test_is_texas_supreme_docket(self):
-        appeals_docket_data = cast(
-            TexasCourtOfAppealsDocket
-            | TexasCourtOfCriminalAppealsDocket
-            | TexasSupremeCourtDocket,
-            cast(
-                object,
-                TexasCourtOfAppealsDocketDictFactory(
-                    court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-                    docket_number=self.docket_number_coa1,
-                    originating_court=TexasOriginatingDistrictCourtDictFactory(
-                        district=5,
-                    ),
-                ),
-            ),
-        )
-        supreme_docket_data = cast(
-            TexasCourtOfAppealsDocket
-            | TexasCourtOfCriminalAppealsDocket
-            | TexasSupremeCourtDocket,
-            cast(
-                object,
-                TexasFinalCourtDocketDictFactory(
-                    court_id=CourtID.SUPREME_COURT.value,
-                    docket_number=DocketFactory.create(
-                        court=self.texas_cca
-                    ).docket_number,
-                    appeals_court=TexasAppellateCourtInfoDictFactory(
-                        court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-                    ),
-                ),
-            ),
-        )
-
-        self.assertFalse(is_texas_supreme_docket(appeals_docket_data))
-        self.assertTrue(is_texas_supreme_docket(supreme_docket_data))
-
-        # Here we make sure that narrowing is legible to analyzer with
-        # `assert_type`
-        if not is_texas_supreme_docket(appeals_docket_data):
-            assert_type(appeals_docket_data, TexasCourtOfAppealsDocket)
-        else:
-            self.fail()
-        if is_texas_supreme_docket(supreme_docket_data):
-            assert_type(
-                supreme_docket_data,
-                TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
-            )
-        else:
-            self.fail()
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
@@ -6108,7 +6005,7 @@ class TamesMissingFileTest(SimpleTestCase):
     def test_missing_file_page_detected(self):
         """Verify a TAMES 'File not found' page is correctly identified."""
         fixture_path = self.test_dir / "missing_file.html"
-        with open(fixture_path, "rb") as f:
+        with fixture_path.open("rb") as f:
             self.assertTrue(is_missing_file_page(f.read()))
 
     def test_normal_page_not_flagged(self):
@@ -6288,6 +6185,37 @@ class CentraliaShouldIngestTest(SimpleTestCase):
         self.assertFalse(ingestible)
         self.assertIn("already extracted", reason)
 
+    def test_text_coverage_ignores_whitespace_and_counts_the_syllabus(
+        self,
+    ) -> None:
+        """Is coverage counted without whitespace and with the syllabus?
+
+        pdftotext pads `plain_text` with layout whitespace a structured read
+        drops, and the PDF it came from includes the syllabus.
+        """
+        syllabus_text = "Held: the statute applies to petitioner."
+        payload = self.make_payload(
+            opinions=[
+                {"order": 1, "type": "majority", "html": "<p>Affirmed.</p>"}
+            ],
+            headmatter={"text": "COURT OF APPEALS"},
+            sections={"syllabus": {"html": [syllabus_text]}},
+        )
+        payload["opinions"][0]["text"] = "Affirmed."
+        whole_pdf = f"COURT OF APPEALS {syllabus_text} Affirmed."
+        for label, plain_text in (
+            ("padded", "\n\n    ".join(whole_pdf.split(" ")) + " " * 500),
+            ("unpadded", whole_pdf),
+        ):
+            with self.subTest(label=label):
+                opinion = Opinion(plain_text=plain_text)
+
+                ingestible, reason = should_ingest(opinion, payload)
+
+                self.assertTrue(ingestible, msg=reason)
+                metrics = compare_structured_extraction(opinion, payload)
+                self.assertEqual(metrics["old_chars"], metrics["new_chars"])
+
     def test_ingests_a_clean_read(self) -> None:
         """Does a complete read of a real opinion pass the gate?"""
         opinion = Opinion(plain_text="Affirmed.")
@@ -6306,12 +6234,12 @@ class CentraliaIngestTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
-        with open(
-            cls.test_dir / "centralia_payload_multi.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_multi.json").open(
+            encoding="utf-8"
         ) as f:
             cls.multi_payload = json.load(f)
-        with open(
-            cls.test_dir / "centralia_payload_single.json", encoding="utf-8"
+        with (cls.test_dir / "centralia_payload_single.json").open(
+            encoding="utf-8"
         ) as f:
             cls.single_payload = json.load(f)
 
@@ -6327,27 +6255,202 @@ class CentraliaIngestTest(TestCase):
             html="",
             xml_harvard="<sentinel/>",
             download_url="https://example.com/opinion.pdf",
+            local_path="pdf/2024/01/01/opinion.pdf",
         )
 
-    @patch("cl.corpus_importer.centralia.logger")
-    def test_rejects_a_multi_writing_payload(self, mock_logger) -> None:
-        """Is a payload with several writings refused, leaving the cluster untouched?
+    def test_a_multi_writing_payload_splits_the_opinion(self) -> None:
+        """Does each writing after the first become a sibling opinion?
 
-        Only single-opinion documents are supported for now, so the extra
-        writings are neither merged into the seed nor created as siblings.
+        The seed keeps the first writing, so citations to it still point at
+        the decision and its PDF. Siblings get no PDF, sha1 or download
+        URL, so the PDF is offered once and duplicate and version detection
+        don't group them with the seed.
         """
-        ingested, reason = merge_structured_opinion_into_cl_opinion(
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
             self.seed, self.multi_payload
         )
 
-        self.assertFalse(ingested)
-        self.assertIn("found 2 opinions", reason)
-        mock_logger.warning.assert_called_once()
-        self.assertEqual(mock_logger.warning.call_args.args[2], reason)
-        self.assertEqual(self.cluster.sub_opinions.count(), 1)
+        self.assertEqual(len(opinion_pks), 2, msg=reason)
+        self.assertEqual(opinion_pks[0], self.seed.pk)
         self.seed.refresh_from_db()
-        self.assertEqual(self.seed.html, "")
-        self.assertEqual(self.seed.type, Opinion.COMBINED)
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertEqual(self.seed.author_str, "Walker")
+        self.assertEqual(self.seed.ordering_key, 1)
+        self.assertIn("The judgment of the district court", self.seed.html)
+        self.assertEqual(self.seed.plain_text, "The judgment is affirmed.")
+
+        dissent = Opinion.objects.get(pk=opinion_pks[1])
+        self.assertEqual(dissent.cluster_id, self.cluster.pk)
+        self.assertEqual(dissent.type, Opinion.DISSENT)
+        self.assertEqual(dissent.author_str, "Lee")
+        self.assertFalse(dissent.per_curiam)
+        self.assertEqual(dissent.ordering_key, 2)
+        self.assertTrue(
+            dissent.html.startswith('<div class="centralia">'),
+            msg=dissent.html[:80],
+        )
+        self.assertEqual(dissent.plain_text, "I respectfully dissent.")
+        self.assertEqual(dissent.local_path.name, "")
+        self.assertEqual(
+            self.seed.local_path.name, "pdf/2024/01/01/opinion.pdf"
+        )
+        self.assertEqual(dissent.sha1, "")
+        self.assertIsNone(dissent.download_url)
+        self.assertEqual(self.cluster.sub_opinions.count(), 2)
+
+    def test_an_unsigned_order_is_per_curiam(self) -> None:
+        """Is an unsigned order in a split paper a per curiam lead?
+
+        The scraper credits a SCOTUS cert denial with a dissent from it to
+        the dissent's author, since that is the only name on the paper. The
+        seed takes the order when the paper is split, so the seed's author
+        must be dropped, not kept for the order.
+        """
+        self.seed.author = PersonFactory()
+        self.seed.author_str = ""
+        self.seed.save()
+        payload = copy.deepcopy(self.multi_payload)
+        payload["opinions"][0].update(
+            type="order", author=None, author_name=None, author_title=None
+        )
+
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, payload
+        )
+
+        self.assertEqual(len(opinion_pks), 2, msg=reason)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertTrue(self.seed.per_curiam)
+        self.assertEqual(self.seed.author_str, "")
+        self.assertIsNone(self.seed.author_id)
+        dissent = Opinion.objects.get(pk=opinion_pks[1])
+        self.assertEqual(dissent.type, Opinion.DISSENT)
+        self.assertFalse(dissent.per_curiam)
+        self.assertEqual(dissent.author_str, "Lee")
+
+    def test_a_signed_order_is_not_per_curiam(self) -> None:
+        """Does an order with an author keep it, unflagged, in a split paper?
+
+        Only an order with neither an author nor an author name is the
+        court's own. One the read found a signer for is that judge's.
+        """
+        author = PersonFactory()
+        for author_fields, author_str, author_id in (
+            ({"author": None, "author_name": "WALKER"}, "Walker", None),
+            ({"author": "WALKER", "author_name": None}, "", author.pk),
+        ):
+            with self.subTest(author_fields=author_fields):
+                self.cluster.sub_opinions.exclude(pk=self.seed.pk).delete()
+                self.seed.author = author
+                self.seed.author_str = ""
+                self.seed.save()
+                payload = copy.deepcopy(self.multi_payload)
+                payload["opinions"][0].update(type="order", **author_fields)
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    self.seed, payload
+                )
+
+                self.assertEqual(len(opinion_pks), 2, msg=reason)
+                self.seed.refresh_from_db()
+                self.assertFalse(self.seed.per_curiam)
+                self.assertEqual(self.seed.author_str, author_str)
+                self.assertEqual(self.seed.author_id, author_id)
+
+    def test_a_lone_unsigned_order_keeps_its_author(self) -> None:
+        """Does a single-writing order keep the author it already had?
+
+        Only a split paper drops the seed's author for an unsigned order.
+        A lone order is imported as before, so single-opinion clusters
+        keep the author the scraper gave them.
+        """
+        author = PersonFactory()
+        self.seed.author = author
+        self.seed.author_str = ""
+        self.seed.save()
+        payload = copy.deepcopy(self.single_payload)
+        payload["opinions"][0].update(
+            type="order", author=None, author_name=None, author_title=None
+        )
+
+        opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+            self.seed, payload
+        )
+
+        self.assertEqual(opinion_pks, [self.seed.pk], msg=reason)
+        self.seed.refresh_from_db()
+        self.assertEqual(self.seed.type, Opinion.LEAD)
+        self.assertFalse(self.seed.per_curiam)
+        self.assertEqual(self.seed.author_str, "")
+        self.assertEqual(self.seed.author_id, author.pk)
+
+    def test_orders_fall_back_to_position(self) -> None:
+        """Are unusable Centralia orders replaced by 1 to N?
+
+        Ordering keys must be unique within a cluster, so duplicate or
+        missing orders must not stop the split.
+        """
+        for orders in ([1, 1], [None, 2], [0, 1]):
+            with self.subTest(orders=orders):
+                cluster = OpinionClusterFactory(
+                    docket=DocketFactory(court=self.court),
+                    date_filed=date(2024, 1, 1),
+                )
+                seed = OpinionFactory(cluster=cluster, html="", plain_text="")
+                payload = copy.deepcopy(self.multi_payload)
+                for writing, order in zip(payload["opinions"], orders):
+                    writing["order"] = order
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
+                )
+
+                self.assertEqual(len(opinion_pks), 2, msg=reason)
+                self.assertEqual(
+                    list(
+                        cluster.sub_opinions.order_by(
+                            "ordering_key"
+                        ).values_list("type", "ordering_key")
+                    ),
+                    [(Opinion.LEAD, 1), (Opinion.DISSENT, 2)],
+                )
+
+    @patch("cl.corpus_importer.centralia.logger")
+    def test_refuses_to_split_unsafely(self, mock_logger) -> None:
+        """Is a split refused when it isn't safe, leaving the cluster as is?
+
+        A split is unsafe when a writing has no HTML or the cluster already
+        has several opinions. The second case is also what stops a split cluster from being split
+        again, since its siblings share the original PDF.
+        """
+        no_html = copy.deepcopy(self.multi_payload)
+        no_html["opinions"][1]["html"] = " "
+        for name, payload, add_sibling, expected in (
+            ("blank writing", no_html, False, "a writing carries no html"),
+            ("existing sibling", self.multi_payload, True, "already has 2"),
+        ):
+            with self.subTest(name):
+                cluster = OpinionClusterFactory(
+                    docket=DocketFactory(court=self.court),
+                    date_filed=date(2024, 1, 1),
+                )
+                seed = OpinionFactory(cluster=cluster, html="", plain_text="")
+                if add_sibling:
+                    OpinionFactory(cluster=cluster)
+
+                opinion_pks, reason = merge_structured_opinion_into_cl_opinion(
+                    seed, payload
+                )
+
+                self.assertEqual(opinion_pks, [])
+                self.assertIn(expected, reason)
+                self.assertEqual(mock_logger.warning.call_args.args[2], reason)
+                self.assertEqual(
+                    cluster.sub_opinions.count(), 2 if add_sibling else 1
+                )
+                seed.refresh_from_db()
+                self.assertEqual(seed.html, "")
 
     def test_a_lone_writing_ingests_as_the_lead(self) -> None:
         """Does a single-writing paper become the lead opinion?
@@ -6377,3 +6480,81 @@ class CentraliaIngestTest(TestCase):
             msg="xml_harvard must never be touched",
         )
         self.assertEqual(self.cluster.sub_opinions.count(), 1)
+
+
+class ExtractStructuredOpinionTest(TestCase):
+    """Test extracting a scraped opinion's PDF with Centralia."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+        with (
+            CentraliaIngestTest.test_dir / "centralia_payload_multi.json"
+        ).open(encoding="utf-8") as f:
+            cls.multi_payload = json.load(f)
+
+    def setUp(self) -> None:
+        self.cluster = OpinionClusterFactory(
+            docket=DocketFactory(court=self.court),
+            date_filed=date(2024, 1, 1),
+        )
+        self.seed = OpinionFactory(
+            cluster=self.cluster,
+            html="",
+            plain_text="",
+            local_path="pdf/2024/01/01/opinion.pdf",
+        )
+        response = mock.MagicMock(is_success=True)
+        response.json.return_value = {"success": True, **self.multi_payload}
+        patches = [
+            patch(
+                "cl.corpus_importer.management.commands."
+                "extract_structured_opinions.microservice",
+                new_callable=mock.AsyncMock,
+                return_value=response,
+            ),
+            # The PDF is only streamed to the mocked microservice
+            patch("django.db.models.fields.files.FieldFile.open"),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    @patch(
+        "cl.corpus_importer.management.commands.extract_structured_opinions."
+        "find_citations_and_parentheticals_for_opinion_by_pks"
+    )
+    def test_a_split_finds_citations_for_every_opinion(
+        self, mock_find_citations
+    ) -> None:
+        """Are citations found for the seed and its new siblings?
+
+        A dry run must save nothing and queue nothing.
+        """
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                result = extract_structured_opinion(self.seed, dry_run=dry_run)
+
+                self.assertEqual(result["writings"], 2)
+                if dry_run:
+                    self.assertEqual(
+                        result["status"],
+                        StructuredExtractionStatus.WOULD_INGEST,
+                        msg=result["reason"],
+                    )
+                    self.assertEqual(self.cluster.sub_opinions.count(), 1)
+                    mock_find_citations.si.assert_not_called()
+                    continue
+                self.assertEqual(
+                    result["status"],
+                    StructuredExtractionStatus.INGESTED,
+                    msg=result["reason"],
+                )
+                self.assertEqual(self.cluster.sub_opinions.count(), 2)
+                mock_find_citations.si.assert_called_once_with(
+                    list(
+                        self.cluster.sub_opinions.order_by(
+                            "ordering_key"
+                        ).values_list("pk", flat=True)
+                    )
+                )

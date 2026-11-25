@@ -1,8 +1,10 @@
+"""Shared REST API helpers: serializers, filters, throttles, and usage logging."""
+
 import logging
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
 from typing import Any, TypedDict
@@ -31,16 +33,16 @@ from django.views.decorators.vary import vary_on_headers
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
-from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.exceptions import NotFound, Throttled, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
-from rest_framework.request import clone_request
+from rest_framework.request import Request, clone_request
 from rest_framework.response import Response as DRFResponse
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
-from waffle import switch_is_active
+from waffle import flag_is_active, switch_is_active
 
 from cl.api.constants import LEVEL_TO_RATES
 from cl.api.models import (
@@ -227,6 +229,7 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """
 
     def to_html(self, request, queryset, view):
+        """Render no filter controls."""
         return ""
 
 
@@ -280,7 +283,7 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
         return ""
 
 
-class FilterManyToManyMixin:
+class FilterManyToManyMixin(FilterSet):
     """Mixin for filtering nested many-to-many relationships.
 
     Provides helper methods to efficiently filter nested querysets when using
@@ -297,7 +300,7 @@ class FilterManyToManyMixin:
 
     join_table_cleanup_mapping: dict[str, str] = {}
 
-    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+    def _get_filter_label(self, field_name: str) -> str:
         """Maps a filter field name to its corresponding label.
 
         When defining filters(Declarative or using the `fields` attribute) in a
@@ -340,7 +343,7 @@ class FilterManyToManyMixin:
             join_table_key = join_table_key.replace(url_key, new_key, 1)
         return join_table_key
 
-    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
+    def get_filters_for_join_table(self) -> dict[str, Any]:
         """Processes request filters for use in a join table query.
 
         Iterates through the request filters, cleaning and transforming them to
@@ -360,7 +363,9 @@ class FilterManyToManyMixin:
         for related_name, related_filterset in self.related_filtersets.items():
             prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
             # Check if the related filterset has data to apply
-            if not any(value.startswith(prefix) for value in self.data):
+            if self.data is None or not any(
+                value.startswith(prefix) for value in self.data
+            ):
                 # Skip processing if no parameter starts with the prefix
                 continue
 
@@ -408,6 +413,7 @@ class NoEmptyFilterSet(FilterSet):
     def __init__(
         self, data=None, queryset=None, *, relationship=None, **kwargs
     ):
+        """Build the filterset, dropping empty parameters from ``data``."""
         # Remove any empty query parameters from the QueryDict. Fixes #2066
         if data:
             # Make a mutable copy so we can tweak it.
@@ -419,7 +425,13 @@ class NoEmptyFilterSet(FilterSet):
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
+    """Metadata that also describes the view's filters."""
+
     def determine_metadata(self, request, view):
+        """Add each filter's type and lookup types to the view's metadata.
+
+        The API root has no filterset, so its metadata is returned unchanged.
+        """
         metadata = super().determine_metadata(request, view)
         filters: OrderedDict[str, OrderedDict[str, Any]] = OrderedDict()
         if not hasattr(view, "filterset_class"):
@@ -519,12 +531,14 @@ class LoggingMixin:
     milestones = get_milestone_range("SM", "XXXL")
 
     def initial(self, request, *args, **kwargs):
+        """Set ``requested_at`` to now, for timing the request."""
         super().initial(request, *args, **kwargs)
 
         # For logging the timing in self.finalize_response
         self.requested_at = now()
 
     def finalize_response(self, request, response, *args, **kwargs):
+        """Log the request's usage stats unless the response is an exception."""
         response = super().finalize_response(
             request, response, *args, **kwargs
         )
@@ -593,8 +607,7 @@ class LoggingMixin:
         timing_key = f"{api_prefix}.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
-        results = pipe.execute()
-        return results
+        return pipe.execute()
 
     def _handle_events(self, results, user, api_version):
         total_count = results[0]
@@ -639,6 +652,7 @@ class CacheListMixin:
     # Ensure that permissions are maintained and not cached!
     @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
+        """List results, cached for a minute per cookie and authorization."""
         return super().list(*args, **kwargs)
 
 
@@ -668,6 +682,11 @@ class NoFilterCacheListMixin:
     """
 
     def list(self, request, *args, **kwargs):
+        """List results, using and filling the cache for eligible requests.
+
+        V3 requests and requests with pagination, dynamic fields, or filters
+        are never cached. Cached responses last ten minutes.
+        """
         queryset = self.filter_queryset(self.get_queryset())
         has_filters = queryset.query.has_filters()
         is_count_request = (
@@ -1171,6 +1190,7 @@ class CloudFrontIdentMixin:
     """
 
     def get_ident(self, request):
+        """Identify the client by its CloudFront viewer address, if present."""
         return get_ratelimit_ident(request) or super().get_ident(request)
 
 
@@ -1219,6 +1239,7 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
     throttle_type = ThrottleType.API
 
     def __init__(self):
+        """Load the scope's default rates, which may be one rate or a list."""
         raw = self.THROTTLE_RATES.get(self.scope)
         if raw is None:
             self.rate = None
@@ -1239,6 +1260,7 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
         return self.scope == "user" and promo_doubling_applies(request.user)
 
     def get_cache_key(self, request, view):
+        """Get the throttle's cache key, with a separate key while the x2 promo applies."""
         key = super().get_cache_key(request, view)
         if key is None:
             return None
@@ -1261,6 +1283,11 @@ class ExceptionalUserRateThrottle(CloudFrontIdentMixin, UserRateThrottle):
         return rates
 
     def allow_request(self, request, view):
+        """Check the request against every effective rate.
+
+        Requests are allowed if the scope has no rate or there is no cache
+        key for the request.
+        """
         if self.rate is None:
             return True
 
@@ -1386,6 +1413,11 @@ class AlertThrottle(ExceptionalUserRateThrottle):
     throttle_type = ThrottleType.ALERTS
 
     def allow_request(self, request, view):
+        """Check the request against the user's configured alert rates.
+
+        This throttle always allows anonymous users and users without an
+        ALERTS override.
+        """
         if not request.user or not request.user.is_authenticated:
             return True
 
@@ -1449,6 +1481,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         return len(citation_objs)
 
     def get_cache_key_for_citations(self, request, view):
+        """Get the user's cache key for the citation throttle."""
         return self.cache_format % {
             "scope": "citations",
             "ident": request.user.pk,
@@ -1478,6 +1511,13 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         return overrides.get(request.user.username) or default_rates
 
     def throttle_request_by_citation_count(self, request, view):
+        """Throttle the request if the user's citations exceed any rate window.
+
+        If no window is exceeded, the request's citation count is recorded.
+
+        Raises:
+            Throttled: If any rate window has been exceeded.
+        """
         rates = self.get_citations_rate(request)
         parsed: list[tuple[int, int]] = [
             (n, d)
@@ -1524,6 +1564,11 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         self.cache.set(self.key, self.history, max_duration)
 
     def allow_request(self, request, view):
+        """Check the request against both the citation and request rates.
+
+        Raises:
+            Throttled: If the citation rate has been exceeded.
+        """
         self.throttle_request_by_citation_count(request, view)
         return super().allow_request(request, view)
 
@@ -1583,6 +1628,7 @@ class ApiUsageRateThrottle(ExceptionalUserRateThrottle):
     scope = "api_usage"
 
     def get_effective_rates(self, request) -> list[str]:
+        """Use the scope's default rates, ignoring per-user overrides."""
         return self.default_rates
 
 
@@ -1619,6 +1665,8 @@ class RECAPUploaders(DjangoModelPermissions):
 
 
 class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
+    """Let users with view access read and users with email upload access post."""
+
     perms_map = {
         "POST": ["%(app_label)s.has_recap_email_upload_access"],
         "GET": ["%(app_label)s.view_%(model_name)s"],
@@ -1727,7 +1775,7 @@ def invert_user_logs(
     for k, v in out.items():
         try:
             user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
+        except User.DoesNotExist, ValueError:
             user_keyed_out[k] = v
         else:
             user_keyed_out[user.username] = v
@@ -1855,6 +1903,47 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     return results[0] / results[1]
 
 
+async def get_coverage_data_fds() -> dict[str, int]:
+    """Get estimated row counts for the financial disclosure tables.
+
+    Uses Postgres's table estimates instead of COUNT(*), since exact counts
+    of the bigger tables (e.g. investments) are too slow to run in a request.
+
+    Returns:
+        A dict mapping item types to their estimated counts.
+    """
+    # Imported here because cl.search.models imports this module (via
+    # cl.users.models), and both of these import cl.search.models.
+    from cl.disclosures.models import (
+        Agreement,
+        Debt,
+        FinancialDisclosure,
+        Gift,
+        Investment,
+        NonInvestmentIncome,
+        Position,
+        Reimbursement,
+        SpouseIncome,
+    )
+    from cl.search.selectors import get_total_estimate_count
+
+    models: dict[str, type[Model]] = {
+        "disclosures": FinancialDisclosure,
+        "investments": Investment,
+        "positions": Position,
+        "agreements": Agreement,
+        "non_investment_income": NonInvestmentIncome,
+        "spousal_income": SpouseIncome,
+        "reimbursements": Reimbursement,
+        "gifts": Gift,
+        "debts": Debt,
+    }
+    return {
+        k: await sync_to_async(get_total_estimate_count)(model._meta.db_table)
+        for k, model in models.items()
+    }
+
+
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """Returns the next retry datetime to schedule a webhook retry based on its current retry counter.
 
@@ -1886,10 +1975,7 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """
     INITIAL_TIME = 3  # minutes
     # Update new_next_retry_date exponentially
-    new_next_retry_date = now() + timedelta(
-        minutes=pow(INITIAL_TIME, retry_counter + 1)
-    )
-    return new_next_retry_date
+    return now() + timedelta(minutes=pow(INITIAL_TIME, retry_counter + 1))
 
 
 WEBHOOK_MAX_RETRY_COUNTER = 7
@@ -2031,6 +2117,8 @@ def update_webhook_event_after_request(
 
 
 class WebhookKeyType(TypedDict):
+    """The ``webhook`` key of a webhook event's payload."""
+
     event_type: int
     version: int
     date_created: str | None
@@ -2047,12 +2135,11 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
     Returns:
         The ISO-8601 formatted date string with UTC timezone.
     """
-    deprecation_date = (
+    return (
         datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
         .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         .isoformat()
     )
-    return deprecation_date
 
 
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
@@ -2069,7 +2156,7 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     match webhook.version:
         case WebhookVersions.v1:
             deprecation_date = get_webhook_deprecation_date(
-                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
+                settings.WEBHOOK_V1_DEPRECATION_DATE
             )
         case WebhookVersions.v2:
             deprecation_date = None
@@ -2111,8 +2198,7 @@ def log_webhook_event(webhook_user_id: int) -> list[int | float]:
     # the number of successful webhook request the user made in total.
     pipe.zincrby(f"{webhook_prefix}.user.counts", 1, webhook_user_id)
 
-    results = pipe.execute()
-    return results
+    return pipe.execute()
 
 
 def handle_webhook_events(results: list[int | float], user: User) -> None:
@@ -2202,7 +2288,6 @@ class DynamicFieldsMixin:
             allowed = set(filter(None, filter_fields))
 
         # omit fields in the `omit` argument.
-        # TODO: Typing this correctly involves going through a long chain of things that probably also need to be typed
         omitted = set(filter(None, omit_fields))
 
         for field in existing:
@@ -2214,15 +2299,22 @@ class DynamicFieldsMixin:
 
         return fields
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> Iterable[str] | Default:
+        """Split a comma-separated fields parameter, or return ``default`` if it is missing."""
         try:
             return params.split(",")
         except AttributeError:
             return default
 
     def get_omit_fields(self, params, level, source):
+        """Split a comma-separated omit parameter, or return an empty list if it is missing."""
         return self.get_filter_fields(
             params, level, source, default=[], include_parent=False
         )
@@ -2248,11 +2340,17 @@ class NestedDynamicFieldsMixin(DynamicFieldsMixin):
 
     @property
     def prevent_nested_processing(self):
+        """Always False, so every nesting level filters its fields."""
         return False
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> set[str] | Default:
         """Parse the raw `fields` parameter and return the subset of fields that apply at this serializer’s nesting level under the given source prefix."""
         fields = super().get_filter_fields(
             params, level, source, default, include_parent
@@ -2278,15 +2376,23 @@ def get_source_path(serializer) -> str:
     return f"{parent_path}__{name}" if parent_path else name
 
 
-def get_fields_for_level_and_prefix(
-    fields_list, level, source, include_parent, default
-):
+def get_fields_for_level_and_prefix[
+    Fields: Iterable[str] | None,
+    Default: Iterable[str] | None,
+](
+    fields_list: Fields,
+    level: int,
+    source: str,
+    include_parent: bool,
+    default: Default,
+) -> set[str] | Default:
     """Extract the field names relevant to a specific nesting depth from a list of double‑underscore lookup strings."""
     if not fields_list:
         return default
 
     prefix = source.split("__") if source else []
     allowed = set()
+    # pyrefly:ignore[not-iterable]
     for f in fields_list:
         parts = f.split("__")
 
@@ -2325,6 +2431,8 @@ def compute_level(serializer) -> int:
 
 
 class RetrieveFilteredFieldsMixin:
+    """Serializer mixin that works out which model fields the ``fields`` and ``omit`` parameters leave out."""
+
     @staticmethod
     def _get_concrete_fields_for_model(model: type[Model]) -> list[str]:
         return [
@@ -2410,9 +2518,9 @@ class RetrieveFilteredFieldsMixin:
             # with them.
             field_names = self._get_concrete_fields_for_model(nested_model)
             # Determine which nested fields to defer
-            for name in field_names:
-                if should_defer(name, items):
-                    child_names.append(name)
+            child_names.extend(
+                name for name in field_names if should_defer(name, items)
+            )
 
             if child_names:
                 nested_defer_map[parent] = (nested_model, child_names)
@@ -2535,6 +2643,10 @@ class DeferredFieldsMixin:
     """
 
     def get_queryset(self) -> QuerySet:
+        """Get the queryset with the serializer's omitted fields deferred.
+
+        Querysets that use ``values()`` or ``annotate()`` are returned as is.
+        """
         qs = super().get_queryset()  # type: ignore[misc]
         # Skip for queries that uses values() or annotate()
         if qs.query.values_select or qs.query.annotations:
@@ -2586,3 +2698,23 @@ class DeferredFieldsMixin:
             nested_prefetches + existing_simple_lookups
         )
         return new_qs
+
+
+class WaffleFlagMixin:
+    """ViewSet mixin that answers 404 unless the ``waffle_flag`` is active.
+
+    The flag is checked after authentication, so flags that target users or
+    groups work for token and OAuth requests too. Register the viewset with
+    ``cl.api.drf_routers.WaffleFlagRouter`` so the API root also hides its
+    route while the flag is off.
+    """
+
+    waffle_flag: str
+
+    def check_permissions(self, request: Request) -> None:
+        """Raise a 404 if the flag is off, then check the usual permissions."""
+        # DRF's authentication also sets the user on the Django request,
+        # which is what waffle reads to target users and groups.
+        if not flag_is_active(request._request, self.waffle_flag):
+            raise NotFound()
+        super().check_permissions(request)  # type: ignore[misc]

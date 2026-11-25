@@ -1,3 +1,5 @@
+"""Clean the raw docket numbers of non-RECAP dockets in given courts."""
+
 import time
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -11,13 +13,17 @@ from cl.search.models import Docket
 
 
 class Command(VerboseCommand):
+    """Clean raw docket numbers, queueing hard cases for the LLM cleaning daemon."""
+
     help = "Clean docket_number_raw and send to LLM cleaning daemon if needed."
 
     def __init__(self, *args, **kwargs):
+        """Build the command with no throttle."""
         super().__init__(*args, **kwargs)
         self.throttle = None
 
     def add_arguments(self, parser):
+        """Add the court IDs, resume, delay, and test mode options."""
         parser.add_argument(
             "--court-ids",
             nargs="+",
@@ -44,6 +50,11 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
+        """Clean the raw docket numbers of non-RECAP dockets in the courts.
+
+        Progress is saved to Redis every 100 dockets so a run can resume.
+        Outside test mode, waits ``--delay`` seconds after each docket.
+        """
         super().handle(*args, **options)
         court_ids = options.get("court_ids")
         auto_resume = options["auto_resume"]

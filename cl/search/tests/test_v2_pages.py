@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django import forms
+from django.contrib.auth.models import User
 from django.db import connection
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -10,6 +11,7 @@ from django.utils import timezone
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.donate.factories import NeonMembershipFactory
 from cl.lib import widgets
 from cl.lib.test_helpers import (
     RECAPSearchTestCase,
@@ -124,7 +126,13 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn(">Login</a>", resp.content.decode())
+        tree = lhtml.fromstring(resp.content)
+        sign_in_links = tree.xpath(
+            f'//a[starts-with(@href, "{reverse("sign-in")}")]'
+        )
+        self.assertIn(
+            "Login", [a.text_content().strip() for a in sign_in_links]
+        )
         self.assertNotIn(
             'aria-label="Toggle account menu"', resp.content.decode()
         )
@@ -134,10 +142,39 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertNotIn(">Login</a>", resp.content.decode())
+        tree = lhtml.fromstring(resp.content)
+        sign_in_links = tree.xpath(
+            f'//a[starts-with(@href, "{reverse("sign-in")}")]'
+        )
+        self.assertNotIn(
+            "Login", [a.text_content().strip() for a in sign_in_links]
+        )
         self.assertIn(
             'aria-label="Toggle account menu"', resp.content.decode()
         )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_membership_links_waffle")
+@override_flag("use_new_design", True)
+class HomepageMembershipLinksTest(SimpleUserDataMixin, TestCase):
+    """The homepage links members to their membership instead of the join page."""
+
+    def test_membership_links_follow_membership(self) -> None:
+        """Non-members are invited to join; members are sent to their membership.
+
+        Who counts as a member is covered by ProfileMembershipTest, so this only
+        checks that the homepage uses it.
+        """
+        self.client.login(username="pandora", password="password")
+        resp = self.client.get(reverse("show_results"))
+        self.assertContains(resp, "Become a Member")
+        self.assertNotContains(resp, "Your Membership")
+
+        NeonMembershipFactory(user=User.objects.get(username="pandora"))
+        resp = self.client.get(reverse("show_results"))
+        self.assertNotContains(resp, "Become a Member")
+        # Once in the "Support FLP" menu and once in the homepage actions.
+        self.assertContains(resp, "Your Membership", count=2)
 
 
 @override_flag("use_new_design", True)

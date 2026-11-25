@@ -1,11 +1,12 @@
+"""Import opinions from the scanning project's final XML files."""
+
 import copy
 import itertools
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import date
 from functools import partial
-from glob import glob
+from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
@@ -43,7 +44,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.url_utils import BASE_URL
-from cl.lib.utils import human_sort
+from cl.lib.utils import glob_files, human_sort
 from cl.people_db.lookup_utils import (
     extract_judge_last_name,
 )
@@ -249,9 +250,14 @@ def xml_file_paths(path: str) -> list[str]:
     Returns:
         A list of XML file paths.
     """
-    if os.path.isfile(path):
+    if Path(path).is_file():
         return [path]
-    return human_sort(glob(os.path.join(path, "**", "*.xml"), recursive=True))
+    return human_sort(
+        [
+            str(xml)
+            for xml in glob_files(Path(path), "**/*.xml", recursive=True)
+        ]
+    )
 
 
 def s3_xml_keys(
@@ -308,8 +314,7 @@ def read_local_xml(file_path: str) -> str:
     Returns:
         The XML content.
     """
-    with open(file_path, encoding="utf-8") as f:
-        return f.read()
+    return Path(file_path).read_text(encoding="utf-8")
 
 
 def get_citation_strings(soup: BeautifulSoup) -> list[str]:
@@ -1035,7 +1040,7 @@ def add_opinion_content(
         opinion=opinion,
         content=opinion.xml_scan,
         source=OpinionContent.FLP_SCANNING,
-        extraction_type=OpinionContent.OCR,
+        extraction_type=OpinionContent.OCR_ENSEMBLE,
         is_main_version=True,
         sha1=sha1(opinion.xml_scan),
         page_count=scan_case.page_count,

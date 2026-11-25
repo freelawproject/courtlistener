@@ -1,3 +1,5 @@
+"""Celery tasks for crawling PACER RSS feeds and merging their contents."""
+
 import bz2
 import errno
 import json
@@ -220,7 +222,7 @@ async def check_if_feed_changed_base(
         )
         feed_status.status = RssFeedStatus.PROCESSING_FAILED
         await feed_status.asave()
-        return
+        return None
 
     content = rss_feed.response.content
     if not content:
@@ -232,7 +234,7 @@ async def check_if_feed_changed_base(
             logger.warning(str(exc))
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
-            return
+            return None
 
     try:
         rss_feed.response.raise_for_status()
@@ -245,7 +247,7 @@ async def check_if_feed_changed_base(
         )
         feed_status.status = RssFeedStatus.PROCESSING_FAILED
         await feed_status.asave()
-        return
+        return None
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
@@ -264,7 +266,7 @@ async def check_if_feed_changed_base(
             logger.warning(str(exc))
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
-            return
+            return None
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
@@ -276,7 +278,7 @@ async def check_if_feed_changed_base(
         # Abort. Nothing has changed here.
         feed_status.status = RssFeedStatus.UNCHANGED
         await feed_status.asave()
-        return
+        return None
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge.",
@@ -306,8 +308,7 @@ async def check_if_feed_changed_base(
             feed_status.status = RssFeedStatus.PROCESSING_FAILED
             await feed_status.asave()
             return None
-        else:
-            raise exc
+        raise exc
 
     return rss_feed.data
 
@@ -317,8 +318,7 @@ def hash_item(item):
     """Hash an RSS item. Item should be a dict at this stage."""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
-    item_hash = sha256(item_j)
-    return item_hash
+    return sha256(item_j)
 
 
 # TODO Remove after scheduled merge_rss_feed_contents have been processed
@@ -348,10 +348,12 @@ async def cache_hash(item_hash: str) -> bool:
 
 
 def rss_cache_prefix() -> str:
+    """Get the prefix of the Redis keys for claimed RSS items."""
     return "rss_hash"
 
 
 def get_rss_cache_key(item_hash: str) -> str:
+    """Make the Redis key for a claimed RSS item's hash."""
     return f"{rss_cache_prefix()}:{item_hash}"
 
 
@@ -457,6 +459,7 @@ def merge_rss_feed_contents(
     queue=settings.CELERY_FEEDS_QUEUE,
 )
 def mark_status_successful(self: Task, feed_status_pk: int) -> None:
+    """Mark a feed status as successfully processed."""
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)

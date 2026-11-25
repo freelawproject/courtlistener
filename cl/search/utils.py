@@ -1,4 +1,7 @@
+"""Helpers for gathering homepage statistics."""
+
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
@@ -12,6 +15,15 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
 from cl.stats.constants import StatMetric
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
+
+    def cache_memoize[F: Callable](
+        *args: Any, **kwargs: Any
+    ) -> Callable[[F], F]:
+        """Type check only shadow of the `cache_memoize` decorator to allow correct inference."""
 
 
 def get_redis_stat_sum(
@@ -54,7 +66,7 @@ def get_v2_homepage_stats():
         minutes=Floor(Coalesce(Sum("duration"), Value(0)) / Value(60.0))
     )["minutes"]
 
-    homepage_stats = {
+    return {
         "alerts_in_last_ten": alerts_in_last_ten,
         "queries_in_last_ten": queries_in_last_ten,
         "api_in_last_ten": api_in_last_ten,
@@ -63,7 +75,6 @@ def get_v2_homepage_stats():
         "docket_count": get_total_estimate_count("search_docket"),
         "recap_doc_count": get_total_estimate_count("search_recapdocument"),
     }
-    return homepage_stats
 
 
 @cache_memoize(5 * 60)
@@ -86,7 +97,7 @@ def get_homepage_stats():
         date_created__gte=ten_days_ago
     ).count()
 
-    homepage_data = {
+    return {
         "alerts_in_last_ten": alerts_in_last_ten,
         "queries_in_last_ten": queries_in_last_ten,
         "api_in_last_ten": api_in_last_ten,
@@ -101,4 +112,3 @@ def get_homepage_stats():
         )["d"],
         "private": False,  # VERY IMPORTANT!
     }
-    return homepage_data

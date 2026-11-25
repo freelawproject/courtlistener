@@ -1,6 +1,9 @@
+"""Models for user profiles, bar memberships, email flags, and stored emails."""
+
 import re
 import uuid
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.conf import settings
@@ -18,6 +21,16 @@ from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
 
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    UserGroupsEvent: type[Event]
+    UserPermissionsEvent: type[Event]
+    UserProfileBarMembershipEvent: type[Event]
+    UserProfileEvent: type[Event]
+    UserProxyEvent: type[Event]
+
 donation_exclusion_codes = [
     1,  # Unknown error
     3,  # Cancelled
@@ -27,6 +40,8 @@ donation_exclusion_codes = [
 
 
 class BarMembership(models.Model):
+    """A state bar membership, identified by its state."""
+
     barMembership = USStateField(
         "the two letter state abbreviation of a bar membership"
     )
@@ -41,6 +56,8 @@ class BarMembership(models.Model):
 
 @pghistory.track()
 class UserProfile(models.Model):
+    """A user's settings and details beyond Django's user model."""
+
     user = models.OneToOneField(
         User,
         related_name="profile",
@@ -364,10 +381,9 @@ class EmailFlag(AbstractDateTimeModel):
         Returns:
             bool: True if so, False if not.
         """
-        if now() < self.next_retry_date:
-            return True
-        else:
-            return False
+        return (
+            self.next_retry_date is not None and now() < self.next_retry_date
+        )
 
     def __str__(self) -> str:
         return f"{self.get_flag_type_display()} for {self.email_address}"
@@ -533,6 +549,14 @@ class FailedEmail(AbstractDateTimeModel):
 def generate_recap_email(
     user_profile: UserProfile, append: int | None = None
 ) -> str:
+    """Make a unique ``@recap.email`` address from the user's username.
+
+    Non-alphanumeric runs become dots, and a number is appended if the
+    address is taken.
+
+    Raises:
+        FieldError: If no free address is found after 100 attempts.
+    """
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""
@@ -543,7 +567,7 @@ def generate_recap_email(
     )
     if append is not None and append >= 100:
         raise FieldError("Too many requests made to generate recap email.")
-    elif len(user_profiles_with_match) > 0:
+    if len(user_profiles_with_match) > 0:
         return generate_recap_email(user_profile, (append or 0) + 1)
     return recap_email
 

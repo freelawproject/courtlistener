@@ -67,9 +67,7 @@ COMMAND_MODULE = (
 CITATIONS_TASK = (
     f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
 )
-SCAN_XML_PATH = str(
-    Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
-)
+SCAN_XML_PATH = Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 
 
 def make_soup(xml: str) -> BeautifulSoup:
@@ -125,7 +123,7 @@ class ScanXmlHelpersTest(SimpleTestCase):
 
     def test_pair_opinions(self) -> None:
         """Are opinions paired by author and text, and only one-to-one?"""
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             lead_opinion = make_soup(f.read()).select_one("opinion")
         if lead_opinion is None:
             self.fail("The test XML must have an opinion")
@@ -551,12 +549,12 @@ class ImportScannedOpinionsTest(TestCase):
         cls.court = CourtFactory.create(
             id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
         )
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             opinion = make_soup(f.read()).select_one("opinion")
         if opinion is None:
             raise ValueError("The test XML must have an opinion")
         cls.opinion_text = opinion.get_text(" ")
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
     def setUp(self) -> None:
@@ -589,7 +587,10 @@ class ImportScannedOpinionsTest(TestCase):
 
     def import_scan(self, **kwargs: str | bool | None) -> None:
         """Run the command over the test XML."""
-        options = {"court_id": self.court.pk, "path": SCAN_XML_PATH} | kwargs
+        options = {
+            "court_id": self.court.pk,
+            "path": str(SCAN_XML_PATH),
+        } | kwargs
         call_command("import_scanned_opinions", **options)
 
     def import_xml(self, xml: str, **kwargs: str | bool | None) -> None:
@@ -675,7 +676,7 @@ class ImportScannedOpinionsTest(TestCase):
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
-        self.assertEqual(content.extraction_type, OpinionContent.OCR)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR_ENSEMBLE)
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
@@ -1791,7 +1792,7 @@ class ImportFromScanningBucketTest(TestCase):
         cls.court = CourtFactory.create(
             id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
         )
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
     def import_from_bucket(

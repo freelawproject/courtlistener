@@ -1,3 +1,5 @@
+"""Update opinions and related objects with metadata extracted from their text."""
+
 import traceback
 from datetime import datetime
 
@@ -106,6 +108,8 @@ def rerun_extract_from_text(
 
 
 class Command(ScraperCommand):
+    """Re-run a scraper's ``extract_from_text`` on selected opinions."""
+
     help = """Updates objects by running Site.extract_from_text
     over extracted content found on Opinion.plain_text or Opinion.html.
 
@@ -131,6 +135,7 @@ class Command(ScraperCommand):
     juriscraper_module_type = "opinions"
 
     def add_arguments(self, parser):
+        """Add the opinion ID, date filed range, and cluster status options."""
         super().add_arguments(parser)
         parser.add_argument(
             "--opinion-ids",
@@ -164,6 +169,14 @@ class Command(ScraperCommand):
         )
 
     def handle(self, *args, **options):
+        """Re-extract the given opinions, or the court's scraped opinions filed in the date range.
+
+        Logs the counts of modified objects.
+
+        Raises:
+            ValueError: If no opinion IDs are given and either date filter is
+                missing.
+        """
         super().handle(*args, **options)
         juriscraper_module = options["court_id"]
 

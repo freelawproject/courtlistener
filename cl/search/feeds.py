@@ -1,5 +1,8 @@
+"""Atom feeds of search results and of each jurisdiction's opinions."""
+
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -43,8 +46,7 @@ def get_item(item):
     """Normalize grouped and non-grouped results to return the item itself."""
     if "doclist" in item:
         return item["doclist"]["docs"][0]
-    else:
-        return item
+    return item
 
 
 def cleanup_control_chars(
@@ -100,6 +102,7 @@ class SearchFeed(Feed):
     feed_copyright = "Created for the public domain by Free Law Project"
 
     def get_object(self, request, get_string):
+        """Use the request as the feed's object."""
         return request
 
     def items(self, obj):
@@ -166,24 +169,31 @@ class SearchFeed(Feed):
         return context
 
     def item_author_name(self, item):
+        """Use the item's court as its author."""
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
+        """Get the item's publication date.
+
+        RECAP items use their entry filing date: midnight Pacific Time on it
+        if it is timezone-aware, otherwise localized to the court's
+        timezone. Opinions use midnight Pacific Time on their filing date.
+        """
         try:
             # Get pub_date for RECAP
             entry_date = get_item(item)["entry_date_filed"]
             if not is_naive(entry_date):
                 # Handle non-naive dates
                 return midnight_pt(entry_date)
-            else:
-                return localize_naive_datetime_to_court_timezone(
-                    get_item(item)["court_id"], entry_date
-                )
+            return localize_naive_datetime_to_court_timezone(
+                get_item(item)["court_id"], entry_date
+            )
         except KeyError:
             # Get pub_date for Opinions
             return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
+        """Use the item's case name as its title."""
         return get_item(item)["caseName"]
 
 
@@ -198,9 +208,11 @@ class JurisdictionFeed(Feed):
     description_template = "feeds/description_template.html"
 
     def title(self, obj):
+        """Title the feed as all opinions for the court."""
         return f"CourtListener.com: All opinions for the {obj.full_name}"
 
     def get_object(self, request, court):
+        """Get the court, or raise 404 if it doesn't exist."""
         return get_object_or_404(Court, pk=court)
 
     def items(self, obj):
@@ -222,21 +234,27 @@ class JurisdictionFeed(Feed):
         return items
 
     def item_link(self, item):
+        """Link to the item's page."""
         return get_item(item)["absolute_url"]
 
     def item_author_name(self, item):
+        """Use the item's court as its author."""
         return get_item(item)["court"]
 
-    def item_pubdate(self, item):
+    def item_pubdate(self, item) -> datetime | None:
+        """Use midnight Pacific Time on the item's filing date."""
         return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
+        """Use the item's case name as its title."""
         return get_item(item)["caseName"]
 
-    def item_categories(self, item):
+    def item_categories(self, item) -> list[str] | None:
+        """Use the item's precedential status as its only category."""
         return [get_item(item)["status"]]
 
     def item_enclosure_url(self, item):
+        """Link to the item's file in storage, or None if that fails."""
         try:
             path = get_item(item)["local_path"]
             return f"https://storage.courtlistener.com/{path}"
@@ -244,6 +262,7 @@ class JurisdictionFeed(Feed):
             return None
 
     def item_enclosure_mime_type(self, item):
+        """Get the MIME type of the item's file, or None if that fails."""
         try:
             path = get_item(item)["local_path"]
             return lookup_mime_type(path)
@@ -255,10 +274,13 @@ class JurisdictionFeed(Feed):
 
 
 class AllJurisdictionsFeed(JurisdictionFeed):
+    """Feed of the 20 most recently filed opinions from any court."""
+
     title = "CourtListener.com: All Opinions (High Volume)"
 
     def get_object(self, request):
-        return None
+        """Use no object, since the feed covers every court."""
+        return
 
     def items(self, obj):
         """Do a match all search query. Return the first 20 results."""
@@ -287,8 +309,7 @@ def search_feed_error_handler(view_func: Callable) -> Callable:
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
         try:
-            response = view_func(request, *args, **kwargs)
-            return response
+            return view_func(request, *args, **kwargs)
         except (
             UnbalancedParenthesesQuery,
             UnbalancedQuotesQuery,

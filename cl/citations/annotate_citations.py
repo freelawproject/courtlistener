@@ -1,3 +1,5 @@
+"""Annotate opinion HTML with links to the opinions it cites."""
+
 import html
 import re
 from collections.abc import Mapping, Sequence
@@ -126,7 +128,7 @@ def create_cited_html(
                 new_html = html.escape(plain_text)
         return new_html
 
-    document = list(citation_resolutions.values())[0][0].document
+    document = next(iter(citation_resolutions.values()))[0].document
     # eyecite.get_citations attaches the Document to every citation it returns
     assert document is not None
 

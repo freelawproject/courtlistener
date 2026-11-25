@@ -1,6 +1,9 @@
+"""Models for API throttle overrides, webhooks, and webhook events."""
+
 import re
 import uuid
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.contrib.auth.models import User
@@ -9,6 +12,13 @@ from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    APIThrottleEvent: type[Event]
+    WebhookHistoryEvent: type[Event]
 
 # Pattern: digits, slash, then valid time unit (s/m/h/d or full words)
 RATE_PATTERN = re.compile(r"^\d+/(s|m|h|d|sec|min|second|minute|hour|day)$")
@@ -29,6 +39,8 @@ def normalize_time_unit(rate: str) -> str:
 
 
 class ThrottleType(models.IntegerChoices):
+    """The kinds of API usage that can be throttled."""
+
     API = 1, "API"
     CITATION_LOOKUP = 2, "Citation Lookup"
     ALERTS = 3, "Alerts"
@@ -95,6 +107,13 @@ class APIThrottle(AbstractDateTimeModel):
         return f"{self.user.username} at {self.rate} ({throttle_type})"
 
     def clean(self) -> None:
+        """Validate the throttle's rate.
+
+        Raises:
+            ValidationError: If an unblocked throttle has no rate, the rate is
+                malformed, or another throttle from the same source already
+                has a rate for this user, type, and time unit.
+        """
         super().clean()
         if not self.blocked and not self.rate:
             raise ValidationError(
@@ -129,6 +148,8 @@ class APIThrottle(AbstractDateTimeModel):
 
 
 class WebhookEventType(models.IntegerChoices):
+    """The kinds of events that can trigger a webhook."""
+
     DOCKET_ALERT = 1, "Docket Alert"
     SEARCH_ALERT = 2, "Search Alert"
     RECAP_FETCH = 3, "Recap Fetch"
@@ -137,11 +158,13 @@ class WebhookEventType(models.IntegerChoices):
 
 
 class WebhookVersions(models.IntegerChoices):
+    """Webhook payload versions."""
+
     v1 = 1, "v1"
     v2 = 2, "v2"
 
 
-HttpStatusCodes = models.IntegerChoices(  # type: ignore
+HttpStatusCodes = models.IntegerChoices(
     "HttpStatusCodes",
     [(s.name, s.value) for s in HTTPStatus],  # type: ignore[arg-type]
 )
@@ -155,6 +178,8 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
     model_name="WebhookHistoryEvent",
 )
 class Webhook(AbstractDateTimeModel):
+    """A user's endpoint that receives POST requests for one event type."""
+
     user = models.ForeignKey[User, User](
         User,
         help_text="The user that has provisioned the webhook.",
@@ -206,6 +231,8 @@ class WEBHOOK_EVENT_STATUS:
 
 
 class WebhookEvent(AbstractDateTimeModel):
+    """One delivery of a webhook, with its content, response, and retry state."""
+
     webhook = models.ForeignKey[Webhook, Webhook](
         Webhook,
         help_text="The Webhook this event is associated with.",
@@ -265,4 +292,5 @@ class WebhookEvent(AbstractDateTimeModel):
 
     @property
     def event_type(self):
+        """The event type of the event's webhook."""
         return self.webhook.event_type

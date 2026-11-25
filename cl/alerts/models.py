@@ -1,4 +1,7 @@
+"""Models for search alerts, docket alerts, and scheduled alert hits."""
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import pghistory
 from django.contrib.auth.models import User
@@ -12,6 +15,13 @@ from model_utils import FieldTracker
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
+
+if TYPE_CHECKING:
+    from pghistory.models import Event
+
+    # Event models that pghistory.track() adds to this module at runtime.
+    AlertEvent: type[Event]
+    DocketAlertEvent: type[Event]
 
 
 def check_valid_alert_type_or_raise_error(
@@ -52,6 +62,8 @@ def validate_recap_alert_type(value: str) -> None:
 
 @pghistory.track()
 class Alert(AbstractDateTimeModel):
+    """A user's saved search query, sent to them at a chosen rate."""
+
     REAL_TIME = "rt"
     DAILY = "dly"
     WEEKLY = "wly"
@@ -140,12 +152,17 @@ class Alert(AbstractDateTimeModel):
 
 
 class DocketAlertManager(models.Manager):
+    """Manager for docket alerts."""
+
     def subscriptions(self):
+        """Return only the subscription alerts."""
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
 @pghistory.track()
 class DocketAlert(AbstractDateTimeModel):
+    """A user's subscription, or unsubscription, to a docket's updates."""
+
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
     TYPES = (
@@ -195,7 +212,10 @@ class DocketAlert(AbstractDateTimeModel):
 
 
 class DateJSONEncoder(DjangoJSONEncoder):
+    """JSON encoder that writes datetimes in full ISO format."""
+
     def default(self, o):
+        """Encode datetimes with ``isoformat``, deferring other types to Django."""
         if isinstance(o, datetime):
             return o.isoformat()
         return super().default(o)
@@ -227,7 +247,7 @@ class ScheduledAlertHit(AbstractDateTimeModel):
         related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
     )
-    document_content = models.JSONField(  # type: ignore
+    document_content = models.JSONField(
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
     )

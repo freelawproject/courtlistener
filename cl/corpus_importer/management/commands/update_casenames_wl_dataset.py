@@ -1,3 +1,5 @@
+"""Update case names and citations from a Westlaw dataset CSV."""
+
 import logging
 import re
 import time
@@ -65,14 +67,12 @@ def tokenize_case_name(case_name: str) -> set[str]:
     Returns:
         list of words
     """
-    words = []
-    for word in WORD_PATTERN.findall(case_name):
-        if len(word) > 1:
-            # Only keep words with more than one character
-            words.append(word.lower())
-
-    # Return only valid words
-    return set(words) - FALSE_POSITIVES
+    # Only keep words with more than one character and return only valid words
+    return {
+        word.lower()
+        for word in WORD_PATTERN.findall(case_name)
+        if len(word) > 1
+    } - FALSE_POSITIVES
 
 
 def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
@@ -132,7 +132,7 @@ def parse_date(date_str: str) -> date | None:
     for fmt in DATE_FORMATS:
         try:
             return datetime.strptime(date_str, fmt).date()
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
     logger.warning("Invalid date format: %s", date_str)
     return None
@@ -214,13 +214,11 @@ def query_possible_matches(
             cluster__date_filed=date_filed,
         )
         citation_queries |= citation_query
-    possible_matches = (
+    return (
         Citation.objects.filter(citation_queries)
         .select_related("cluster")
         .distinct("cluster__id")
     )
-
-    return possible_matches
 
 
 def update_matched_case_name(
@@ -353,7 +351,7 @@ def process_csv(
                 index,
             )
             continue
-        elif len(matches) > 1:
+        if len(matches) > 1:
             # More than one match, log and go to next row
             matches_found = ", ".join([str(cluster.id) for cluster in matches])
             logger.warning(
@@ -395,7 +393,7 @@ def process_csv(
                 if Citation.objects.filter(**citation).exists():
                     # We already have the citation
                     continue
-                elif Citation.objects.filter(
+                if Citation.objects.filter(
                     cluster_id=citation["cluster_id"],
                     reporter=citation.get("reporter"),
                 ).exists():
@@ -407,14 +405,13 @@ def process_csv(
                     )
                     transaction.set_rollback(True)
                     break
-                else:
-                    new_citation = Citation.objects.create(**citation)
-                    logger.info(
-                        "New citation added: %s to cluster id: %s",
-                        new_citation,
-                        matched_cluster.id,
-                    )
-                    total_citations_added += 1
+                new_citation = Citation.objects.create(**citation)
+                logger.info(
+                    "New citation added: %s to cluster id: %s",
+                    new_citation,
+                    matched_cluster.id,
+                )
+                total_citations_added += 1
 
             # Wait between each processed row to avoid sending to many
             # indexing tasks
@@ -426,12 +423,15 @@ def process_csv(
 
 
 class Command(BaseCommand):
+    """Match CSV case details to existing records and update them."""
+
     help = (
         "Match and compare case details from a CSV file with existing "
         "records in the database."
     )
 
     def add_arguments(self, parser):
+        """Add the file path, delay, dry-run, start row, and limit options."""
         parser.add_argument(
             "--filepath",
             type=str,
@@ -466,6 +466,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Process each CSV file.
+
+        Raises:
+            CommandError: If no file path is given.
+        """
         files = options["filepath"]
         delay = options["delay"]
         dry_run = options["dry_run"]

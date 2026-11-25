@@ -1,3 +1,5 @@
+"""Base classes for large sitemaps that are pre-generated with cursor pagination."""
+
 import logging
 from datetime import datetime
 from functools import cached_property
@@ -39,6 +41,7 @@ class CustomCursorPaginator(CursorPaginator):
     section: str | None = None
 
     def __init__(self, queryset, ordering: dict[str], section: str):
+        """Build the paginator for a sitemap section."""
         super().__init__(queryset, ordering)
         self.section = section
 
@@ -72,6 +75,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     # set url scheme to be compatible with the regular sitemap
     def get_protocol(self, protocol=None):
+        """Get the sitemap's protocol, the given one, or http in testing and development and https otherwise."""
         env_based_protocol = (
             "http"
             if any([settings.TESTING, settings.DEVELOPMENT])
@@ -93,6 +97,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         )
 
     def set_cursor(self, cursor: str | None = None):
+        """Set the cursor to generate URLs after."""
         self._cursor = cursor
         logger.debug(
             "Cursor set to '%s' for section '%s'", cursor, self.section
@@ -100,10 +105,12 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     @property
     def cursor(self):
+        """The cursor to generate URLs after."""
         return self._cursor
 
     @property
     def has_next(self):
+        """Whether the last generated page of URLs has a next page."""
         return self._has_next
 
     @property
@@ -113,6 +120,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     @property
     def paginator(self):
+        """A cursor paginator over the sitemap's items for its section."""
         return CustomCursorPaginator(
             self._items(), self.ordering, self.section
         )

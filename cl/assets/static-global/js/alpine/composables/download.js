@@ -6,7 +6,8 @@ navigating away, picked from the root element's `data-error-message-<status>`
 attributes with `data-error-message-default` as the fallback; without a
 default, a failure shows nothing. A redirect whose target carries a `next`
 parameter is taken as a sign-in redirect: the browser goes there with `next`
-pointed back at the current page, so signing in returns here. Without
+pointed back at the current page, so signing in returns here. Activation
+while `busy` is ignored, since a link cannot be disabled. Without
 JavaScript the link still downloads natively.
 
 Usage:
