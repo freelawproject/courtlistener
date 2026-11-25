@@ -91,7 +91,7 @@ def make_objects(
     list[Opinion],
     OpinionCluster,
     list[Citation],
-    OriginatingCourtInformation,
+    OriginatingCourtInformation | None,
 ]:
     """Takes the meta data from the scraper and associates it with objects.
 

@@ -3260,11 +3260,14 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.error_message = ""
                 pq.save()
                 return pq
-
-        if is_bankr_short_doc_id:
-            r_msg = "Invalid short pacer_doc_id for bankruptcy court."
-        if not magic_number:
+        elif not magic_number:
             r_msg = "No magic number available to download the document."
+        elif is_bankr_short_doc_id:
+            r_msg = "Invalid short pacer_doc_id for bankruptcy court."
+        else:
+            # An existing PQ that isn't eligible for a retry.
+            return pq
+
         if created or should_download:
             async_to_sync(mark_pq_status)(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
@@ -3614,25 +3617,21 @@ def process_recap_email(
         return None
 
     dockets = data["dockets"]
-    # Look for the main docket that has the valid magic number
-    magic_number = pacer_doc_id = pacer_case_id = document_url = None
-    for docket_data in dockets:
-        docket_entry = docket_data["docket_entries"][0]
-        if docket_entry["pacer_magic_num"] is not None:
-            magic_number = docket_entry["pacer_magic_num"]
-            pacer_doc_id = docket_entry["pacer_doc_id"]
-            pacer_case_id = docket_entry["pacer_case_id"]
-            document_url = docket_entry["document_url"]
-            pacer_seq_no = docket_entry["pacer_seq_no"]
-            break
-
-    # Some notifications don't contain a magic number at all, assign the
-    # pacer_doc_id, pacer_case_id and document_url from the first docket entry.
-    if magic_number is None:
-        pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
-        pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
-        document_url = dockets[0]["docket_entries"][0]["document_url"]
-        pacer_seq_no = dockets[0]["docket_entries"][0]["pacer_seq_no"]
+    # Use the main docket that has the valid magic number. Some notifications
+    # don't contain a magic number at all; fall back to the first docket entry.
+    main_entry = next(
+        (
+            docket_data["docket_entries"][0]
+            for docket_data in dockets
+            if docket_data["docket_entries"][0]["pacer_magic_num"] is not None
+        ),
+        dockets[0]["docket_entries"][0],
+    )
+    magic_number = main_entry["pacer_magic_num"]
+    pacer_doc_id = main_entry["pacer_doc_id"]
+    pacer_case_id = main_entry["pacer_case_id"]
+    document_url = main_entry["document_url"]
+    pacer_seq_no = main_entry["pacer_seq_no"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.
