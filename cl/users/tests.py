@@ -1,7 +1,7 @@
 import json
 import re
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
@@ -157,7 +157,11 @@ from cl.users.models import (
     UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
-from cl.users.utils import create_stub_account, message_dict
+from cl.users.utils import (
+    build_docket_alert_rows,
+    create_stub_account,
+    message_dict,
+)
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
 
@@ -6450,3 +6454,89 @@ class MembershipPageTest(TestCase):
                 response = self.client.get(url)
                 self.assertContains(response, "Renew Your Membership")
                 self.assertContains(response, "<dt>Term ended</dt>")
+
+
+@override_settings(TIME_ZONE="America/Los_Angeles")
+class DocketAlertRowsTest(SimpleTestCase):
+    """build_docket_alert_rows turns docket alerts into display-ready rows."""
+
+    def make_alert(
+        self, date_last_hit: datetime | None = None, **docket_fields: Any
+    ) -> DocketAlert:
+        """Builds an unsaved alert on an unsaved docket.
+
+        Docket fields default to a complete docket; pass any of them to
+        override it.
+        """
+        docket = DocketFactory.build(
+            **{
+                "pk": 42,
+                "slug": "united-states-v-trump",
+                "case_name": "United States v. Trump",
+                "court": CourtFactory.build(short_name="D.D.C."),
+                "docket_number": "1:23-cr-00257",
+                "date_filed": date(2023, 8, 1),
+                **docket_fields,
+            }
+        )
+        return DocketAlertFactory.build(
+            docket=docket, date_last_hit=date_last_hit
+        )
+
+    def test_row_has_display_ready_values(self) -> None:
+        """Every field is a string ready to print, in the site's formats."""
+        # 03:28 UTC on Dec. 13 is still Dec. 12 in Los Angeles, which shows
+        # the hit is converted to local time before it's formatted.
+        alert = self.make_alert(
+            date_last_hit=datetime(2024, 12, 13, 3, 28, tzinfo=UTC)
+        )
+
+        rows = build_docket_alert_rows([alert])
+
+        docket_url = reverse("view_docket", args=[42, "united-states-v-trump"])
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "case_name": "United States v. Trump",
+                    "date_filed": "Aug. 1, 2023",
+                    "docket_number": "1:23-cr-00257",
+                    "court": "D.D.C.",
+                    "last_hit": "Dec. 12, 2024, 7:28 p.m.",
+                    "url": f"{docket_url}?order_by=desc",
+                }
+            ],
+        )
+
+    def test_missing_values_fall_back(self) -> None:
+        """Empty values show a fallback instead of a blank cell."""
+        cases = [
+            ("date_filed", {"date_filed": None}, "Not provided"),
+            ("docket_number", {"docket_number": None}, "Not provided"),
+            ("last_hit", {}, "Never"),
+        ]
+        for field, docket_fields, expected in cases:
+            with self.subTest(field=field):
+                alert = self.make_alert(**docket_fields)
+
+                row = build_docket_alert_rows([alert])[0]
+
+                self.assertEqual(row[field], expected)
+
+    def test_rows_keep_the_given_order(self) -> None:
+        """One row per alert, in the order the caller sorted them."""
+        alerts = [
+            self.make_alert(pk=1, case_name="Zebra v. Apple"),
+            self.make_alert(pk=2, case_name="Apple v. Zebra"),
+        ]
+
+        rows = build_docket_alert_rows(alerts)
+
+        self.assertEqual(
+            [row["case_name"] for row in rows],
+            ["Zebra v. Apple", "Apple v. Zebra"],
+        )
+
+    def test_no_alerts_give_no_rows(self) -> None:
+        """An empty list in gives an empty list out."""
+        self.assertEqual(build_docket_alert_rows([]), [])
