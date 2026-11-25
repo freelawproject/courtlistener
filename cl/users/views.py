@@ -173,7 +173,7 @@ def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
         order_by = name_map[order_name]
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
-    )
+    ).select_related("docket__court")
     if order_by == "date_last_hit":
         if direction:
             docket_alerts = docket_alerts.order_by(

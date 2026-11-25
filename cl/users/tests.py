@@ -26,12 +26,12 @@ from django.core.mail import (
     send_mail,
 )
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.test import AsyncClient, RequestFactory
 from django.test.client import Client
-from django.test.utils import override_settings
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -6565,3 +6565,30 @@ class AlertsTabsTest(SimpleTestCase):
                 },
             ],
         )
+
+
+class AlertsViewsContextTest(TestCase):
+    """The alerts views pass what the v2 alerts page needs."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory().user
+
+    def setUp(self) -> None:
+        self.client.login(username=self.user.username, password="password")
+
+    def test_docket_alerts_queries_do_not_grow_with_alerts(self) -> None:
+        """Dockets and courts load with the alerts, not once per row."""
+        url = reverse("profile_docket_alerts")
+        DocketAlertWithParentsFactory(user=self.user)
+        # The first request fills caches (session, flags) that later ones
+        # reuse, so it isn't measured.
+        self.client.get(url)
+
+        with CaptureQueriesContext(connection) as one_alert:
+            self.client.get(url)
+        DocketAlertWithParentsFactory.create_batch(3, user=self.user)
+        with CaptureQueriesContext(connection) as four_alerts:
+            self.client.get(url)
+
+        self.assertEqual(len(four_alerts), len(one_alert))
