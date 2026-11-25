@@ -4,7 +4,7 @@ import re
 import tempfile
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from unittest import mock
 
 import time_machine
@@ -1609,12 +1609,18 @@ class ImportScannedOpinionsTest(TestCase):
         """
         cluster_save = OpinionCluster.save
 
-        def fail_path_save(cluster, *args, **kwargs):
+        def fail_path_save(
+            cluster: OpinionCluster, *args: Any, **kwargs: Any
+        ) -> None:
+            """Fail the cluster save that stores the XML path."""
             if "filepath_xml_scan" in (kwargs.get("update_fields") or []):
                 raise ValueError("boom")
-            return cluster_save(cluster, *args, **kwargs)
+            cluster_save(cluster, *args, **kwargs)
 
-        def save_file(field_file, name, content, save=True):
+        def save_file(
+            field_file: FieldFile, name: str, content: File, save: bool = True
+        ) -> None:
+            """Set the uploaded file's name without storing it."""
             field_file.name = f"xml/2024/05/22/{name}"
 
         corrected = self.scan_xml.replace(
