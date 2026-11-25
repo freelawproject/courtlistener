@@ -11,6 +11,7 @@
   tabs=""
   has_alert=""
   note_form=""
+  docket_tags=""
   tab_content_id="tab-content"
 />
 
@@ -102,14 +103,10 @@
     {% endif %}
   </div>
 
-  {# Action buttons — Tags is a placeholder. #}
-  {# TODO: Wire up Tags button interactivity. #}
+  {# Action buttons #}
   <div class="flex flex-wrap gap-2">
     <c-add-note.dialog :form="note_form"/>
-    <c-button variant="outline">
-      {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
-      Tags
-    </c-button>
+    <c-docket-tags-button :docket="docket" :docket_tags="docket_tags" />
     {% if docket_source_url %}
     <c-menu-button
       button_variant="outline"
