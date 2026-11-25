@@ -33,16 +33,16 @@ from django.views.decorators.vary import vary_on_headers
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
-from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.exceptions import NotFound, Throttled, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
-from rest_framework.request import clone_request
+from rest_framework.request import Request, clone_request
 from rest_framework.response import Response as DRFResponse
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
-from waffle import switch_is_active
+from waffle import flag_is_active, switch_is_active
 
 from cl.api.constants import LEVEL_TO_RATES
 from cl.api.models import (
@@ -2698,3 +2698,23 @@ class DeferredFieldsMixin:
             nested_prefetches + existing_simple_lookups
         )
         return new_qs
+
+
+class WaffleFlagMixin:
+    """ViewSet mixin that answers 404 unless the ``waffle_flag`` is active.
+
+    The flag is checked after authentication, so flags that target users or
+    groups work for token and OAuth requests too. Register the viewset with
+    ``cl.api.drf_routers.WaffleFlagRouter`` so the API root also hides its
+    route while the flag is off.
+    """
+
+    waffle_flag: str
+
+    def check_permissions(self, request: Request) -> None:
+        """Raise a 404 if the flag is off, then check the usual permissions."""
+        # DRF's authentication also sets the user on the Django request,
+        # which is what waffle reads to target users and groups.
+        if not flag_is_active(request._request, self.waffle_flag):
+            raise NotFound()
+        super().check_permissions(request)  # type: ignore[misc]
