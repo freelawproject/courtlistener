@@ -301,11 +301,18 @@ class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
         "entry_number",
         "sequence_number",
     )
-    # Entries without attachments keep an empty placeholder document for ES,
-    # which isn't a real document, so it's left out. The nested documents
-    # never include plain_text, so it isn't read either.
+    # The nested documents' absolute_url needs the docket's slug, so only it
+    # is read from the docket; the entry's own columns are left to
+    # DeferredFieldsMixin. Entries without attachments keep an empty
+    # placeholder document for ES, which isn't a real document, so it's left
+    # out. The nested documents never include plain_text, so it isn't read
+    # either.
     queryset = (
         SCOTUSDocketEntry.objects.select_related("docket")
+        .only(
+            *(field.name for field in SCOTUSDocketEntry._meta.concrete_fields),
+            "docket__slug",
+        )
         .prefetch_related(
             Prefetch(
                 "scotus_documents",
@@ -328,11 +335,17 @@ class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
         *BaseSourceReadOnlyViewSet.ordering_fields,
         "document_number",
     )
-    # The docket is needed to build absolute_url. Placeholders, the empty
-    # documents of entries without attachments, are left out.
+    # absolute_url needs the entry's docket_id and the docket's slug, so only
+    # those are read from the joined tables; the document's own columns are
+    # left to DeferredFieldsMixin. Placeholders, the empty documents of
+    # entries without attachments, are left out.
     queryset = (
         SCOTUSDocument.objects.exclude(url="")
         .select_related("docket_entry__docket")
+        .only(
+            *(field.name for field in SCOTUSDocument._meta.concrete_fields),
+            "docket_entry__docket__slug",
+        )
         .order_by("-id")
     )
 

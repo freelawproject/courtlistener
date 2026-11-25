@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
@@ -547,6 +548,105 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
                     self.assertEqual([doc["id"] for doc in nested], ids)
                     for doc in nested:
                         self.assertEqual(set(doc), document_keys)
+
+
+class ScotusAPIRelatedColumnsTest(ScotusAPITestCase):
+    """The documents endpoint reads only the related columns it uses."""
+
+    def setUp(self) -> None:
+        """Log in as a plain user."""
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def test_documents_read_only_docket_slug(self) -> None:
+        """Do documents read just the entry and docket columns they need?
+
+        absolute_url needs the entry's docket_id and the docket's slug; the
+        rest of the docket row is wide and unused.
+        """
+        expected_url = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "att_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        cases = [
+            (self.list_path("scotusdocument"), {"id": self.attachment_1.pk}),
+            (self.detail_path("scotusdocument", self.attachment_1.pk), {}),
+        ]
+        for path, params in cases:
+            with self.subTest(path=path):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(path, params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                data = r.json()
+                document = data["results"][0] if "results" in data else data
+                self.assertEqual(document["absolute_url"], expected_url)
+
+                selects = [
+                    q["sql"].split(" FROM ")[0]
+                    for q in ctx.captured_queries
+                    if 'FROM "search_scotusdocument"' in q["sql"]
+                ]
+                self.assertEqual(len(selects), 1, selects)
+                for table, columns in (
+                    ("search_scotusdocketentry", {"id", "docket_id"}),
+                    ("search_docket", {"id", "slug"}),
+                ):
+                    selected = set(
+                        re.findall(rf'"{table}"\."(\w+)"', selects[0])
+                    )
+                    self.assertEqual(selected, columns)
+
+    def test_entries_read_only_docket_slug(self) -> None:
+        """Do entries read just the docket columns their documents need?
+
+        The nested documents' absolute_url needs the docket's slug; the rest
+        of the docket row is wide and unused.
+        """
+        expected_url = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "att_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        cases = [
+            (self.list_path("scotusdocketentry"), {"id": self.entry.pk}),
+            (
+                self.list_path("scotusdocketentry"),
+                {"scotus_documents__id": self.attachment_1.pk},
+            ),
+            (self.detail_path("scotusdocketentry", self.entry.pk), {}),
+        ]
+        for path, params in cases:
+            with self.subTest(path=path, params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(path, params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                data = r.json()
+                entry = data["results"][0] if "results" in data else data
+                urls = {
+                    doc["id"]: doc["absolute_url"]
+                    for doc in entry["scotus_documents"]
+                }
+                self.assertEqual(urls[self.attachment_1.pk], expected_url)
+
+                selects = [
+                    q["sql"].split(" FROM ")[0]
+                    for q in ctx.captured_queries
+                    if 'FROM "search_scotusdocketentry"' in q["sql"]
+                ]
+                self.assertEqual(len(selects), 1, selects)
+                selected = set(
+                    re.findall(r'"search_docket"\."(\w+)"', selects[0])
+                )
+                self.assertEqual(selected, {"id", "slug"})
 
 
 class ScotusAPIPlainTextTest(ScotusAPITestCase):
