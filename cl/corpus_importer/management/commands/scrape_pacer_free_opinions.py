@@ -233,7 +233,7 @@ def fetch_doc_report(
     try:
         status, rows_to_create = get_and_save_free_document_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
-        )  # type: ignore
+        )
     except (
         HTTPError,
         TimeoutError,
@@ -379,7 +379,7 @@ def get_and_save_free_document_reports(
             exc = fetch_doc_report(
                 pacer_court_id,
                 _start,
-                _end,  # type: ignore
+                _end,
                 day_span=day_span,
             )
             if exc:

@@ -84,7 +84,7 @@ class V3APIPermission(permissions.BasePermission):
         """
         if (
             not self.is_v3_api_request(request)
-            or not settings.BLOCK_NEW_V3_USERS  # type: ignore
+            or not settings.BLOCK_NEW_V3_USERS
         ):
             # Allow the request if it is not a V3 request
             return True

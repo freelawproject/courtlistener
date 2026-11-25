@@ -1,6 +1,5 @@
-import os
 from datetime import datetime
-from os.path import join
+from pathlib import Path
 
 from django.conf import settings
 from juriscraper.OralArgumentSite import OralArgumentSite
@@ -11,16 +10,16 @@ class Site(OralArgumentSite):
         super().__init__()
         self.court_id = self.__module__
         self.url = "http://test"
-        self.mock_url = join(
-            settings.INSTALL_ROOT,
-            "cl/scrapers/test_assets/test_oral_arg_site.xml",
+        self.mock_url = str(
+            settings.INSTALL_ROOT
+            / "cl/scrapers/test_assets/test_oral_arg_site.xml"
         )
         self.method = "LOCAL"
 
     def _get_download_urls(self) -> list[str]:
         path = "//url/text()"
         return [
-            os.path.join(settings.MEDIA_ROOT, "test", "audio", url)
+            str(Path(settings.MEDIA_ROOT) / "test" / "audio" / url)
             for url in self.html.xpath(path)
         ]
 

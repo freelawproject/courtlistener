@@ -2,12 +2,15 @@
 
 import csv
 import os
+from pathlib import Path
 
 from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
 from cl.corpus_importer.tasks import (
+    AppellateDocketReportQueryParams,
+    DocketReportQueryParams,
     do_case_query_by_pacer_case_id,
     get_appellate_docket_by_docket_number,
     get_docket_by_pacer_case_id,
@@ -25,7 +28,7 @@ PROJECT_TAG_NAME = "cmSyHgaaCIFnUOop"
 
 def download_dockets(options):
     """Download dockets listed in the spreadsheet."""
-    f = open(options["input_file"])
+    f = Path(options["input_file"]).open()
     dialect = csv.Sniffer().sniff(f.read(2048))
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)
@@ -54,13 +57,15 @@ def download_dockets(options):
                     # Do not get the docket entries for now. We're only
                     # interested in the date terminated. If it's an open case,
                     # we'll handle that later.
-                    show_docket_entries=False,
-                    show_orig_docket=False,
-                    show_prior_cases=False,
-                    show_associated_cases=False,
-                    show_panel_info=True,
-                    show_party_atty_info=True,
-                    show_caption=True,
+                    **AppellateDocketReportQueryParams(
+                        show_docket_entries=False,
+                        show_orig_docket=False,
+                        show_prior_cases=False,
+                        show_associated_cases=False,
+                        show_panel_info=True,
+                        show_party_atty_info=True,
+                        show_caption=True,
+                    ),
                 ).set(queue=q),
             ).apply_async()
         else:
@@ -81,12 +86,14 @@ def download_dockets(options):
                     court_id=row["cl_court"],
                     session_data=session_data,
                     tag_names=[PROJECT_TAG_NAME, row_tag],
-                    # No docket entries
-                    doc_num_start=10000,
-                    doc_num_end=10000,
-                    show_parties_and_counsel=True,
-                    show_terminated_parties=True,
-                    show_list_of_member_cases=True,
+                    **DocketReportQueryParams(
+                        # No docket entries
+                        doc_num_start=10000,
+                        doc_num_end=10000,
+                        show_parties_and_counsel=True,
+                        show_terminated_parties=True,
+                        show_list_of_member_cases=True,
+                    ),
                 ).set(queue=q),
             ).apply_async()
 

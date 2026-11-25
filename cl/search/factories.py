@@ -17,6 +17,7 @@ from factory import (
     SubFactory,
     post_generation,
 )
+from factory.declarations import BaseDeclaration
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -149,7 +150,7 @@ class ParentheticalFactory(DjangoModelFactory):
     class Meta:
         model = Parenthetical
 
-    describing_opinion = SelfAttribute("described_opinion")
+    describing_opinion: BaseDeclaration = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
 
@@ -214,7 +215,7 @@ class OpinionContentFactory(DjangoModelFactory):
     opinion = SubFactory(OpinionWithParentsFactory)
     content = Faker("text", max_nb_chars=2000)
     source = OpinionContent.FLP_SCANNING
-    extraction_type = OpinionContent.OCR
+    extraction_type = OpinionContent.OCR_ENSEMBLE
     is_main_version = True
 
 
@@ -232,7 +233,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     date_filed = Faker("date")
     slug = Faker("slug")
     source = FuzzyChoice(ClusterSources.NAMES, getter=lambda c: c[0])
-    precedential_status = FuzzyChoice(
+    precedential_status: BaseDeclaration | str = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )
 
@@ -301,7 +302,7 @@ class DocketEntryFactory(DjangoModelFactory):
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
-    docket = SubFactory(DocketFactory)
+    docket: BaseDeclaration = SubFactory(DocketFactory)
 
 
 class RECAPDocumentFactory(DjangoModelFactory):
