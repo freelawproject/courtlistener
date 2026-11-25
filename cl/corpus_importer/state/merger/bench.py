@@ -500,7 +500,7 @@ class MatchBench:
         ]
 
         def run():
-            group = MatchGroup.build(
+            group = MatchGroup(
                 TieredEntryMerger,
                 Siblings(),
                 relation=relation,
@@ -631,7 +631,7 @@ class MergeDBBench:
             DocketMerger(scrape, params=params).merge()
 
         def run():
-            group = MatchGroup.build(
+            group = MatchGroup(
                 DocketMerger, Global(), relation=None, params=params
             )
             mergers = [

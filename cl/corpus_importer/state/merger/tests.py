@@ -2294,6 +2294,18 @@ def entry_scrape(
     }
 
 
+def matching[T: Merger](base: type[T], match: Match, pool: Pool) -> type[T]:
+    """A subclass of `base` that matches by `match` in `pool`, for building a `MatchGroup` around an arbitrary match."""
+    return cast(
+        type[T],
+        type(
+            base.__name__,
+            (base,),
+            {"match": match, "pool": pool},
+        ),
+    )
+
+
 def lookup_state(merger: Merger) -> MergerState.Lookup[Any, Any, Any]:
     """The state of a merger that has not started merging."""
     return cast(MergerState.Lookup[Any, Any, Any], merger.state)
@@ -2355,15 +2367,14 @@ class MatchGroupTest(TestCase):
     ) -> tuple[MatchGroup[DocketEntry], list[MatchEntryMerger]]:
         """A group of entry mergers over a docket's entries, one merger for each scrape."""
         docket = docket or self.docket
-        bound = match.bind(MatchEntryMerger, pool)
-        reader = pool.reader(
-            MatchEntryMerger,
+        merger = matching(MatchEntryMerger, match, pool)
+        group = MatchGroup(
+            merger,
+            pool,
             relation=docket.docket_entries.all(),
             params=RelatedParams(None, parent=docket),
-            ordering=bound.tiers[0].ordering,
         )
-        group = MatchGroup(MatchEntryMerger, bound, reader)
-        mergers = [MatchEntryMerger(s, params=None) for s in scrapes]
+        mergers = [merger(s, params=None) for s in scrapes]
         for merger in mergers:
             group.join(merger, lookup_state(merger))
         return group, mergers
@@ -2492,27 +2503,27 @@ class MatchGroupTest(TestCase):
         party = PartyFactory.create(name="Two Roles", docket=docket)
         for role in ("Appellant", "Respondent"):
             PartyTypeFactory.create(docket=docket, party=party, name=role)
-        bound = Match(
-            Key(
-                "name",
-                ambiguous=Narrow(
-                    Annotation("role") == Scrape(dict)["role"],
-                    ambiguous=First("pk"),
-                ),
-            )
-        ).bind(PartyPoolMerger, PARTY_POOL)
-        group = MatchGroup(
+        merger = matching(
             PartyPoolMerger,
-            bound,
-            PARTY_POOL.reader(
-                PartyPoolMerger,
-                relation=None,
-                params=RelatedParams(None, parent=docket),
-                ordering=bound.tiers[0].ordering,
+            Match(
+                Key(
+                    "name",
+                    ambiguous=Narrow(
+                        Annotation("role") == Scrape(dict)["role"],
+                        ambiguous=First("pk"),
+                    ),
+                )
             ),
+            PARTY_POOL,
+        )
+        group = MatchGroup(
+            merger,
+            PARTY_POOL,
+            relation=None,
+            params=RelatedParams(None, parent=docket),
         )
         mergers = [
-            PartyPoolMerger({"name": "Two Roles", "role": role}, params=None)
+            merger({"name": "Two Roles", "role": role}, params=None)
             for role in ("Appellant", "Respondent")
         ]
         for merger in mergers:
@@ -2544,6 +2555,8 @@ class MatchGroupTest(TestCase):
             match,
             [entry_scrape("SAME"), entry_scrape("same")],
             [("create", None)] * 2,
+            # A keyed pool cannot query a term that transforms its stored field.
+            pools=[Siblings()],
         )
 
     def test_duplicate_fails_every_member(self) -> None:
@@ -2857,20 +2870,9 @@ class MatchGroupTest(TestCase):
     ) -> tuple[MatchGroup[FloridaDocument], list[UuidDocumentMerger]]:
         """A group of Florida document mergers over every document, matching on link UUID."""
         pool = Global()
-        bound = Match(Key("link_uuid")).bind(UuidDocumentMerger, pool)
-        group = MatchGroup(
-            UuidDocumentMerger,
-            bound,
-            pool.reader(
-                UuidDocumentMerger,
-                relation=None,
-                params=None,
-                ordering=bound.tiers[0].ordering,
-            ),
-        )
-        mergers = [
-            UuidDocumentMerger({"uuid": value}, params=None) for value in uuids
-        ]
+        merger = matching(UuidDocumentMerger, Match(Key("link_uuid")), pool)
+        group = MatchGroup(merger, pool, relation=None, params=None)
+        mergers = [merger({"uuid": value}, params=None) for value in uuids]
         for merger in mergers:
             group.join(merger, lookup_state(merger))
         return group, mergers
@@ -2881,20 +2883,22 @@ class MatchGroupTest(TestCase):
         party = PartyFactory.create(name="Two Roles", docket=docket)
         for role in ("Appellant", "Respondent"):
             PartyTypeFactory.create(docket=docket, party=party, name=role)
-        bound = Match(Key("name")).bind(PartyPoolMerger, PARTY_POOL)
+        params = RelatedParams(None, parent=docket)
         reader = PARTY_POOL.reader(
-            PartyPoolMerger,
-            relation=None,
-            params=RelatedParams(None, parent=docket),
-            ordering=bound.tiers[0].ordering,
+            PartyPoolMerger, relation=None, params=params, ordering=("pk",)
         )
         self.assertEqual(
             len(reader.rows(Q(name="Two Roles"), ("pk",))),
             2,
             "The pool reads one row for each of the party's roles.",
         )
-        group = MatchGroup(PartyPoolMerger, bound, reader)
-        merger = PartyPoolMerger({"name": "Two Roles"}, params=None)
+        merger_class = matching(
+            PartyPoolMerger, Match(Key("name")), PARTY_POOL
+        )
+        group = MatchGroup(
+            merger_class, PARTY_POOL, relation=None, params=params
+        )
+        merger = merger_class({"name": "Two Roles"}, params=None)
         group.join(merger, lookup_state(merger))
 
         verdict = group.verdict(merger, lookup_state(merger))
@@ -2907,19 +2911,12 @@ class MatchGroupTest(TestCase):
         mine = self.entry("same")
         theirs = self.entry("same", docket=other)
         pool = Global()
-        bound = Match(Key("description")).bind(MatchEntryMerger, pool)
-        group = MatchGroup(
-            MatchEntryMerger,
-            bound,
-            pool.reader(
-                MatchEntryMerger,
-                relation=None,
-                params=None,
-                ordering=bound.tiers[0].ordering,
-            ),
+        merger_class = matching(
+            MatchEntryMerger, Match(Key("description")), pool
         )
+        group = MatchGroup(merger_class, pool, relation=None, params=None)
         mergers = [
-            MatchEntryMerger(
+            merger_class(
                 entry_scrape("same"),
                 params=RelatedParams(
                     None, parent=docket, parent_name="docket"
@@ -3028,31 +3025,20 @@ class MatchGroupTest(TestCase):
         """Does matching leave the rows a whole reader hands out as they were?"""
         for description in ("a", "b", "c"):
             self.entry(description, number=1)
-        pool = Siblings()
-        bound = Match(
-            Key("description", ambiguous=Narrow("entry_number")),
-            Key("entry_number", ambiguous=First("-pk")),
-        ).bind(MatchEntryMerger, pool)
-        reader = pool.reader(
-            MatchEntryMerger,
-            relation=self.docket.docket_entries.all(),
-            params=None,
-            ordering=bound.tiers[0].ordering,
+        group, mergers = self.group(
+            Match(
+                Key("description", ambiguous=Narrow("entry_number")),
+                Key("entry_number", ambiguous=First("-pk")),
+            ),
+            [entry_scrape(d, number=1) for d in ("a", "b", "c", "d")],
+            Siblings(),
         )
-        before = list(reader.rows(Q(), bound.tiers[0].ordering))
-        group = MatchGroup(MatchEntryMerger, bound, reader)
-        mergers = [
-            MatchEntryMerger(entry_scrape(d, number=1), params=None)
-            for d in ("a", "b", "c", "d")
-        ]
-        for merger in mergers:
-            group.join(merger, lookup_state(merger))
+        ordering = group._match.tiers[0].ordering
+        before = list(group._reader.rows(Q(), ordering))
 
         self.verdicts(group, mergers)
 
-        self.assertEqual(
-            list(reader.rows(Q(), bound.tiers[0].ordering)), before
-        )
+        self.assertEqual(list(group._reader.rows(Q(), ordering)), before)
 
     def test_prune_delegates_to_the_reader(self) -> None:
         """Does the group delete the relation's rows that were not kept?"""
@@ -3068,8 +3054,8 @@ class MatchGroupTest(TestCase):
             [kept.pk],
         )
 
-    def test_build_reads_the_pool_in_the_first_tiers_order(self) -> None:
-        """Does a built group's reader order rows by the first tier's ordering, ending in pk?"""
+    def test_reads_the_pool_in_the_first_tiers_order(self) -> None:
+        """Does a group's reader order rows by the first tier's ordering, ending in pk?"""
         older = self.entry("twice", number=1)
         newer = self.entry("twice", number=2)
         for row, year in ((older, 2020), (newer, 2021)):
@@ -3077,18 +3063,13 @@ class MatchGroupTest(TestCase):
                 date_created=datetime(year, 1, 1, tzinfo=UTC)
             )
         pool = Relatives(docket=Ancestor(Docket))
-        merger = type(
-            "BuiltEntryMerger",
-            (MatchEntryMerger,),
-            {
-                "pool": pool,
-                "match": Match(
-                    Key("description", ambiguous=First("-date_created"))
-                ),
-            },
+        merger = matching(
+            MatchEntryMerger,
+            Match(Key("description", ambiguous=First("-date_created"))),
+            pool,
         )
 
-        group = MatchGroup.build(
+        group = MatchGroup(
             merger,
             pool,
             relation=None,
@@ -3102,8 +3083,8 @@ class MatchGroupTest(TestCase):
             ("update", newer.pk),
         )
 
-    def test_build_rejects_a_match_the_pool_cannot_query(self) -> None:
-        """Does building a group refuse a match with a tier the keyed pool would read whole?"""
+    def test_rejects_a_match_the_pool_cannot_query(self) -> None:
+        """Does starting a group refuse a match with a tier the keyed pool would read whole?"""
         merger = type(
             "UnqueryableEntryMerger",
             (MatchEntryMerger,),
@@ -3120,12 +3101,12 @@ class MatchGroupTest(TestCase):
         )
 
         with self.assertRaises(TypeError):
-            MatchGroup.build(merger, Global(), relation=None, params=None)
+            MatchGroup(merger, Global(), relation=None, params=None)
 
-    def test_build_accepts_the_match_of_a_merger_that_overrides_lookup(
+    def test_accepts_the_match_of_a_merger_that_overrides_lookup(
         self,
     ) -> None:
-        """Does building a group leave the match of a merger that overrides `lookup` unchecked, since the merger never matches by it?"""
+        """Does starting a group leave the match of a merger that overrides `lookup` unchecked, since the merger never matches by it?"""
 
         class OverridingEntryMerger(MatchEntryMerger):
             match = Match(
@@ -3143,9 +3124,7 @@ class MatchGroupTest(TestCase):
             ) -> MergerState.LookupOutput[Any, Any, DocketEntry]:
                 return state.create()
 
-        MatchGroup.build(
-            OverridingEntryMerger, Global(), relation=None, params=None
-        )
+        MatchGroup(OverridingEntryMerger, Global(), relation=None, params=None)
 
 
 class MatchDeclarationWiringTest(SimpleTestCase):
