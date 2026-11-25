@@ -12,7 +12,7 @@ document.addEventListener('alpine:init', () => {
     // Settles when every request made so far has finished.
     let queue = Promise.resolve();
 
-    /** Sends JSON to the API and returns the parsed response. Throws on failure, with the API's answer in `body` when it gave one. */
+    /** Sends JSON to the API and returns the parsed response. Throws on failure, with the HTTP `status` and, when the API gave one, its answer in `body`. */
     const sendJson = async (method, url, csrfToken, body) => {
       const response = await fetch(url, {
         method,
@@ -20,9 +20,10 @@ document.addEventListener('alpine:init', () => {
         body: body && JSON.stringify(body),
       });
       if (response.status === 204) return null;
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
       if (response.ok) return data;
       const error = new Error(`HTTP ${response.status}`);
+      error.status = response.status;
       error.body = data;
       throw error;
     };
@@ -38,32 +39,41 @@ document.addEventListener('alpine:init', () => {
         this.associations = JSON.parse(script.textContent);
       },
 
-      /** Moves focus to the search input when the popover opens. */
-      focusSearch(event) {
+      /** Runs when the popover opens or closes: moves focus to the search input on open and drops the error on close. */
+      toggled(event) {
         if (event.newState === 'open') event.target.querySelector('[role="combobox"]').focus();
+        else this.errorMessage = '';
       },
 
-      /** Closes the popover, which returns focus to the button. */
-      close() {
-        this.$el.hidePopover();
+      /** Closes the popover from Escape, which returns focus to the button. Leaves it open while an input method is composing. */
+      close(event) {
+        if (!event.isComposing) this.$el.hidePopover();
       },
 
       /** Applies the selected tag to the docket. */
       attach({ detail }) {
         const { docket, docketTagsUrl, csrfToken } = this.$root.dataset;
         const tag = detail.option.value;
+        this.errorMessage = '';
         this.save(async () => {
           const association = await sendJson('POST', docketTagsUrl, csrfToken, { tag, docket: Number(docket) });
           this.associations[tag] = association.id;
         }, detail.undo);
       },
 
-      /** Removes the deselected tag from the docket. */
+      /** Removes the deselected tag from the docket. A tag that isn't applied, or no longer is, counts as removed. */
       detach({ detail }) {
         const { docketTagsUrl, csrfToken } = this.$root.dataset;
         const tag = detail.option.value;
+        this.errorMessage = '';
         this.save(async () => {
-          await sendJson('DELETE', `${docketTagsUrl}${this.associations[tag]}/`, csrfToken);
+          const association = this.associations[tag];
+          if (association === undefined) return;
+          try {
+            await sendJson('DELETE', `${docketTagsUrl}${association}/`, csrfToken);
+          } catch (error) {
+            if (error.status !== 404) throw error;
+          }
           delete this.associations[tag];
         }, detail.undo);
       },
@@ -71,6 +81,7 @@ document.addEventListener('alpine:init', () => {
       /** Creates a tag named as typed and selects it, which applies it. */
       create({ detail }) {
         const { tagsUrl, csrfToken, errorMessageInvalidName } = this.$root.dataset;
+        this.errorMessage = '';
         if (!TAG_NAME.test(detail.label)) {
           this.errorMessage = errorMessageInvalidName;
           return;
@@ -85,7 +96,6 @@ document.addEventListener('alpine:init', () => {
       save(request, undo) {
         const { errorMessageDefault } = this.$root.dataset;
         queue = queue.then(async () => {
-          this.errorMessage = '';
           try {
             await request();
           } catch (error) {
