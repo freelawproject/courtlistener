@@ -81,6 +81,7 @@ from cl.stats.metrics import accounts_deleted_total
 from cl.users.data_export import (
     build_user_data_export,
     claim_daily_export,
+    had_recent_export,
 )
 from cl.users.forms import (
     CustomPasswordChangeForm,
@@ -616,9 +617,9 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Show the data export page, and download the export on POST.
 
-    The user must confirm their password, and gets one export every 24 hours.
-    export is built in memory during the request, which is fine for the small
-    amount of data a typical account holds.
+    The user must confirm their password, and gets one export every 24
+    hours. The export is built in memory during the request, which is fine
+    for the small amount of data a typical account holds.
     """
     is_post = request.method == "POST"
     form = PasswordConfirmForm(request, request.POST if is_post else None)
@@ -627,27 +628,33 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
             request, "profile/take_out.html", {"form": form, "private": True}
         )
 
-    response = JsonResponse(
-        build_user_data_export(request.user), json_dumps_params={"indent": 2}
-    )
-    # Claim the day only once the export is ready, so that an error while
-    # building it doesn't stop the user from trying again.
-    if not claim_daily_export(request.user):
-        form.add_error(
-            None,
-            "You can download your data once every 24 hours. Please try "
-            "again 24 hours after your last download.",
+    # Check the limit first so a refused request skips building the export,
+    # but claim the day only once the export is ready, so an error while
+    # building it doesn't stop the user from trying again. The claim is the
+    # atomic step; the check is a shortcut.
+    if not had_recent_export(request.user):
+        response = JsonResponse(
+            build_user_data_export(request.user),
+            json_dumps_params={"indent": 2},
         )
-        return TemplateResponse(
-            request,
-            "profile/take_out.html",
-            {"form": form, "private": True},
-            status=HTTPStatus.TOO_MANY_REQUESTS,
-        )
+        if claim_daily_export(request.user):
+            filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
+            response["Content-Disposition"] = (
+                f'attachment; filename="{filename}"'
+            )
+            return response
 
-    filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
+    form.add_error(
+        None,
+        "You can download your data once every 24 hours. Please try again "
+        "24 hours after your last download.",
+    )
+    return TemplateResponse(
+        request,
+        "profile/take_out.html",
+        {"form": form, "private": True},
+        status=HTTPStatus.TOO_MANY_REQUESTS,
+    )
 
 
 @ratelimiter_unsafe_10_per_m

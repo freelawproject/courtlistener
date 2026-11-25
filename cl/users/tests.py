@@ -6365,6 +6365,37 @@ class TakeOutViewTest(TestCase):
         )
         self.assertNotIn("Content-Disposition", response)
 
+    def test_refused_export_skips_building(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Is a second export refused without building the file again?"""
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+        with patch("cl.users.views.build_user_data_export") as mock_build:
+            response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        mock_build.assert_not_called()
+
+    def test_claim_refuses_when_check_misses(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Does the claim still refuse an export the quick check let through?
+
+        Two requests at once can both pass the check; only one may export.
+        """
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+        with patch("cl.users.views.had_recent_export", return_value=False):
+            response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertNotIn("Content-Disposition", response)
+
     def test_failed_export_allows_retry(self, mock_usage: MagicMock) -> None:
         """Can the user try again after an error while building the export?"""
         mock_usage.side_effect = RedisConnectionError

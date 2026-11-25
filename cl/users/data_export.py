@@ -127,6 +127,31 @@ def build_user_data_export(user: User) -> dict[str, Any]:
     return export
 
 
+def _export_key(user: User) -> str:
+    """Return the cache key recording a user's latest export."""
+    return f"rl:data-export:{user.pk}"
+
+
+def had_recent_export(user: User) -> bool:
+    """Has the user already had an export in the last 24 hours?
+
+    A quick check, so a request that will be refused can skip building the
+    export. It isn't atomic, so call claim_daily_export() before sending the
+    export.
+
+    Args:
+        user: The user who wants an export.
+
+    Returns:
+        True if the user had an export in the last 24 hours. False if not, or
+        if the cache is unreachable.
+    """
+    try:
+        return get_ratelimit_cache().get(_export_key(user)) is not None
+    except ConnectionError:
+        return False
+
+
 def claim_daily_export(user: User) -> bool:
     """Record an export for the user, unless they already had one today.
 
@@ -145,7 +170,7 @@ def claim_daily_export(user: User) -> bool:
         # add() only writes when the key is absent, so of two simultaneous
         # requests, only one gets True.
         return get_ratelimit_cache().add(
-            f"rl:data-export:{user.pk}", True, EXPORT_INTERVAL
+            _export_key(user), True, EXPORT_INTERVAL
         )
     except ConnectionError:
         return True
