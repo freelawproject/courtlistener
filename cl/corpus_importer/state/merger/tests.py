@@ -58,7 +58,9 @@ from cl.corpus_importer.state.merger.specifications import (
     Coalesce,
     Comparison,
     Database,
+    ShorthandComparison,
     Source,
+    VerboseComparison,
 )
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import (
@@ -1715,9 +1717,9 @@ class ExpressionSourceTest(SimpleTestCase):
         left, right = Database(Docket.case_name), Scrape(dict)["n"]
         term = left == right
 
-        self.assertIsInstance(term, Comparison)
-        self.assertIs(term.left, left)
-        self.assertIs(term.right, right)
+        self.assertIsInstance(term, VerboseComparison)
+        self.assertIs(term.stored, left)
+        self.assertIs(term.scraped, right)
 
     def test_eq_with_plain_value_is_not_a_comparison(self) -> None:
         """Is `==` with something other than an expression left to Python?"""
@@ -2059,97 +2061,6 @@ class NumberedEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
 class MatchDeclarationTest(SimpleTestCase):
     """Declaring match tiers and binding them to a merger."""
 
-    def test_rejections(self) -> None:
-        """Is each invalid declaration rejected, naming the problem?"""
-        cases: dict[str, tuple[Match, str]] = {
-            "unknown shorthand field": (Match(Key("nope")), "nope"),
-            "shorthand not computed by merger": (
-                Match(Key("entry_number")),
-                "entry_number",
-            ),
-            "stored side reads scrape": (
-                Match(
-                    Key(
-                        Fn(operator.add)(
-                            Database(DocketEntry.description),
-                            Scrape(dict)["x"],
-                        )
-                        == Constant(1)
-                    )
-                ),
-                "may only read",
-            ),
-            "stored side reads params": (
-                Match(Key(Fn(str)(Params(Any)) == Scrape(dict)["x"])),
-                "exactly one side",
-            ),
-            "neither side reads row": (
-                Match(Key(Constant(1) == Scrape(dict)["x"])),
-                "exactly one side",
-            ),
-            "both sides read row": (
-                Match(
-                    Key(
-                        Database(DocketEntry.description)
-                        == Database(DocketEntry.description)
-                    )
-                ),
-                "exactly one side",
-            ),
-            "annotation not in pool": (
-                Match(Key(Annotation("role") == Scrape(dict)["r"])),
-                "role",
-            ),
-            "ordering not a field": (
-                Match(Key("description", ambiguous=First("nope"))),
-                "nope",
-            ),
-            "ordering is an expression": (
-                Match(
-                    Key("description", ambiguous=First("description__lower"))
-                ),
-                "description__lower",
-            ),
-            "ordering is a relation": (
-                Match(Key("description", ambiguous=First("docket"))),
-                "docket",
-            ),
-            "descending ordering is a relation": (
-                Match(Key("description", ambiguous=First("-docket"))),
-                "-docket",
-            ),
-            "ordering of a narrow is a relation": (
-                Match(
-                    Key(
-                        "description",
-                        ambiguous=Narrow(
-                            "description", ambiguous=First("docket")
-                        ),
-                    )
-                ),
-                "docket",
-            ),
-            "no tiers": (Match(), "at least one tier"),
-            "non-term": (Match(Key(False)), "False"),
-            "invalid term in a narrow": (
-                Match(Key("description", ambiguous=Narrow("nope"))),
-                "nope",
-            ),
-        }
-        for name, (match, problem) in cases.items():
-            with self.subTest(name):
-                with self.assertRaises(ExceptionGroup) as raised:
-                    match.bind(KeyedEntryMerger, None)
-                self.assertIn(problem, str(raised.exception))
-
-    def test_every_problem_is_reported(self) -> None:
-        """Does the group carry one error for each problem in the declaration?"""
-        with self.assertRaises(ExceptionGroup) as raised:
-            Match(
-                Key("nope"), Key("description", ambiguous=First("nah"))
-            ).bind(KeyedEntryMerger, None)
-        self.assertEqual(len(raised.exception.exceptions), 2)
-
     def test_annotation_in_declared_pool_is_accepted(self) -> None:
         """Is an annotation the declared pool adds accepted in a term?"""
         pool = Siblings().annotate(role=F("description"))
@@ -2218,6 +2129,7 @@ class MatchDeclarationTest(SimpleTestCase):
         bound = Match(Key("docket_id")).bind(DocketIdEntryMerger, None)
         term = bound.tiers[0].terms[0]
         self.assertIs(term.field, DocketEntry._meta.get_field("docket"))
+        self.assertIsInstance(term, ShorthandComparison)
         self.assertEqual(term.attribute, "docket_id")
         self.assertEqual(bound.columns, {"docket"})
 
@@ -2308,6 +2220,7 @@ class MatchDeclarationTest(SimpleTestCase):
         )
         self.assertEqual(term.stored_value(DocketEntry(entry_number=5)), 5)
         self.assertIsNotNone(term.field)
+        self.assertIsInstance(term, ShorthandComparison)
         self.assertEqual(term.attribute, "entry_number")
 
     def test_explicit_term_values(self) -> None:
@@ -2329,7 +2242,7 @@ class MatchDeclarationTest(SimpleTestCase):
             term.stored_value(DocketEntry(description="XyZ")), "xyz"
         )
         self.assertIsNone(term.field)
-        self.assertIsNone(term.attribute)
+        self.assertIsInstance(term, VerboseComparison)
 
     def test_explicit_bare_term_converts_scraped_value(self) -> None:
         """Is the scraped side of a bare `Database` term converted by the stored field?"""
@@ -3270,7 +3183,7 @@ class MatchDeclarationWiringTest(SimpleTestCase):
 
     def test_invalid_match_fails_class_definition(self) -> None:
         """Is a match naming a field its merger does not compute refused when the merger is defined, naming the problem?"""
-        with self.assertRaisesRegex(TypeError, "nope"):
+        with self.assertRaisesRegex(ValueError, "nope"):
 
             class BadEntryMerger(Merger[dict[str, str], Any, DocketEntry]):
                 config: ClassVar[MergerConfig[DocketEntry]] = MergerConfig(

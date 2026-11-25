@@ -15,16 +15,17 @@ from django.core.exceptions import ValidationError
 from django.db.models import Field, Model, Q, QuerySet
 from typing_extensions import Sentinel
 
+from cl.corpus_importer.state.merger.specifications import (
+    ShorthandComparison,
+    VerboseComparison,
+)
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
 from .parameters import Create, Update
 from .pool import Ordering, Pool, PoolReader
 from .specifications import (
-    AttributeMerger,
     Comparison,
-    Source,
-    _DatabaseProxy,
 )
 
 if typing.TYPE_CHECKING:
@@ -140,74 +141,6 @@ class Key:
 
 
 @dataclass(slots=True)
-class BoundTerm:
-    """A term checked against its merger, ready to evaluate on either side.
-
-    Compared by identity: expressions overload `==`.
-
-    Attributes:
-        stored: The side that reads the stored row.
-        field: The stored field, set when `stored` is a bare `Database`. The scraped value is converted by it before it is compared.
-        attribute: The merger attribute holding the scraped value, set for the string shorthand.
-        scraped: The expression for the scraped value, set for an explicit term.
-    """
-
-    stored: Final[AttributeMerger]
-    field: Final[Field | None] = None
-    attribute: Final[str | None] = None
-    scraped: Final[AttributeMerger | None] = None
-
-    def stored_value(self, row: Model) -> Any:
-        """Evaluate the stored side on a row.
-
-        Args:
-            row: A stored row, loaded with the pool's annotations if the term reads any.
-
-        Returns:
-            The row's value for the term.
-        """
-        return self.stored.transform(None, None, row)
-
-    def scraped_raw(
-        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
-    ) -> Any:
-        """Evaluate the scraped side for a merger, before the stored field converts it.
-
-        Args:
-            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
-            state: The merger's state, whose scrape and params an explicit term is evaluated against.
-
-        Returns:
-            The scraped value as the merger has it.
-        """
-        if self.attribute is not None:
-            return getattr(merger, self.attribute)
-        return cast(AttributeMerger, self.scraped).transform(
-            state.scrape, state.params, None
-        )
-
-    def scraped_value(
-        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
-    ) -> Any:
-        """Evaluate the scraped side for a merger.
-
-        Args:
-            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
-            state: The merger's state, whose scrape and params an explicit term is evaluated against.
-
-        Returns:
-            The value to compare with `stored_value`, converted by the stored field when there is one.
-
-        Raises:
-            django.core.exceptions.ValidationError: If the stored field rejects the scraped value.
-        """
-        value = self.scraped_raw(merger, state)
-        if self.field is None:
-            return value
-        return self.field.to_python(value)
-
-
-@dataclass(slots=True)
 class BoundNarrow:
     """A `Narrow` whose terms are bound.
 
@@ -217,7 +150,7 @@ class BoundNarrow:
         ambiguous: What happens when more than one candidate remains.
     """
 
-    terms: Final[tuple[BoundTerm, ...]]
+    terms: Final[tuple[Comparison, ...]]
     missing: Final[Outcome]
     ambiguous: Final[AmbiguousBound]
 
@@ -240,16 +173,16 @@ class BoundTier:
     """
 
     index: Final[int]
-    terms: Final[tuple[BoundTerm, ...]]
+    terms: Final[tuple[Comparison, ...]]
     missing: Final[Outcome]
     ambiguous: Final[AmbiguousBound]
     duplicate: Final[Next | Fail]
     ordering: Final[Ordering]
 
     @property
-    def chain_terms(self) -> tuple[BoundTerm, ...]:
+    def chain_terms(self) -> tuple[Comparison, ...]:
         """The terms of every `Narrow` the tier's `ambiguous` outcome chains through, in order."""
-        terms: list[BoundTerm] = []
+        terms: list[Comparison] = []
         outcome = self.ambiguous
         while isinstance(outcome, BoundNarrow):
             terms.extend(outcome.terms)
@@ -386,7 +319,7 @@ class _Binder:
             case _:
                 return outcome
 
-    def term(self, term: object) -> BoundTerm | None:
+    def term(self, term: object) -> Comparison | None:
         """Bind one term.
 
         Args:
@@ -397,63 +330,9 @@ class _Binder:
         """
         match term:
             case str():
-                if (field := self.named_fields.get(term)) is None:
-                    self.errors.append(
-                        ValueError(
-                            f"tier {self.tier_index}: {term!r} is not a concrete field of {self.model.__name__}"
-                        )
-                    )
-                    return None
-                if term not in self.merger.config.registry.attr:
-                    self.errors.append(
-                        ValueError(
-                            f"tier {self.tier_index}: {self.merger.__name__} does not compute {term!r}, so the shorthand term has no scraped value"
-                        )
-                    )
-                    return None
-                return BoundTerm(
-                    stored=_DatabaseProxy(field), field=field, attribute=term
-                )
-            case Comparison():
-                stored_sides = [
-                    side
-                    for side in (term.left, term.right)
-                    if side._sources & Source.DATABASE
-                ]
-                if len(stored_sides) != 1:
-                    self.errors.append(
-                        ValueError(
-                            f"tier {self.tier_index}: exactly one side of a term must read the stored row (Database or Annotation)"
-                        )
-                    )
-                    return None
-                stored = stored_sides[0]
-                scraped = term.right if stored is term.left else term.left
-                valid = True
-                if disallowed := stored._sources & Source.MERGE:
-                    self.errors.append(
-                        ValueError(
-                            f"tier {self.tier_index}: the stored side of a term may only read Database, Annotation and Constant, not {disallowed}"
-                        )
-                    )
-                    valid = False
-                for key in stored._annotations:
-                    if key not in self.annotations:
-                        self.errors.append(
-                            ValueError(
-                                f"tier {self.tier_index}: annotation {key!r} is not annotated by the pool of {self.merger.__name__}"
-                            )
-                        )
-                        valid = False
-                if not valid:
-                    return None
-                return BoundTerm(
-                    stored=stored,
-                    field=stored._field
-                    if isinstance(stored, _DatabaseProxy)
-                    else None,
-                    scraped=scraped,
-                )
+                return ShorthandComparison(term, self.merger)
+            case VerboseComparison():
+                return term
             case _:
                 self.errors.append(
                     TypeError(
@@ -618,7 +497,7 @@ class _Entry[M: Model]:
         """The primary keys of the candidates, each once, in order."""
         return list(dict.fromkeys(row.pk for row in self.candidates))
 
-    def narrow(self, terms: Sequence[BoundTerm]) -> None:
+    def narrow(self, terms: Sequence[Comparison]) -> None:
         """Keep the candidates equal to the member on the next terms of its `Narrow` chain.
 
         Args:
@@ -878,7 +757,7 @@ class MatchGroup[M: Model]:
             return False
         return True
 
-    def _scraped(self, member: _Member[M], term: BoundTerm) -> Any:
+    def _scraped(self, member: _Member[M], term: Comparison) -> Any:
         """A member's scraped value for a term.
 
         Raises:

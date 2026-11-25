@@ -14,7 +14,6 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass
 from enum import Enum, Flag, auto
 from typing import (
     Any,
@@ -264,7 +263,7 @@ class AttributeMerger[Scrape, Params, Transform](
         """
         if not isinstance(other, AttributeMerger):
             return NotImplemented
-        return Comparison(self, other)
+        return VerboseComparison(self, other)
 
     # Defining `__eq__` removes the inherited hash; expressions are hashed and
     # compared by identity wherever they are collected.
@@ -288,12 +287,151 @@ class AttributeMerger[Scrape, Params, Transform](
         return self._transform(scrape, params, database)
 
 
-@dataclass(slots=True)
-class Comparison:
-    """A term declaring that two expressions must evaluate to equal values."""
+class Comparison(ABC):
+    """Base class for comparisons between expressions.
 
-    left: Final[AttributeMerger]
-    right: Final[AttributeMerger]
+    Attributes:
+        stored: The stored database attribute side of the comparison.
+        field: The stored field, set when `stored` is a bare `Database`. The scraped value is converted by it before it is compared.
+    """
+
+    __slots__ = ("stored", "field")
+
+    def __init__(self, stored: AttributeMerger, field: Field | None):
+        """Shared initialization for comparisons."""
+        self.stored: Final[AttributeMerger] = stored
+        self.field: Final[Field | None] = field
+
+    def stored_value(self, row: Model) -> Any:
+        """Evaluate the stored side on a row.
+
+        Args:
+            row: A stored row, loaded with the pool's annotations if the term reads any.
+
+        Returns:
+            The row's value for the term.
+        """
+        return self.stored.transform(None, None, row)
+
+    @abstractmethod
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        """Evaluate the scraped side for a merger, before the stored field converts it.
+
+        Args:
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
+
+        Returns:
+            The scraped value as the merger has it.
+        """
+
+    def scraped_value(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        """Evaluate the scraped side for a merger.
+
+        Args:
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
+
+        Returns:
+            The value to compare with `stored_value`, converted by the stored field when there is one.
+
+        Raises:
+            django.core.exceptions.ValidationError: If the stored field rejects the scraped value.
+        """
+        value = self.scraped_raw(merger, state)
+        if self.field is None:
+            return value
+        return self.field.to_python(value)
+
+
+class VerboseComparison(Comparison):
+    """A term declaring that two expressions must evaluate to equal values.
+
+    Attributes:
+        scraped: The expression for the scraped value.
+    """
+
+    __slots__ = ("scraped",)
+
+    def __init__(self, left: AttributeMerger, right: AttributeMerger):
+        """Initialize an expression requiring that `left == right` after evaluation.
+
+        Raises:
+            ValueError: If both `left` and `right` are sourced from the database or neither is. Or if the the database side of the comparison reads scraped data.
+        """
+        if left._sources & Source.DATABASE == right._sources & Source.DATABASE:
+            raise ValueError(
+                "Exactly one side of a term must read the stored row (Database or Annotation)"
+            )
+        if left._sources & Source.DATABASE:
+            stored = left
+            scraped = right
+        else:
+            stored = right
+            scraped = left
+
+        if stored._sources & Source.MERGE:
+            raise ValueError(
+                "The stored side of a term may only read Database, Annotation and Constant"
+            )
+        super().__init__(
+            stored,
+            stored._field if isinstance(stored, _DatabaseProxy) else None,
+        )
+        self.scraped: Final[AttributeMerger] = scraped
+
+    @override
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        return self.scraped.transform(state.scrape, state.params, None)
+
+
+class ShorthandComparison(Comparison):
+    """A term declaring that a scraped value must be equal to a stored database value.
+
+    Attributes:
+        attribute: The name of the scraped attribute on the merger.
+    """
+
+    __slots__ = ("attribute",)
+
+    def __init__(self, term: str, merger: type[Merger]):
+        """Initialize an expression requiring that `Merger.<term> == Model.<field>` when evaluated.
+
+        Parameters:
+            term: The name of the scraped attribute on the merger.
+            merger: The merger this comparison is being performed on. Used for validation and identifying model fields.
+        """
+        field = next(
+            (
+                f
+                for f in merger.config.model._meta.concrete_fields
+                if term == f.name or term == f.attname
+            ),
+            None,
+        )
+
+        if field is None:
+            raise ValueError(
+                f"{term!r} is not a concrete field of {merger.config.model.__name__}"
+            )
+
+        if term not in merger.config.registry.attr:
+            raise ValueError(f"{merger.__name__} does not compute {term!r}.")
+
+        super().__init__(_DatabaseProxy(field), field)
+        self.attribute: Final[str] = term
+
+    @override
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        return getattr(merger, self.attribute)
 
 
 class _AncestorProxy[M: Model](AttributeMerger):
