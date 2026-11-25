@@ -1,5 +1,6 @@
 import datetime
 import pickle
+import sys
 import tempfile
 import threading
 import time
@@ -24,9 +25,12 @@ from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
+from django.views.decorators.debug import sensitive_variables
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
+from sentry_sdk.consts import DEFAULT_OPTIONS as SENTRY_DEFAULT_OPTIONS
+from sentry_sdk.utils import event_from_exception
 from waffle.testutils import override_flag
 
 from cl.lib.auth import filter_by_email
@@ -115,6 +119,7 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.settings.third_party.sentry import scrub_sensitive_data
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
 
@@ -3398,3 +3403,109 @@ class ResolveActiveTabTest(SimpleTestCase):
                 self.assertEqual(
                     resolve_active_tab(self.tabs, requested), expected
                 )
+
+
+class SentryScrubTest(SimpleTestCase):
+    """Tests for applying Django's sensitive_* decorators to Sentry events."""
+
+    VARIABLES_WRAPPER = (
+        "django.views.decorators.debug",
+        "sensitive_variables_wrapper",
+    )
+    POST_WRAPPER = (
+        "django.views.decorators.debug",
+        "sensitive_post_parameters_wrapper",
+    )
+
+    @staticmethod
+    def frame(module: str, function: str) -> dict:
+        """Make a Sentry stack frame that has local variables."""
+        return {"module": module, "function": function, "vars": {"x": "1"}}
+
+    @staticmethod
+    def event(key: str, frames: list[dict]) -> dict:
+        """Make a Sentry event with one stack and a form submission."""
+        return {
+            key: {"values": [{"stacktrace": {"frames": frames}}]},
+            "request": {"data": {"password1": "hunter2"}},
+        }
+
+    def test_scrubs_variables_under_sensitive_variables(self) -> None:
+        """Are the marked function, and everything it called, scrubbed?"""
+        for key in ("exception", "threads"):
+            with self.subTest(key=key):
+                frames = [
+                    self.frame("django.core.handlers.base", "_get_response"),
+                    self.frame(*self.VARIABLES_WRAPPER),
+                    self.frame("cl.users.views", "register"),
+                    self.frame("django.forms.forms", "full_clean"),
+                ]
+                event = self.event(key, frames)
+
+                scrub_sensitive_data(event)
+
+                self.assertEqual(
+                    ["vars" in frame for frame in frames],
+                    [True, False, False, False],
+                )
+                self.assertEqual(
+                    event["request"]["data"], {"password1": "hunter2"}
+                )
+
+    def test_scrubs_body_under_sensitive_post_parameters(self) -> None:
+        """Is the request body dropped when the view marks POST data?"""
+        frames = [
+            self.frame(*self.POST_WRAPPER),
+            self.frame("cl.users.views", "password_change"),
+        ]
+        event = self.event("exception", frames)
+
+        scrub_sensitive_data(event)
+
+        self.assertEqual(event["request"]["data"], "[Filtered]")
+        self.assertTrue(all("vars" in frame for frame in frames))
+
+    def test_scrubs_chained_exceptions(self) -> None:
+        """Is an exception chained under a marked function scrubbed too?"""
+
+        def fail() -> None:
+            secret = "x"  # noqa: F841  # read by Sentry, not by us
+            raise KeyError
+
+        @sensitive_variables()
+        def marked() -> None:
+            try:
+                fail()
+            except KeyError as err:
+                # The KeyError's own stack starts here, below the wrapper.
+                raise RuntimeError from err
+
+        try:
+            marked()
+        except RuntimeError:
+            event, _ = event_from_exception(
+                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
+            )
+
+        scrub_sensitive_data(event)
+
+        frames = {
+            frame["function"]: frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        }
+        self.assertNotIn("vars", frames["fail"])
+        self.assertIn("vars", frames["test_scrubs_chained_exceptions"])
+
+    def test_leaves_unmarked_code_alone(self) -> None:
+        """Do events from code without the decorators keep their data?"""
+        frames = [
+            self.frame("cl.users.views", "view_api"),
+            self.frame("cl.search.models", "save"),
+        ]
+        event = self.event("exception", frames)
+
+        scrub_sensitive_data(event)
+
+        self.assertTrue(all("vars" in frame for frame in frames))
+        self.assertEqual(event["request"]["data"], {"password1": "hunter2"})
