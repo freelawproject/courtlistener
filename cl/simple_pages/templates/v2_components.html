@@ -2116,7 +2116,7 @@ Sample code here.
   {# DOCKET PAGE SHELL #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-page">
     <h2 class="mt-6 mb-3">Docket page</h2>
-    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. Each docket tab template uses this component and passes its content via the default slot.</p>
+    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. Each docket tab template uses this component and passes its content via the default slot. The tab content is a section whose <code>&lt;h2&gt;</code> is the active tab's name (visually hidden unless a single-tab docket is viewed on a phone), so the slot's own headings start at <code>&lt;h3&gt;</code>.</p>
 
     <c-library.list title="Props" only>
       <c-library.item only>
