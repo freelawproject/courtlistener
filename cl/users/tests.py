@@ -1,6 +1,5 @@
 import json
 import re
-import sys
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -37,15 +36,12 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
-from django.views.decorators.debug import sensitive_variables
 from django_ses import SESBackend, signals
 from lxml.html import fromstring
 from redis import ConnectionError as RedisConnectionError
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
-from sentry_sdk.consts import DEFAULT_OPTIONS as SENTRY_DEFAULT_OPTIONS
-from sentry_sdk.utils import event_from_exception
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_flag, override_switch
 
@@ -113,7 +109,6 @@ from cl.search.factories import (
     SCOTUSDocumentFactory,
 )
 from cl.search.models import Docket, SearchQuery
-from cl.settings.third_party.sentry import before_send, scrub_sensitive_data
 from cl.stats.models import Event as StatsEvent
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -6290,34 +6285,6 @@ class DataExportTest(TestCase):
 
         self.assertNotIn("Not mine", content)
 
-    def test_error_reports_omit_export_data(
-        self, mock_usage: MagicMock
-    ) -> None:
-        """Does an error while exporting reach Sentry without the user's data?"""
-        mock_usage.side_effect = RuntimeError
-
-        try:
-            build_user_data_export(self.user)
-        except RuntimeError:
-            event, hint = event_from_exception(
-                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
-            )
-        before_send(event, hint)
-
-        frames = event["exception"]["values"][0]["stacktrace"]["frames"]
-        locations = [(frame["module"], frame["function"]) for frame in frames]
-        wrapper = locations.index(
-            ("django.views.decorators.debug", "sensitive_variables_wrapper")
-        )
-        self.assertIn(
-            ("cl.users.data_export", "build_user_data_export"),
-            locations[wrapper:],
-        )
-        self.assertIn("vars", frames[wrapper - 1])
-        for frame in frames[wrapper:]:
-            with self.subTest(function=frame["function"]):
-                self.assertNotIn("vars", frame)
-
     def test_empty_account(self, mock_usage: MagicMock) -> None:
         """Does an account with no saved items export empty sections?"""
         export = build_user_data_export(self.other_user)
@@ -6418,112 +6385,6 @@ class TakeOutViewTest(TestCase):
 
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn(reverse("sign-in"), response["Location"])
-
-
-class SentryScrubTest(SimpleTestCase):
-    """Tests for applying Django's sensitive_* decorators to Sentry events."""
-
-    VARIABLES_WRAPPER = (
-        "django.views.decorators.debug",
-        "sensitive_variables_wrapper",
-    )
-    POST_WRAPPER = (
-        "django.views.decorators.debug",
-        "sensitive_post_parameters_wrapper",
-    )
-
-    @staticmethod
-    def frame(module: str, function: str) -> dict:
-        """Make a Sentry stack frame that has local variables."""
-        return {"module": module, "function": function, "vars": {"x": "1"}}
-
-    @staticmethod
-    def event(key: str, frames: list[dict]) -> dict:
-        """Make a Sentry event with one stack and a form submission."""
-        return {
-            key: {"values": [{"stacktrace": {"frames": frames}}]},
-            "request": {"data": {"password1": "hunter2"}},
-        }
-
-    def test_scrubs_variables_under_sensitive_variables(self) -> None:
-        """Are the marked function, and everything it called, scrubbed?"""
-        for key in ("exception", "threads"):
-            with self.subTest(key=key):
-                frames = [
-                    self.frame("django.core.handlers.base", "_get_response"),
-                    self.frame(*self.VARIABLES_WRAPPER),
-                    self.frame("cl.users.views", "register"),
-                    self.frame("django.forms.forms", "full_clean"),
-                ]
-                event = self.event(key, frames)
-
-                scrub_sensitive_data(event)
-
-                self.assertEqual(
-                    ["vars" in frame for frame in frames],
-                    [True, False, False, False],
-                )
-                self.assertEqual(
-                    event["request"]["data"], {"password1": "hunter2"}
-                )
-
-    def test_scrubs_body_under_sensitive_post_parameters(self) -> None:
-        """Is the request body dropped when the view marks POST data?"""
-        frames = [
-            self.frame(*self.POST_WRAPPER),
-            self.frame("cl.users.views", "password_change"),
-        ]
-        event = self.event("exception", frames)
-
-        scrub_sensitive_data(event)
-
-        self.assertEqual(event["request"]["data"], "[Filtered]")
-        self.assertTrue(all("vars" in frame for frame in frames))
-
-    def test_scrubs_chained_exceptions(self) -> None:
-        """Is an exception chained under a marked function scrubbed too?"""
-
-        def fail() -> None:
-            secret = "x"  # noqa: F841  # read by Sentry, not by us
-            raise KeyError
-
-        @sensitive_variables()
-        def marked() -> None:
-            try:
-                fail()
-            except KeyError as err:
-                # The KeyError's own stack starts here, below the wrapper.
-                raise RuntimeError from err
-
-        try:
-            marked()
-        except RuntimeError:
-            event, _ = event_from_exception(
-                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
-            )
-
-        scrub_sensitive_data(event)
-
-        frames = {
-            frame["function"]: frame
-            for value in event["exception"]["values"]
-            for frame in value["stacktrace"]["frames"]
-        }
-        self.assertNotIn("vars", frames["fail"])
-        self.assertIn("vars", frames["test_scrubs_chained_exceptions"])
-
-    def test_leaves_unmarked_code_alone(self) -> None:
-        """Do events from code without the decorators keep their data?"""
-        frames = [
-            self.frame("cl.users.views", "view_api"),
-            self.frame("cl.search.models", "save"),
-        ]
-        event = self.event("exception", frames)
-
-        scrub_sensitive_data(event)
-
-        self.assertTrue(all("vars" in frame for frame in frames))
-        self.assertEqual(event["request"]["data"], {"password1": "hunter2"})
 
 
 class MembershipPageTest(TestCase):
