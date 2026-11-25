@@ -576,12 +576,20 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             with transaction.atomic():
                 delete_user_assets(request.user)
                 user = convert_to_stub_account(request.user)
-            send_mail(
-                email["subject"],
-                body,
-                email["from_email"],
-                email["to"],
-            )
+            # The account is already deleted, so a failed notice must not
+            # turn into an error page or skip the logout below.
+            try:
+                send_mail(
+                    email["subject"],
+                    body,
+                    email["from_email"],
+                    email["to"],
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to send account deletion notice for user %s",
+                    user.pk,
+                )
             accounts_deleted_total.inc()
             update_session_auth_hash(request, user)
             logout(request)

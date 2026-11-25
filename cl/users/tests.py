@@ -909,6 +909,31 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(profile.stub_account)
         self.assertFalse(profile.user.is_active)
 
+    def test_account_deletion_finishes_when_notice_fails(self) -> None:
+        """Does a failure sending the deletion notice still log the user out and redirect, since the account is already deleted by then?"""
+        profile = UserProfileWithParentsFactory()
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+
+        with (
+            patch(
+                "cl.users.views.send_mail",
+                side_effect=ConnectionError("SES is down"),
+            ),
+            self.assertLogs("cl.users.views", level="ERROR"),
+        ):
+            response = self.client.post(
+                reverse("delete_account"), {"password": "password"}
+            )
+
+        self.assertRedirects(response, reverse("delete_profile_done"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        profile.refresh_from_db()
+        self.assertTrue(profile.stub_account)
+
     def test_failed_account_deletion_changes_nothing(self) -> None:
         """Does a failure while converting the account to a stub leave the user's assets in place, queue no alert cleanup and send no deletion notice?"""
         profile = UserProfileWithParentsFactory()
