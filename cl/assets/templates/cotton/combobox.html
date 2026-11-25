@@ -30,7 +30,9 @@
   class="relative flex flex-col gap-1.5 {{ class }}"
   {{ attrs }}
 >
-  {{ options|json_script }}
+  {# Inside a template because htmx removes script tags from the content it swaps in. #}
+  <template data-options>{{ options|json_script }}</template>
+  <p role="status" aria-live="polite" aria-atomic="true" class="sr-only" x-text="searchResultsMessage"></p>
   {% if name and multiple %}
     <template x-for="option in $combobox.value" x-bind:key="option.value">
       <input type="hidden" name="{{ name }}" x-bind:value="option.value" {% if disabled %}disabled{% endif %} />
@@ -67,8 +69,7 @@
         x-combobox:input
         {% if not multiple %}x-bind:display-value="displayLabel"{% endif %}
         {% if searchable %}
-          x-on:change="syncQuery"
-          {% if not multiple %}x-on:input="clearWhenEmptied"{% endif %}
+          x-on:input="followInput"
         {% else %}
           inputmode="none"
           x-on:beforeinput="blockTyping"

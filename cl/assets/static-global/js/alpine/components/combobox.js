@@ -36,7 +36,7 @@ document.addEventListener('alpine:init', () => {
 
       /** Loads the options and the initial selection the template rendered. */
       init() {
-        const script = this.$el.querySelector(':scope > script[type="application/json"]');
+        const script = this.$el.querySelector(':scope > template[data-options]').content.querySelector('script');
         const options = JSON.parse(script.textContent) ?? [];
         this.options = options.map(({ value, label }) => ({ value, label }));
         this.multiple = this.$el.hasAttribute('multiple');
@@ -66,6 +66,14 @@ document.addEventListener('alpine:init', () => {
         return this.filteredOptions.length === 0 && !this.canCreate;
       },
 
+      /** What screen readers are told while the user searches: how many options match the typed text, or that none do. */
+      get searchResultsMessage() {
+        if (this.query.trim() === '') return '';
+        const count = this.filteredOptions.length;
+        if (count === 0) return this.canCreate ? '' : 'No results.';
+        return count === 1 ? '1 result.' : `${count} results.`;
+      },
+
       /** The value a form submits for the single selection; empty when there is none. */
       get formValue() {
         return this.$combobox.value?.value ?? '';
@@ -76,14 +84,11 @@ document.addEventListener('alpine:init', () => {
         return option?.label ?? '';
       },
 
-      /** Copies the input's text into `query`. */
-      syncQuery() {
+      /** Follows the input's text however it was entered: filters by it, opens the list and clears the single selection once the text is deleted. */
+      followInput() {
         typed = this.query = this.$refs.__input.value;
-      },
-
-      /** Clears the single selection once its text has been deleted from the input. */
-      clearWhenEmptied() {
-        if (this.$refs.__input.value === '') this.select([]);
+        if (!this.$combobox.isOpen) this.$data.__open();
+        if (!this.multiple && this.query === '') this.select([]);
       },
 
       /** Empties the single selection and the input from the clear button, and moves focus to the input. */
