@@ -923,12 +923,13 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "cl.users.views.send_mail",
                 side_effect=ConnectionError("SES is down"),
             ),
-            self.assertLogs("cl.users.views", level="ERROR"),
+            patch("cl.users.views.logger") as mock_logger,
         ):
             response = self.client.post(
                 reverse("delete_account"), {"password": "password"}
             )
 
+        mock_logger.exception.assert_called_once()
         self.assertRedirects(response, reverse("delete_profile_done"))
         self.assertNotIn("_auth_user_id", self.client.session)
         profile.refresh_from_db()
