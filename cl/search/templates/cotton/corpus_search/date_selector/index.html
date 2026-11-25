@@ -38,7 +38,7 @@
 
   <div
     data-type="calendar"
-    class="{% if split and not relative %}contents{% else %}grid grid-cols-2 gap-2 items-end{% endif %}"
+    class="{% if split and not relative %}contents{% else %}grid grid-cols-2 gap-2 items-end [&>div+div>label:not(.sr-only)]:pl-2{% endif %}"
     x-show="isSelectedType"
   >
     <c-corpus-search.date-selector.calendar-input
