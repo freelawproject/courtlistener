@@ -1,11 +1,15 @@
 {% load text_filters %}
 <span id="docket-alert-row-toggle-{{ docket.pk }}" hx-swap-oob="innerHTML">
   {% if has_alert %}
-    <c-icon name="bell_slash" />
-    <span class="sr-only">Disable alert for {{ docket|best_case_name }}</span>
+    <span class="flex p-2 rounded-lg bg-primary-600 text-white group-hover:bg-primary-700">
+      <c-icon name="bell_slash" size="md" />
+      <span class="sr-only">Disable alert for {{ docket|best_case_name }}</span>
+    </span>
   {% else %}
-    <c-icon name="bell_plus" />
-    <span class="sr-only">Enable alert for {{ docket|best_case_name }}</span>
+    <span class="flex p-2 rounded-lg bg-primary-100 text-primary-600 group-hover:bg-primary-200">
+      <c-icon name="bell_plus" size="md" />
+      <span class="sr-only">Enable alert for {{ docket|best_case_name }}</span>
+    </span>
   {% endif %}
 </span>
 <span id="docket-alerts-status" hx-swap-oob="innerHTML">{{ message }}: {{ docket|best_case_name }}</span>

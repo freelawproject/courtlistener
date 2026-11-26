@@ -50,14 +50,17 @@
                     <c-flex-cell>{{ row.last_hit }}</c-flex-cell>
                     <c-flex-cell>
                         <c-button
+                            class="group rounded-lg outline-none focus-visible:ring-4 focus-visible:ring-primary-300"
                             hx-post="{% url 'toggle_docket_alert' %}"
                             hx-vals='{"id": "{{ row.docket_pk }}", "source": "docket_alerts_table"}'
                             hx-swap="none"
                             hx-sync="this:drop"
                         >
                         <span id="docket-alert-row-toggle-{{ row.docket_pk }}" class="contents">
-                            <c-icon name="bell_slash"/>
-                            <span class="sr-only">Disable alert for {{row.case_name}}</span>
+                            <span class="flex p-2 rounded-lg bg-primary-600 text-white group-hover:bg-primary-700">
+                                <c-icon name="bell_slash" size="md"/>
+                                <span class="sr-only">Disable alert for {{row.case_name}}</span>
+                            </span>
                         </span>
                         </c-button>
                     </c-flex-cell>
