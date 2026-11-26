@@ -1036,7 +1036,9 @@ class DocketAlertTest(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_v3_docket_webhook_payload_has_its_source(self, mock_post) -> None:
+    def test_v3_docket_webhook_payload_has_its_source(
+        self, mock_post: mock.MagicMock
+    ) -> None:
         """v3 docket webhooks also get the API path of their entries.
 
         Earlier versions keep their payload as it was.
@@ -1068,7 +1070,7 @@ class DocketAlertTest(TestCase):
 
     @mock.patch("cl.alerts.tasks.send_docket_alert_webhook_events")
     def test_recap_webhook_task_gets_two_arguments(
-        self, mock_webhooks
+        self, mock_webhooks: mock.MagicMock
     ) -> None:
         """RECAP alerts queue the webhook task with its old two arguments.
 
@@ -1323,7 +1325,9 @@ class DocketAlertScotusTest(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_triggering_scotus_docket_webhook(self, mock_post) -> None:
+    def test_triggering_scotus_docket_webhook(
+        self, mock_post: mock.MagicMock
+    ) -> None:
         """A SCOTUS docket alert sends the SCOTUS entries to v3 webhooks.
 
         Earlier versions only know the RECAP results format.
