@@ -2,7 +2,7 @@
 
 import sys
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import environ
 import sentry_sdk
@@ -11,6 +11,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.types import Event, Hint
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -195,7 +196,7 @@ def scrub_sensitive_data(event: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
-def before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
+def before_send(event: Event, hint: Hint) -> Event:
     """Prepare an event for Sentry: scrub sensitive data, then fingerprint it.
 
     Args:
@@ -205,7 +206,9 @@ def before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any]:
     Returns:
         the event that will be sent to Sentry
     """
-    return fingerprint_sentry_error(scrub_sensitive_data(event), hint)
+    # Event is a TypedDict over the plain dict the helpers work on.
+    scrubbed = scrub_sensitive_data(cast(dict[str, Any], event))
+    return cast(Event, fingerprint_sentry_error(scrubbed, hint))
 
 
 if SENTRY_DSN:
