@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import OperationalError
 from django.db.models.signals import post_delete, post_save
 from django.test import SimpleTestCase, override_settings
@@ -3597,3 +3597,8 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         )
         doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
         self.assertTrue(another_opinion.id in doc["cites"])
+
+    def test_missing_reindex_target_is_rejected(self):
+        """Is a run without --reindex-target rejected as a usage error?"""
+        with self.assertRaises(CommandError):
+            call_command("reindex_es_cite_fields", start_id=1, end_id=10)
