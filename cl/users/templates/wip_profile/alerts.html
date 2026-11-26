@@ -29,7 +29,7 @@
                   </p>
                 {% endif %}
                 <c-flex-table
-                    caption="Docket Alerts table"
+                    caption="Your Docket Alerts"
                     :columns="[
                         {'label': 'Case Name'},
                         {'label': 'Court'},
@@ -53,7 +53,7 @@
                             hx-post="{% url 'toggle_docket_alert' %}"
                             hx-vals='{"id": "{{ row.docket_pk }}", "source": "docket_alerts_table"}'
                             hx-swap="none"
-                            hx-disabled-elt="this"
+                            hx-sync="this:drop"
                         >
                         <span id="docket-alert-row-toggle-{{ row.docket_pk }}" class="contents">
                             <c-icon name="bell_slash"/>

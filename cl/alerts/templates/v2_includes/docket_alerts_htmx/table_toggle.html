@@ -8,4 +8,4 @@
     <span class="sr-only">Enable alert for {{ docket|best_case_name }}</span>
   {% endif %}
 </span>
-<span id="docket-alerts-status" hx-swap-oob="innerHTML">{{ message }}</span>
+<span id="docket-alerts-status" hx-swap-oob="innerHTML">{{ message }}: {{ docket|best_case_name }}</span>
