@@ -4,7 +4,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from pathlib import Path
@@ -21,7 +21,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
@@ -3646,6 +3646,41 @@ class SentryScrubTest(SimpleTestCase):
             self.assertEqual(
                 event["request"]["data"], {"password1": "hunter2"}
             )
+
+    def test_scrubs_body_after_marked_view_returns_async(self) -> None:
+        """Does the middleware expose the request in async mode too?
+
+        Production serves requests through ASGI, where the middleware runs
+        async.
+        """
+
+        @sensitive_post_parameters("new_password1")
+        def marked_view(request: HttpRequest) -> HttpResponse:
+            """Stand in for a view that marks its POST data."""
+            return HttpResponse()
+
+        events: list[dict] = []
+
+        async def get_response(request: HttpRequest) -> HttpResponse:
+            """Call the view, then capture an event, as a failed render would."""
+            response = marked_view(request)
+            events.append(scrub_sensitive_data(self.event("exception", [])))
+            return response
+
+        middleware = SentryRequestMiddleware(get_response)
+        self.assertTrue(middleware.async_mode)
+
+        async def handle() -> None:
+            """Run a request through the middleware, then capture an event."""
+            request = RequestFactory().post("/", {"new_password1": "x"})
+            await cast(Awaitable[HttpResponseBase], middleware(request))
+            events.append(scrub_sensitive_data(self.event("exception", [])))
+
+        async_to_sync(handle)()
+
+        during, after = events
+        self.assertEqual(during["request"]["data"], "[Filtered]")
+        self.assertEqual(after["request"]["data"], {"password1": "hunter2"})
 
     def test_leaves_unmarked_code_alone(self) -> None:
         """Do events from code without the decorators keep their data?"""
