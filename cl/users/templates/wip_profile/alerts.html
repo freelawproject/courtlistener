@@ -48,10 +48,23 @@
                     <c-flex-cell>{{ row.docket_number }}</c-flex-cell>
                     <c-flex-cell>{{ row.date_filed }}</c-flex-cell>
                     <c-flex-cell>{{ row.last_hit }}</c-flex-cell>
-                    <c-flex-cell></c-flex-cell>
+                    <c-flex-cell>
+                        <c-button
+                            hx-post="{% url 'toggle_docket_alert' %}"
+                            hx-vals='{"id": "{{ row.docket_pk }}", "source": "docket_alerts_table"}'
+                            hx-swap="none"
+                            hx-disabled-elt="this"
+                        >
+                        <span id="docket-alert-row-toggle-{{ row.docket_pk }}" class="contents">
+                            <c-icon name="bell_slash"/>
+                            <span class="sr-only">Disable alert for {{row.case_name}}</span>
+                        </span>
+                        </c-button>
+                    </c-flex-cell>
                 </tr>
                 {% endfor %}
                 </c-flex-table>
+                <p id="docket-alerts-status" class="sr-only" role="status"></p>
             {% else %}
                 {# Here goes the empty state feature. #}
                 <p class="py-4">You don't have active alerts.</p>
