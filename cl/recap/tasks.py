@@ -2796,13 +2796,12 @@ async def fetch_appellate_docket_base(
             )
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
-        logger.error(
+        logger.exception(
             "fq %s: %s %s answered HTTP %s while purchasing docket",
             fq_pk,
             exc.request.method,
             exc.request.url,
             status,
-            exc_info=True,
         )
         if status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
             # The court rejected the request outright, either an auth problem
