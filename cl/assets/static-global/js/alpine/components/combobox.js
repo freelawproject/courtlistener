@@ -22,6 +22,8 @@ document.addEventListener('alpine:init', () => {
     let controller = null;
     // Text of the last remote search asked for; null before the first.
     let searchedQuery = null;
+    // Text of the remote search whose options are listed.
+    let listedQuery = '';
     const afterPause = Alpine.debounce((search) => search(), 300);
 
     return {
@@ -271,19 +273,23 @@ document.addEventListener('alpine:init', () => {
         if (!this.$el.contains(event.relatedTarget)) this.focused = false;
       },
 
-      /** Runs as an effect on a remote combobox in use: searches for the typed text once the user pauses. */
+      /** Runs as an effect on a remote combobox in use: drops the search in progress when the typed text changes and starts a new one once the user pauses. */
       searchWhenNeeded() {
         const query = this.query.trim();
         if (!(this.focused || this.$combobox.isOpen) || query === searchedQuery) return;
         searchedQuery = query;
+        controller?.abort();
+        controller = null;
         this.loading = true;
-        afterPause(() => this.search(query, 1));
+        this.loadingMore = false;
+        afterPause(() => query === searchedQuery && this.search(query, 1));
       },
 
       /** Dispatches `combobox-search` for a page of `query`, replacing any search in progress. */
       search(query, page) {
         controller?.abort();
         const current = (controller = new AbortController());
+        listedQuery = query;
         this.loading = true;
         this.loadingMore = page !== 1;
         this.searchError = '';
@@ -332,12 +338,14 @@ document.addEventListener('alpine:init', () => {
         );
       },
 
-      /** Handles the "Load more" option: keeps the list open on the typed text and asks for the next page. */
+      /** Handles the "Load more" option: keeps the list open on the search it lists and asks for its next page. */
       loadMore() {
         if (this.loadingMore) return;
-        this.$refs.__input.value = this.query = typed;
+        // Choosing the option closed a single-select's list and put the selection's label in its input.
+        searchedQuery = this.query = listedQuery;
+        if (this.multiple || listedQuery) this.$refs.__input.value = listedQuery;
         this.$data.__open();
-        this.search(searchedQuery, this.page + 1);
+        this.search(listedQuery, this.page + 1);
       },
     };
   });
