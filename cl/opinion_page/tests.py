@@ -6510,6 +6510,7 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        """Creates a docket and a user with tags on it and on another docket, plus another user's tag on it."""
         cls.court = CourtFactory(id="cand", jurisdiction="FD")
         cls.docket = DocketFactory(
             court=cls.court,
@@ -6640,7 +6641,7 @@ class DocketTagsButtonV2Test(CottonComponentMixin, TestCase):
 
     async def test_every_tab_embeds_the_users_tags(self) -> None:
         """Each docket tab hands the combobox the tags applied to the docket as its options."""
-        for url_name in ("view_docket", "docket_idb_data"):
+        for url_name in ("view_docket", "docket_idb_data", "docket_parties"):
             with self.subTest(url_name=url_name):
                 root = await self.button(url_name)
                 script = root.xpath(

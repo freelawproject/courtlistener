@@ -70,12 +70,13 @@ document.addEventListener('alpine:init', () => {
         }
       },
 
-      /** Applies the selected tag to the docket. */
+      /** Applies the selected tag to the docket. A tag that is still applied counts as applied. */
       attach({ detail }) {
         const { docket, docketTagsUrl, csrfToken } = this.$root.dataset;
         const tag = detail.option.value;
         this.errorMessage = '';
         this.save(async () => {
+          if (this.associations[tag] !== undefined) return;
           const association = await callApi(docketTagsUrl, { method: 'POST', csrfToken, body: { tag, docket: Number(docket) } });
           this.associations[tag] = association.id;
         }, detail.undo);
