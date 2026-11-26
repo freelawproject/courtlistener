@@ -1,0 +1,11 @@
+{% extends "docket_alert_email_base.txt" %}
+{% load extras %}
+
+{% block rows %}
+{% autoescape off %}{% for de in new_des %}Date Filed: {{ de.date_filed|date:"M j, Y"|default:"Unknown" }}{% for line in de.display_lines %}
+{{ line|wordwrap:80 }}{% endfor %}{% for doc in de.texasdocument_set.all %}
+{{ doc.description|default:"Document" }}{% if doc.filepath_local %}
+Download from RECAP: {{ doc.filepath_local.url }}{% elif doc.url|http_url %}
+Download from TAMES: {{ doc.url|http_url }}{% endif %}{% endfor %}
+
+{% endfor %}{% endautoescape %}{% endblock %}

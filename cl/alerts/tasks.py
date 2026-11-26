@@ -20,7 +20,10 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
-from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
+from cl.alerts.docket_alert_sources import (
+    RECAP_ALERT_SOURCE,
+    SCOTUS_ALERT_SOURCE,
+)
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -66,6 +69,7 @@ from cl.search.models import (
     RECAPDocument,
     SCOTUSDocketEntry,
     SCOTUSDocument,
+    TexasDocketEntry,
 )
 from cl.search.types import (
     ESDictDocument,
@@ -232,7 +236,9 @@ def get_docket_notes_and_tags_by_user(
 
 def make_alert_messages(
     d: Docket,
-    new_des: QuerySet[DocketEntry] | QuerySet[SCOTUSDocketEntry],
+    new_des: QuerySet[DocketEntry]
+    | QuerySet[SCOTUSDocketEntry]
+    | QuerySet[TexasDocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users.
@@ -240,7 +246,8 @@ def make_alert_messages(
     Args:
         d: The docket to work on
         new_des: The new docket entries (SCOTUSDocketEntry for a SCOTUS
-            docket, DocketEntry otherwise -- see Docket.get_alert_source())
+            docket, TexasDocketEntry for a Texas one, DocketEntry otherwise
+            -- see Docket.get_alert_source())
         da_recipients: A list of DocketAlertRecipients objects
 
     Returns:
@@ -262,6 +269,7 @@ def make_alert_messages(
         str,
         QuerySet[DocketEntry]
         | QuerySet[SCOTUSDocketEntry]
+        | QuerySet[TexasDocketEntry]
         | int
         | Docket
         | None
@@ -360,8 +368,8 @@ def send_alert_and_webhook(
      The second email comes in to atty1@recap.email. We:
      -Do nothing.
 
-    Entries and email templates are resolved per docket source (RECAP vs.
-    SCOTUS) via Docket.get_alert_source() -- see
+    Entries and email templates are resolved per docket source (RECAP,
+    SCOTUS or Texas) via Docket.get_alert_source() -- see
     cl/alerts/docket_alert_sources.py.
 
     Args:
@@ -418,12 +426,13 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook. SCOTUS webhooks stay off until
-    # send_docket_alert_webhook_events supports SCOTUSDocketEntry: it looks
-    # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
-    if (
-        source is not SCOTUS_ALERT_SOURCE
-        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+    # Send docket entries to webhook. send_docket_alert_webhook_events looks
+    # des_pks up as DocketEntry pks, so for any other source it would send
+    # unrelated RECAP entries. Only RECAP is allowed by default; SCOTUS stays
+    # behind its setting until the webhook task supports SCOTUSDocketEntry.
+    if source is RECAP_ALERT_SOURCE or (
+        source is SCOTUS_ALERT_SOURCE
+        and settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
     ):
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:

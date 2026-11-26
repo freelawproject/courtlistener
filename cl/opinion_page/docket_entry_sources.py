@@ -23,7 +23,7 @@ from django.db.models import (
 )
 from django.urls import reverse
 from django.utils.formats import date_format
-from django.utils.html import conditional_escape, format_html, format_html_join
+from django.utils.html import conditional_escape, format_html_join
 from django.utils.safestring import SafeString, mark_safe
 
 from cl.custom_filters.templatetags.extras import http_url
@@ -270,7 +270,7 @@ class DocketEntrySource:
     entry, which the view puts on ``entry.display_text``. The legacy stack
     renders it unescaped, as it always did for RECAP descriptions, so a
     source that builds it from scraped fields MUST escape them, e.g. with
-    ``format_html``, as ``_texas_entry_display_text`` does.
+    ``format_html_join``, as ``_texas_entry_display_text`` does.
 
     ``document_download_label`` returns the label of the button that
     downloads a document's stored file, which ``attach_display_fields`` puts
@@ -772,19 +772,14 @@ def _texas_documents_for_entry(
 
 
 def _texas_entry_display_text(entry: TexasDocketEntry) -> SafeString:
-    """Return what the docket page shows for one Texas entry, one line each: its type, its description, and its disposition and remarks when TAMES lists them.
+    """Return what the docket page shows for one Texas entry: its display_lines, one per line.
 
     TAMES keeps an entry's text in entry_type, and only appellate briefs have
-    a description. Every part comes from the court, so format_html escapes
-    it before the lines are joined.
+    a description. Every line comes from the court, so format_html_join
+    escapes it before the lines are joined.
     """
-    lines = [entry.entry_type, entry.description]
-    if entry.disposition:
-        lines.append(format_html("Disposition: {}", entry.disposition))
-    if entry.remarks:
-        lines.append(format_html("Remarks: {}", entry.remarks))
     return format_html_join(
-        mark_safe("<br>"), "{}", ((line,) for line in lines if line)
+        mark_safe("<br>"), "{}", ((line,) for line in entry.display_lines)
     )
 
 

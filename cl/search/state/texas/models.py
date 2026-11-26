@@ -80,6 +80,21 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         "appellate_brief",
     ]
 
+    @property
+    def display_lines(self) -> list[str]:
+        """Return the lines that show this entry: its type, its description, and its disposition and remarks when TAMES lists them.
+
+        The docket page and the docket alert emails both show an entry this
+        way. Every line is plain text from the court, so callers rendering
+        HTML MUST escape it.
+        """
+        lines = [self.entry_type, self.description]
+        if self.disposition:
+            lines.append(f"Disposition: {self.disposition}")
+        if self.remarks:
+            lines.append(f"Remarks: {self.remarks}")
+        return [line for line in lines if line]
+
 
 @pghistory.track()
 @document_model
