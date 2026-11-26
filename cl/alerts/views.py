@@ -233,8 +233,9 @@ def enable_alert(request, secret_key):
 def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Creates or disables the user's alert on a docket.
 
-    Routes on the request type: htmx requests from the v2 docket page get a
-    fragment to swap in place, legacy AJAX requests get a plain text message.
+    Routes on the request type: htmx requests from the v2 docket page and the
+    v2 docket alerts table get a fragment to swap in place, legacy AJAX
+    requests get a plain text message.
     """
     if request.headers.get("HX-Request"):
         return _toggle_docket_alert_htmx(request)
@@ -246,12 +247,19 @@ def _toggle_docket_alert_htmx(
 ) -> HttpResponse:
     """Toggles the alert for an htmx POST and returns the v2 fragment.
 
+    The fragment depends on the page that sent the request. The docket
+    alerts table sends `source="docket_alerts_table"` and gets one that
+    updates that row's button and the table's status region. Any other
+    request gets the docket page's fragment.
+
     A user at their quota is refused a new or re-enabled subscription. The
     refusal is still a 200: htmx does not swap error responses, and the
-    partial carries the status message plus the live alert count for the
-    page's quota dialog. The `HX-Trigger-After-Swap` header is what opens
-    that dialog, once the count is in the page and the menu has closed and
-    refocused its trigger.
+    partial carries the status message. On the docket page it also carries
+    the live alert count for the page's quota dialog, and the
+    `HX-Trigger-After-Swap` header is what opens that dialog, once the count
+    is in the page and the menu has closed and refocused its trigger. The
+    alerts table has no dialog: the button stays on "Enable" and the status
+    region announces the refusal.
 
     The `recap_installed` cookie, set by the page when the RECAP extension
     announces itself, raises the quota by the RECAP bonus. The cookie is
@@ -302,9 +310,16 @@ def _toggle_docket_alert_htmx(
                 DocketAlert.objects.create(docket=docket, user=request.user)
             has_alert = True
             message = "Alerts are now enabled for this docket"
+
+    alert_toggle_template = (
+        "v2_includes/docket_alerts_htmx/table_toggle.html"
+        if request.POST.get("source") == "docket_alerts_table"
+        else "v2_includes/docket_alerts_htmx/toggle.html"
+    )
+
     return TemplateResponse(
         request,
-        "v2_includes/docket_alerts_htmx/toggle.html",
+        alert_toggle_template,
         {
             "docket": docket,
             "has_alert": has_alert,

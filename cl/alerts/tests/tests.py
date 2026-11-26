@@ -3307,6 +3307,7 @@ class ToggleDocketAlertHtmxTest(TestCase):
     """The docket alert toggle answers htmx requests with a v2 fragment."""
 
     FRAGMENT = "v2_includes/docket_alerts_htmx/toggle.html"
+    TABLE_FRAGMENT = "v2_includes/docket_alerts_htmx/table_toggle.html"
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3316,11 +3317,18 @@ class ToggleDocketAlertHtmxTest(TestCase):
     def setUp(self) -> None:
         self.client.force_login(self.profile.user)
 
-    def toggle(self) -> _MonkeyPatchedWSGIResponse:
-        """Posts the toggle the way the v2 docket page does."""
+    def toggle(self, source: str = "") -> _MonkeyPatchedWSGIResponse:
+        """Posts the toggle the way a v2 page does.
+
+        Without `source` it's the docket page; pass it to post as the docket
+        alerts table does.
+        """
+        data = {"id": self.docket.pk}
+        if source:
+            data["source"] = source
         return self.client.post(
             reverse("toggle_docket_alert"),
-            {"id": self.docket.pk},
+            data,
             headers={"HX-Request": "true"},
         )
 
@@ -3425,6 +3433,38 @@ class ToggleDocketAlertHtmxTest(TestCase):
         r = self.toggle()
         self.assertTrue(r.context["quota_reached"])
         self.assertEqual(r.context["subscription_count"], 1)
+
+    def test_table_gets_its_own_fragment(self) -> None:
+        """The alerts table gets a fragment that updates its row and status region.
+
+        Each toggle swaps in the button for the new state, named after the
+        case, and the message for the status region to announce.
+        """
+        self.docket = DocketFactory(
+            source=Docket.RECAP, case_name="United States v. Trump"
+        )
+        DocketAlertFactory(user=self.profile.user, docket=self.docket)
+        row_id = f'id="docket-alert-row-toggle-{self.docket.pk}"'
+        cases = [
+            (
+                "disable",
+                "Enable alert for United States v. Trump",
+                "Alert disabled successfully",
+            ),
+            (
+                "enable",
+                "Disable alert for United States v. Trump",
+                "Alerts are now enabled for this docket",
+            ),
+        ]
+        for action, label, message in cases:
+            with self.subTest(action=action):
+                r = self.toggle(source="docket_alerts_table")
+                self.assertTemplateUsed(r, self.TABLE_FRAGMENT)
+                self.assertTemplateNotUsed(r, self.FRAGMENT)
+                self.assertContains(r, f'{row_id} hx-swap-oob="innerHTML"')
+                self.assertContains(r, label)
+                self.assertContains(r, message)
 
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.
