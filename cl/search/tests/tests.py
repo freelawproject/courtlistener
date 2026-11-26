@@ -1487,6 +1487,12 @@ class ESCommonSearchTest(AuthenticatedClientMixin, ESIndexTestCase, TestCase):
             "10 days": False,  # Invalid syntax
             "past 3 days": "now-3d/d",
             # months (30d each)
+            "1mo ago": "now-30d/d",
+            "3mo ago": "now-90d/d",
+            "6mo ago": "now-180d/d",
+            "2MO ago": "now-60d/d",
+            "-4mo": "now-120d/d",
+            "2mo": False,  # Invalid syntax
             "1m ago": "now-30d/d",
             "2M ago": "now-60d/d",
             "2m": False,  # Invalid syntax
