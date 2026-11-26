@@ -1,4 +1,5 @@
 import datetime
+import logging
 import pickle
 import sys
 import tempfile
@@ -13,6 +14,7 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import httpx
+import sentry_sdk
 import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
@@ -34,6 +36,9 @@ from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
 from sentry_sdk.consts import DEFAULT_OPTIONS as SENTRY_DEFAULT_OPTIONS
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.transport import Transport
 from sentry_sdk.utils import event_from_exception
 from waffle.testutils import override_flag
 
@@ -124,7 +129,7 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.settings.third_party.sentry import scrub_sensitive_data
+from cl.settings.third_party.sentry import before_send, scrub_sensitive_data
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
 
@@ -3410,6 +3415,21 @@ class ResolveActiveTabTest(SimpleTestCase):
                 )
 
 
+class MemoryTransport(Transport):
+    """A Sentry transport that keeps events in memory instead of sending them."""
+
+    def __init__(self) -> None:
+        """Start with no events."""
+        super().__init__()
+        self.events: list[dict] = []
+
+    def capture_envelope(self, envelope: Envelope) -> None:
+        """Keep the events in an envelope."""
+        for item in envelope.items:
+            if item.type == "event" and item.payload.json:
+                self.events.append(item.payload.json)
+
+
 class SentryScrubTest(SimpleTestCase):
     """Tests for applying Django's sensitive_* decorators to Sentry events."""
 
@@ -3542,6 +3562,59 @@ class SentryScrubTest(SimpleTestCase):
             [frame["function"] for frame in frames], ["marked", "fail"]
         )
         self.assertFalse(any("vars" in frame for frame in frames))
+
+    def test_scrubs_error_logged_through_sentry_logging(self) -> None:
+        """Does an error logged inside a marked function reach Sentry scrubbed?
+
+        Runs the real path: logger.exception, Sentry's logging integration
+        and our before_send hook, which also has to keep fingerprinting.
+        """
+        transport = MemoryTransport()
+        client = sentry_sdk.Client(
+            dsn="http://public@localhost/1",
+            transport=transport,
+            before_send=before_send,
+            attach_stacktrace=True,
+            default_integrations=False,
+            integrations=[LoggingIntegration()],
+        )
+        logger = logging.getLogger("cl.lib.tests.sentry")
+        # The test runner disables logging unless asked not to.
+        self.addCleanup(logging.disable, logging.root.manager.disable)
+        logging.disable(logging.NOTSET)
+
+        def fail() -> None:
+            """Raise an error from a frame with a local for Sentry to read."""
+            secret = "x"  # noqa: F841  # read by Sentry, not by us
+            raise KeyError
+
+        @sensitive_variables()
+        def marked() -> None:
+            """Catch fail()'s error and log it, like register does."""
+            try:
+                fail()
+            except KeyError:
+                logger.exception(
+                    "Unexpected error", extra={"fingerprint": ["scrub-test"]}
+                )
+
+        with sentry_sdk.new_scope() as scope, self.assertLogs(logger, "ERROR"):
+            scope.set_client(client)
+            marked()
+        client.close()
+
+        self.assertEqual(len(transport.events), 1)
+        event = transport.events[0]
+        frames = [
+            frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        ]
+        self.assertEqual(
+            [frame["function"] for frame in frames], ["marked", "fail"]
+        )
+        self.assertFalse(any("vars" in frame for frame in frames))
+        self.assertEqual(event["fingerprint"], ["scrub-test"])
 
     def test_scrubs_marked_frames_in_nested_causes(self) -> None:
         """Is a marked function scrubbed in every exception it shows up in?
