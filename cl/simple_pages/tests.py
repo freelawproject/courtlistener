@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Iterator
 from http import HTTPStatus
@@ -1485,6 +1486,266 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
             '<c-toast title="Saved" x-on:docket-blocked.window="open" />'
         )
         self.assertIn('x-on:docket-blocked.window="open"', html)
+
+
+class ComboboxComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The markup c-combobox renders for each prop, which its script and the Alpine UI plugin read in the browser."""
+
+    options = [
+        {"value": 1, "label": "appeals", "selected": True},
+        {"value": 2, "label": "<b>bankruptcy</b>", "selected": False},
+    ]
+
+    def render(self, source: str) -> HtmlElement:
+        """Renders a Cotton snippet and returns the component's root."""
+        html = self.render_component(source, {"options": self.options})
+        return fromstring(html).xpath("//*[@x-data='combobox']")[0]
+
+    def test_options_reach_the_script_as_json(self) -> None:
+        """The JSON script the component's script loads parses back to the options given, HTML in a label included."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        script = root.xpath(
+            "./template[@data-options]/script[@type='application/json']"
+        )[0]
+        self.assertEqual(json.loads(script.text), self.options)
+
+    def test_search_results_are_announced(self) -> None:
+        """The root holds a polite live region for the outcome of a search."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        status = root.xpath("./*[@role='status'][@aria-live='polite']")
+        self.assertEqual(len(status), 1)
+        self.assertEqual(status[0].get("x-text"), "searchResultsMessage")
+
+    def test_listeners_land_on_the_root(self) -> None:
+        """A listener written on the component tag sits on the element that dispatches the component's events."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" x-on:combobox-add="attach" />'
+        )
+        self.assertEqual(root.get("x-on:combobox-add"), "attach")
+
+    def test_single_selection_is_the_default(self) -> None:
+        """Without `multiple`, the root lacks the attribute that turns on multiple selection."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.get("multiple"))
+
+    def test_multiple_turns_on_multiple_selection(self) -> None:
+        """With `multiple`, the root carries the attribute that turns on multiple selection."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" multiple />'
+        )
+        self.assertIsNotNone(root.get("multiple"))
+
+    def test_only_multiple_shows_the_selection_as_chips(self) -> None:
+        """The chip rendered per selected option exists only with `multiple`."""
+        chips = ".//template[@x-for='option in $combobox.value']"
+        single = self.render('<c-combobox label="Tags" :options="options" />')
+        multiple = self.render(
+            '<c-combobox label="Tags" :options="options" multiple />'
+        )
+        self.assertEqual(len(single.xpath(chips)), 0)
+        self.assertEqual(len(multiple.xpath(chips)), 1)
+
+    def test_creatable_offers_the_create_option(self) -> None:
+        """With `creatable`, the list has the option that creates the typed text and the root enables it."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" creatable />'
+        )
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 1)
+        self.assertIsNotNone(root.get("data-creatable"))
+
+    def test_without_creatable_there_is_no_create_option(self) -> None:
+        """Without `creatable`, the list only holds the options given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
+        self.assertIsNone(root.get("data-creatable"))
+
+    def test_creatable_needs_search(self) -> None:
+        """`creatable` has no effect on a combobox that takes no typed text."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" creatable :searchable="False" />'
+        )
+        self.assertEqual(len(root.xpath(".//template[@x-if='canCreate']")), 0)
+        self.assertIsNone(root.get("data-creatable"))
+
+    def test_searchable_is_the_default(self) -> None:
+        """Without the prop, the input accepts the text that filters the options."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.xpath(".//input")[0].get("x-on:beforeinput"))
+
+    def test_not_searchable_blocks_typing(self) -> None:
+        """With search turned off, the input rejects the text entered in it."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" :searchable="False" />'
+        )
+        self.assertEqual(
+            root.xpath(".//input")[0].get("x-on:beforeinput"), "blockTyping"
+        )
+
+    def test_only_clearable_adds_the_clear_button(self) -> None:
+        """The button that empties the single selection exists only with `clearable`."""
+        button = ".//button[@*[name()='x-on:click']='clear']"
+        plain = self.render('<c-combobox label="Tags" :options="options" />')
+        clearable = self.render(
+            '<c-combobox label="Tags" :options="options" clearable />'
+        )
+        self.assertEqual(len(plain.xpath(button)), 0)
+        self.assertEqual(len(clearable.xpath(button)), 1)
+
+    def test_clearable_has_no_effect_with_multiple(self) -> None:
+        """A combobox with chips, each with its own remove button, gets no clear button."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" multiple clearable />'
+        )
+        buttons = root.xpath(".//button[@*[name()='x-on:click']='clear']")
+        self.assertEqual(len(buttons), 0)
+
+    def test_name_submits_the_single_selection(self) -> None:
+        """With `name`, a hidden input of that name carries the selected option's value."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" />'
+        )
+        hidden = root.xpath("./input[@type='hidden'][@name='tag']")
+        self.assertEqual(len(hidden), 1)
+        self.assertEqual(hidden[0].get("x-bind:value"), "formValue")
+
+    def test_name_submits_each_of_multiple_selections(self) -> None:
+        """With `name` and `multiple`, one hidden input of that name is rendered per selected option."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" multiple />'
+        )
+        hidden = root.xpath(
+            "./template[@x-for='option in $combobox.value']/input[@type='hidden'][@name='tag']"
+        )
+        self.assertEqual(len(hidden), 1)
+
+    def test_without_name_nothing_is_submitted(self) -> None:
+        """Without `name`, the combobox renders no form input for its selection."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertEqual(len(root.xpath(".//input[@type='hidden']")), 0)
+
+    def test_name_stays_off_the_root(self) -> None:
+        """The root carries no `name`, which the plugin would turn into inputs of its own."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" />'
+        )
+        self.assertIsNone(root.get("name"))
+
+    def test_disabled_disables_every_control(self) -> None:
+        """With `disabled`, the root, the text input, the buttons and the form input are all disabled."""
+        for flags in ("multiple", "clearable"):
+            with self.subTest(flags=flags):
+                root = self.render(
+                    f'<c-combobox label="Tags" :options="options" name="tag" {flags} disabled />'
+                )
+                controls = [root, *root.xpath(".//input | .//button")]
+                self.assertEqual(
+                    [
+                        control.get("disabled") is not None
+                        for control in controls
+                    ],
+                    [True] * len(controls),
+                )
+
+    def test_enabled_is_the_default(self) -> None:
+        """Without `disabled`, no control of the combobox is disabled."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" name="tag" multiple />'
+        )
+        self.assertEqual(
+            len(root.xpath("descendant-or-self::*[@disabled]")), 0
+        )
+
+    def test_remote_leaves_the_search_to_the_page(self) -> None:
+        """With `remote`, the root tells the script not to filter and the list asks for its options."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" remote />'
+        )
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNotNone(root.get("data-remote"))
+        self.assertEqual(listbox.get("x-effect"), "searchWhenNeeded")
+
+    def test_only_remote_offers_more_pages(self) -> None:
+        """The option that asks for the next page exists only with `remote`."""
+        more = ".//template[@x-if='canLoadMore']"
+        local = self.render('<c-combobox label="Tags" :options="options" />')
+        remote = self.render(
+            '<c-combobox label="Tags" :options="options" remote />'
+        )
+        self.assertEqual(len(local.xpath(more)), 0)
+        self.assertEqual(len(remote.xpath(more)), 1)
+
+    def test_local_filtering_is_the_default(self) -> None:
+        """Without `remote`, the script filters the options it was given."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        self.assertIsNone(root.get("data-remote"))
+
+    def test_list_is_a_popup_by_default(self) -> None:
+        """Without `inline`, the plugin opens and closes the list."""
+        root = self.render('<c-combobox label="Tags" :options="options" />')
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNone(listbox.get("static"))
+
+    def test_inline_keeps_the_list_visible(self) -> None:
+        """With `inline`, the list tells the plugin to keep it shown."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" inline />'
+        )
+        listbox = root.xpath(".//ul[@*[name()='x-combobox:options']]")[0]
+        self.assertIsNotNone(listbox.get("static"))
+
+    def test_inline_keeps_the_button_the_plugin_needs(self) -> None:
+        """An inline combobox still renders the plugin's button, which the plugin reads on every click outside."""
+        root = self.render(
+            '<c-combobox label="Tags" :options="options" inline />'
+        )
+        buttons = root.xpath(".//button[@*[name()='x-combobox:button']]")
+        self.assertEqual(len(buttons), 1)
+
+
+class ComponentsComboboxDemoTest(SimpleTestCase):
+    """The components view answers the searches of the remote combobox demo."""
+
+    def search(self, **params: str) -> _MonkeyPatchedWSGIResponse:
+        """Requests a page of options the way the demo's script does."""
+        return self.client.get(
+            reverse("components"), {"combobox": "search", **params}
+        )
+
+    def test_first_page_holds_twenty_options_and_announces_more(self) -> None:
+        """An empty search returns the first twenty dockets and says more follow."""
+        page = self.search().json()
+        self.assertEqual(
+            [option["label"] for option in page["results"]],
+            [f"docket-{number:03d}" for number in range(1, 21)],
+        )
+        self.assertTrue(page["has_more"])
+
+    def test_later_pages_continue_where_the_previous_ended(self) -> None:
+        """Page 2 starts at the twenty-first docket."""
+        page = self.search(page="2").json()
+        self.assertEqual(
+            page["results"][0], {"value": 21, "label": "docket-021"}
+        )
+
+    def test_last_page_announces_no_more(self) -> None:
+        """The page that reaches the last docket says nothing follows."""
+        page = self.search(page="5").json()
+        self.assertEqual(page["results"][-1]["label"], "docket-095")
+        self.assertFalse(page["has_more"])
+
+    def test_search_matches_the_start_of_the_name(self) -> None:
+        """Only the dockets whose name starts with the text are returned, whatever its case."""
+        page = self.search(q="DOCKET-09").json()
+        self.assertEqual(
+            [option["label"] for option in page["results"]],
+            [f"docket-{number:03d}" for number in range(90, 96)],
+        )
+
+    def test_error_fails_on_purpose(self) -> None:
+        """Searching for "error" answers with a failure the demo can show."""
+        self.assertEqual(
+            self.search(q="error").status_code, HTTPStatus.SERVICE_UNAVAILABLE
+        )
 
 
 class ComponentsToastDemoTest(TestCase):

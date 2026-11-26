@@ -34,6 +34,7 @@
         {'href': '#banner', 'text': 'Banner'},
         {'href': '#tooltip', 'text': 'Tooltip'},
         {'href': '#toast', 'text': 'Toast'},
+        {'href': '#combobox', 'text': 'Combobox'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#profile-section-shell', 'text': 'Profile section shell'},
@@ -1983,6 +1984,279 @@ Sample code here.
 &lt;!-- Not in the demo: the view answers the request with the header HX-Trigger: docket-blocked --&gt;
 &lt;c-button variant="outline" hx-post="{% templatetag openblock %} url 'block_item' {% templatetag closeblock %}" hx-swap="none"&gt;Block this docket&lt;/c-button&gt;
 &lt;c-toast variant="success" title="Docket blocked" x-on:docket-blocked.window="open" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# COMBOBOX #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="combobox">
+    <h2 class="mt-6 mb-3">Combobox</h2>
+    <p>A field that opens a list of options and selects one of them, or any number with <code>multiple</code>. Typing in the field filters the list unless <code>searchable</code> is turned off. Implements the <a class="links-external" href="https://www.w3.org/WAI/ARIA/apg/patterns/combobox/" target="_blank" rel="noopener noreferrer">ARIA combobox pattern</a> on top of the <a class="links-external" href="https://alpinejs.dev/component/headless-combobox/docs" target="_blank" rel="noopener noreferrer">Alpine UI combobox</a>.</p>
+    <p class="mt-2">The single selection shows as the field's text, and emptying the text clears it. Multiple selections show as chips, each with a button that removes it.</p>
+    <p class="mt-2">The component keeps the selection in the browser and saves nothing. It reports each change with an event dispatched from its root, which bubbles; listen with <code>x-on:</code> on the component tag or on an ancestor.</p>
+    <p class="mt-2">For a plain choice inside a Django form, prefer a native <code>&lt;select&gt;</code> with the <code>Select</code> widget from <code>cl.lib.widgets</code>.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500">Single selection (default)</p>
+        <c-combobox
+          label="Court"
+          name="court"
+          placeholder="Search courts"
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court'},
+            {'value': 'ca1', 'label': 'First Circuit'},
+            {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
+            {'value': 'ca9', 'label': 'Ninth Circuit'},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>clearable</code></p>
+        <c-combobox
+          label="Jurisdiction"
+          placeholder="Search jurisdictions"
+          clearable
+          :options="[
+            {'value': 'federal', 'label': 'Federal', 'selected': True},
+            {'value': 'state', 'label': 'State'},
+            {'value': 'tribal', 'label': 'Tribal'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>multiple</code></p>
+        <c-combobox
+          label="Courts"
+          name="courts"
+          placeholder="Search courts"
+          multiple
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
+            {'value': 'ca1', 'label': 'First Circuit'},
+            {'value': 'ca2', 'label': 'Second Circuit'},
+            {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>:searchable="False"</code></p>
+        <c-combobox
+          label="Status"
+          placeholder="Choose an option"
+          :searchable="False"
+          :options="[
+            {'value': 'published', 'label': 'Published'},
+            {'value': 'unpublished', 'label': 'Unpublished'},
+            {'value': 'errata', 'label': 'Errata'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>multiple</code> and <code>creatable</code></p>
+        <c-combobox
+          label="Tags"
+          placeholder="Search or create tags"
+          multiple
+          creatable
+          create_label="Create tag:"
+          :options="[
+            {'value': 1, 'label': 'appeals'},
+            {'value': 2, 'label': 'bankruptcy', 'selected': True},
+            {'value': 3, 'label': 'patents'},
+          ]"
+        />
+      </div>
+      {% require_script "js/alpine/components/combobox_remote_demo.js" %}
+      <div
+        x-data="comboboxRemoteDemo"
+        x-on:combobox-search="answer"
+        data-search-url="{% url 'components' %}"
+        data-error-message="There was a problem. Try again later."
+        class="flex flex-col gap-2"
+      >
+        <p class="text-sm text-greyscale-500"><code>remote</code></p>
+        <c-combobox
+          label="Dockets"
+          placeholder="Search dockets"
+          multiple
+          remote
+          :options="[{'value': 7, 'label': 'docket-007', 'selected': True}]"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <p class="text-sm text-greyscale-500"><code>disabled</code></p>
+        <c-combobox
+          label="Courts"
+          placeholder="Search courts"
+          multiple
+          disabled
+          :options="[
+            {'value': 'scotus', 'label': 'Supreme Court', 'selected': True},
+            {'value': 'ca9', 'label': 'Ninth Circuit', 'selected': True},
+            {'value': 'cafc', 'label': 'Federal Circuit'},
+          ]"
+        />
+      </div>
+      <div class="flex flex-col gap-2 items-start">
+        <p class="text-sm text-greyscale-500"><code>inline</code>, inside a popover</p>
+        <c-button variant="outline" popovertarget="combobox-inline-demo" x-ref="comboboxInlineTrigger">Reporters</c-button>
+        <div
+          id="combobox-inline-demo"
+          popover
+          role="dialog"
+          aria-label="Reporters"
+          x-anchor.bottom-start.offset.8="$refs.comboboxInlineTrigger"
+          class="m-0 w-80 max-w-[calc(100vw-2rem)] p-4 border border-greyscale-200 rounded-lg bg-white shadow-lg"
+        >
+          <c-combobox
+            label="Reporters"
+            placeholder="Search reporters"
+            multiple
+            inline
+            :options="[
+              {'value': 'us', 'label': 'U.S. Reports', 'selected': True},
+              {'value': 'f3d', 'label': 'Federal Reporter, Third Series'},
+              {'value': 'fsupp', 'label': 'Federal Supplement'},
+            ]"
+          />
+        </div>
+      </div>
+    </div>
+
+    <p class="text-sm text-greyscale-600 mb-2">The <code>remote</code> demo is searched and paginated by this page's view. Type <code>error</code> in it to see a failed search.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>label</code></c-slot>
+        <c-slot name="description">Visible label of the field. It names the input and the list of options.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>options</code></c-slot>
+        <c-slot name="description">List of dictionaries with a unique <code>value</code> and a <code>label</code>. An optional <code>selected</code> marks the options selected on load; without <code>multiple</code>, only the first one counts. The options are listed in the order given.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>placeholder</code></c-slot>
+        <c-slot name="description">Text shown in the field while it is empty.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>multiple</code></c-slot>
+        <c-slot name="description">Selects any number of options and keeps the list open after each choice. Without it, choosing an option replaces the selection and closes the list.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>searchable</code></c-slot>
+        <c-slot name="description">Whether typing in the field filters the list. Defaults to <code>True</code>. Pass <code>:searchable="False"</code> for short lists: the field then only opens the list, and letter keys jump to the first option starting with them. Without search, <code>creatable</code> has no effect and the single selection can only be cleared with <code>clearable</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>creatable</code></c-slot>
+        <c-slot name="description">Offers an option, listed after the matches, that creates the typed text when it equals no option's label, ignoring case, and no option's value.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>create_label</code></c-slot>
+        <c-slot name="description">Text shown before the typed text in the create option. Defaults to <code>Create:</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>clearable</code></c-slot>
+        <c-slot name="description">Adds a button to the field that empties the single selection, shown while an option is selected. For optional fields. Has no effect with <code>multiple</code>, where each chip has its own remove button. Clearing dispatches <code>combobox-remove</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>name</code></c-slot>
+        <c-slot name="description">Submits the selection with the surrounding form under this name: the selected option's <code>value</code>, or one value per selected option with <code>multiple</code>. A single-select with nothing selected submits an empty value. Without it the selection only reaches the page through the events.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>disabled</code></c-slot>
+        <c-slot name="description">Shows the selection without letting the user change it or open the list. A disabled combobox submits nothing, as a disabled form control.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>remote</code></c-slot>
+        <c-slot name="description">Leaves the search to the page: the component filters nothing and asks for its options with <code>combobox-search</code>, so a server can search and paginate them. <code>options</code> then only needs the options selected on load. The list shows a loading row while it waits, the message of a failed search, and a "Load more" row while there are further pages.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>inline</code></c-slot>
+        <c-slot name="description">Renders the list below the field, in the page flow and always visible, instead of opening it as a popup. For a combobox inside a popover or a dialog, which does the opening and closing. Escape pressed in the field does not close a native popover; close it from a <code>keydown.escape</code> listener in the capture phase.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes for the root.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p class="p-2.5">None.</p>
+    </c-library.list>
+
+    <c-library.list title="Events" only>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-add</code></c-slot>
+        <c-slot name="description">An option was selected. <code>detail.option</code> holds its <code>value</code> and <code>label</code>. <code>detail.undo()</code> deselects it again without dispatching events, for a listener that could not save the change.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-remove</code></c-slot>
+        <c-slot name="description">An option was deselected: from the list, from its chip, by emptying the field, or because another option replaced it as the single selection, in which case it follows that option's <code>combobox-add</code>. <code>detail.option</code> holds its <code>value</code> and <code>label</code>. <code>detail.undo()</code> selects it again without dispatching events.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-create</code></c-slot>
+        <c-slot name="description">The create option was chosen. <code>detail.label</code> holds the typed text. Unless a listener calls <code>preventDefault()</code>, the text becomes a new selected option whose value is its label, and <code>combobox-add</code> follows. A listener that cancels the event can call <code>detail.add({value, label})</code> later, for instance once the server has given the new option its id; the option is then added and selected, and <code>combobox-add</code> follows.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>combobox-search</code></c-slot>
+        <c-slot name="description">Only with <code>remote</code>. Asks for the options matching <code>detail.query</code>, the typed text, which the listener is free to match as its source does. Dispatched when the combobox is first used and, after a pause in typing, when the text changes, with <code>detail.page</code> 1; choosing "Load more" dispatches it for the next page. Answer with <code>detail.respond(options, {hasMore})</code>, which replaces the list for page 1 and extends it for later pages, or with <code>detail.fail(message)</code>. An answer to a search that a newer one replaced is ignored; pass <code>detail.signal</code> to <code>fetch</code> to cancel its request too.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Single selection, filtered by typing, submitted with its form as "court" --&gt;
+&lt;c-combobox
+  label="Court"
+  name="court"
+  placeholder="Search courts"
+  :options="[
+    {'value': 'scotus', 'label': 'Supreme Court'},
+    {'value': 'ca2', 'label': 'Second Circuit', 'selected': True},
+  ]"
+/&gt;
+
+&lt;!-- Single selection with a button that empties it, for optional fields --&gt;
+&lt;c-combobox label="Jurisdiction" placeholder="Search jurisdictions" clearable :options="jurisdiction_options" /&gt;
+
+&lt;!-- Options searched and paginated by the page; searchDockets fetches them and answers the event --&gt;
+&lt;c-combobox
+  label="Dockets"
+  placeholder="Search dockets"
+  multiple
+  remote
+  :options="selected_docket_options"
+  x-on:combobox-search="searchDockets"
+/&gt;
+
+&lt;!-- Selection shown but not editable --&gt;
+&lt;c-combobox label="Courts" multiple disabled :options="court_options" /&gt;
+
+&lt;!-- Single selection without typing --&gt;
+&lt;c-combobox label="Status" placeholder="Choose an option" :searchable="False" :options="status_options" /&gt;
+
+&lt;!-- Multiple selection with the create option; the listeners are methods of an Alpine component on an ancestor --&gt;
+&lt;c-combobox
+  label="Tags"
+  placeholder="Search or create tags"
+  multiple
+  creatable
+  create_label="Create tag:"
+  :options="tag_options"
+  x-on:combobox-add="attachTag"
+  x-on:combobox-remove="detachTag"
+  x-on:combobox-create="createTag"
+/&gt;
+
+&lt;!-- List always visible, inside a popover that its button opens and closes --&gt;
+&lt;c-button variant="outline" popovertarget="reporters" x-ref="trigger"&gt;Reporters&lt;/c-button&gt;
+&lt;div id="reporters" popover role="dialog" aria-label="Reporters" x-anchor.bottom-start.offset.8="$refs.trigger"&gt;
+  &lt;c-combobox label="Reporters" multiple inline :options="reporter_options" /&gt;
+&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </section>

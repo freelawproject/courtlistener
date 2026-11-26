@@ -1,0 +1,163 @@
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/components/combobox.js" %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
+{% require_script "js/alpine/plugins/anchor" defer=True %}
+
+<c-vars
+  label
+  options
+  placeholder=""
+  multiple
+  :searchable="True"
+  creatable
+  create_label="Create:"
+  inline
+  clearable
+  name=""
+  disabled
+  remote
+  class=""
+/>
+
+<div
+  x-data="combobox"
+  x-combobox
+  {% if multiple %}multiple{% endif %}
+  {% if disabled %}disabled{% endif %}
+  by="value"
+  x-bind:default-value="initialSelection"
+  x-effect="trackSelection"
+  {% if creatable and searchable %}data-creatable{% endif %}
+  {% if remote %}
+    data-remote
+    x-on:focusin="focusEntered"
+    x-on:focusout="focusLeft"
+  {% endif %}
+  class="relative flex flex-col gap-1.5 {{ class }}"
+  {{ attrs }}
+>
+  {# Inside a template because htmx removes script tags from the content it swaps in. #}
+  <template data-options>{{ options|json_script }}</template>
+  <p role="status" aria-live="polite" aria-atomic="true" class="sr-only" x-text="searchResultsMessage"></p>
+  {% if name and multiple %}
+    <template x-for="option in $combobox.value" x-bind:key="option.value">
+      <input type="hidden" name="{{ name }}" x-bind:value="option.value" {% if disabled %}disabled{% endif %} />
+    </template>
+  {% elif name %}
+    <input type="hidden" name="{{ name }}" x-bind:value="formValue" {% if disabled %}disabled{% endif %} />
+  {% endif %}
+  <label x-combobox:label class="text-sm font-medium text-greyscale-600">{{ label }}</label>
+  <div x-ref="field" x-effect="clearQueryWhenClosed" class="focus-container items-center gap-1.5 min-h-10 py-1.5 px-3 border border-greyscale-200 rounded-lg bg-white has-[input:disabled]:bg-greyscale-50">
+    {% if searchable %}
+      <span x-show="$combobox.isOpen" x-cloak class="flex shrink-0 text-greyscale-500">{% svg "magnifier" class="size-5" aria_hidden="true" %}</span>
+    {% endif %}
+    <div
+      {% if multiple %}x-effect="showInput"{% endif %}
+      class="flex flex-wrap flex-1 items-center gap-1.5 min-w-0 {% if multiple %}max-h-28 overflow-y-auto overscroll-contain{% endif %}"
+    >
+      {% if multiple %}
+        <ul class="contents list-none" aria-label="Selected: {{ label }}">
+          <template x-for="option in $combobox.value" x-bind:key="option.value">
+            <li class="flex items-center gap-1 max-w-full pl-2 pr-1 py-0.5 rounded-md border border-greyscale-300 bg-white text-sm font-medium text-greyscale-700">
+              <span x-text="option.label" class="truncate"></span>
+              <button
+                type="button"
+                x-on:click="remove(option)"
+                x-bind:aria-label="removeLabel(option)"
+                {% if disabled %}disabled{% endif %}
+                class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-500 hover:text-greyscale-800 focus-self"
+              >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
+            </li>
+          </template>
+        </ul>
+      {% endif %}
+      <input
+        x-combobox:input
+        {% if not multiple %}x-bind:display-value="displayLabel"{% endif %}
+        {% if searchable %}
+          x-on:input="followInput"
+        {% else %}
+          inputmode="none"
+          x-on:beforeinput="blockTyping"
+          x-on:compositionend="restoreInput"
+          x-on:click="toggleList"
+          x-on:keydown="typeahead"
+          x-on:keydown.enter.capture="openIfClosed"
+          x-on:keydown.space.capture="openIfClosed"
+          x-on:keydown.space.prevent="selectActive"
+        {% endif %}
+        type="text"
+        autocomplete="off"
+        {% if disabled %}disabled{% endif %}
+        placeholder="{{ placeholder }}"
+        class="flex-1 min-w-24 bg-transparent outline-none text-sm font-medium text-greyscale-600 placeholder:font-normal placeholder:text-greyscale-500 {% if not searchable %}caret-transparent cursor-pointer{% endif %}"
+      />
+    </div>
+    {% if clearable and not multiple %}
+      <button
+        type="button"
+        x-show="$combobox.value"
+        x-cloak
+        x-on:click="clear"
+        aria-label="Clear selection"
+        {% if disabled %}disabled{% endif %}
+        class="flex items-center justify-center shrink-0 size-5 rounded text-greyscale-400 hover:text-greyscale-800 focus-self"
+      >{% svg "cross" class="size-3" aria_hidden="true" %}</button>
+    {% endif %}
+    <button x-combobox:button aria-label="Show options" {% if disabled %}disabled{% endif %} class="{% if inline %}hidden{% else %}flex{% endif %} items-center justify-center shrink-0 size-5 text-greyscale-400">
+      {% svg "chevron" class="size-full" aria_hidden="true" %}
+    </button>
+  </div>
+  <ul
+    x-combobox:options
+    {% if inline %}
+      static
+    {% else %}
+      x-anchor.bottom-start.offset.4="$refs.field"
+      x-cloak
+    {% endif %}
+    {% if multiple %}aria-multiselectable="true"{% endif %}
+    {% if remote %}
+      x-effect="searchWhenNeeded"
+      x-bind:aria-busy="loading"
+    {% endif %}
+    class="flex flex-col gap-0.5 w-full max-h-80 overflow-y-auto list-none {% if disabled %}pointer-events-none{% endif %} {% if inline %}p-0 [&>li]:px-3{% else %}z-20 p-1.5 [&>li]:px-2 border border-greyscale-200 rounded-lg bg-white shadow-lg{% endif %}"
+  >
+    <template x-for="option in filteredOptions" x-bind:key="option.value">
+      <li
+        x-combobox:option
+        x-bind:value="option"
+        x-bind:data-active="$comboboxOption.isActive"
+        class="group flex items-center justify-between gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer aria-selected:bg-greyscale-50 data-[active]:bg-greyscale-100"
+      >
+        <span x-text="option.label" class="min-w-0 break-words"></span>
+        {% svg "check" class="size-5 shrink-0 invisible group-aria-selected:visible" aria_hidden="true" %}
+      </li>
+    </template>
+    {% if creatable and searchable %}
+      <template x-if="canCreate">
+        <li
+          x-combobox:option
+          x-bind:value="createOption"
+          x-bind:data-active="$comboboxOption.isActive"
+          class="flex items-center gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer data-[active]:bg-greyscale-100"
+        >{{ create_label }} <span x-text="query" class="min-w-0 break-words"></span></li>
+      </template>
+    {% endif %}
+    {% if remote %}
+      <li x-show="canLoadMore" x-cloak role="presentation" class="shrink-0 h-1 my-1 {% if not inline %}-mx-1.5{% endif %} bg-greyscale-100"></li>
+      <template x-if="canLoadMore">
+        <li
+          x-combobox:option
+          x-bind:value="moreOption"
+          x-bind:data-active="$comboboxOption.isActive"
+          x-text="moreLabel"
+          class="flex items-center gap-2 py-2.5 rounded-md text-sm font-medium text-greyscale-600 cursor-pointer data-[active]:bg-greyscale-100"
+        ></li>
+      </template>
+      <li x-show="isSearching" x-cloak role="presentation" class="py-2.5 text-sm text-greyscale-500">Loading…</li>
+      <li x-show="searchError" x-text="searchError" x-cloak role="presentation" class="py-2.5 text-sm text-red-600"></li>
+    {% endif %}
+    <li x-show="isEmpty" role="presentation" class="py-2.5 text-sm text-greyscale-500">No results.</li>
+  </ul>
+</div>

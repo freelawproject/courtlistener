@@ -8,7 +8,12 @@ from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -150,6 +155,29 @@ async def components(request: HttpRequest) -> HttpResponse:
             "includes/components/toast_demo.html",
             {"rendered_at": timezone.localtime().strftime("%H:%M:%S")},
             headers={"HX-Trigger-After-Settle": "toast-demo-server-ready"},
+        )
+
+    if request.GET.get("combobox") == "search":
+        # The library's remote combobox demo: pages of twenty made-up dockets
+        # whose name starts with `q`. Searching for "error" fails on purpose.
+        query = request.GET.get("q", "").lower()
+        if query == "error":
+            return JsonResponse(
+                {"detail": "This search fails on purpose."},
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+        page = request.GET.get("page", "")
+        end = (int(page) if page.isdecimal() and int(page) else 1) * 20
+        matches = [
+            {"value": number, "label": name}
+            for number in range(1, 96)
+            if (name := f"docket-{number:03d}").startswith(query)
+        ]
+        return JsonResponse(
+            {
+                "results": matches[end - 20 : end],
+                "has_more": len(matches) > end,
+            }
         )
 
     # Mock data for docket entry rows demo
