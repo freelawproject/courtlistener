@@ -6485,7 +6485,7 @@ class DocketAlertRowsTest(SimpleTestCase):
         )
 
     def test_row_has_display_ready_values(self) -> None:
-        """Every field is a string ready to print, in the site's formats."""
+        """Display fields are strings ready to print, in the site's formats."""
         # 03:28 UTC on Dec. 13 is still Dec. 12 in Los Angeles, which shows
         # the hit is converted to local time before it's formatted.
         alert = self.make_alert(
@@ -6501,6 +6501,7 @@ class DocketAlertRowsTest(SimpleTestCase):
                 {
                     "case_name": "United States v. Trump",
                     "date_filed": "Aug. 1, 2023",
+                    "docket_pk": 42,
                     "docket_number": "1:23-cr-00257",
                     "court": "D.D.C.",
                     "last_hit": "Dec. 12, 2024, 7:28 p.m.",

@@ -465,12 +465,15 @@ def is_search_history_on_cached(user_pk: int) -> bool:
 class DocketAlertRow(TypedDict):
     """One row of the docket alerts table on the user's alerts page.
 
-    Values are display-ready strings, so the template prints them as they are.
+    Display values are ready-made strings, so the template prints them as
+    they are.
 
     Attributes:
         case_name: The docket's best case name.
         date_filed: The date the case was filed, in the site's date format,
             or "Not provided" if it's unknown.
+        docket_pk: The docket's primary key, which the alert toggle posts to
+            identify the docket.
         docket_number: The docket number, or "Not provided" if it's unknown.
         court: The court's short name.
         last_hit: When the alert last triggered, in the site's date and time
@@ -480,6 +483,7 @@ class DocketAlertRow(TypedDict):
 
     case_name: str
     date_filed: str
+    docket_pk: int
     docket_number: str
     court: str
     last_hit: str
@@ -512,6 +516,7 @@ def build_docket_alert_rows(
                     else not_provided
                 ),
                 "docket_number": docket.docket_number or not_provided,
+                "docket_pk": docket.pk,
                 "court": docket.court.short_name,
                 "last_hit": (
                     date_format(
