@@ -1,6 +1,7 @@
 """REST API filters for courts, dockets, opinions, and related search models."""
 
 import rest_framework_filters as filters
+from django.db.models import QuerySet
 
 from cl.api.utils import (
     BASIC_TEXT_LOOKUPS,
@@ -21,7 +22,9 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 
@@ -272,10 +275,63 @@ class BaseSourceFilter(NoEmptyFilterSet):
         }
 
 
+class BaseSourceDocketEntryFilter(BaseSourceFilter):
+    """Base filterset for the docket entries of a docket source.
+
+    Sources whose date_filed is a DateTimeField must override its lookups:
+    there, date_filed=2025-01-01 only matches entries filed at midnight.
+    """
+
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookup reads just the id.
+    docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
+
+    class Meta(BaseSourceFilter.Meta):
+        fields = {
+            **BaseSourceFilter.Meta.fields,
+            "date_filed": DATE_LOOKUPS,
+        }
+
+
+class BaseSourceDocumentFilter(BaseSourceFilter):
+    """Base filterset for the documents of a docket source.
+
+    Pairs with BaseSourceDocumentSerializer: the model's is_available property
+    must read its filepath_local file field.
+    """
+
+    is_available = filters.BooleanFilter(method="filter_is_available")
+
+    class Meta(BaseSourceFilter.Meta):
+        fields = {
+            **BaseSourceFilter.Meta.fields,
+            "sha1": ["exact"],
+            "ocr_status": INTEGER_LOOKUPS,
+        }
+
+    def filter_is_available(
+        self, queryset: QuerySet, name: str, value: bool
+    ) -> QuerySet:
+        """Filter on whether the document has a file.
+
+        is_available is a model property, not a column, so it can't be
+        looked up directly.
+        """
+        if value:
+            return queryset.exclude(filepath_local="")
+        return queryset.filter(filepath_local="")
+
+
 class ScotusDocketMetadataFilter(BaseSourceFilter):
     """Filters for SCOTUS docket metadata."""
 
-    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookup reads just the id.
+    docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
 
     class Meta(BaseSourceFilter.Meta):
         model = ScotusDocketMetadata
@@ -283,4 +339,39 @@ class ScotusDocketMetadataFilter(BaseSourceFilter):
             **BaseSourceFilter.Meta.fields,
             "capital_case": ["exact"],
             "date_discretionary_court_decision": DATE_LOOKUPS,
+        }
+
+
+class SCOTUSDocketEntryFilter(BaseSourceDocketEntryFilter):
+    """Filters for SCOTUS docket entries."""
+
+    # Placeholders, the empty documents of entries without attachments,
+    # don't count as documents.
+    scotus_documents = filters.RelatedFilter(
+        "cl.search.filters.SCOTUSDocumentFilter",
+        queryset=SCOTUSDocument.objects.exclude(url="").only("id"),
+        distinct=True,
+    )
+
+    class Meta(BaseSourceDocketEntryFilter.Meta):
+        model = SCOTUSDocketEntry
+        fields = {
+            **BaseSourceDocketEntryFilter.Meta.fields,
+            "entry_number": INTEGER_LOOKUPS + ["isnull"],
+        }
+
+
+class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
+    """Filters for SCOTUS documents."""
+
+    docket_entry = filters.RelatedFilter(
+        SCOTUSDocketEntryFilter,
+        queryset=SCOTUSDocketEntry.objects.only("id"),
+    )
+
+    class Meta(BaseSourceDocumentFilter.Meta):
+        model = SCOTUSDocument
+        fields = {
+            **BaseSourceDocumentFilter.Meta.fields,
+            "document_number": INTEGER_LOOKUPS + ["isnull"],
         }
