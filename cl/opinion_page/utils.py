@@ -1046,13 +1046,22 @@ class CoreDocketDataDict(TypedDict):
 
 
 async def core_docket_data(
-    request: HttpRequest,
-    pk: int,
+    request: HttpRequest, pk: int, note_form_class: type[NoteForm] = NoteForm
 ) -> tuple[Docket, CoreDocketDataDict]:
     """Gather the core data shared by every tab view of a docket.
 
     The tab navigation is built here so every tab lists the same set,
     whichever one is active.
+
+    Args:
+        request: The request, used for the user and feature flags.
+        pk: The primary key of the docket.
+        note_form_class: The NoteForm subclass to build the note form
+            with. Only pages that render the form with the matching widgets
+            should change it; the legacy modal depends on the default's ids.
+
+    Returns:
+        The docket and a dict of the data shared by docket pages.
     """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
@@ -1072,6 +1081,7 @@ async def core_docket_data(
         docket,
         await request.auser(),  # type: ignore[arg-type]
         trunc(best_case_name(docket), 100, ellipsis="..."),
+        form_class=note_form_class,
     )
 
     has_alert = await user_has_alert(

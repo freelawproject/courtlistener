@@ -59,8 +59,9 @@ from cl.citations.utils import (
     slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites import forms_v2 as favorites_forms_v2
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import get_note_form_for
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -381,9 +382,13 @@ async def view_docket(
     sort_order_asc = True
     if await sync_to_async(flag_is_active)(request, "use_new_design"):
         form = forms_v2.DocketEntryFilterForm(request.GET, request=request)
+        note_form_class = favorites_forms_v2.NoteForm
     else:
         form = DocketEntryFilterForm(request.GET, request=request)
-    docket, context = await core_docket_data(request, pk)
+        note_form_class = NoteForm
+    docket, context = await core_docket_data(
+        request, pk, note_form_class=note_form_class
+    )
 
     source = docket.get_entry_source()
     de_list = await fetch_docket_entries(docket)
@@ -486,7 +491,16 @@ async def view_parties(
     slug: str,
 ) -> HttpResponse:
     """Show the parties and attorneys tab, 1,000 party types per page."""
-    docket, context = await core_docket_data(request, docket_id)
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
@@ -573,7 +587,16 @@ async def docket_idb_data(
     Raises:
         Http404: If the docket has no IDB data.
     """
-    docket, context = await core_docket_data(request, docket_id)
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
             pk=docket.idb_data_id

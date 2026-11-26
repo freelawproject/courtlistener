@@ -4,7 +4,7 @@ import logging
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
 from typing import Any, TypedDict
@@ -33,16 +33,16 @@ from django.views.decorators.vary import vary_on_headers
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
-from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.exceptions import NotFound, Throttled, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
-from rest_framework.request import clone_request
+from rest_framework.request import Request, clone_request
 from rest_framework.response import Response as DRFResponse
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
-from waffle import switch_is_active
+from waffle import flag_is_active, switch_is_active
 
 from cl.api.constants import LEVEL_TO_RATES
 from cl.api.models import (
@@ -283,7 +283,7 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
         return ""
 
 
-class FilterManyToManyMixin:
+class FilterManyToManyMixin(FilterSet):
     """Mixin for filtering nested many-to-many relationships.
 
     Provides helper methods to efficiently filter nested querysets when using
@@ -300,7 +300,7 @@ class FilterManyToManyMixin:
 
     join_table_cleanup_mapping: dict[str, str] = {}
 
-    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+    def _get_filter_label(self, field_name: str) -> str:
         """Maps a filter field name to its corresponding label.
 
         When defining filters(Declarative or using the `fields` attribute) in a
@@ -343,7 +343,7 @@ class FilterManyToManyMixin:
             join_table_key = join_table_key.replace(url_key, new_key, 1)
         return join_table_key
 
-    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
+    def get_filters_for_join_table(self) -> dict[str, Any]:
         """Processes request filters for use in a join table query.
 
         Iterates through the request filters, cleaning and transforming them to
@@ -363,7 +363,9 @@ class FilterManyToManyMixin:
         for related_name, related_filterset in self.related_filtersets.items():
             prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
             # Check if the related filterset has data to apply
-            if not any(value.startswith(prefix) for value in self.data):
+            if self.data is None or not any(
+                value.startswith(prefix) for value in self.data
+            ):
                 # Skip processing if no parameter starts with the prefix
                 continue
 
@@ -2286,7 +2288,6 @@ class DynamicFieldsMixin:
             allowed = set(filter(None, filter_fields))
 
         # omit fields in the `omit` argument.
-        # TODO: Typing this correctly involves going through a long chain of things that probably also need to be typed
         omitted = set(filter(None, omit_fields))
 
         for field in existing:
@@ -2298,9 +2299,14 @@ class DynamicFieldsMixin:
 
         return fields
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> Iterable[str] | Default:
         """Split a comma-separated fields parameter, or return ``default`` if it is missing."""
         try:
             return params.split(",")
@@ -2337,9 +2343,14 @@ class NestedDynamicFieldsMixin(DynamicFieldsMixin):
         """Always False, so every nesting level filters its fields."""
         return False
 
-    def get_filter_fields(
-        self, params, level, source, default=None, include_parent=True
-    ):
+    def get_filter_fields[Default: Iterable[str] | None](
+        self,
+        params,
+        level: int,
+        source: str,
+        default: Default = None,
+        include_parent: bool = True,
+    ) -> set[str] | Default:
         """Parse the raw `fields` parameter and return the subset of fields that apply at this serializer’s nesting level under the given source prefix."""
         fields = super().get_filter_fields(
             params, level, source, default, include_parent
@@ -2365,15 +2376,23 @@ def get_source_path(serializer) -> str:
     return f"{parent_path}__{name}" if parent_path else name
 
 
-def get_fields_for_level_and_prefix(
-    fields_list, level, source, include_parent, default
-):
+def get_fields_for_level_and_prefix[
+    Fields: Iterable[str] | None,
+    Default: Iterable[str] | None,
+](
+    fields_list: Fields,
+    level: int,
+    source: str,
+    include_parent: bool,
+    default: Default,
+) -> set[str] | Default:
     """Extract the field names relevant to a specific nesting depth from a list of double‑underscore lookup strings."""
     if not fields_list:
         return default
 
     prefix = source.split("__") if source else []
     allowed = set()
+    # pyrefly:ignore[not-iterable]
     for f in fields_list:
         parts = f.split("__")
 
@@ -2679,3 +2698,23 @@ class DeferredFieldsMixin:
             nested_prefetches + existing_simple_lookups
         )
         return new_qs
+
+
+class WaffleFlagMixin:
+    """ViewSet mixin that answers 404 unless the ``waffle_flag`` is active.
+
+    The flag is checked after authentication, so flags that target users or
+    groups work for token and OAuth requests too. Register the viewset with
+    ``cl.api.drf_routers.WaffleFlagRouter`` so the API root also hides its
+    route while the flag is off.
+    """
+
+    waffle_flag: str
+
+    def check_permissions(self, request: Request) -> None:
+        """Raise a 404 if the flag is off, then check the usual permissions."""
+        # DRF's authentication also sets the user on the Django request,
+        # which is what waffle reads to target users and groups.
+        if not flag_is_active(request._request, self.waffle_flag):
+            raise NotFound()
+        super().check_permissions(request)  # type: ignore[misc]

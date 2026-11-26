@@ -22,10 +22,8 @@ from typing import (
     IO,
     Any,
     Literal,
-    Never,
     NotRequired,
     TypedDict,
-    TypeIs,
     Unpack,
     cast,
 )
@@ -3091,6 +3089,9 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         "docket_entry__docket"
     ).aget(pk=rd_pk)
     d = rd.docket_entry.docket
+    # Type-only narrowing: this task has always assumed the docket has a
+    # pacer_case_id, so don't add a runtime check here.
+    pacer_case_id = cast(str, d.pacer_case_id)
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
@@ -3101,10 +3102,10 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         async with s:
             if rd.document_type == rd.ATTACHMENT:
                 await report.query(
-                    d.pacer_case_id, rd.document_number, rd.attachment_number
+                    pacer_case_id, rd.document_number, rd.attachment_number
                 )
             else:
-                await report.query(d.pacer_case_id, rd.document_number)
+                await report.query(pacer_case_id, rd.document_number)
     except HTTPError as exc:
         raise CourtQueryError(f"Unable to get PDF for {rd}") from exc
     try:
@@ -5008,45 +5009,6 @@ def texas_docket_has_valid_appellate_info(
     return docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
 
 
-def is_texas_appellate_docket(
-    d: TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[TexasCourtOfAppealsDocket]:
-    """Check if a Texas docket is from an appellate court."""
-    return d["court_type"] == CourtType.APPELLATE.value
-
-
-def is_texas_supreme_docket(
-    d: TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
-    """Check if a Texas docket's court type is ``CourtType.SUPREME``."""
-    return d["court_type"] == CourtType.SUPREME.value
-
-
-# TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
-# function should be replaced by a simple `is None` check.
-def is_texas_docket(
-    d: dict[Never, Never]
-    | TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[
-    TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket
-]:
-    """`TexasCommonScraper` may fail successfully.
-
-    In which case it returns an empty `dict`. This cannot be readily
-    distinguished from `TypedDict`. This enables type narrowing to happen for
-    `TexasCommonScraper` as-is.
-    """
-    return "court_type" in d
-
-
 def merge_texas_parties(
     docket: Docket, parties: list[TexasCaseParty]
 ) -> MergeResult:
@@ -5085,9 +5047,11 @@ def merge_texas_docket_originating_court(
     Returns:
         The result of the merge operation.
     """
-    if is_texas_supreme_docket(
+    if docket_data[
+        "court_type"
+    ] == CourtType.SUPREME and texas_docket_has_valid_appellate_info(
         docket_data
-    ) and texas_docket_has_valid_appellate_info(docket_data):
+    ):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
             logger.warning(
@@ -5176,12 +5140,12 @@ def merge_texas_case_transfers(
     oc_dn: str = originating_court["case"]
     ac_id: str = (
         docket_data["appeals_court"]["court_id"]
-        if is_texas_supreme_docket(docket_data)
+        if docket_data["court_type"] == CourtType.SUPREME
         else ""
     )
     ac_dns: list[str] = (
         docket_data["appeals_court"]["case_number"]
-        if is_texas_supreme_docket(docket_data)
+        if docket_data["court_type"] == CourtType.SUPREME
         else []
     )
     trial_court_id = texas_originating_court_to_court_id(originating_court)
@@ -5242,7 +5206,7 @@ def merge_texas_case_transfers(
                 ac_id
             )
             appeal_transfer_origin_dns = ac_dns
-        case _ if is_texas_appellate_docket(docket_data):
+        case _ if docket_data["court_type"] == CourtType.APPELLATE:
             logger.info(
                 "Docket %s is an appellate docket", docket.docket_number
             )
@@ -5377,7 +5341,7 @@ def merge_texas_docket(
 
     with transaction.atomic():
         docket = None
-        if is_texas_appellate_docket(docket_data):
+        if docket_data["court_type"] == CourtType.APPELLATE:
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
             )
@@ -5422,9 +5386,11 @@ def merge_texas_docket(
             docket, docket_data
         )
 
-        if is_texas_supreme_docket(
+        if docket_data[
+            "court_type"
+        ] == CourtType.SUPREME and texas_docket_has_valid_appellate_info(
             docket_data
-        ) and texas_docket_has_valid_appellate_info(docket_data):
+        ):
             lower_court_data = docket_data["appeals_court"]
             lower_court_id = texas_js_court_id_to_court_id(
                 lower_court_data["court_id"]
@@ -5453,7 +5419,7 @@ def merge_texas_docket(
 
         docket.save()
 
-    if is_texas_supreme_docket(docket_data):
+    if docket_data["court_type"] == CourtType.SUPREME:
         trial_court_result = merge_texas_trial_court_data(docket, docket_data)
     else:
         trial_court_result = MergeResult.unnecessary()
@@ -5539,7 +5505,7 @@ def texas_ingest_docket_task(
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
-        if not is_texas_docket(docket_data):
+        if not docket_data:
             raise ValueError("Docket parser failed to produce a valid Docket")
     except Exception as e:
         logger.error(
