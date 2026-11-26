@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from typing import cast
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet
 from django.http.response import Http404
 from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
@@ -46,7 +46,10 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
+    SCOTUSDocketEntrySerializer,
     ScotusDocketMetadataSerializer,
+    SCOTUSDocumentListSerializer,
+    SCOTUSDocumentSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -68,7 +71,9 @@ from cl.search.filters import (
     OpinionFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
+    SCOTUSDocketEntryFilter,
     ScotusDocketMetadataFilter,
+    SCOTUSDocumentFilter,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -83,7 +88,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 
@@ -280,6 +287,74 @@ class ScotusDocketMetadataViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
     serializer_class = ScotusDocketMetadataSerializer
     filterset_class = ScotusDocketMetadataFilter
     queryset = ScotusDocketMetadata.objects.order_by("-id")
+
+
+class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS docket entries, with their documents nested."""
+
+    waffle_flag = "scotus-api"
+    serializer_class = SCOTUSDocketEntrySerializer
+    filterset_class = SCOTUSDocketEntryFilter
+    # The nested documents' absolute_url needs the docket's slug, so only it
+    # is read from the docket; the entry's own columns are left to
+    # DeferredFieldsMixin. Entries without attachments keep an empty
+    # placeholder document for ES, which isn't a real document, so it's left
+    # out. The nested documents never include plain_text, so it isn't read
+    # either.
+    queryset = (
+        SCOTUSDocketEntry.objects.select_related("docket")
+        .only(
+            *(field.name for field in SCOTUSDocketEntry._meta.concrete_fields),
+            "docket__slug",
+        )
+        .prefetch_related(
+            Prefetch(
+                "scotus_documents",
+                queryset=SCOTUSDocument.objects.exclude(url="").defer(
+                    "plain_text"
+                ),
+            )
+        )
+        .order_by("-id")
+    )
+
+
+class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """Documents filed in SCOTUS docket entries."""
+
+    waffle_flag = "scotus-api"
+    serializer_class = SCOTUSDocumentSerializer
+    filterset_class = SCOTUSDocumentFilter
+    ordering_fields = (
+        *BaseSourceReadOnlyViewSet.ordering_fields,
+        "document_number",
+    )
+    # absolute_url needs the entry's docket_id and the docket's slug, so only
+    # those are read from the joined tables; the document's own columns are
+    # left to DeferredFieldsMixin. Placeholders, the empty documents of
+    # entries without attachments, are left out.
+    queryset = (
+        SCOTUSDocument.objects.exclude(url="")
+        .select_related("docket_entry__docket")
+        .only(
+            *(field.name for field in SCOTUSDocument._meta.concrete_fields),
+            "docket_entry__docket__slug",
+        )
+        .order_by("-id")
+    )
+
+    def get_serializer_class(self) -> type[SCOTUSDocumentSerializer]:
+        """Return a serializer without plain_text for list pages."""
+        if self.action == "list":
+            return SCOTUSDocumentListSerializer
+        return SCOTUSDocumentSerializer
+
+    def get_queryset(self) -> QuerySet[SCOTUSDocument]:
+        """Return the documents, not loading plain_text for list pages."""
+        queryset = super().get_queryset()
+        if self.action == "list":
+            return queryset.defer("plain_text")
+        return queryset
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
