@@ -1,0 +1,14 @@
+<c-vars variant="" class="" />
+
+<span
+  {{ attrs }}
+  class="{% if variant %}inline-block px-3 py-1 text-sm font-semibold border rounded-lg
+      {% if variant == 'info' %}text-sky-800 bg-sky-100 border-sky-400
+      {% elif variant == 'success' %}text-green-800 bg-green-100 border-green-300
+      {% elif variant == 'warning' %}text-yellow-800 bg-yellow-50 border-amber-450
+      {% elif variant == 'danger' %}text-red-700 bg-red-100 border-red-300
+      {% else %}text-greyscale-700 bg-greyscale-100 border-greyscale-300
+      {% endif %}
+    {% endif %}
+    {{ class }}"
+>{{ slot }}</span>
