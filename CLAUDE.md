@@ -162,6 +162,19 @@ docker exec cl-django uv run pytest -c bench.ini
 When creating code that modifies Django models, MUST strictly follow the Database
 Migration guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrations.md
 
+### User Data: Export and Deletion
+
+Users can download their data (`cl/users/data_export.py`) and delete their accounts
+(`delete_user_assets` and `convert_to_stub_account` in `cl/users/utils.py`). When adding
+or changing a model that holds a user's data, MUST check both:
+
+- **New table linked to a user**: MUST decide whether it belongs in the export and in
+  deletion, then add it to each, or explain in the PR why it is left out.
+- **New column on an exported table**: the export includes every column automatically.
+  MUST add credentials, secrets and staff-only fields to `EXCLUDED_FIELDS`.
+- **New column holding personal data** (names, addresses, IP addresses, free text): MUST
+  make sure account deletion removes or blanks it, including its pghistory event rows.
+
 ## Submitting Work
 
 ### Commits
