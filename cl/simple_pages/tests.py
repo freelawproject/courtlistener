@@ -1475,7 +1475,9 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
         html = self.render_component(
             '<c-toast title="Docket blocked"><button>Undo</button></c-toast>'
         )
-        close_button = re.search(r'<button[^>]*aria-label="Close"[^>]*>', html)
+        close_button = re.search(
+            r'<button[^>]*aria-label="Close: Docket blocked"[^>]*>', html
+        )
         self.assertIsNotNone(close_button)
         self.assertIn('x-show="isOpen"', close_button[0])
         action_container = re.search(
