@@ -14,6 +14,7 @@ from cl.audio.models import Audio
 from cl.people_db.models import Party, Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -374,4 +375,35 @@ class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
         fields = {
             **BaseSourceDocumentFilter.Meta.fields,
             "document_number": INTEGER_LOOKUPS + ["isnull"],
+        }
+
+
+class CaseTransferFilter(BaseSourceFilter):
+    """Filters for case transfers.
+
+    The docket numbers aren't filterable because they're unindexed text; use
+    the court and docket filters instead.
+    """
+
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookups read just the id.
+    origin_court = filters.RelatedFilter(
+        CourtFilter, queryset=Court.objects.only("id")
+    )
+    origin_docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
+    destination_court = filters.RelatedFilter(
+        CourtFilter, queryset=Court.objects.only("id")
+    )
+    destination_docket = filters.RelatedFilter(
+        DocketFilter, queryset=Docket.objects.only("id")
+    )
+
+    class Meta(BaseSourceFilter.Meta):
+        model = CaseTransfer
+        fields = {
+            **BaseSourceFilter.Meta.fields,
+            "transfer_date": DATE_LOOKUPS,
+            "transfer_type": ["exact", "in"],
         }

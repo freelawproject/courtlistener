@@ -223,6 +223,13 @@ router_v4.register(
     basename="scotusdocument",
 )
 
+# State content (v4 only)
+router_v4.register(
+    r"case-transfers",
+    search_views.CaseTransferViewSet,
+    basename="casetransfer",
+)
+
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
 # - The only ViewSet that requires removal is SearchViewSet and its related
