@@ -5895,14 +5895,12 @@ class DocketFilterDatePickerTest(DocketFilterRenderTestCase):
                     self.assertEqual(len(fields), 1)
                     field = fields[0]
                     self.assertEqual(field.get("name"), f"filed_{direction}")
-                    self.assertEqual(
-                        field.get("placeholder"), "mm/dd/yyyy"
-                    )
+                    self.assertEqual(field.get("placeholder"), "mm/dd/yyyy")
                     if direction == "after":
                         self.assertEqual(field.get("value"), "01/15/2025")
                     parent = field.getparent()
                     hidden = parent.xpath(
-                        './input[@data-confirmed-date-picker]'
+                        "./input[@data-confirmed-date-picker]"
                     )
                     self.assertEqual(len(hidden), 1)
                     self.assertIsNone(hidden[0].get("name"))

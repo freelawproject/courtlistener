@@ -29,4 +29,6 @@ class DocketEntryFilterForm(V1DocketEntryFilterForm):
         )
         date_attrs = {"placeholder": "mm/dd/yyyy", "autocomplete": "off"}
         self.fields["filed_after"].widget = widgets.TextInput(attrs=date_attrs)
-        self.fields["filed_before"].widget = widgets.TextInput(attrs=date_attrs)
+        self.fields["filed_before"].widget = widgets.TextInput(
+            attrs=date_attrs
+        )
