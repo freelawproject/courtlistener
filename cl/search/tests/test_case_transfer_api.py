@@ -328,6 +328,47 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
                 self.assertEqual(r.status_code, HTTPStatus.OK, r.json())
                 self.assertEqual(len(r.json()["results"]), expected)
 
+    async def test_invalid_filter_values_are_rejected(self) -> None:
+        """Do bad filter values return a 400 naming the parameter?"""
+        await self.async_client.aforce_login(self.user)
+        cases = [
+            ("transfer_type", "9"),
+            ("transfer_date", "not-a-date"),
+            ("origin_court__jurisdiction", "XX"),
+            ("origin_docket", "999999999"),
+        ]
+        for param, value in cases:
+            with self.subTest(param=param, value=value):
+                r = await self.async_client.get(
+                    self.list_path(), {param: value}
+                )
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+                self.assertIn(param, r.json())
+
+    async def test_unindexed_sort_keys_are_ignored(self) -> None:
+        """Do transfers ignore sort keys their table has no index for?
+
+        Sorting the whole table on them would be slow, so the view doesn't
+        offer them and the default -id order applies. Each key here would
+        change the order if it were honored.
+        """
+        await self.async_client.aforce_login(self.user)
+        expected = [
+            self.no_origin_docket.pk,
+            self.no_destination_docket.pk,
+            self.appeal.pk,
+        ]
+        for order_by in ("transfer_date", "-transfer_date", "-transfer_type"):
+            with self.subTest(order_by=order_by):
+                r = await self.async_client.get(
+                    self.list_path(), {"order_by": order_by}
+                )
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertEqual(
+                    [transfer["id"] for transfer in r.json()["results"]],
+                    expected,
+                )
+
 
 class CaseTransferAPIDynamicFieldsTest(CaseTransferAPITestCase):
     """The fields and omit params trim the response."""
