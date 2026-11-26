@@ -3516,13 +3516,6 @@
       "severity": "error"
     },
     {
-      "column": 30,
-      "path": "cl/users/views.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `User` has no attribute `profile`",
-      "severity": "error"
-    },
-    {
       "column": 34,
       "path": "cl/users/views.py",
       "name": "missing-attribute",

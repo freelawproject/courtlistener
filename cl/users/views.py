@@ -4,6 +4,7 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from http import HTTPStatus
 from typing import TypedDict
 
 from django.conf import settings
@@ -22,6 +23,7 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseRedirect,
+    JsonResponse,
     QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect
@@ -75,8 +77,12 @@ from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.es_docket_sources import es_uid
 from cl.search.models import SEARCH_TYPES
-from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
+from cl.users.data_export import (
+    build_user_data_export,
+    claim_daily_export,
+    had_recent_export,
+)
 from cl.users.forms import (
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
@@ -614,48 +620,52 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
+@sensitive_post_parameters("password")
+@never_cache
 @login_required
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
+@sensitive_variables()
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Request an export of the user's data.
+    """Show the data export page, and download the export on POST.
 
-    On POST, queues a Zoho Desk ticket for the export and redirects to the
-    done page.
+    The user must confirm their password, and gets one export every 24
+    hours. The export is built in memory during the request, which is fine
+    for the small amount of data a typical account holds.
     """
-    if request.method == "POST":
-        user = request.user
-        confirmed = "Yes" if user.profile.email_confirmed else "No"
-        description = (
-            "A user has requested an export of their data in accordance "
-            "with the GDPR/CCPA. Their account details are:<br><br>"
-            f"Logged In As: {user.username} ({user.email})<br>"
-            f"Email Confirmed: {confirmed}"
-        )
-        create_zoho_desk_ticket.delay(
-            subject="User data export request",
-            name=user.get_full_name() or user.username,
-            email=user.email,
-            description=description,
-            request_type="Data Export Request",
-            assignee_id=settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
-                "data_export", ""
-            ),
+    is_post = request.method == "POST"
+    form = PasswordConfirmForm(request, request.POST if is_post else None)
+    if not is_post or not form.is_valid():
+        return TemplateResponse(
+            request, "profile/take_out.html", {"form": form, "private": True}
         )
 
-        return HttpResponseRedirect(reverse("take_out_done"))
+    # Check the limit first so a refused request skips building the export,
+    # but claim the day only once the export is ready, so an error while
+    # building it doesn't stop the user from trying again. The claim is the
+    # atomic step; the check is a shortcut.
+    if not had_recent_export(request.user):
+        response = JsonResponse(
+            build_user_data_export(request.user),
+            json_dumps_params={"indent": 2},
+        )
+        if claim_daily_export(request.user):
+            filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
+            response["Content-Disposition"] = (
+                f'attachment; filename="{filename}"'
+            )
+            return response
 
+    form.add_error(
+        None,
+        "You can download your data once every 24 hours. Please try again "
+        "24 hours after your last download.",
+    )
     return TemplateResponse(
         request,
         "profile/take_out.html",
-        {"private": True},
-    )
-
-
-async def take_out_done(request: HttpRequest) -> HttpResponse:
-    """Render the page confirming the data export was requested."""
-    return TemplateResponse(
-        request,
-        "profile/take_out_done.html",
-        {"private": True},
+        {"form": form, "private": True},
+        status=HTTPStatus.TOO_MANY_REQUESTS,
     )
 
 
