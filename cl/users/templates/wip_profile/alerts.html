@@ -27,7 +27,6 @@
             {% if docket_alerts_rows %}
                 <c-flex-table
                     caption="Docket Alerts table"
-                    align="data-center"
                     :columns="[
                         {'label': 'Case Name'},
                         {'label': 'Court'},
@@ -50,10 +49,13 @@
                 </c-flex-table>
             {% else %}
                 {# Here goes the empty state feature. #}
-                <p>You don't have active alerts.</p>
+                <p class="py-4">You don't have active alerts.</p>
             {% endif %}
+            <c-button variant="outline" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">
+                Learn More About RECAP Alerts
+            </c-button>
         {% else %}
-            <h2>Here comes Search page</h2>
+            {# Here goes the Search page #}
         {% endif %}
       </c-tabs>
     </c-profile-section-shell>
