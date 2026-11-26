@@ -21,7 +21,10 @@
             {% else %}
               <p>
                 Members get unlimited docket alerts.
-                <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer">Join FLP</a>
+                <a href="https://free.law/membership/"
+                  class="links-external"
+                  target="_blank"
+                  rel="noopener noreferrer">Join FLP</a>
               </p>
             {% endif %}
             {% if docket_alerts_rows %}
@@ -38,7 +41,9 @@
                 >
                 {% for row in docket_alerts_rows %}
                 <tr>
-                    <c-flex-cell header><a href="{{row.url}}">{{ row.case_name }}</a></c-flex-cell>
+                    <c-flex-cell header>
+                        <a href="{{row.url}}" class="font-medium">{{ row.case_name }}</a>
+                    </c-flex-cell>
                     <c-flex-cell>{{ row.court }}</c-flex-cell>
                     <c-flex-cell>{{ row.docket_number }}</c-flex-cell>
                     <c-flex-cell>{{ row.date_filed }}</c-flex-cell>
