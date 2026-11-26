@@ -2695,7 +2695,7 @@ async def purchase_appellate_docket_by_docket_number(
         report = AppellateDocketReport(pacer_court_id, session)
         await report.query(docket_number, **kwargs)
         docket_data = report.data
-    
+
     if not docket_data:
         raise ParsingException("No data found in docket report.")
 
