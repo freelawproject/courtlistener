@@ -1387,12 +1387,12 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <p>Each of the two calendar fields above uses the same component; when there is no visible label, its placeholder supplies a visually hidden label.</p>
     <h4 class="mt-3">Props</h4>
-    <p><code>input_id</code> (an Alpine getter name), <code>field_name</code>, <code>placeholder</code>, optional <code>label</code> and <code>relative</code>.</p>
+    <p><code>request</code> for script registration, <code>input_id</code> (an Alpine getter name), <code>field_name</code>, <code>placeholder</code>, optional <code>label</code> and <code>relative</code>.</p>
     <h4 class="mt-3">Slots</h4>
     <p>None.</p>
     <h4 class="mt-3">Code</h4>
     <c-code>
-&lt;c-corpus-search.date-selector.calendar-input input_id="calendarAfterInputId" label="Filed After" field_name="filed_after" placeholder="mm/dd/yyyy" only /&gt;
+&lt;c-corpus-search.date-selector.calendar-input :request="request" input_id="calendarAfterInputId" label="Filed After" field_name="filed_after" placeholder="mm/dd/yyyy" only /&gt;
     </c-code>
     <h3 class="mt-6">Mode selector</h3>
     <h4 class="mt-3">Demo</h4>
@@ -1462,7 +1462,7 @@ Sample code here.
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>date_picker</code></c-slot>
-        <c-slot name="description">Adds a mouse-operated calendar icon, a temporary picker input, and an accessible date-format hint. Used by the docket filter, which initializes the shared confirmed-date-picker helper.</c-slot>
+        <c-slot name="description">Adds the shared calendar picker used by the docket filters, with a mouse-operated icon, Apply and Cancel controls, and an accessible date-format hint. Pass <code>:request="request"</code> when rendering with <code>only</code> so the picker scripts can be registered.</c-slot>
       </c-library.item>
     </c-library.list>
 

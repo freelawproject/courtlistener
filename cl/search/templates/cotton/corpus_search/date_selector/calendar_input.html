@@ -1,7 +1,9 @@
-{% load svg_tags %}
+{% load component_tags svg_tags %}
+{% require_script "js/third_party/flatpickr/flatpickr" %}
+{% require_script "js/alpine/components/confirmed_date_picker.js" %}
 
 {# IDs are Alpine getter names from the surrounding dateSelector scope. #}
-<c-vars input_id label relative field_name placeholder />
+<c-vars request input_id label relative field_name placeholder />
 
 <div class="flex flex-col gap-1.5">
   {% if label and not relative %}

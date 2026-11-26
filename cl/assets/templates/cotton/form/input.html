@@ -1,6 +1,11 @@
-{% load extras svg_tags %}
+{% load component_tags extras svg_tags %}
 
-<c-vars form field_name namespace="" form_prefix="" hide_label date_picker/>
+<c-vars request form field_name namespace="" form_prefix="" hide_label date_picker/>
+
+{% if date_picker %}
+  {% require_script "js/third_party/flatpickr/flatpickr" %}
+  {% require_script "js/alpine/components/confirmed_date_picker.js" %}
+{% endif %}
 
 {# The id joins form_prefix, namespace and field_name with underscores. `yesno` yields each separator only when its part is set, so empty parts are skipped. #}
 {% with prefix_sep=form_prefix|yesno:"_," namespace_sep=namespace|yesno:"_," %}
