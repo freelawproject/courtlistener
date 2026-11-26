@@ -20,7 +20,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
-from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
+from cl.alerts.docket_alert_sources import RECAP_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -420,7 +420,7 @@ def send_alert_and_webhook(
 
     # Send docket entries to webhook. RECAP calls keep two arguments, so
     # workers still on the old task signature accept them during a deploy.
-    if source is not SCOTUS_ALERT_SOURCE:
+    if source is RECAP_ALERT_SOURCE:
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     elif settings.SCOTUS_ALERT_WEBHOOKS_ENABLED:
         send_docket_alert_webhook_events.delay(
