@@ -21,7 +21,8 @@ SCHEDULED_ALERT_HIT_BATCH_SIZE = env.int(
 ##########################
 # Keeps SCOTUS docket alert webhooks off until the SCOTUS API their source
 # points to launches, and SCOTUS search alert webhooks off until SCOTUS ids are
-# exposed in the search API (#8153). Alert emails are not affected.
+# exposed in the search API (#8153). It also hides webhook v3, which exists for
+# SCOTUS docket alerts, from the webhook form. Alert emails are not affected.
 SCOTUS_ALERT_WEBHOOKS_ENABLED = env.bool(
     "SCOTUS_ALERT_WEBHOOKS_ENABLED", default=False
 )

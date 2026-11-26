@@ -2142,6 +2142,21 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
     )
 
 
+def get_selectable_webhook_versions() -> list[tuple[int, str]]:
+    """Return the webhook versions users can pick for a new webhook.
+
+    v3 is offered only when SCOTUS_ALERT_WEBHOOKS_ENABLED is on, since it
+    exists for SCOTUS docket alerts. Existing v3 webhooks keep working and
+    stay editable when it's off.
+    """
+    return [
+        (version, label)
+        for version, label in WebhookVersions.choices
+        if version < WebhookVersions.v3
+        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+    ]
+
+
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     """Generate a dictionary representing the content for the webhook key.
 

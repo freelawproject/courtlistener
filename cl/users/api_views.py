@@ -20,6 +20,7 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.api.tasks import send_test_webhook_event
+from cl.api.utils import get_selectable_webhook_versions
 from cl.users.filters import WebhookEventViewFilter
 from cl.users.forms import WebhookForm
 
@@ -260,7 +261,7 @@ class WebhooksViewSet(ModelViewSet):
         # Get available webhook versions, excluding used ones
         version_choices = [
             (v, label)
-            for v, label in WebhookVersions.choices
+            for v, label in get_selectable_webhook_versions()
             if v not in used_versions
         ]
         context["version_choices"] = version_choices
