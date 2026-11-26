@@ -378,23 +378,39 @@ class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
         }
 
 
+class CaseTransferCourtFilter(NoEmptyFilterSet):
+    """Filters for the courts at either end of a case transfer.
+
+    Unlike CourtFilter, it can't filter courts by their dockets: from the
+    transfers endpoint, that would let one request scan every docket in
+    CourtListener. Filter transfers by their docket fields instead.
+    """
+
+    jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
+
+    class Meta:
+        model = Court
+        fields = {"id": ["exact", "in"]}
+
+
 class CaseTransferFilter(BaseSourceFilter):
     """Filters for case transfers.
 
     The docket numbers aren't filterable because they're unindexed text; use
-    the court and docket filters instead.
+    the court and docket filters instead. A docket filter with isnull finds
+    transfers whose end isn't in CourtListener.
     """
 
     # A RelatedFilter looks up the object its exact value names, then only
     # uses its pk, so the lookups read just the id.
     origin_court = filters.RelatedFilter(
-        CourtFilter, queryset=Court.objects.only("id")
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
     )
     origin_docket = filters.RelatedFilter(
         DocketFilter, queryset=Docket.objects.only("id")
     )
     destination_court = filters.RelatedFilter(
-        CourtFilter, queryset=Court.objects.only("id")
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
     )
     destination_docket = filters.RelatedFilter(
         DocketFilter, queryset=Docket.objects.only("id")
@@ -404,6 +420,8 @@ class CaseTransferFilter(BaseSourceFilter):
         model = CaseTransfer
         fields = {
             **BaseSourceFilter.Meta.fields,
+            "origin_docket": ["isnull"],
+            "destination_docket": ["isnull"],
             "transfer_date": DATE_LOOKUPS,
             "transfer_type": ["exact", "in"],
         }

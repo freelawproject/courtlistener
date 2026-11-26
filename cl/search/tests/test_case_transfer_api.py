@@ -295,9 +295,20 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
             ({"destination_court": self.appellate_court.pk}, 1),
             ({"origin_court__jurisdiction": Court.STATE_TRIAL}, 1),
             ({"destination_court__id": self.supreme_court.pk}, 1),
+            (
+                {
+                    "origin_court__id__in": (
+                        f"{self.trial_court.pk},{self.supreme_court.pk}"
+                    )
+                },
+                1,
+            ),
             ({"origin_docket": self.appellate_docket.pk}, 1),
             ({"destination_docket": self.appellate_docket.pk}, 1),
             ({"destination_docket__id": self.supreme_docket.pk}, 1),
+            ({"origin_docket__isnull": "true"}, 1),
+            ({"origin_docket__isnull": "false"}, 2),
+            ({"destination_docket__isnull": "true"}, 1),
             ({"transfer_type": CaseTransfer.APPEAL}, 2),
             (
                 {
@@ -383,6 +394,23 @@ class CaseTransferAPIRelatedFilterTest(CaseTransferAPITestCase):
                     )
                 )
                 self.assertEqual(selected, {"id"})
+
+    def test_court_filters_never_read_dockets(self) -> None:
+        """Is filtering a transfer's courts by their dockets refused?
+
+        Filtering courts by their dockets would scan every docket in
+        CourtListener, so the court filters must not offer that relation.
+        """
+        self.client.force_login(self.user)
+        for side in ("origin", "destination"):
+            param = f"{side}_court__dockets__source"
+            with self.subTest(param=param):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(self.list_path(), {param: 0})
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+                self.assertEqual(r.json()["unknown_params"], [param])
+                for query in ctx.captured_queries:
+                    self.assertNotIn('"search_docket"', query["sql"])
 
 
 # The usage stats write milestone events when their request counters reach
