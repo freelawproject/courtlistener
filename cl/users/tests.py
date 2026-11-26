@@ -65,7 +65,11 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.api.utils import (
+    DOUBLE_API_THROTTLES_SWITCH,
+    clear_tiered_cache,
+    get_selectable_webhook_versions,
+)
 from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     PROVIDERS,
@@ -4254,6 +4258,30 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         await webhook.arefresh_from_db()
         self.assertEqual(webhook.url, "https://example.com/new")
+
+
+class GetSelectableWebhookVersionsTest(SimpleTestCase):
+    """Tests for get_selectable_webhook_versions."""
+
+    def test_gated_versions(self) -> None:
+        """Are the gated version and later ones left out until enabled?"""
+        all_versions = list(WebhookVersions.choices)
+        test_cases = [
+            ("no gate", None, False, all_versions),
+            ("gate enabled", WebhookVersions.v2, True, all_versions),
+            (
+                "gate disabled",
+                WebhookVersions.v2,
+                False,
+                [(WebhookVersions.v1, "v1")],
+            ),
+        ]
+        for label, gated_version, enabled, expected in test_cases:
+            with self.subTest(label):
+                self.assertEqual(
+                    get_selectable_webhook_versions(gated_version, enabled),
+                    expected,
+                )
 
 
 @override_settings(DEVELOPMENT=False)

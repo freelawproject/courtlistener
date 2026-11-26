@@ -2,6 +2,7 @@
 
 from http import HTTPStatus
 
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.template import loader
@@ -261,7 +262,10 @@ class WebhooksViewSet(ModelViewSet):
         # Get available webhook versions, excluding used ones
         version_choices = [
             (v, label)
-            for v, label in get_selectable_webhook_versions()
+            # v3 exists for SCOTUS docket alerts, so it launches with them.
+            for v, label in get_selectable_webhook_versions(
+                WebhookVersions.v3, settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+            )
             if v not in used_versions
         ]
         context["version_choices"] = version_choices

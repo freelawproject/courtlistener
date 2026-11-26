@@ -569,9 +569,9 @@ class WebhookForm(ModelForm):
         """Build the form, limiting the event type and version choices.
 
         When updating, only the webhook's current event type and version are
-        offered, read-only. When creating, only the versions from
-        get_selectable_webhook_versions() are offered, along with the event
-        types the user doesn't yet have a webhook for in each of them.
+        offered, read-only. When creating, v3 is offered only when
+        SCOTUS_ALERT_WEBHOOKS_ENABLED is on, and an event type is shown only
+        if the user still lacks a webhook for it in one of those versions.
         """
         super().__init__(*args, **kwargs)
 
@@ -602,7 +602,10 @@ class WebhookForm(ModelForm):
             used_version_types = [
                 f"{w.event_type}_{w.version}" for w in webhooks
             ]
-            version_choices = get_selectable_webhook_versions()
+            # v3 exists for SCOTUS docket alerts, so it launches with them.
+            version_choices = get_selectable_webhook_versions(
+                WebhookVersions.v3, settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+            )
             available_type_choices = {
                 w_type
                 for w_type in WebhookEventType.choices
