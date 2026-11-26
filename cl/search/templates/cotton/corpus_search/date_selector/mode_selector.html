@@ -1,0 +1,45 @@
+{% load svg_tags %}
+
+<c-vars label help_url />
+
+<div class="flex flex-row justify-between">
+  <div class="flex flex-grow items-center justify-start gap-1">
+    <div class="text-sm font-medium text-greyscale-600" x-bind:id="labelId">{{ label }}</div>
+    <a
+      href="{{ help_url }}/search/use-relative-date-queries-to-keep-alerts-fresh"
+      class="inline-flex"
+      aria-label="Learn about relative date queries"
+    >
+      {% svg "circle_question_mark" aria_hidden="true" class="text-greyscale-400" %}
+    </a>
+  </div>
+  <div
+    role="radiogroup"
+    aria-label="Choose between calendar dates and relative dates"
+    class="flex flex-row w-fit items-center gap-2"
+  >
+    <label data-type="calendar" x-on:pointerup="focusFirstInput" class="cursor-pointer group flex gap-2 items-center text-sm font-medium text-greyscale-600">
+      <input
+        x-on:change="selectDateType"
+        type="radio"
+        x-bind:name="typeSelectName"
+        value="calendar"
+        class="cursor-pointer group-hover:shadow-lg"
+        data-ignore-input="true"
+        checked
+      >
+      Calendar
+    </label>
+    <label data-type="relative" x-on:pointerup="focusFirstInput" class="cursor-pointer group flex gap-2 items-center text-sm font-medium text-greyscale-600">
+      <input
+        x-on:change="selectDateType"
+        type="radio"
+        x-bind:name="typeSelectName"
+        value="relative"
+        class="cursor-pointer group-hover:shadow-lg"
+        data-ignore-input="true"
+      >
+      Relative
+    </label>
+  </div>
+</div>

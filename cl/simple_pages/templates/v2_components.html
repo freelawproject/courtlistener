@@ -28,6 +28,7 @@
         {'href': '#callout', 'text': 'Callout'},
         {'href': '#button', 'text': 'Button'},
         {'href': '#form-input', 'text': 'Form input'},
+        {'href': '#corpus-date-selector', 'text': 'Corpus search date selector'},
         {'href': '#icon', 'text': 'Icon'},
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
@@ -1418,6 +1419,51 @@ Sample code here.
   </c-layout-with-navigation.section>
 
   {# FORM INPUT #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="corpus-date-selector">
+    <h2 class="mt-6 mb-3">Corpus search date selector</h2>
+    <p>The date selector owns Alpine state and layout. Its internal calendar-input, mode-selector and relative-input components share that state and are not intended to be mounted independently.</p>
+    <h4 class="mt-3">Demo</h4>
+    <div class="grid grid-cols-2 gap-2">
+      <c-corpus-search.date-selector :request="request" label="Argued After" second_label="Argued Before" date_after_field_name="demo_after" date_before_field_name="demo_before" date_after_placeholder="mm/dd/yyyy" date_before_placeholder="mm/dd/yyyy" split only />
+    </div>
+    <div class="mt-4">
+      <c-corpus-search.date-selector :request="request" label="Docket Date" date_after_field_name="demo_filed_after" date_before_field_name="demo_filed_before" relative only />
+    </div>
+    <h3 class="mt-6">Calendar input</h3>
+    <h4 class="mt-3">Demo</h4>
+    <p>Each of the two calendar fields above uses the same component; when there is no visible label, its placeholder supplies a visually hidden label.</p>
+    <h4 class="mt-3">Props</h4>
+    <p><code>request</code> for script registration, <code>input_id</code> (an Alpine getter name), <code>field_name</code>, <code>placeholder</code>, optional <code>label</code> and <code>relative</code>.</p>
+    <h4 class="mt-3">Slots</h4>
+    <p>None.</p>
+    <h4 class="mt-3">Code</h4>
+    <c-code>
+&lt;c-corpus-search.date-selector.calendar-input :request="request" input_id="calendarAfterInputId" label="Filed After" field_name="filed_after" placeholder="mm/dd/yyyy" only /&gt;
+    </c-code>
+    <h3 class="mt-6">Mode selector</h3>
+    <h4 class="mt-3">Demo</h4>
+    <p>The Calendar/Relative radio group in the Docket Date example.</p>
+    <h4 class="mt-3">Props</h4>
+    <p><code>label</code> for the group and <code>help_url</code> for the help site base URL.</p>
+    <h4 class="mt-3">Slots</h4>
+    <p>None.</p>
+    <h4 class="mt-3">Code</h4>
+    <c-code>
+&lt;c-corpus-search.date-selector.mode-selector label="Docket Date" :help_url="WIKI_HELP_URL" only /&gt;
+    </c-code>
+    <h3 class="mt-6">Relative input</h3>
+    <h4 class="mt-3">Demo</h4>
+    <p>Select Relative in the Docket Date example to see the input and preset options.</p>
+    <h4 class="mt-3">Props</h4>
+    <p><code>label</code> for the presets' listbox and <code>field_name</code> for the submitted search field.</p>
+    <h4 class="mt-3">Slots</h4>
+    <p>None.</p>
+    <h4 class="mt-3">Code</h4>
+    <c-code>
+&lt;c-corpus-search.date-selector.relative-input label="Docket Date" field_name="filed_after" only /&gt;
+    </c-code>
+  </section>
+
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="form-input">
     <h2 class="mt-6 mb-3">Form input</h2>
     <p>Renders one field of a Django form: its label, the input, and any validation errors. The field is looked up as <code>form[field_name]</code>. The input's id is <code>form_prefix</code>, <code>namespace</code> and <code>field_name</code> joined with underscores, skipping empty parts; <code>form_prefix</code> only matters when the same form is rendered more than once on a page, such as the docket filter's desktop and mobile layouts. A field with errors gets a red border, <code>aria-invalid</code>, and an <code>aria-describedby</code> pointing at the error element, whose id is the field id plus <code>-error</code>.</p>
@@ -1459,6 +1505,10 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>:hide_label</code></c-slot>
         <c-slot name="description">Bool — hides the label visually but keeps it for screen readers.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>date_picker</code></c-slot>
+        <c-slot name="description">Adds the shared calendar picker used by the docket filters, with a mouse-operated icon, Apply and Cancel controls, and an accessible date-format hint. Pass <code>:request="request"</code> when rendering with <code>only</code> so the picker scripts can be registered.</c-slot>
       </c-library.item>
     </c-library.list>
 

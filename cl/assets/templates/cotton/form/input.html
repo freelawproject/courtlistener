@@ -1,15 +1,27 @@
-{% load extras %}
+{% load component_tags extras svg_tags %}
 
-<c-vars form field_name namespace="" form_prefix="" hide_label/>
+<c-vars request form field_name namespace="" form_prefix="" hide_label date_picker/>
 
 {# The id joins form_prefix, namespace and field_name with underscores. `yesno` yields each separator only when its part is set, so empty parts are skipped. #}
 {% with prefix_sep=form_prefix|yesno:"_," namespace_sep=namespace|yesno:"_," %}
-{% with field=form|get_item:field_name field_id=form_prefix|add:prefix_sep|add:namespace|add:namespace_sep|add:field_name %}
+{% with field=form|get_item:field_name field_id=form_prefix|add:prefix_sep|add:namespace|add:namespace_sep|add:field_name input_classes="focus-container input-text has-[textarea]:h-auto has-[[aria-invalid=true]]:border-red-700" %}
 <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-  <label for="{{ field_id }}" {% if hide_label %}class="sr-only"{% endif %}>{{ field.label }}</label>
-  <div class="focus-container input-text has-[textarea]:h-auto has-[[aria-invalid=true]]:border-red-700">
-    {% render_field_with_id field field_id %}
-  </div>
+  <label for="{{ field_id }}" class="{% if hide_label %}sr-only{% endif %}">{{ field.label }}{% if date_picker %}<span class="sr-only"> in format MM/DD/YYYY</span>{% endif %}</label>
+  {% if date_picker %}
+    {% require_script "js/third_party/flatpickr/flatpickr" %}
+    {% require_script "js/alpine/components/confirmed_date_picker.js" %}
+    <div class="{{ input_classes }} flex items-center gap-2" x-data="confirmedDatePicker" data-allow-future-dates>
+      <input type="hidden" data-confirmed-date-picker>
+      <button type="button" tabindex="-1" aria-hidden="true" x-on:mousedown.prevent class="shrink-0">
+        {% svg "calendar" class="w-5 h-5" aria_hidden="true" %}
+      </button>
+      {% render_field_with_id field field_id %}
+    </div>
+  {% else %}
+    <div class="{{ input_classes }}">
+      {% render_field_with_id field field_id %}
+    </div>
+  {% endif %}
   {% if field.errors %}
     <p id="{{ field_id }}-error" class="text-xs text-red-700">{{ field.errors|join:" " }}</p>
   {% endif %}
