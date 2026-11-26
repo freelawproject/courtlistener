@@ -12,22 +12,22 @@
       <c-tabs label="Alert types" :tabs="tabs" :active_tab="page">
         {% if page == "docket_alerts" %}
             <h2>RECAP Docket Alerts for PACER Cases</h2>
-            {% if user.profile.unlimited_docket_alerts %}
-              <p>Your account has unlimited docket alerts</p>
-            {% elif user.profile.email_grants_unlimited_docket_alerts %}
-              <p>Your email address provides you unlimited docket alerts</p>
-            {% elif user.profile.is_member %}
-              <p>As a member you get unlimited docket alerts. Thanks!</p>
-            {% else %}
-              <p>
-                Members get unlimited docket alerts.
-                <a href="https://free.law/membership/"
-                  class="links-external"
-                  target="_blank"
-                  rel="noopener noreferrer">Join FLP</a>
-              </p>
-            {% endif %}
             {% if docket_alerts_rows %}
+                {% if user.profile.unlimited_docket_alerts %}
+                  <p>Your account has unlimited docket alerts</p>
+                {% elif user.profile.email_grants_unlimited_docket_alerts %}
+                  <p>Your email address provides you unlimited docket alerts</p>
+                {% elif user.profile.is_member %}
+                  <p>As a member you get unlimited docket alerts. Thanks!</p>
+                {% else %}
+                  <p>
+                    Members get unlimited docket alerts.
+                    <a href="https://free.law/membership/"
+                      class="links-external"
+                      target="_blank"
+                      rel="noopener noreferrer">Join FLP</a>
+                  </p>
+                {% endif %}
                 <c-flex-table
                     caption="Docket Alerts table"
                     :columns="[
@@ -65,13 +65,13 @@
                 {% endfor %}
                 </c-flex-table>
                 <p id="docket-alerts-status" class="sr-only" role="status"></p>
+                <c-button variant="outline" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">
+                    Learn More About RECAP Alerts
+                </c-button>
             {% else %}
                 {# Here goes the empty state feature. #}
                 <p class="py-4">You don't have active alerts.</p>
             {% endif %}
-            <c-button variant="outline" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">
-                Learn More About RECAP Alerts
-            </c-button>
         {% else %}
             {# Here goes the Search page #}
         {% endif %}
