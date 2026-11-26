@@ -1,0 +1,6 @@
+{# A button that may go busy declares it with aria-busy, static or bound from Alpine. Only those render the busy markup and its script; every other button is c-button.base alone. #}
+{% if "aria-busy" in attrs or "x-bind:aria-busy" in attrs %}
+<c-button.busy :attrs="attrs">{{ slot }}</c-button.busy>
+{% else %}
+<c-button.base :attrs="attrs">{{ slot }}</c-button.base>
+{% endif %}
