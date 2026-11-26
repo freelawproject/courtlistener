@@ -35,7 +35,7 @@
       x-on:keydown.escape.capture="close"
       class="m-0 w-80 max-w-[calc(100vw-2rem)] p-4 border border-greyscale-200 rounded-lg bg-white shadow-lg"
     >
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-3 [&_[role=listbox]]:-mx-4 [&_[role=listbox]]:w-auto [&_[role=listbox]>li]:px-4">
         <c-combobox
           label="Apply tags to this item"
           placeholder="Search tags…"
@@ -47,9 +47,8 @@
           remote
         />
         <p x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></p>
-        <div class="pt-3 border-t border-greyscale-200">
-          <c-button variant="ghost" size="sm" href="{% url 'tag_list' user.username %}">View All Tags</c-button>
-        </div>
+        <div aria-hidden="true" class="-mx-4 h-1 bg-greyscale-100"></div>
+        <a href="{% url 'tag_list' user.username %}" class="links self-start text-sm">View All Tags</a>
       </div>
     </div>
   </div>
