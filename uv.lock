@@ -548,7 +548,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.18.1" },
     { name = "itypes", specifier = ">=1.2.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=4.0.0" },
+    { name = "juriscraper", specifier = ">=4.0.6" },
     { name = "kombu", specifier = ">=5.6.2" },
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1923,7 +1923,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "4.0.5"
+version = "4.0.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1940,9 +1940,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/17/16bc74627ca4b9522ee5c27778906836a38429d9efda28fc507ccd6fdb2d/juriscraper-4.0.5.tar.gz", hash = "sha256:7462f2e1e981691a30c1c5eb8ad667fd7c87adbc6924420457522a30b7cc60e3", size = 498474, upload-time = "2026-11-23T19:46:34.213Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/b6/01f69ae4a02e368dd2d6ccffceedfe98dd67b00dbab81575eea7b07025c6/juriscraper-4.0.6.tar.gz", hash = "sha256:e30d67ac1639393e20708273062e99a3d6ac992e0c298c8a762d635738a0964a", size = 501271, upload-time = "2026-11-26T18:21:59.491Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/b4/cf1e67c9e2f53c0e98031ac87e68c7ac2228c408f0b60ceecfd380d5eed5/juriscraper-4.0.5-py3-none-any.whl", hash = "sha256:89f51c5046c5805b02ae9abac9d34498e5975909977b32bbe722b4bd673d9e76", size = 748999, upload-time = "2026-11-23T19:46:32.081Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/0c/276f2b4f17dc73faa0b957ab118fcb2c00b20a4439727a04b2d48f5cb994/juriscraper-4.0.6-py3-none-any.whl", hash = "sha256:7351c9e423528199a2e0c39115493c3c8a5fb6dfc3276f55b3b6c3acae75f8c1", size = 752340, upload-time = "2026-11-26T18:21:57.3Z" },
 ]
 
 [[package]]
