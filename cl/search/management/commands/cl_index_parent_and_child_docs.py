@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from datetime import date
 from itertools import batched
+from typing import Literal
 
 from django.conf import settings
 from django.core.management import CommandError
@@ -482,7 +483,12 @@ class Command(VerboseCommand):
         count: int,
         search_type: str,
         chunk_size: int,
-        task_to_use: str,
+        task_to_use: Literal[
+            "index_parent_and_child_docs",
+            "index_parent_or_child_docs_in_es",
+            "remove_parent_and_child_docs_by_query",
+            "update_children_docs_by_query",
+        ],
         es_document: type[ESDocumentType] | None = None,
     ) -> None:
         """Process a queryset and execute tasks based on the specified celery task_to_use.

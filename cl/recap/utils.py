@@ -60,6 +60,10 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
 
     Returns:
         The court ID as a string.
+
+    Raises:
+        ValueError: If the fetch queue has no recap document, docket, or
+            court.
     """
     # Convert PacerFetchQueue to dictionary if necessary.  This allows us to
     # handle both types consistently.
@@ -89,6 +93,10 @@ def get_court_id_from_fetch_queue(fq: PacerFetchQueue | dict[str, Any]) -> str:
             else attrs["court"].pk
         )
 
+    if court_id is None:
+        raise ValueError(
+            "Fetch queue has no recap document, docket, or court."
+        )
     return court_id
 
 
@@ -142,22 +150,21 @@ def find_subdocket_pdf_rds_from_data(
         .exclude(docket_entry__docket__pacer_case_id__in=pacer_case_ids)
         .exclude(is_available=True)
     )
-    sub_docket_pqs = []
-    for main_rd in sub_docket_main_rds:
-        # Create PQs related to RD that require replication.
-        sub_docket_pqs.append(
-            ProcessingQueue(
-                uploader_id=user_id,
-                pacer_doc_id=main_rd.pacer_doc_id,
-                pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
-                document_number=main_rd.document_number,
-                attachment_number=main_rd.attachment_number,
-                court_id=court_id,
-                upload_type=UPLOAD_TYPE.PDF,
-                filepath_local=ContentFile(pdf_bytes, name="document.pdf"),
-                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
-            )
+    # Create PQs related to RD that require replication.
+    sub_docket_pqs = [
+        ProcessingQueue(
+            uploader_id=user_id,
+            pacer_doc_id=main_rd.pacer_doc_id,
+            pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
+            document_number=main_rd.document_number,
+            attachment_number=main_rd.attachment_number,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.PDF,
+            filepath_local=ContentFile(pdf_bytes, name="document.pdf"),
+            source=PROCESSING_QUEUE_SOURCE.REPLICATION,
         )
+        for main_rd in sub_docket_main_rds
+    ]
 
     if not sub_docket_pqs:
         return []
@@ -194,22 +201,19 @@ def find_subdocket_atts_rds_from_data(
         )
     )
 
-    sub_docket_pqs = []
-    for main_rd in sub_docket_main_rds:
-        # Create PQs related to RD that require replication.
-        sub_docket_pqs.append(
-            ProcessingQueue(
-                uploader_id=user_id,
-                pacer_doc_id=main_rd.pacer_doc_id,
-                pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
-                court_id=court_id,
-                upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-                filepath_local=ContentFile(
-                    att_bytes, name="attachment_page.html"
-                ),
-                source=PROCESSING_QUEUE_SOURCE.REPLICATION,
-            )
+    # Create PQs related to RD that require replication.
+    sub_docket_pqs = [
+        ProcessingQueue(
+            uploader_id=user_id,
+            pacer_doc_id=main_rd.pacer_doc_id,
+            pacer_case_id=main_rd.docket_entry.docket.pacer_case_id,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=ContentFile(att_bytes, name="attachment_page.html"),
+            source=PROCESSING_QUEUE_SOURCE.REPLICATION,
         )
+        for main_rd in sub_docket_main_rds
+    ]
 
     if not sub_docket_pqs:
         return []

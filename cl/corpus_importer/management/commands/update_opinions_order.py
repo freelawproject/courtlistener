@@ -3,6 +3,7 @@
 import argparse
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -96,8 +97,7 @@ def fetch_cleaned_columbia_text(filepath: str) -> str:
     Returns:
         the opinion text cleaned up
     """
-    with open(filepath, encoding="utf-8") as f:
-        content = f.read()
+    content = Path(filepath).read_text(encoding="utf-8")
 
     columbia_xml = BeautifulSoup(content, "html.parser")
     clean_columbia_text = re.sub(r"[^a-zA-Z0-9\s]+", " ", columbia_xml.text)

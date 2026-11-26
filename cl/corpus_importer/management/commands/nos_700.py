@@ -8,6 +8,7 @@ from django.conf import settings
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
     filter_docket_by_tags,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -269,9 +270,11 @@ def get_dockets(options, items, tags: list[str], sample_size=0):
                 court_id=row.district_id,
                 session_data=session,
                 tag_names=tags,
-                show_parties_and_counsel=True,
-                show_terminated_parties=True,
-                show_list_of_member_cases=True,
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=True,
+                ),
             ).set(queue=q),
         ).apply_async()
 

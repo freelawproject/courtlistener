@@ -5,7 +5,7 @@ import time
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.management import CommandParser  # type: ignore
+from django.core.management import CommandParser
 from django.db.models import F, Window
 from django.db.models.functions import RowNumber
 from redis.exceptions import ConnectionError

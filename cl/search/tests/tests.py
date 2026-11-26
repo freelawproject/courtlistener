@@ -2848,8 +2848,8 @@ class ESIndexingTasksUtils(TestCase):
         ]
         for test in tests:
             doc_id, parent_id = get_es_doc_id_and_parent_id(
-                test["es_doc"],  # type: ignore
-                test["instance"],  # type: ignore
+                test["es_doc"],
+                test["instance"],
             )
             self.assertEqual(doc_id, test["expected_doc_id"])
             self.assertEqual(parent_id, test["expected_parent_id"])

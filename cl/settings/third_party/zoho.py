@@ -1,7 +1,7 @@
 """Settings for the Zoho CRM SDK and Zoho Desk."""
 
-import os
 import tempfile
+from pathlib import Path
 
 import environ
 from zohocrmsdk.src.com.zoho.api.authenticator.store import FileStore
@@ -14,7 +14,7 @@ ZOHO_CLIENT_ID = env("ZOHO_CLIENT_ID", default="")
 ZOHO_CLIENT_SECRET = env("ZOHO_CLIENT_SECRET", default="")
 ZOHO_CRM_API_USER_EMAIL = env("ZOHO_CRM_API_USER_EMAIL", default="")
 ZOHO_STORE = FileStore(
-    file_path=os.path.join(tempfile.gettempdir(), Constants.TOKEN_FILE)
+    file_path=str(Path(tempfile.gettempdir()) / Constants.TOKEN_FILE)
 )
 ZOHO_RESOURCE_PATH = tempfile.gettempdir()
 ZOHO_ENV = USDataCenter.PRODUCTION()
@@ -42,5 +42,4 @@ ZOHO_DESK_AGENT_ASSIGNMENTS: dict[str, str] = {
     "support": env("ZOHO_DESK_AGENT_SUPPORT", default=""),
     "volunteering": env("ZOHO_DESK_AGENT_VOLUNTEERING", default=""),
     "partnerships": env("ZOHO_DESK_AGENT_PARTNERSHIPS", default=""),
-    "data_export": env("ZOHO_DESK_AGENT_DATA_EXPORT", default=""),
 }

@@ -1,13 +1,14 @@
 import json
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
+from typing import Any
 from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -24,6 +25,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.http import HttpResponse
@@ -36,6 +38,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
 from lxml.html import fromstring
+from redis import ConnectionError as RedisConnectionError
 from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
@@ -120,6 +123,7 @@ from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
 from cl.users import signals as user_signals
 from cl.users.admin import UserAdmin, UserProfileInline
+from cl.users.data_export import build_user_data_export
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -156,6 +160,22 @@ from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 from cl.users.utils import create_stub_account, message_dict
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
+
+TEST_ASSETS_DIR = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+
+
+def load_test_asset(file_name: str) -> Any:
+    """Load a JSON file from this app's test assets.
+
+    Args:
+        file_name: The name of the file in the test assets directory.
+
+    Returns:
+        The parsed JSON object.
+    """
+    return json.loads(
+        (TEST_ASSETS_DIR / file_name).read_text(encoding="utf-8")
+    )
 
 
 class UserTest(LiveServerTestCase):
@@ -398,7 +418,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -418,6 +438,53 @@ class UserDataTest(LiveServerTestCase):
         await up.arefresh_from_db()
         self.assertEqual(up.activation_key, "")
 
+    async def test_unknown_or_used_key_explains_what_happened(self) -> None:
+        """Does an unknown or already-used key get a helpful message?
+
+        Once a key is spent it is blanked, so a used key looks the same as one
+        that never existed. The page should say so rather than just "invalid".
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        url = reverse("email_confirm", args=[up.activation_key])
+        await self.async_client.post(url)  # Spends the key.
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                r = await getattr(self.async_client, method)(url)
+                self.assertEqual(r.status_code, 200)
+                content = r.content.decode()
+                self.assertIn("Confirmation Link Not Found", content)
+                self.assertIn("may have already been used", content)
+
+    async def test_get_does_not_confirm_email(self) -> None:
+        """Does a GET leave the account and key untouched?
+
+        A GET (e.g. a mail scanner prefetch) must only show the confirmation
+        button, so the human can still confirm afterward with a POST.
+        """
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+        key = up.activation_key
+        url = reverse("email_confirm", args=[key])
+
+        r = await self.async_client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Confirm My Email Address", r.content.decode())
+        self.assertNotIn("has been confirmed", r.content.decode())
+
+        await up.arefresh_from_db()
+        self.assertFalse(up.email_confirmed)
+        self.assertEqual(up.activation_key, key)
+
+        # The human can still confirm afterward.
+        r = await self.async_client.post(url)
+        self.assertIn("has been confirmed", r.content.decode())
+        await up.arefresh_from_db()
+        self.assertTrue(up.email_confirmed)
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -429,7 +496,7 @@ class UserDataTest(LiveServerTestCase):
             email_confirmed=False,
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -498,7 +565,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 "Tags",
                 "Developer Tools",
                 "Prayers",
-                "Your Support",
+                "Membership",
                 "Account",
             ],
         )
@@ -565,29 +632,6 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             response,
             reverse("delete_profile_done"),
         )
-
-    @patch("cl.users.views.create_zoho_desk_ticket")
-    async def test_take_out_creates_zoho_desk_ticket(
-        self, mock_task: MagicMock
-    ) -> None:
-        """Does requesting a data export create a Zoho Desk ticket?"""
-        user = await sync_to_async(User.objects.get)(username="pandora")
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
-        )
-        response = await self.async_client.post(
-            reverse("take_out"),
-            follow=True,
-        )
-        self.assertRedirects(response, reverse("take_out_done"))
-        mock_task.delay.assert_called_once()
-        call_kwargs = mock_task.delay.call_args.kwargs
-        self.assertEqual(call_kwargs["email"], user.email)
-        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
-        self.assertIn(user.username, call_kwargs["description"])
-        self.assertIn("Email Confirmed:", call_kwargs["description"])
 
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
@@ -1354,33 +1398,17 @@ class LiveUserTest(BaseSeleniumTest):
 class SNSWebhookTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
-            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
-        ):
-            cls.soft_bounce_asset = json.load(general_soft_bounce)
-            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
-            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.suppressed_asset = json.load(suppressed_bounce)
-            cls.no_failed_bounce_asset = json.load(no_bounce)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.soft_bounce_cnt_rejected_asset = load_test_asset(
+            "cnt_rejected_bounce.json"
+        )
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.suppressed_asset = load_test_asset("suppressed_bounce.json")
+        cls.no_failed_bounce_asset = load_test_asset("no_bounce.json")
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event.
@@ -1960,30 +1988,16 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
-            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
-            cls.complaint_asset = json.load(complaint)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_asset_2 = load_test_asset("general_soft_bounce_2.json")
+        cls.soft_bounce_msg_large_asset = load_test_asset(
+            "msg_large_bounce.json"
+        )
+        cls.complaint_asset = load_test_asset("complaint.json")
 
-        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
-        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.attachment_150 = TEST_ASSETS_DIR / "file_sample_150kB.pdf"
+        cls.attachment_500 = TEST_ASSETS_DIR / "file_example_500kB.pdf"
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -3008,17 +3022,10 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-        ):
-            cls.soft_bounce_asset = json.load(soft_bounce)
-            cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.soft_bounce_asset = load_test_asset("general_soft_bounce.json")
+        cls.soft_bounce_with_id_asset = load_test_asset(
+            "soft_bounce_msg_id.json"
+        )
         cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
@@ -3525,29 +3532,15 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-        ):
-            cls.hard_bounce_asset = json.load(hard_bounce)
-            cls.complaint_asset = json.load(complaint)
-            cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
-            cls.mail_box_full_soft_bounce_asset = json.load(
-                mail_box_full_soft_bounce
-            )
-            cls.msg_large_bounce_asset = json.load(msg_large_bounce)
+        cls.hard_bounce_asset = load_test_asset("hard_bounce.json")
+        cls.complaint_asset = load_test_asset("complaint.json")
+        cls.no_email_hard_bounce_asset = load_test_asset(
+            "no_email_hard_bounce.json"
+        )
+        cls.mail_box_full_soft_bounce_asset = load_test_asset(
+            "mail_box_full_soft_bounce.json"
+        )
+        cls.msg_large_bounce_asset = load_test_asset("msg_large_bounce.json")
         cls.user = UserFactory()
 
     async def send_signal(self, test_asset, event_name, signal) -> None:
@@ -4187,7 +4180,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4224,7 +4217,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -4250,7 +4243,7 @@ class NeonAccountCreationTest(TestCase):
             email_confirmed=False
         )
 
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("email_confirm", args=[up.activation_key])
         )
         self.assertEqual(
@@ -6193,3 +6186,267 @@ class MembershipHeaderLinkTest(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(self.url)
         self.assertContains(response, "Join FLP")
+
+
+@patch.object(
+    UserProfile, "total_api_usage", new_callable=PropertyMock, return_value=7
+)
+class DataExportTest(TestCase):
+    """Tests for build_user_data_export."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="exporter",
+            employer="Exporter LLP",
+            notes="Staff-only remark",
+        ).user
+        cls.other_user = UserProfileWithParentsFactory.create().user
+        cls.docket = DocketFactory.create()
+
+        AlertFactory.create(
+            user=cls.user, name="My alert", secret_key="alertsecret"
+        )
+        AlertFactory.create(user=cls.other_user, name="Not mine")
+        DocketAlertWithParentsFactory.create(
+            user=cls.user, docket=cls.docket, secret_key="docketsecret"
+        )
+        NoteFactory.create(user=cls.user, name="My note")
+        tag = UserTagFactory.create(user=cls.user, name="my-tag")
+        tag.dockets.add(cls.docket)
+        PrayerFactory.create(user=cls.user)
+        VisualizationFactory.create(user=cls.user, title="My map")
+        NeonMembershipFactory.create(user=cls.user)
+        SearchQuery.objects.create(
+            user=cls.user,
+            get_params="q=foo",
+            query_time_ms=5,
+            hit_cache=False,
+            failed=False,
+            source=SearchQuery.WEBSITE,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+
+    def test_exports_each_kind_of_data(self, mock_usage: MagicMock) -> None:
+        """Does each section hold the user's rows as stored?"""
+        export = build_user_data_export(self.user)
+
+        expected_counts = {
+            "search_alerts": 1,
+            "docket_alerts": 1,
+            "notes": 1,
+            "tags": 1,
+            "tagged_dockets": 1,
+            "prayers": 1,
+            "visualizations": 1,
+            "search_history": 1,
+        }
+        for section, count in expected_counts.items():
+            with self.subTest(section=section):
+                self.assertEqual(len(export[section]), count)
+
+        self.assertEqual(export["user"]["fields"]["username"], "exporter")
+        self.assertEqual(
+            export["profile"]["fields"]["employer"], "Exporter LLP"
+        )
+        self.assertEqual(
+            export["membership"]["model"], "donate.neonmembership"
+        )
+        self.assertEqual(
+            export["docket_alerts"][0]["fields"]["docket"], self.docket.pk
+        )
+        self.assertEqual(
+            export["tagged_dockets"][0]["fields"]["docket"], self.docket.pk
+        )
+        self.assertEqual(export["total_api_requests"], 7)
+
+    def test_leaves_out_excluded_fields(self, mock_usage: MagicMock) -> None:
+        """Are credentials, staff fields and links to the user left out?"""
+        export = build_user_data_export(self.user)
+
+        excluded = [
+            (export["user"], "password"),
+            (export["user"], "is_staff"),
+            (export["profile"], "notes"),
+            (export["profile"], "user"),
+            (export["search_alerts"][0], "secret_key"),
+            (export["search_alerts"][0], "user"),
+            (export["docket_alerts"][0], "secret_key"),
+        ]
+        for row, field in excluded:
+            with self.subTest(model=row["model"], field=field):
+                self.assertNotIn(field, row["fields"])
+
+    def test_leaves_out_other_users(self, mock_usage: MagicMock) -> None:
+        """Are other people's rows kept out of the export?"""
+        content = json.dumps(
+            build_user_data_export(self.user), cls=DjangoJSONEncoder
+        )
+
+        self.assertNotIn("Not mine", content)
+
+    def test_empty_account(self, mock_usage: MagicMock) -> None:
+        """Does an account with no saved items export empty sections?"""
+        export = build_user_data_export(self.other_user)
+
+        self.assertIsNone(export["membership"])
+        self.assertEqual(export["docket_alerts"], [])
+        self.assertEqual(export["tagged_dockets"], [])
+        self.assertEqual(export["search_history"], [])
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Process-local, so parallel workers can't reset or share the
+            # daily export counter mid-test.
+            "LOCATION": "take-out-view-test",
+        },
+    },
+)
+@patch.object(
+    UserProfile, "total_api_usage", new_callable=PropertyMock, return_value=0
+)
+class TakeOutViewTest(TestCase):
+    """Tests for the take_out view."""
+
+    PASSWORD = "a-good-password"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create(
+            user__username="taker",
+            user__password=make_password(cls.PASSWORD),
+        ).user
+
+    def setUp(self) -> None:
+        django_cache.clear()
+        self.client.force_login(self.user)
+
+    def download(self, password: str) -> HttpResponse:
+        """POST the export form with the given password."""
+        return self.client.post(reverse("take_out"), {"password": password})
+
+    def test_downloads_export(self, mock_usage: MagicMock) -> None:
+        """Does the right password download the user's data?"""
+        response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        export = json.loads(response.content)
+        self.assertEqual(export["user"]["fields"]["username"], "taker")
+
+    def test_wrong_password_shows_error(self, mock_usage: MagicMock) -> None:
+        """Does a wrong password show the form again, without using up the day?"""
+        response = self.download("wrong")
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your password was invalid.")
+        self.assertNotIn("Content-Disposition", response)
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+    def test_one_export_per_day(self, mock_usage: MagicMock) -> None:
+        """Is a second export within a day refused with a helpful message?"""
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+        with time_machine.travel(now() + timedelta(hours=23), tick=False):
+            response = self.download(self.PASSWORD)
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertContains(
+            response,
+            "Please try again 24 hours after your last download.",
+            status_code=HTTPStatus.TOO_MANY_REQUESTS,
+        )
+        self.assertNotIn("Content-Disposition", response)
+
+    def test_refused_export_skips_building(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Is a second export refused without building the file again?"""
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+        with patch("cl.users.views.build_user_data_export") as mock_build:
+            response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        mock_build.assert_not_called()
+
+    def test_claim_refuses_when_check_misses(
+        self, mock_usage: MagicMock
+    ) -> None:
+        """Does the claim still refuse an export the quick check let through?
+
+        Two requests at once can both pass the check; only one may export.
+        """
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+        with patch("cl.users.views.had_recent_export", return_value=False):
+            response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertNotIn("Content-Disposition", response)
+
+    def test_failed_export_allows_retry(self, mock_usage: MagicMock) -> None:
+        """Can the user try again after an error while building the export?"""
+        mock_usage.side_effect = RedisConnectionError
+
+        with self.assertRaises(RedisConnectionError):
+            self.download(self.PASSWORD)
+
+        mock_usage.side_effect = None
+        self.assertEqual(
+            self.download(self.PASSWORD).status_code, HTTPStatus.OK
+        )
+
+    def test_requires_login(self, mock_usage: MagicMock) -> None:
+        """Are anonymous users sent to sign in instead of getting data?"""
+        self.client.logout()
+
+        response = self.download(self.PASSWORD)
+
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), response["Location"])
+
+
+class MembershipPageTest(TestCase):
+    """Tests for the profile's Membership page."""
+
+    def test_page_follows_membership_state(self) -> None:
+        """The page offers join, upgrade or renew, and words the term to match."""
+        user = UserProfileWithParentsFactory.create().user
+        self.client.force_login(user)
+        url = reverse("profile_your_support")
+        now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+
+        with time_machine.travel(now, tick=False):
+            with self.subTest(state="none"):
+                response = self.client.get(url)
+                self.assertContains(response, "Become a Member")
+
+            membership = NeonMembershipFactory(
+                user=user,
+                level=NeonMembershipLevel.TIER_2,
+                termination_date=now + timedelta(days=60),
+            )
+            with self.subTest(state="active"):
+                response = self.client.get(url)
+                self.assertContains(response, "Upgrade Membership")
+                self.assertContains(response, "<dt>Term ends</dt>")
+                self.assertContains(response, "at 4:00 AM PST")
+
+            membership.termination_date = now - timedelta(days=60)
+            membership.save()
+            with self.subTest(state="lapsed"):
+                response = self.client.get(url)
+                self.assertContains(response, "Renew Your Membership")
+                self.assertContains(response, "<dt>Term ended</dt>")
