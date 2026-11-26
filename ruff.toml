@@ -27,6 +27,14 @@ lint.select = [
   "RET",
   # flake8-slots
   "SLOT",
+  # flake8-use-pathlib
+  "PTH",
+  # pygrep-hooks
+  "PGH",
+  # perflint
+  "PERF",
+  # unnecessary-iterable-allocation-for-first-element
+  "RUF015",
 ]
 lint.ignore = [
   # flake8-bugbear opinionated rules

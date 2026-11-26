@@ -63,9 +63,7 @@ COMMAND_MODULE = (
 CITATIONS_TASK = (
     f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
 )
-SCAN_XML_PATH = str(
-    Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
-)
+SCAN_XML_PATH = Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 
 
 def make_soup(xml: str) -> BeautifulSoup:
@@ -121,7 +119,7 @@ class ScanXmlHelpersTest(SimpleTestCase):
 
     def test_pair_opinions(self) -> None:
         """Are opinions paired by author and text, and only one-to-one?"""
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             lead_opinion = make_soup(f.read()).select_one("opinion")
         if lead_opinion is None:
             self.fail("The test XML must have an opinion")
@@ -288,6 +286,51 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "<syllabus>Shown from its field</syllabus>"
                 "<opinion><p>Text</p></opinion></casebody>",
                 "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
+            ),
+            (
+                # The heading of the syllabus is left out, not its page
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<heading><page-number label="2">*2</page-number>'
+                "<em>Syllabus by the Court</em></heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<heading>Appeal from the Circuit Court</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n'
+                "<heading>Appeal from the Circuit Court</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # Nor the mark of the syllabus note
+                "<casebody><heading>Syllabus <footnotemark>*</footnotemark>"
+                "</heading><syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<footnotemark>*</footnotemark>\n</headmatter>",
+            ),
+            (
+                # A page that starts inside the syllabus is still marked
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>First point</syllabus>"
+                '<syllabus>Second <page-number label="2">*2</page-number>'
+                "point</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n</headmatter>',
+            ),
+            (
+                # A heading with other words before the syllabus is kept
+                "<casebody><heading>On Motion for Rehearing</heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>On Motion for Rehearing</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # So is a "Syllabus" heading with no syllabus after it
+                "<casebody><heading>Syllabus</heading><court>A Court</court>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>Syllabus</heading>\n"
+                "<court>A Court</court>\n</headmatter>",
             ),
             ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
             ("<court>No casebody</court>", ""),
@@ -547,17 +590,20 @@ class ImportScannedOpinionsTest(TestCase):
         cls.court = CourtFactory.create(
             id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
         )
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             opinion = make_soup(f.read()).select_one("opinion")
         if opinion is None:
             raise ValueError("The test XML must have an opinion")
         cls.opinion_text = opinion.get_text(" ")
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
     def import_scan(self, **kwargs: str | bool | None) -> None:
         """Run the command over the test XML."""
-        options = {"court_id": self.court.pk, "path": SCAN_XML_PATH} | kwargs
+        options = {
+            "court_id": self.court.pk,
+            "path": str(SCAN_XML_PATH),
+        } | kwargs
         call_command("import_scanned_opinions", **options)
 
     def import_xml(self, xml: str, **kwargs: str | bool | None) -> None:
@@ -643,7 +689,7 @@ class ImportScannedOpinionsTest(TestCase):
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
-        self.assertEqual(content.extraction_type, OpinionContent.OCR)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR_ENSEMBLE)
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
@@ -708,6 +754,29 @@ class ImportScannedOpinionsTest(TestCase):
         cluster = OpinionCluster.objects.get()
         self.assertIn("The syllabus.", cluster.syllabus)
         self.assertNotIn("syllabus", cluster.headmatter)
+
+    def test_import_schema_2(self) -> None:
+        """Is a schema 2 file, with its syllabus under a heading, imported?"""
+        xml = self.scan_xml.replace('schema="1"', 'schema="2"').replace(
+            "<court>",
+            '<heading><page-number label="1">*1</page-number>'
+            "<em>Syllabus by the Court</em></heading>"
+            "<syllabus>1. The first point.</syllabus>"
+            "<syllabus>2. The second point.</syllabus><court>",
+            1,
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.syllabus,
+            "<p>1. The first point.</p> <p>2. The second point.</p>",
+        )
+        self.assertNotIn("syllabus", cluster.headmatter.lower())
+        self.assertIn(
+            '<page-number label="1">*1</page-number>', cluster.headmatter
+        )
 
     def test_merge_links_the_judges_it_fills(self) -> None:
         """Are the judges a merge fills in linked, keeping set authors?"""
@@ -1565,7 +1634,7 @@ class ImportFromScanningBucketTest(TestCase):
         cls.court = CourtFactory.create(
             id="fladistctapp4", jurisdiction=Court.STATE_APPELLATE
         )
-        with open(SCAN_XML_PATH, encoding="utf-8") as f:
+        with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
     def import_from_bucket(

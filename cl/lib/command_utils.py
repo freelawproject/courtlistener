@@ -3,6 +3,7 @@
 import logging
 import os
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import Any, ClassVar
 
 from django.core.management import BaseCommand, CommandError
@@ -75,7 +76,7 @@ class CommandUtils:
     @staticmethod
     def ensure_file_ok(file_path: str) -> None:
         """Check to make sure that a file path exists and is valid."""
-        if not os.path.exists(file_path):
+        if not Path(file_path).exists():
             raise CommandError(f"Unable to find file at {file_path}")
         if not os.access(file_path, os.R_OK):
             raise CommandError(f"Unable to read file at {file_path}")

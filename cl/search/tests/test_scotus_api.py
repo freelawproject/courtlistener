@@ -1,11 +1,16 @@
+import re
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
 
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
+from waffle.testutils import override_flag
 
+from cl.api.utils import LoggingMixin
+from cl.corpus_importer.tasks import add_scotus_placeholder_document
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -23,6 +28,11 @@ from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
 BASENAMES = ["scotusdocketmetadata", "scotusdocketentry", "scotusdocument"]
+PREFIXES = [
+    "scotus-docket-metadata",
+    "scotus-docket-entries",
+    "scotus-documents",
+]
 
 # The keys of a serialized SCOTUS docket entry.
 ENTRY_KEYS = {
@@ -68,11 +78,28 @@ LISTED_DOCUMENT_KEYS = DOCUMENT_KEYS - {"plain_text"}
 
 
 class ScotusAPITestCase(TestCase):
-    """Shared SCOTUS data for the API tests.
+    """Shared SCOTUS data for the API tests, with the endpoints' flag on.
+
+    The flag is enabled in setUp, so subclasses that override setUp must
+    call super().setUp().
 
     The entry with documents gets its attachment 2 created before attachment
-    1, so tests can tell display order apart from id order.
+    1, so tests can tell display order apart from id order. The entry
+    without documents gets the empty placeholder document production gives
+    such entries, which the API must hide.
     """
+
+    def setUp(self) -> None:
+        """Turn on the endpoints' flag in a waffle cache of this test's own.
+
+        Tests run in parallel and share the cache, so a common prefix would
+        let a test that turns the flag off leak its cached value into others.
+        The flag is set here rather than with a decorator because async tests
+        can't write it to the database.
+        """
+        super().setUp()
+        self.enterContext(override_settings(WAFFLE_CACHE_PREFIX=self.id()))
+        self.enterContext(override_flag("scotus-api", active=True))
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -123,6 +150,10 @@ class ScotusAPITestCase(TestCase):
             document_number=None,
             attachment_number=1,
         )
+        add_scotus_placeholder_document(cls.entry_no_docs)
+        cls.placeholder = SCOTUSDocument.objects.get(
+            docket_entry=cls.entry_no_docs
+        )
 
     @staticmethod
     def list_path(basename: str) -> str:
@@ -149,6 +180,56 @@ class ScotusAPIRoutingTest(ScotusAPITestCase):
                 path = self.list_path(basename).replace("/v4/", "/v3/")
                 r = await self.async_client.get(path)
                 self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+
+class ScotusAPIFlagTest(ScotusAPITestCase):
+    """The SCOTUS endpoints stay hidden until the scotus-api flag is on."""
+
+    def setUp(self) -> None:
+        """Log in as a plain user."""
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def get_root_prefixes(self) -> set[str]:
+        """Return the route prefixes the v4 API root lists."""
+        r = self.client.get(reverse("api-root", kwargs={"version": "v4"}))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return set(r.json())
+
+    def test_endpoints_are_hidden_when_flag_is_off(self) -> None:
+        """Do the endpoints 404 and drop out of the API root?"""
+        detail_pks = {
+            "scotusdocketmetadata": self.metadata.pk,
+            "scotusdocketentry": self.entry.pk,
+            "scotusdocument": self.attachment_1.pk,
+        }
+        with override_flag("scotus-api", active=False):
+            for basename in BASENAMES:
+                with self.subTest(basename=basename):
+                    r = self.client.get(self.list_path(basename))
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+                    r = self.client.get(
+                        self.detail_path(basename, detail_pks[basename])
+                    )
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+            root_prefixes = self.get_root_prefixes()
+        self.assertTrue(root_prefixes.isdisjoint(PREFIXES), root_prefixes)
+        # Unflagged routes are still listed.
+        self.assertIn("dockets", root_prefixes)
+
+    def test_anonymous_users_get_404_when_flag_is_off(self) -> None:
+        """Does the flag hide the endpoints before asking for credentials?"""
+        self.client.logout()
+        with override_flag("scotus-api", active=False):
+            for basename in BASENAMES:
+                with self.subTest(basename=basename):
+                    r = self.client.get(self.list_path(basename))
+                    self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_endpoints_are_listed_when_flag_is_on(self) -> None:
+        """Does the API root list the endpoints once the flag is on?"""
+        root_prefixes = self.get_root_prefixes()
+        self.assertTrue(set(PREFIXES) <= root_prefixes, root_prefixes)
 
 
 class ScotusAPIPermissionTest(ScotusAPITestCase):
@@ -206,6 +287,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.async_client.force_login(self.user)
 
     @staticmethod
@@ -214,7 +296,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         return f"http://testserver{path}"
 
     async def test_metadata(self) -> None:
-        """Does metadata link its docket and expose its file as a URL?"""
+        """Does metadata link its docket and expose its file's path?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocketmetadata", self.metadata.pk)
         )
@@ -241,7 +323,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertTrue(data["capital_case"])
         self.assertEqual(
             data["questions_presented_file"],
-            self.absolute(self.metadata.questions_presented_file.url),
+            self.metadata.questions_presented_file.name,
         )
 
         r = await self.async_client.get(
@@ -250,7 +332,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertIsNone(r.json()["questions_presented_file"])
 
     async def test_docket_entry(self) -> None:
-        """Does an entry nest its documents in display order?"""
+        """Does an entry nest its documents in display order, but not its placeholder?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocketentry", self.entry.pk)
         )
@@ -275,7 +357,7 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertEqual(r.json()["scotus_documents"], [])
 
     async def test_document(self) -> None:
-        """Does a document link its entry and expose its file and page?"""
+        """Does a document link its entry and expose its file's path and page?"""
         r = await self.async_client.get(
             self.detail_path("scotusdocument", self.attachment_1.pk)
         )
@@ -302,7 +384,18 @@ class ScotusAPISerializationTest(ScotusAPITestCase):
         self.assertTrue(data["is_available"])
         self.assertEqual(
             data["filepath_local"],
-            self.absolute(self.attachment_1.filepath_local.url),
+            self.attachment_1.filepath_local.name,
+        )
+
+    async def test_placeholders_are_hidden(self) -> None:
+        """Are placeholder documents missing from the document endpoints?"""
+        r = await self.async_client.get(
+            self.detail_path("scotusdocument", self.placeholder.pk)
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        r = await self.async_client.get(self.list_path("scotusdocument"))
+        self.assertNotIn(
+            self.placeholder.pk, [doc["id"] for doc in r.json()["results"]]
         )
 
     async def test_document_without_file_or_page(self) -> None:
@@ -328,6 +421,7 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.async_client.force_login(self.user)
 
     async def assert_filter_counts(
@@ -373,6 +467,8 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 ({"date_filed__range": "2025-01-01,2025-01-31"}, 2),
                 ({"scotus_documents__id": self.attachment_2.pk}, 1),
                 ({"scotus_documents__document_number": 1}, 1),
+                # Only entry_no_number's real document, not the placeholder.
+                ({"scotus_documents__document_number__isnull": "true"}, 1),
             ],
         )
 
@@ -382,8 +478,10 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
             "scotusdocument",
             [
                 ({"docket_entry": self.entry.pk}, 2),
+                ({"docket_entry": self.entry_no_docs.pk}, 0),
+                # Both documents of the entry that has an available one.
+                ({"docket_entry__scotus_documents__is_available": "true"}, 2),
                 ({"docket_entry__docket": self.docket.pk}, 2),
-                ({"attachment_number": 2}, 1),
                 ({"document_number__isnull": "true"}, 1),
                 ({"is_available": "true"}, 1),
                 ({"is_available": "false"}, 2),
@@ -391,6 +489,15 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 ({"ocr_status": SCOTUSDocument.OCR_COMPLETE}, 1),
             ],
         )
+
+    async def test_invalid_document_filter_values_are_rejected(self) -> None:
+        """Do bad values in document filters on entries return a 400?"""
+        r = await self.async_client.get(
+            self.list_path("scotusdocketentry"),
+            {"scotus_documents__document_number": "abc"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("scotus_documents__document_number", r.json())
 
     async def test_unknown_params_are_rejected(self) -> None:
         """Do typos in filter names return a 400 instead of everything?"""
@@ -402,12 +509,14 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
                 self.assertEqual(r.json()["unknown_params"], ["bogus"])
 
-    async def test_docket_entry_ordering(self) -> None:
-        """Can entries be ordered by their SCOTUS sequence number?"""
-        for order_by, expected in (
-            ("sequence_number", [self.entry_no_docs, self.entry]),
-            ("-sequence_number", [self.entry, self.entry_no_docs]),
-        ):
+    async def test_unindexed_sort_keys_are_ignored(self) -> None:
+        """Do entries ignore sort keys their table has no index for?
+
+        Sorting the whole table on them would be slow, so the view doesn't
+        offer them and the default -id order applies. Each key here would put
+        self.entry first if it were honored.
+        """
+        for order_by in ("-sequence_number", "entry_number", "date_filed"):
             with self.subTest(order_by=order_by):
                 r = await self.async_client.get(
                     self.list_path("scotusdocketentry"),
@@ -415,7 +524,7 @@ class ScotusAPIFilterTest(ScotusAPITestCase):
                 )
                 self.assertEqual(
                     [entry["id"] for entry in r.json()["results"]],
-                    [entry.pk for entry in expected],
+                    [self.entry_no_docs.pk, self.entry.pk],
                 )
 
 
@@ -423,9 +532,15 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
     """The fields and omit params work on the nested documents."""
 
     async def test_nested_fields_and_omit(self) -> None:
-        """Do fields and omit trim the nested documents?"""
+        """Do fields and omit trim the nested documents?
+
+        They must keep leaving out placeholders and keep their display order.
+        """
         await self.async_client.aforce_login(self.user)
-        path = self.detail_path("scotusdocketentry", self.entry.pk)
+        expected_ids = {
+            self.entry.pk: [self.attachment_1.pk, self.attachment_2.pk],
+            self.entry_no_docs.pk: [],
+        }
         cases = [
             (
                 {"fields": "id,scotus_documents__id"},
@@ -439,13 +554,160 @@ class ScotusAPIDynamicFieldsTest(ScotusAPITestCase):
             ),
         ]
         for params, entry_keys, document_keys in cases:
-            with self.subTest(params=params):
-                r = await self.async_client.get(path, params)
+            for entry_pk, ids in expected_ids.items():
+                with self.subTest(params=params, entry=entry_pk):
+                    r = await self.async_client.get(
+                        self.detail_path("scotusdocketentry", entry_pk),
+                        params,
+                    )
+                    self.assertEqual(r.status_code, HTTPStatus.OK)
+                    data = r.json()
+                    self.assertEqual(set(data), entry_keys)
+                    nested = data["scotus_documents"]
+                    self.assertEqual([doc["id"] for doc in nested], ids)
+                    for doc in nested:
+                        self.assertEqual(set(doc), document_keys)
+
+
+class ScotusAPIRelatedColumnsTest(ScotusAPITestCase):
+    """The documents endpoint reads only the related columns it uses."""
+
+    def setUp(self) -> None:
+        """Log in as a plain user."""
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def test_documents_read_only_docket_slug(self) -> None:
+        """Do documents read just the entry and docket columns they need?
+
+        absolute_url needs the entry's docket_id and the docket's slug; the
+        rest of the docket row is wide and unused.
+        """
+        expected_url = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "att_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        cases = [
+            (self.list_path("scotusdocument"), {"id": self.attachment_1.pk}),
+            (self.detail_path("scotusdocument", self.attachment_1.pk), {}),
+        ]
+        for path, params in cases:
+            with self.subTest(path=path):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(path, params)
                 self.assertEqual(r.status_code, HTTPStatus.OK)
                 data = r.json()
-                self.assertEqual(set(data), entry_keys)
-                for doc in data["scotus_documents"]:
-                    self.assertEqual(set(doc), document_keys)
+                document = data["results"][0] if "results" in data else data
+                self.assertEqual(document["absolute_url"], expected_url)
+
+                selects = [
+                    q["sql"].split(" FROM ")[0]
+                    for q in ctx.captured_queries
+                    if 'FROM "search_scotusdocument"' in q["sql"]
+                ]
+                self.assertEqual(len(selects), 1, selects)
+                for table, columns in (
+                    ("search_scotusdocketentry", {"id", "docket_id"}),
+                    ("search_docket", {"id", "slug"}),
+                ):
+                    selected = set(
+                        re.findall(rf'"{table}"\."(\w+)"', selects[0])
+                    )
+                    self.assertEqual(selected, columns)
+
+    def test_entries_read_only_docket_slug(self) -> None:
+        """Do entries read just the docket columns their documents need?
+
+        The nested documents' absolute_url needs the docket's slug; the rest
+        of the docket row is wide and unused.
+        """
+        expected_url = reverse(
+            "view_recap_attachment",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "att_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        cases = [
+            (self.list_path("scotusdocketentry"), {"id": self.entry.pk}),
+            (
+                self.list_path("scotusdocketentry"),
+                {"scotus_documents__id": self.attachment_1.pk},
+            ),
+            (self.detail_path("scotusdocketentry", self.entry.pk), {}),
+        ]
+        for path, params in cases:
+            with self.subTest(path=path, params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(path, params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                data = r.json()
+                entry = data["results"][0] if "results" in data else data
+                urls = {
+                    doc["id"]: doc["absolute_url"]
+                    for doc in entry["scotus_documents"]
+                }
+                self.assertEqual(urls[self.attachment_1.pk], expected_url)
+
+                selects = [
+                    q["sql"].split(" FROM ")[0]
+                    for q in ctx.captured_queries
+                    if 'FROM "search_scotusdocketentry"' in q["sql"]
+                ]
+                self.assertEqual(len(selects), 1, selects)
+                selected = set(
+                    re.findall(r'"search_docket"\."(\w+)"', selects[0])
+                )
+                self.assertEqual(selected, {"id", "slug"})
+
+    def test_related_filter_lookups_read_only_ids(self) -> None:
+        """Do related filters look up their object by reading only its id?
+
+        A related filter's exact value is checked by fetching that object,
+        and only its pk is used afterwards.
+        """
+        cases = [
+            ("scotusdocument", {"docket_entry": self.entry.pk}, 2),
+            ("scotusdocketentry", {"docket": self.docket.pk}, 2),
+            (
+                "scotusdocketentry",
+                {"scotus_documents": self.attachment_1.pk},
+                1,
+            ),
+            ("scotusdocketmetadata", {"docket": self.docket.pk}, 1),
+        ]
+        tables = {
+            "docket_entry": "search_scotusdocketentry",
+            "docket": "search_docket",
+            "scotus_documents": "search_scotusdocument",
+        }
+        for basename, params, expected_count in cases:
+            with self.subTest(endpoint=basename, params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    r = self.client.get(self.list_path(basename), params)
+                self.assertEqual(r.status_code, HTTPStatus.OK)
+                self.assertEqual(len(r.json()["results"]), expected_count)
+
+                table = tables[next(iter(params))]
+                lookups = [
+                    q["sql"]
+                    for q in ctx.captured_queries
+                    if re.search(rf'"{table}"\."id" = \d+\)? LIMIT', q["sql"])
+                ]
+                self.assertEqual(len(lookups), 1, lookups)
+                selected = set(
+                    re.findall(
+                        rf'"{table}"\."(\w+)"', lookups[0].split(" FROM ")[0]
+                    )
+                )
+                self.assertEqual(selected, {"id"})
 
 
 class ScotusAPIPlainTextTest(ScotusAPITestCase):
@@ -457,6 +719,7 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
 
     def setUp(self) -> None:
         """Log in as a plain user."""
+        super().setUp()
         self.client.force_login(self.user)
 
     def get_documents(
@@ -525,6 +788,10 @@ class ScotusAPIPlainTextTest(ScotusAPITestCase):
         )
 
 
+# The usage stats write milestone events when their request counters reach
+# certain values. Those counters live in Redis and other tests reset them, so
+# the events are turned off to keep them from adding queries at random.
+@mock.patch.object(LoggingMixin, "_handle_events")
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
@@ -545,7 +812,9 @@ class ScotusAPIQueryCountTest(ScotusAPITestCase):
         return len(ctx.captured_queries)
 
     def test_queries_are_flat(
-        self, mock_logging_prefix: mock.MagicMock
+        self,
+        mock_logging_prefix: mock.MagicMock,
+        mock_handle_events: mock.MagicMock,
     ) -> None:
         """Does adding entries with documents add no queries?"""
         # Warm up process-level caches that other tests may have cleared,

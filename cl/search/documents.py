@@ -6,6 +6,7 @@ from functools import partial
 from typing import Any, TypedDict
 
 from django.conf import settings
+from django.db.models import Model
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
@@ -727,7 +728,7 @@ class PersonBaseDocument(Document):
     date_created = fields.DateField(attr="date_created")
 
     class Django:
-        model = Person
+        model: type[Model] = Person
         ignore_signals = True
 
     def prepare_timestamp(self, instance):
@@ -923,7 +924,7 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
 
-    class Django:
+    class Django(PersonBaseDocument.Django):
         model = Position
         ignore_signals = True
 
@@ -1317,7 +1318,7 @@ class RECAPBaseDocument(Document):
     capital_case = fields.BooleanField()
 
     class Django:
-        model = Docket
+        model: type[Model] = Docket
         ignore_signals = True
 
     def prepare_timestamp(self, instance):
@@ -1407,7 +1408,7 @@ class ESRECAPDocument(
 ):
     """Search document for a filed document, indexed as a child of its docket."""
 
-    class Django:
+    class Django(RECAPBaseDocument.Django):
         model = RECAPDocument
         ignore_signals = True
 
@@ -2127,7 +2128,7 @@ class OpinionBaseDocument(Document):
     date_created = fields.DateField(attr="date_created")
 
     class Django:
-        model = OpinionCluster
+        model: type[Model] = OpinionCluster
         ignore_signals = True
 
     def prepare_absolute_url(self, instance):
@@ -2331,7 +2332,7 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         }
     )
 
-    class Django:
+    class Django(OpinionBaseDocument.Django):
         model = Opinion
         ignore_signals = True
 

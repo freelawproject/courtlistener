@@ -6,7 +6,10 @@ from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
-from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
+from cl.corpus_importer.tasks import (
+    DocketReportQueryParams,
+    get_docket_by_pacer_case_id,
+)
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import log_into_pacer
@@ -45,9 +48,11 @@ def get_dockets(options):
                 session_data=session,
                 docket_pk=d.pk,
                 tag_names=[JACKSON_TAG],
-                show_parties_and_counsel=True,
-                show_terminated_parties=True,
-                show_list_of_member_cases=False,
+                **DocketReportQueryParams(
+                    show_parties_and_counsel=True,
+                    show_terminated_parties=True,
+                    show_list_of_member_cases=False,
+                ),
             ).set(queue=q),
         ).apply_async()
 

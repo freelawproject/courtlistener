@@ -4443,8 +4443,8 @@ class EsOpinionsIndexingTest(
         test_dir = (
             Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
         )
-        with open(
-            test_dir / "opinion_1_embeddings.json", encoding="utf-8"
+        with (test_dir / "opinion_1_embeddings.json").open(
+            encoding="utf-8"
         ) as f:
             expected_embeddings = json.load(f)
         inception_mock.return_value = self._get_mock_for_inception(
@@ -4702,13 +4702,11 @@ class OpinionFeedTest(ESIndexTestCase, SearchTestCase, TestCase):
             xml_tree.xpath(
                 "//atom:entry[1]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         second_item_published_str = str(
             xml_tree.xpath(
                 "//atom:entry[2]/atom:published", namespaces=namespaces
             )[0].text
-            # type: ignore
         )
         first_item_published_dt = datetime.datetime.strptime(
             first_item_published_str, published_format

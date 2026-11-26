@@ -296,7 +296,8 @@ class UserCreationFormExtended(UserCreationForm, CleanEmailMixin):
             forms.ValidationError: If the first name contains special
                 characters such as ``!``, ``@``, or ``.``.
         """
-        first_name = self.cleaned_data.get("first_name")
+        # pyrefly:ignore[bad-assignment]
+        first_name: str = self.cleaned_data.get("first_name")
         if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
             raise forms.ValidationError(
                 "First name must not contain any special characters."
@@ -478,7 +479,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         return [
             user
             for user in self.accounts_at_address(email)
-            if user.profile.email_confirmed  # type: ignore
+            if user.profile.email_confirmed  # pyrefly: ignore[missing-attribute]
         ]
 
     def get_users(self, email: str) -> Iterator[User]:

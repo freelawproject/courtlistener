@@ -18,7 +18,15 @@ from pathlib import Path
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, TypeIs, cast
+from typing import (
+    IO,
+    Any,
+    Literal,
+    NotRequired,
+    TypedDict,
+    Unpack,
+    cast,
+)
 from urllib.parse import urljoin
 from uuid import UUID
 
@@ -322,7 +330,7 @@ def generate_ia_json(
         *[
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
-            attorney_prefetch,  # type: ignore
+            attorney_prefetch,
         ],
     )
 
@@ -344,7 +352,7 @@ def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
         output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join(output_directory, f"{d_pk}.json"), "w") as f:
+    with (Path(output_directory) / f"{d_pk}.json").open("w") as f:
         f.write(j)
 
 
@@ -398,9 +406,9 @@ async def download_recap_item(
     and an existing file are logged rather than raised.
     """
     logger.info("  Getting item at: %s", url)
-    location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
+    location = Path(settings.MEDIA_ROOT) / "recap" / filename
     try:
-        if os.path.isfile(location) and not clobber:
+        if location.is_file() and not clobber:
             raise OSError(f"    IOError: File already exists at {location}")
         async with httpx.AsyncClient(
             follow_redirects=True, http2=True
@@ -1900,6 +1908,26 @@ def probe_or_scrape_iquery_pages(
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
+class DocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see DocketReport.query()
+    """
+
+    date_range_type: NotRequired[Literal["Filed", "Entered"]]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    doc_num_start: NotRequired[str | int | None]
+    doc_num_end: NotRequired[str | int | None]
+    show_parties_and_counsel: NotRequired[bool]
+    show_terminated_parties: NotRequired[bool]
+    show_list_of_member_cases: NotRequired[bool]
+    include_pdf_headers: NotRequired[bool]
+    show_multiple_docs: NotRequired[bool]
+    output_format: NotRequired[Literal["html", "pdf"]]
+    order_by: NotRequired[Literal["date", "-date", "document_number"]]
+
+
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
@@ -1916,7 +1944,7 @@ def get_docket_by_pacer_case_id(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_docket_by_pacer_case_id_base."""
     try:
@@ -1941,7 +1969,7 @@ async def get_docket_by_pacer_case_id_base(
     session_data: SessionData,
     docket_pk: int | None = None,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[DocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
@@ -1969,7 +1997,7 @@ async def get_docket_by_pacer_case_id_base(
         return None
 
     # Attempt a light docket look up, we'll do better after fetching more data
-    pacer_case_id = data.get("pacer_case_id")
+    pacer_case_id = data["pacer_case_id"]
     docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = await Docket.objects.aget(pk=docket_pk)
@@ -2034,6 +2062,24 @@ async def get_docket_by_pacer_case_id_base(
     }
 
 
+class AppellateDocketReportQueryParams(TypedDict):
+    """A structured representation of optional keyword arguments.
+
+    For usage see AppellateDocketReport.query()
+    """
+
+    show_docket_entries: NotRequired[bool]
+    show_orig_docket: NotRequired[bool]
+    show_prior_cases: NotRequired[bool]
+    show_associated_cases: NotRequired[bool]
+    show_panel_info: NotRequired[bool]
+    show_party_atty_info: NotRequired[bool]
+    show_caption: NotRequired[bool]
+    date_start: NotRequired[date | None]
+    date_end: NotRequired[date | None]
+    output_format: NotRequired[Literal["html", "xml"]]
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException,),
@@ -2048,7 +2094,7 @@ def get_appellate_docket_by_docket_number(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Celery task wrapper for get_appellate_docket_by_docket_number_base."""
     try:
@@ -2071,7 +2117,7 @@ async def get_appellate_docket_by_docket_number_base(
     court_id: str,
     session_data: SessionData,
     tag_names: list[str] | None = None,
-    **kwargs,
+    **kwargs: Unpack[AppellateDocketReportQueryParams],
 ) -> TaskData | None:
     """Get a docket by docket number, CL court ID, and a collection of kwargs that can be passed to the DocketReport query.
 
@@ -3043,6 +3089,9 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         "docket_entry__docket"
     ).aget(pk=rd_pk)
     d = rd.docket_entry.docket
+    # Type-only narrowing: this task has always assumed the docket has a
+    # pacer_case_id, so don't add a runtime check here.
+    pacer_case_id = cast(str, d.pacer_case_id)
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
@@ -3053,10 +3102,10 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         async with s:
             if rd.document_type == rd.ATTACHMENT:
                 await report.query(
-                    d.pacer_case_id, rd.document_number, rd.attachment_number
+                    pacer_case_id, rd.document_number, rd.attachment_number
                 )
             else:
-                await report.query(d.pacer_case_id, rd.document_number)
+                await report.query(pacer_case_id, rd.document_number)
     except HTTPError as exc:
         raise CourtQueryError(f"Unable to get PDF for {rd}") from exc
     try:
@@ -3070,6 +3119,22 @@ async def get_pacer_doc_id_with_show_case_doc_url_base(
         logger.info("Successfully saved pacer_doc_id to rd %s", rd_pk)
 
 
+def list_of_creditors_report_path(court_id: str, file_name: str) -> Path:
+    """Get the path of a list of creditors report file for a court.
+
+    :param court_id: The court the report belongs to.
+    :param file_name: The name of the report file.
+    :return: The file's path inside the court's reports directory.
+    """
+    return (
+        Path(settings.MEDIA_ROOT)
+        / "list_of_creditors"
+        / "reports"
+        / court_id
+        / file_name
+    )
+
+
 def make_csv_file(
     pipe_limited_file: str, court_id: str, d_number_file_name: str
 ) -> None:
@@ -3080,12 +3145,8 @@ def make_csv_file(
     """
     import pandas as pd  # Only import pandas if function is called.
 
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "list_of_creditors",
-        "reports",
-        court_id,
-        f"{court_id}-{d_number_file_name}.csv",
+    csv_file = list_of_creditors_report_path(
+        court_id, f"{court_id}-{d_number_file_name}.csv"
     )
     docket_number = d_number_file_name.replace("-", ":")
     # Read the pipe-delimited text into a pandas DataFrame
@@ -3274,12 +3335,10 @@ async def query_and_save_list_of_creditors_base(
             "utf-8"
         )
         report._parse_text(text)
-        pipe_limited_file = os.path.join(
-            settings.MEDIA_ROOT,
-            "list_of_creditors",
-            "reports",
-            court_id,
-            f"{court_id}-{d_number_file_name}-raw.txt",
+        pipe_limited_file = str(
+            list_of_creditors_report_path(
+                court_id, f"{court_id}-{d_number_file_name}-raw.txt"
+            )
         )
 
         raw_data = report.data
@@ -4424,22 +4483,31 @@ def download_and_parse_scotus_docket(
     logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
     storage = AWSMediaStorage(bucket_name=bucket)
     with storage.open(s3_key, "rb") as f:
-        content = f.read().decode("utf-8")
+        content = cast(bytes, f.read()).decode("utf-8")
 
     ext = s3_key.rsplit(".", 1)[-1].lower()
-    parser_map: dict[str, type] = {
-        "json": SCOTUSDocketReport,
-        "html": SCOTUSDocketReportHTML,
-        "htm": SCOTUSDocketReportHTM,
-    }
-    if not (parser_cls := parser_map.get(ext)):
-        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+    match ext:
+        case "json":
+            parser = SCOTUSDocketReport()
+        case "html":
+            parser = SCOTUSDocketReportHTML()
+        case "htm":
+            parser = SCOTUSDocketReportHTM()
+        case _:
+            logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+            self.request.chain = None
+            return None
+
+    parser._parse_text(content)
+    data = parser.data
+    if not data:
+        logger.error(
+            "Unparsable SCOTUS Docket at bucket: %s s3_key: %s", bucket, s3_key
+        )
         self.request.chain = None
         return None
 
-    parser = parser_cls()
-    parser._parse_text(content)
-    return parser.data
+    return data
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
@@ -4941,45 +5009,6 @@ def texas_docket_has_valid_appellate_info(
     return docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
 
 
-def is_texas_appellate_docket(
-    d: TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[TexasCourtOfAppealsDocket]:
-    """Check if a Texas docket is from an appellate court."""
-    return d["court_type"] == CourtType.APPELLATE.value
-
-
-def is_texas_supreme_docket(
-    d: TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[TexasSupremeCourtDocket | TexasCourtOfCriminalAppealsDocket]:
-    """Check if a Texas docket's court type is ``CourtType.SUPREME``."""
-    return d["court_type"] == CourtType.SUPREME.value
-
-
-# TODO: `TexasCommonScraper` should return `None` on failure and this narrowing
-# function should be replaced by a simple `is None` check.
-def is_texas_docket(
-    d: dict[str, None]
-    | TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket,
-) -> TypeIs[
-    TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket
-]:
-    """`TexasCommonScraper` may fail successfully.
-
-    In which case it returns an empty `dict`. This cannot be readily
-    distinguished from `TypedDict`. This enables type narrowing to happen for
-    `TexasCommonScraper` as-is.
-    """
-    return "court_type" in d
-
-
 def merge_texas_parties(
     docket: Docket, parties: list[TexasCaseParty]
 ) -> MergeResult:
@@ -5018,9 +5047,11 @@ def merge_texas_docket_originating_court(
     Returns:
         The result of the merge operation.
     """
-    if is_texas_supreme_docket(
+    if docket_data[
+        "court_type"
+    ] == CourtType.SUPREME and texas_docket_has_valid_appellate_info(
         docket_data
-    ) and texas_docket_has_valid_appellate_info(docket_data):
+    ):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
             logger.warning(
@@ -5109,12 +5140,12 @@ def merge_texas_case_transfers(
     oc_dn: str = originating_court["case"]
     ac_id: str = (
         docket_data["appeals_court"]["court_id"]
-        if is_texas_supreme_docket(docket_data)
+        if docket_data["court_type"] == CourtType.SUPREME
         else ""
     )
     ac_dns: list[str] = (
         docket_data["appeals_court"]["case_number"]
-        if is_texas_supreme_docket(docket_data)
+        if docket_data["court_type"] == CourtType.SUPREME
         else []
     )
     trial_court_id = texas_originating_court_to_court_id(originating_court)
@@ -5175,7 +5206,7 @@ def merge_texas_case_transfers(
                 ac_id
             )
             appeal_transfer_origin_dns = ac_dns
-        case _ if is_texas_appellate_docket(docket_data):
+        case _ if docket_data["court_type"] == CourtType.APPELLATE:
             logger.info(
                 "Docket %s is an appellate docket", docket.docket_number
             )
@@ -5310,7 +5341,7 @@ def merge_texas_docket(
 
     with transaction.atomic():
         docket = None
-        if is_texas_appellate_docket(docket_data):
+        if docket_data["court_type"] == CourtType.APPELLATE:
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
             )
@@ -5355,9 +5386,11 @@ def merge_texas_docket(
             docket, docket_data
         )
 
-        if is_texas_supreme_docket(
+        if docket_data[
+            "court_type"
+        ] == CourtType.SUPREME and texas_docket_has_valid_appellate_info(
             docket_data
-        ) and texas_docket_has_valid_appellate_info(docket_data):
+        ):
             lower_court_data = docket_data["appeals_court"]
             lower_court_id = texas_js_court_id_to_court_id(
                 lower_court_data["court_id"]
@@ -5386,7 +5419,7 @@ def merge_texas_docket(
 
         docket.save()
 
-    if is_texas_supreme_docket(docket_data):
+    if docket_data["court_type"] == CourtType.SUPREME:
         trial_court_result = merge_texas_trial_court_data(docket, docket_data)
     else:
         trial_court_result = MergeResult.unnecessary()
@@ -5472,7 +5505,7 @@ def texas_ingest_docket_task(
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
-        if not is_texas_docket(docket_data):
+        if not docket_data:
             raise ValueError("Docket parser failed to produce a valid Docket")
     except Exception as e:
         logger.error(

@@ -2,6 +2,7 @@
 
 import time
 from collections.abc import Callable
+from typing import Literal
 
 from django.db.models import QuerySet
 
@@ -30,6 +31,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--reindex-target",
             choices=["citeCount", "cites"],
+            required=True,
             help="What ElasticSearch Document field to update",
         )
         parser.add_argument(
@@ -51,7 +53,14 @@ class Command(VerboseCommand):
             help="Size of the ids batch to send in a single Elastic bulk update",
         )
 
-    def handle(self, *args, **options):
+    def handle(
+        self,
+        *args,
+        reindex_target: Literal["citeCount", "cites"],
+        start_id: int | None,
+        end_id: int | None,
+        **options,
+    ):
         """Re-index the target field for objects in the ID range.
 
         The range includes ``--start-id`` and excludes ``--end-id``. Only
@@ -60,10 +69,6 @@ class Command(VerboseCommand):
         Raises:
             ValueError: If the start or end ID is missing.
         """
-        reindex_target = options["reindex_target"]
-        start_id = options["start_id"]
-        end_id = options["end_id"]
-
         if start_id is None or end_id is None:
             raise ValueError("`start_id` and `end_id` should have values")
 

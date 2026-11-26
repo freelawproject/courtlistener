@@ -1,17 +1,23 @@
 """Pydantic models for structured LLM docket number cleaning responses."""
 
-from pydantic import BaseModel, Field, constr
+from typing import Annotated
+
+from pydantic import BaseModel, Field
 
 
 class DocketItem(BaseModel):
     """The cleaned docket numbers for one case."""
 
-    unique_id: constr(max_length=20) = Field(
-        ..., description="Unique identifier for the case."
-    )
-    cleaned_nums: list[constr(max_length=200)] = Field(
-        ..., description="A list of cleaned and standardized docket numbers."
-    )
+    unique_id: Annotated[
+        str,
+        Field(max_length=20, description="Unique identifier for the case."),
+    ]
+    cleaned_nums: Annotated[
+        list[Annotated[str, Field(max_length=200)]],
+        Field(
+            description="A list of cleaned and standardized docket numbers."
+        ),
+    ]
 
     class Config:
         extra = "forbid"  # equivalent to additionalProperties=false

@@ -771,7 +771,8 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
         qd = override_alert_query(alert_triggered)
-        alert_triggered.query_run = qd.urlencode()  # type: ignore
+        # pyrefly: ignore[missing-attribute]
+        alert_triggered.query_run = qd.urlencode()
 
         # Compose RT hit to send.
         hits = [

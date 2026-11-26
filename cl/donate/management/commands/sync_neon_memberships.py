@@ -320,7 +320,8 @@ def check_membership(
         What happened to the membership.
     """
     user = membership.user
-    account_id = user.profile.neon_account_id  # type: ignore
+    # pyrefly: ignore[missing-attribute]
+    account_id = user.profile.neon_account_id
     if not account_id:
         logger.warning(
             "User %s has a membership but no Neon account ID; skipping.",
