@@ -1,6 +1,7 @@
 {% load extras %}
 
-<c-vars columns rows footer align caption="Data table" safe></c-vars>
+{# Slots: no_data replaces no_data_label in the row shown when there are no rows. #}
+<c-vars columns rows footer align caption="Data table" safe no_data_label="No data available"></c-vars>
 
 <div class="overflow-auto">
   <table class="w-full">
@@ -44,7 +45,18 @@
           </td>
         {% endfor %}
       </tr>
+    {% empty %}
+      <tr>
+        <td colspan="{{ columns|length }}">
+          {% if no_data %}
+            {{ no_data }}
+          {% else %}
+            <p class="px-4 py-8 text-center text-sm text-greyscale-700">{{ no_data_label }}</p>
+          {% endif %}
+        </td>
+      </tr>
     {% endfor %}
+    </tbody>
     {% if footer %}
       <tfoot>
       {% for item in footer %}
