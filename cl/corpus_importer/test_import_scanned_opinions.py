@@ -1592,11 +1592,17 @@ class ImportScannedOpinionsTest(TestCase):
         court = CourtFactory.create(
             id="ca9", jurisdiction=Court.FEDERAL_APPELLATE
         )
+        names = {
+            "case_name": "R-CALF USA v. Sonny Perdue",
+            "case_name_short": "R-CALF USA",
+            "case_name_full": "R-CALF USA, Appellant, v. Sonny Perdue",
+        }
         docket = DocketFactory.create(
             court=court,
             source=Docket.SCRAPER,
             docket_number="20-35453",
-            case_name="R-CALF USA v. Sonny Perdue",
+            ia_needs_upload=True,
+            **names,
         )
 
         self.import_xml(
@@ -1606,17 +1612,37 @@ class ImportScannedOpinionsTest(TestCase):
 
         self.assertEqual(Docket.objects.count(), 1)
         self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+        docket.refresh_from_db()
+        # The caption is kept whole, not mixed with the scan's names
+        self.assertEqual(
+            {field: getattr(docket, field) for field in names}, names
+        )
+        self.assertTrue(docket.ia_needs_upload)
 
     def test_merge_into_cluster_with_other_caption(self) -> None:
-        """Does a federal docket number match a cluster captioned otherwise?"""
-        court = CourtFactory.create(
+        """Is a differently captioned cluster only matched by docket number?
+
+        Only in the federal appellate court of the scan.
+        """
+        ca5 = CourtFactory.create(
             id="ca5", jurisdiction=Court.FEDERAL_APPELLATE
         )
-        for docket_number, cluster_count in [("20-30019", 1), ("20-30020", 2)]:
-            with (
-                self.subTest(docket_number=docket_number),
-                transaction.atomic(),
-            ):
+        ca9 = CourtFactory.create(
+            id="ca9", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        district = CourtFactory.create(
+            id="lamd", jurisdiction=Court.FEDERAL_DISTRICT
+        )
+        # The court and docket number of the cluster, the court of the scan,
+        # and the clusters after importing the scan of docket 20-30019
+        cases = [
+            ("Same docket", ca5, "20-30019", ca5, 1),
+            ("Other docket number", ca5, "20-30020", ca5, 2),
+            ("Other court", ca5, "20-30019", ca9, 2),
+            ("District court", district, "20-30019", district, 2),
+        ]
+        for name, court, docket_number, scan_court, cluster_count in cases:
+            with self.subTest(name), transaction.atomic():
                 cluster = self.make_matching_cluster()
                 cluster.case_name = "Shell Chem v. Genesis Mrne"
                 cluster.save()
@@ -1630,7 +1656,7 @@ class ImportScannedOpinionsTest(TestCase):
 
                 self.import_xml(
                     self.scan_xml.replace("4D2023-2459", "20-30019"),
-                    court_id=court.pk,
+                    court_id=scan_court.pk,
                 )
 
                 self.assertEqual(OpinionCluster.objects.count(), cluster_count)
@@ -1639,12 +1665,12 @@ class ImportScannedOpinionsTest(TestCase):
     def test_merge_into_cluster_with_unaccented_name(self) -> None:
         """Is a cluster matched when only the scan prints the accents?"""
         cluster = self.make_matching_cluster()
-        cluster.case_name = "Merritt v. Fernandez"
+        cluster.case_name = "Maria Lopez v. Jose Perez"
         cluster.save()
 
         self.import_xml(
-            self.scan_xml.replace("Larry B. MERRITT", "Fernández").replace(
-                "STATE of Florida", "Mérritt"
+            self.scan_xml.replace("Larry B. MERRITT", "María LÓPEZ").replace(
+                "STATE of Florida", "José PÉREZ"
             )
         )
 

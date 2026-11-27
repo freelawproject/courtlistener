@@ -1113,9 +1113,10 @@ def cosine_similarity_too_different(
     """
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
-        # Lowercased: scrapers can store names in capitals
+        # Lowercased: scrapers can store names in capitals. Without
+        # accents, since sources disagree on them
         similarity = get_cosine_similarity(
-            title.lower(), case.case_name.lower()
+            unidecode(title.lower()), unidecode(case.case_name.lower())
         )
         similarities.append(similarity)
     max_similarity = max(similarities)
@@ -1126,23 +1127,32 @@ def cosine_similarity_too_different(
 
 
 def has_same_docket_number_core(
-    case: OpinionCluster, docket_number: str
+    case: OpinionCluster, docket_number: str, court_id: str | None
 ) -> bool:
     """Check if a cluster's docket has the docket number of a file/source.
 
-    Only federal style docket numbers like "20-30019" are compared, since
-    they identify a case within a court. Other numbers, like the "No. 12"
-    that old reporters reuse, never match.
+    Only true in federal appellate courts, where a docket number like
+    "20-30019" identifies a case within the court. Elsewhere different
+    cases can share a core docket number, e.g. the civil and criminal
+    cases of a district court.
 
     Args:
         case: The case opinion cluster
         docket_number: The docket number from file/source to compare
+        court_id: The court of the file/source, or None if unknown
 
     Returns:
-        Whether both have the same, non-empty, core docket number
+        Whether both are in the same federal appellate court and have the
+        same, non-empty, core docket number
     """
+    docket = case.docket
+    if (
+        docket.court_id != court_id
+        or docket.court.jurisdiction != Court.FEDERAL_APPELLATE
+    ):
+        return False
     core = make_docket_number_core(docket_number)
-    return bool(core) and core == case.docket.docket_number_core
+    return bool(core) and core == docket.docket_number_core
 
 
 def has_too_similar_citation(
@@ -1181,6 +1191,7 @@ def match_based_text(
     possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
+    court_id: str | None = None,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates.
 
@@ -1192,12 +1203,16 @@ def match_based_text(
         case_name_full: The full case name
         case_name_abbreviation: The case name abbreviation
         citation: The citation obtained from file/source to compare
+        court_id: The court of the file/source. When given, case names
+            aren't compared with a cluster of that court that has the
+            file's docket number, if it's a federal appellate court
 
     Returns:
         OpinionCluster or None
     """
-    # The docket is read by the content check and by callers of the match
-    for case in possible_clusters.select_related("docket"):
+    # The docket is read by the content check and by callers of the match,
+    # and its court by the docket number check
+    for case in possible_clusters.select_related("docket__court"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
@@ -1209,7 +1224,9 @@ def match_based_text(
         # e.g. consolidated appeals or a substituted public official, so the
         # names aren't compared when the docket number already ties the
         # cluster to the file. The content still has to match.
-        same_docket = has_same_docket_number_core(case, docket_number)
+        same_docket = has_same_docket_number_core(
+            case, docket_number, court_id
+        )
 
         # Checked in this order, cheapest first, until one fails
         checks: list[tuple[str, Callable[[], bool]]] = [

@@ -673,6 +673,7 @@ def find_previously_imported_cases(
                 possible_cases,
                 data["name_abbreviation"],
                 citation,
+                court_id,
             )
             # If a match is found - return it.  Else keep searching.
             if match:
@@ -694,6 +695,7 @@ def find_previously_imported_cases(
         possible_cases,
         data["name_abbreviation"],
         citation,
+        court_id,
     )
     if not match:
         month = timedelta(days=31)
@@ -713,6 +715,7 @@ def find_previously_imported_cases(
             possible_cases,
             data["name_abbreviation"],
             citation,
+            court_id,
         )
     return match
 
