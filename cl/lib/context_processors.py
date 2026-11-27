@@ -29,6 +29,7 @@ class _SettingsInjection(TypedDict):
     WIKI_COVERAGE_OPINIONS_URL: str
     WIKI_COVERAGE_RECAP_URL: str
     WIKI_COVERAGE_SCOTUS_URL: str
+    WIKI_COVERAGE_TEXAS_URL: str
 
 
 def inject_settings(request: HttpRequest) -> _SettingsInjection:
@@ -50,6 +51,7 @@ def inject_settings(request: HttpRequest) -> _SettingsInjection:
         "WIKI_COVERAGE_OPINIONS_URL": settings.WIKI_COVERAGE_OPINIONS_URL,
         "WIKI_COVERAGE_RECAP_URL": settings.WIKI_COVERAGE_RECAP_URL,
         "WIKI_COVERAGE_SCOTUS_URL": settings.WIKI_COVERAGE_SCOTUS_URL,
+        "WIKI_COVERAGE_TEXAS_URL": settings.WIKI_COVERAGE_TEXAS_URL,
     }
 
 

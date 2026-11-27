@@ -1,7 +1,8 @@
 """Models unique to Texas dockets."""
 
 import logging
-from typing import IO
+from collections.abc import Callable
+from typing import IO, TYPE_CHECKING
 
 import pghistory
 from django.db import models
@@ -60,6 +61,11 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         max_length=16,
     )
 
+    if TYPE_CHECKING:
+        # pyrefly can't resolve the "search.Docket" string from this
+        # submodule, so it doesn't add the docket_id column Django creates.
+        docket_id: int
+
     class Meta:
         # Django can't reliably determine what app a model belongs to if it's
         # in a submodule
@@ -68,10 +74,38 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ordering = ["-sequence_number"]
         # verbose_name_plural = "Texas Docket Entries"
 
+    csv_columns = [
+        "id",
+        "date_filed",
+        "sequence_number",
+        "entry_type",
+        "description",
+        "disposition",
+        "remarks",
+        "appellate_brief",
+    ]
+
+    @property
+    def display_lines(self) -> list[str]:
+        """Return the lines that show this entry: its type, its description, and its disposition and remarks when TAMES lists them.
+
+        The docket page and the docket alert emails both show an entry this
+        way. Every line is plain text from the court, so callers rendering
+        HTML MUST escape it.
+        """
+        lines = [self.entry_type, self.description]
+        if self.disposition:
+            lines.append(f"Disposition: {self.disposition}")
+        if self.remarks:
+            lines.append(f"Remarks: {self.remarks}")
+        return [line for line in lines if line]
+
 
 @pghistory.track()
 @document_model
-class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
+class TexasDocument(
+    AbstractDateTimeModel, AbstractStateDocument, CSVExportMixin
+):
     """Represents an attachment to a Texas docket entry.
 
     Attributes:
@@ -90,6 +124,39 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
+
+    csv_columns = [
+        "id",
+        "description",
+        "url",
+        "sha1",
+        "page_count",
+        "file_size",
+        "filepath_local",
+        "filepath_ia",
+        "ocr_status",
+    ]
+
+    def _get_readable_ocr_status(self, field: str) -> str:
+        """Return the OCR status label for the CSV export."""
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, field: str) -> str:
+        """Return the file's full storage URL for the CSV export, or an empty string when there's no file."""
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Return the CSV export's formatter for each column that needs one.
+
+        Formats the file path and OCR status the same way the RECAP and
+        SCOTUS exports do.
+        """
+        return {
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
     @classmethod
     def tmp_prefix(cls) -> str:

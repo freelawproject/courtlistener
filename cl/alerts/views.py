@@ -2,7 +2,6 @@
 
 from http import HTTPStatus
 
-import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib import messages
@@ -37,8 +36,11 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_3_per_m,
 )
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.opinion_page import docket_entry_sources
-from cl.opinion_page.utils import make_docket_title, user_has_alert
+from cl.opinion_page.utils import (
+    is_source_hidden,
+    make_docket_title,
+    user_has_alert,
+)
 from cl.search.models import Docket
 from cl.users.models import UserProfile
 
@@ -366,16 +368,13 @@ async def new_docket_alert(
     """Allow users to create docket alerts for a docket.
 
     The docket is found by its ID, or by its PACER case and court IDs, which
-    is how the RECAP extension links here. SCOTUS dockets are hidden behind
-    the scotus_docket_page flag, like their docket pages.
+    is how the RECAP extension links here. Dockets of a source that hasn't
+    launched (e.g. SCOTUS or Texas behind their launch flags) are a 404,
+    like their docket pages.
     """
     if docket_id is not None:
         docket = await aget_object_or_404(Docket, pk=docket_id)
-        if docket.get_entry_source() is docket_entry_sources.SCOTUS and (
-            not await sync_to_async(waffle.flag_is_active)(
-                request, "scotus_docket_page"
-            )
-        ):
+        if await is_source_hidden(request, docket.get_entry_source()):
             raise Http404("Docket not found.")
         return await render_new_docket_alert(request, docket)
 

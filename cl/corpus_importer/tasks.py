@@ -5317,6 +5317,10 @@ def merge_texas_docket(
 ) -> MergeResult:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
+    When the merge creates docket entries, it also queues the docket alert
+    for the docket's subscribers, like the SCOTUS merger does. Updated
+    entries don't send alerts.
+
     Args:
         docket_data: The scraped Texas docket data.
         download_attachments: Whether to download docket entry attachments.
@@ -5426,12 +5430,17 @@ def merge_texas_docket(
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
 
+    start_time = now()
     entry_merge_result = merge_texas_docket_entries(
         docket,
         docket_data["case_events"],
         docket_data["appellate_briefs"],
         download_attachments=download_attachments,
     )
+    if entry_merge_result.creates.get("TexasDocketEntry"):
+        newly_enqueued = enqueue_docket_alert(docket.pk)
+        if newly_enqueued:
+            send_alert_and_webhook.delay(docket.pk, start_time)
 
     merge_case_transfer_result = merge_texas_case_transfers(
         docket, docket_data

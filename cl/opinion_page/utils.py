@@ -43,7 +43,6 @@ from cl.lib.model_helpers import choices_to_csv
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
-from cl.opinion_page import docket_entry_sources
 from cl.opinion_page.docket_entry_sources import (
     DocketEntrySource,
     MetadataItem,
@@ -64,11 +63,13 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     BankruptcyInformation,
+    CaseTransfer,
     Docket,
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
     SCOTUSDocketEntry,
+    TrialCourtData,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -443,6 +444,116 @@ def build_originating_court_metadata(
         )
 
     return items
+
+
+def build_trial_court_metadata(
+    trial_court: TrialCourtData | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the trial court information section.
+
+    Callers SHOULD load the trial court data with its court and judge
+    (select_related) so building the items adds no queries.
+
+    Args:
+        trial_court: The docket's trial court data, or None if it has none.
+    """
+    if not trial_court:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if court_name := (
+        trial_court.court.short_name
+        if trial_court.court
+        else trial_court.court_name
+    ):
+        items.append({"label": "Court", "value": court_name})
+
+    if docket_number := (
+        trial_court.docket_number_trial or trial_court.docket_number_raw_trial
+    ):
+        items.append({"label": "Docket Number", "value": docket_number})
+
+    if trial_court.county:
+        items.append({"label": "County", "value": trial_court.county})
+
+    # Unlike _person_item, a judge known only by name isn't linked to a
+    # RECAP search: state trial court cases aren't in the RECAP Archive.
+    if trial_court.judge:
+        items.append(
+            {
+                "label": "Judge",
+                "value": trial_court.judge.name_full,
+                "url": trial_court.judge.get_absolute_url(),
+            }
+        )
+    elif trial_court.judge_str:
+        items.append({"label": "Judge", "value": trial_court.judge_str})
+
+    if trial_court.reporter:
+        items.append(
+            {"label": "Court Reporter", "value": trial_court.reporter}
+        )
+
+    if trial_court.date_filed:
+        items.append(
+            {
+                "label": "Date Filed",
+                "value": date_format(trial_court.date_filed),
+            }
+        )
+
+    if trial_court.punishment:
+        items.append({"label": "Punishment", "value": trial_court.punishment})
+
+    return items
+
+
+# Labels for a transfer seen from the docket it arrived at, and from the
+# docket it left.
+_TRANSFER_LABELS: dict[int, tuple[str, str]] = {
+    CaseTransfer.APPEAL: ("Appealed From", "Appealed To"),
+    CaseTransfer.WORKLOAD: ("Transferred From", "Transferred To"),
+    CaseTransfer.JURISDICTION: ("Transferred From", "Transferred To"),
+    CaseTransfer.MERGE: ("Merged From", "Merged Into"),
+}
+
+
+def build_case_transfer_metadata(
+    docket: Docket, transfers: Iterable[CaseTransfer]
+) -> list[MetadataItem]:
+    """Build metadata items for the case transfers section: one per transfer, naming the other court and linking to its docket when we have it.
+
+    Transfers that arrived at the docket come first, then the ones that
+    left it, each in date order. Callers SHOULD load the transfers with
+    their courts and dockets (select_related) so this adds no queries.
+
+    Args:
+        docket: The docket whose page shows the section.
+        transfers: The transfers whose origin or destination is the docket.
+    """
+    rows = []
+    for transfer in transfers:
+        arrived = transfer.destination_docket_id == docket.pk
+        if arrived:
+            court = transfer.origin_court
+            other_docket = transfer.origin_docket
+            other_docket_number = transfer.origin_docket_number
+        else:
+            court = transfer.destination_court
+            other_docket = transfer.destination_docket
+            other_docket_number = transfer.destination_docket_number
+        from_label, to_label = _TRANSFER_LABELS[transfer.transfer_type]
+        item: MetadataItem = {
+            "label": from_label if arrived else to_label,
+            "value": f"{court.short_name}, {date_format(transfer.transfer_date)}",
+        }
+        if other_docket_number:
+            item["suffix_text"] = other_docket_number
+            if other_docket:
+                item["suffix_url"] = other_docket.get_absolute_url()
+        rows.append((not arrived, transfer.transfer_date, item))
+    return [item for *_, item in sorted(rows, key=lambda row: row[:2])]
 
 
 class IdbRow(TypedDict):
@@ -1045,6 +1156,26 @@ class CoreDocketDataDict(TypedDict):
     tabs: list[dict[str, str]]
 
 
+async def is_source_hidden(
+    request: HttpRequest, source: DocketEntrySource
+) -> bool:
+    """Return whether a docket source is still hidden for this request.
+
+    Sources that haven't launched yet name a waffle flag in
+    ``DocketEntrySource.launch_flag``. Views MUST answer 404 for their
+    dockets and documents while this returns True.
+
+    Args:
+        request: The request being served.
+        source: The source of the docket being shown.
+    """
+    if not source.launch_flag:
+        return False
+    return not await sync_to_async(waffle.flag_is_active)(
+        request, source.launch_flag
+    )
+
+
 async def core_docket_data(
     request: HttpRequest, pk: int, note_form_class: type[NoteForm] = NoteForm
 ) -> tuple[Docket, CoreDocketDataDict]:
@@ -1065,14 +1196,10 @@ async def core_docket_data(
     """
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
     source = docket.get_entry_source()
-    is_scotus = source is docket_entry_sources.SCOTUS
 
-    # SCOTUS content is made available using a waffle flag:
-    # every docket-related view shares this helper, so access
-    # control resides here.
-    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
-        request, "scotus_docket_page"
-    ):
+    # Every docket-related view shares this helper, so access control for
+    # sources that haven't launched yet resides here.
+    if await is_source_hidden(request, source):
         raise Http404("Docket not found.")
 
     title = make_docket_title(docket)
@@ -1107,14 +1234,23 @@ async def core_docket_data(
     # undivided block; each stack styles that section itself.
     # Source sections come before the common ones to preserve the
     # long-standing order: Bankruptcy Information, then Originating
-    # Court Information.
+    # Court Information. A source section replaces the common section
+    # with the same title.
+    source_sections = await sync_to_async(docket_source.metadata_sections)(
+        docket
+    )
+    source_titles = {section.get("title") for section in source_sections}
     metadata_sections: list[MetadataSection] = [
         {
             "items": docket_metadata
             + await sync_to_async(docket_source.metadata_items)(docket)
         },
-        *await sync_to_async(docket_source.metadata_sections)(docket),
-        *await _common_metadata_sections(docket, og_info),
+        *source_sections,
+        *[
+            section
+            for section in await _common_metadata_sections(docket, og_info)
+            if section.get("title") not in source_titles
+        ],
     ]
 
     parties = await docket.parties.aexists()
@@ -1176,16 +1312,26 @@ def generate_docket_entries_csv_data(
     # Each docket source keeps its documents under its own related name.
     source = docket_entries[0].docket.get_entry_source()
     columns = docket_entries[0].get_csv_columns(get_column_name=True)
+    document_columns: list[str] = []
     # The first entry may have no documents, so take the document columns
     # from the first document found.
     for docket_entry in docket_entries:
         if documents := list(source.documents_for_entry(docket_entry)):
-            columns += documents[0].get_csv_columns(get_column_name=True)
+            document_columns = documents[0].get_csv_columns(
+                get_column_name=True
+            )
             break
-    csvwriter.writerow(columns)
+    csvwriter.writerow(columns + document_columns)
 
     for docket_entry in docket_entries:
-        for document in source.documents_for_entry(docket_entry):
+        documents = list(source.documents_for_entry(docket_entry))
+        # An entry without documents still gets a row, with empty document
+        # columns, so the export lists every entry the docket page shows.
+        if not documents:
+            csvwriter.writerow(
+                docket_entry.to_csv_row() + [""] * len(document_columns)
+            )
+        for document in documents:
             csvwriter.writerow(
                 docket_entry.to_csv_row() + document.to_csv_row()
             )

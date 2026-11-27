@@ -14,6 +14,15 @@ from cl.opinion_page.utils import make_docket_title
 from cl.search.models import Docket
 
 
+def _entry_number_of(item: SourceDocketEntry) -> int | None:
+    """Return the entry's number, or None when it has none.
+
+    Some sources, like Texas, have no entry numbers at all, so the feed
+    treats their entries like RECAP's unnumbered minute entries.
+    """
+    return getattr(item, "entry_number", None)
+
+
 class DocketFeed(Feed):
     """This feed returns the results of a search feed.
 
@@ -63,17 +72,27 @@ class DocketFeed(Feed):
         )
 
     def item_title(self, item: SourceDocketEntry) -> SafeText:
-        """Title an entry by its number, or by its filing date for minute entries."""
+        """Title an entry by its number, or by its filing date when it has none.
+
+        RECAP calls its unnumbered entries minute entries. Sources without
+        entry numbers, like Texas, have no such thing, so theirs are titled
+        plainly "Entry from <date>".
+        """
         docket_title = make_docket_title(item.docket)
-        entry_number = item.entry_number
+        entry_number = _entry_number_of(item)
         if entry_number:
             preface = f"Entry #{entry_number}"
-        else:
+        elif item.docket.get_entry_source().has_entry_numbers:
             preface = f"Minute entry from {item.date_filed}"
+        else:
+            preface = f"Entry from {item.date_filed}"
         return mark_safe(f"{preface} in {docket_title}")
 
     def item_description(self, item: SourceDocketEntry) -> str:
-        """Describe an entry with its description, falling back to its main document's."""
+        """Return the entry's text as the docket page shows it, falling back to its main document's description."""
+        # Sources like Texas keep an entry's text outside its description
+        # field, so ask the source, as the docket page does.
+        text = item.docket.get_entry_source().entry_display_text(item)
         try:
             # main_docs comes from the source's main_docs_prefetch()
             # to_attr, which pyrefly can't see.
@@ -81,13 +100,13 @@ class DocketFeed(Feed):
             main_doc = item.main_docs[0]
         except IndexError:
             # No doc associated with entry
-            return item.description
-        return item.description or main_doc.description
+            return text
+        return text or main_doc.description
 
     def item_link(self, item: SourceDocketEntry) -> str:
         """Link to the entry on the docket page."""
-        if item.entry_number:
-            anchor = f"entry-{item.entry_number}"
+        if entry_number := _entry_number_of(item):
+            anchor = f"entry-{entry_number}"
         else:
             anchor = f"minute-entry-{item.pk}"
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
@@ -101,9 +120,10 @@ class DocketFeed(Feed):
 
         Returns:
             The stored PDF's URL, or the source's external URL if there is no
-            stored PDF. None for minute entries and entries without documents.
+            stored PDF. None for entries without a number (RECAP minute
+            entries and every Texas entry) and entries without documents.
         """
-        if not item.entry_number:
+        if not _entry_number_of(item):
             return None
 
         # If we don't have a representative document, abort.
