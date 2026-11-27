@@ -43,6 +43,7 @@
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
         {'href': '#docket-alert-label', 'text': 'Docket alert label'},
         {'href': '#add-note', 'text': 'Add note'},
+        {'href': '#docket-tags-button', 'text': 'Docket tags button'},
         {'href': '#pray-button', 'text': 'Pray button'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
         {'href': '#document-source-link', 'text': 'Document source link'},
@@ -2341,6 +2342,10 @@ Sample code here.
         <c-slot name="description">NoteForm instance for the notes modal.</c-slot>
       </c-library.item>
       <c-library.item only>
+        <c-slot name="label"><code>docket_tags</code></c-slot>
+        <c-slot name="description">The tags the user applied to the docket, as built by <code>user_docket_tags</code>. Forwarded to the nested <code>&lt;c-docket-tags-button&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
         <c-slot name="label"><code>tab_content_id</code></c-slot>
         <c-slot name="description">DOM id for the tab content panel. Defaults to <code>"tab-content"</code>.</c-slot>
       </c-library.item>
@@ -2363,6 +2368,7 @@ Sample code here.
   :tabs="tabs"
   :has_alert="has_alert"
   :note_form="note_form"
+  :docket_tags="docket_tags"
 &gt;
   {# Tab content here #}
 &lt;/c-docket-page&gt;
@@ -2504,6 +2510,39 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-add-note.dialog :form="note_form" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET TAGS BUTTON #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-tags-button">
+    <h2 class="mt-6 mb-3">Docket tags button</h2>
+    <p><code>&lt;c-docket-tags-button&gt;</code> is the "Tags" button of the docket page and the popover it opens, where signed-in users apply their tags to the docket, remove them and create new ones. Signed-out users get a link to sign in that returns to the page. The popover holds a <a href="#combobox" class="links"><code>&lt;c-combobox&gt;</code></a> that searches the user's tags through the v4 tags API as they type, and each change is saved through the API as it is made.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">The button as you get it: signed in or signed out. It doesn't open here because its popover searches and saves through the real tags API.</p>
+    <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm" inert>
+      <c-docket-tags-button :docket="{'pk': 1}" :docket_tags="{'options': [], 'associations': {}}" />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The Docket being tagged. Its <code>pk</code> names the docket in the requests and in the popover's id.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_tags</code></c-slot>
+        <c-slot name="description">The tags the user applied to the docket, as built by <code>user_docket_tags</code>: <code>options</code>, the combobox's initial options, all selected, and <code>associations</code>, which maps each applied tag's id to the id of the <code>DocketTag</code> applying it. The user's other tags are not passed; the combobox searches for them.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-tags-button :docket="docket" :docket_tags="docket_tags" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

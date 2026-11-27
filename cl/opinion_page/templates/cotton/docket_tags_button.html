@@ -1,0 +1,65 @@
+{% load component_tags %}
+{% require_script "js/alpine/components/docket_tags_button.js" %}
+{% require_script "js/alpine/plugins/anchor" defer=True %}
+
+<c-vars docket docket_tags />
+
+{% if user.is_authenticated %}
+  <div
+    x-data="docketTagsButton"
+    x-on:combobox-add="attach"
+    x-on:combobox-remove="detach"
+    x-on:combobox-create.prevent="create"
+    x-on:combobox-search="search"
+    data-docket="{{ docket.pk }}"
+    data-user="{{ user.pk }}"
+    data-tags-url="{% url 'UserTag-list' version='v4' %}"
+    data-docket-tags-url="{% url 'DocketTag-list' version='v4' %}"
+    data-csrf-token="{{ csrf_token }}"
+    data-error-message-invalid-name="Only lowercase letters, numbers, and '-' allowed"
+    data-error-message-default="There was a problem. Try again later."
+  >
+    {# Inside a template because htmx removes script tags from the content it swaps in. #}
+    <template data-associations>{{ docket_tags.associations|json_script }}</template>
+    <c-button variant="outline" popovertarget="docket-tags-{{ docket.pk }}" x-ref="trigger">
+      <c-icon name="tag" />
+      Tags
+    </c-button>
+    <div
+      id="docket-tags-{{ docket.pk }}"
+      popover
+      role="dialog"
+      aria-label="Tags"
+      x-anchor.bottom-start.offset.8="$refs.trigger"
+      x-on:toggle="toggled"
+      x-on:keydown.escape.capture="close"
+      class="m-0 w-80 max-w-[calc(100vw-2rem)] p-4 border border-greyscale-200 rounded-lg bg-white shadow-lg"
+    >
+      <div class="flex flex-col gap-3 [&_[role=listbox]]:-mx-4 [&_[role=listbox]]:w-auto [&_[role=listbox]>li]:px-4">
+        <c-combobox
+          label="Apply tags to this item"
+          placeholder="Search tags…"
+          :options="docket_tags.options"
+          multiple
+          creatable
+          create_label="Create tag:"
+          inline
+          remote
+        />
+        <p x-show="errorMessage" x-text="errorMessage" x-cloak role="alert" class="text-sm text-red-600"></p>
+        <div aria-hidden="true" class="-mx-4 h-1 bg-greyscale-100"></div>
+        <a href="{% url 'tag_list' user.username %}" class="links self-start text-sm">View All Tags</a>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <c-button
+    variant="outline"
+    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+    rel="nofollow"
+  >
+    <c-icon name="tag" />
+    Tags
+    <span class="sr-only">(sign in required)</span>
+  </c-button>
+{% endif %}
