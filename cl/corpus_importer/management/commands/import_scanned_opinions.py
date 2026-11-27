@@ -869,8 +869,9 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     looked for in the clusters with the volume and reporter of one of the
     opinion's citations, which are indexed, unlike the file path. The page
     is left out, since a correction in the portal can change it. The
-    cluster's citations aren't updated then, so a warning is logged for
-    review.
+    cluster's citations aren't updated then, so a warning names the scan's
+    citations that the cluster lacks, for review. It also names one that the
+    import skipped because the cluster had another from that reporter.
 
     Caveat: a merged cluster that didn't get any of the scan's citations
     isn't found here; `find_existing_cluster` matches it again, and the
@@ -886,12 +887,11 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     Returns:
         The cluster id, or None if it was not imported yet.
     """
-    volumes, citations = Q(), Q()
+    volumes = Q()
     for cite in scan_case.parsed_citations:
-        volume, reporter = cite.groups["volume"], cite.corrected_reporter()
-        volumes |= Q(citations__volume=volume, citations__reporter=reporter)
-        citations |= Q(
-            volume=volume, reporter=reporter, page=cite.groups["page"]
+        volumes |= Q(
+            citations__volume=cite.groups["volume"],
+            citations__reporter=cite.corrected_reporter(),
         )
     # The citations join returns a cluster once per matching citation
     cluster_ids = list(
@@ -912,13 +912,24 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     if not cluster_ids:
         return None
     cluster_id = cluster_ids[0]
-    if not Citation.objects.filter(citations, cluster_id=cluster_id).exists():
+    # Check each citation, since a correction can change one of several
+    # parallel citations
+    if missing := [
+        cite.corrected_citation()
+        for cite in scan_case.parsed_citations
+        if not Citation.objects.filter(
+            cluster_id=cluster_id,
+            volume=cite.groups["volume"],
+            reporter=cite.corrected_reporter(),
+            page=cite.groups["page"],
+        ).exists()
+    ]:
         logger.warning(
-            "The citation of scanned opinion %s (%s) changed since its "
-            "import into cluster %s. Review it: %s%s",
-            scan_case.file_name_prefix,
-            scan_case.citation.corrected_citation(),
+            "Cluster %s doesn't have the citations %s of scanned opinion %s. "
+            "Review it: %s%s",
             cluster_id,
+            "; ".join(missing),
+            scan_case.file_name_prefix,
             BASE_URL,
             OpinionCluster.objects.get(pk=cluster_id).get_absolute_url(),
         )

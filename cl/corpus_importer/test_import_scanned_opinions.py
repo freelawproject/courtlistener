@@ -954,27 +954,47 @@ class ImportScannedOpinionsTest(TestCase):
     ) -> None:
         """Is a scan whose citation page was corrected found, not added?
 
-        The cluster's citation isn't updated, so a warning asks for review.
+        The cluster's citations aren't updated, so a warning names the
+        corrected one for review, also when it's one of parallel citations.
         """
-        self.import_scan()
-        corrected = self.scan_xml.replace(
+        parallel = self.scan_xml.replace(
             "<citation>388 So. 3d 1</citation>",
-            "<citation>388 So. 3d 2</citation>",
+            "<citation>388 So. 3d 1</citation>"
+            "<citation>2024 WL 2312345</citation>",
         )
-        for overwrite in [False, True]:
-            with (
-                self.subTest(overwrite=overwrite),
-                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-                mock.patch(f"{COMMAND_MODULE}.invalidate_cloudfront"),
-            ):
-                self.import_xml(corrected, overwrite=overwrite)
+        self.import_xml(parallel)
+        cases = [
+            (
+                "citation corrected",
+                parallel.replace("388 So. 3d 1<", "388 So. 3d 2<"),
+                "388 So. 3d 2",
+            ),
+            (
+                "parallel citation corrected",
+                parallel.replace("2312345", "2312346"),
+                "2024 WL 2312346",
+            ),
+        ]
+        for label, xml, missing in cases:
+            for overwrite in [False, True]:
+                with (
+                    self.subTest(label, overwrite=overwrite),
+                    mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                    mock.patch(f"{COMMAND_MODULE}.invalidate_cloudfront"),
+                ):
+                    self.import_xml(xml, overwrite=overwrite)
 
-                self.assertEqual(OpinionCluster.objects.count(), 1)
-                self.assertEqual(str(Citation.objects.get()), "388 So. 3d 1")
-                self.assertIn(
-                    "changed since its import",
-                    mock_logger.warning.call_args[0][0],
-                )
+                    self.assertEqual(OpinionCluster.objects.count(), 1)
+                    self.assertEqual(
+                        sorted(str(c) for c in Citation.objects.all()),
+                        ["2024 WL 2312345", "388 So. 3d 1"],
+                    )
+                    warned = [
+                        c.args[2]
+                        for c in mock_logger.warning.call_args_list
+                        if "doesn't have the citations" in c.args[0]
+                    ]
+                    self.assertEqual(warned, [missing])
 
     def test_overwrite_cleanup_failure_still_finds_citations(self) -> None:
         """Does a failed CloudFront invalidation let citation finding run?
