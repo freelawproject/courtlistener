@@ -309,18 +309,6 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
             ({"origin_docket__isnull": "true"}, 1),
             ({"origin_docket__isnull": "false"}, 2),
             ({"destination_docket__isnull": "true"}, 1),
-            ({"transfer_type": CaseTransfer.APPEAL}, 2),
-            (
-                {
-                    "transfer_type__in": (
-                        f"{CaseTransfer.WORKLOAD},{CaseTransfer.MERGE}"
-                    )
-                },
-                1,
-            ),
-            ({"transfer_date__gte": "2024-01-01"}, 2),
-            ({"transfer_date__year": 2023}, 1),
-            ({"transfer_date__range": "2024-01-01,2024-12-31"}, 1),
         ]
         for params, expected in cases:
             with self.subTest(params=params):
@@ -332,8 +320,7 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
         """Do bad filter values return a 400 naming the parameter?"""
         await self.async_client.aforce_login(self.user)
         cases = [
-            ("transfer_type", "9"),
-            ("transfer_date", "not-a-date"),
+            ("id", "abc"),
             ("origin_court__jurisdiction", "XX"),
             ("origin_docket", "999999999"),
         ]
@@ -344,6 +331,26 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
                 )
                 self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
                 self.assertIn(param, r.json())
+
+    async def test_unindexed_filters_are_rejected(self) -> None:
+        """Do filters on unindexed columns return a 400?
+
+        They would scan the whole table, so the endpoint doesn't offer them
+        until those columns get an index.
+        """
+        await self.async_client.aforce_login(self.user)
+        for param in (
+            "transfer_date",
+            "transfer_date__gte",
+            "transfer_type",
+            "transfer_type__in",
+            "origin_docket_number",
+            "destination_docket_number",
+        ):
+            with self.subTest(param=param):
+                r = await self.async_client.get(self.list_path(), {param: "1"})
+                self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+                self.assertEqual(r.json()["unknown_params"], [param])
 
     async def test_unindexed_sort_keys_are_ignored(self) -> None:
         """Do transfers ignore sort keys their table has no index for?

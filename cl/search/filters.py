@@ -396,9 +396,10 @@ class CaseTransferCourtFilter(NoEmptyFilterSet):
 class CaseTransferFilter(BaseSourceFilter):
     """Filters for case transfers.
 
-    The docket numbers aren't filterable because they're unindexed text; use
-    the court and docket filters instead. A docket filter with isnull finds
-    transfers whose end isn't in CourtListener.
+    Only indexed columns are filterable. The docket numbers, transfer date
+    and transfer type have no index, so use the court and docket filters
+    instead. A docket filter with isnull finds transfers whose end isn't in
+    CourtListener.
     """
 
     # A RelatedFilter looks up the object its exact value names, then only
@@ -422,6 +423,4 @@ class CaseTransferFilter(BaseSourceFilter):
             **BaseSourceFilter.Meta.fields,
             "origin_docket": ["isnull"],
             "destination_docket": ["isnull"],
-            "transfer_date": DATE_LOOKUPS,
-            "transfer_type": ["exact", "in"],
         }
