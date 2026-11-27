@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from typing import cast
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet
 from django.http.response import Http404
 from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
@@ -24,6 +24,7 @@ from cl.api.utils import (
     DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
+    WaffleFlagMixin,
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
@@ -45,6 +46,10 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
+    SCOTUSDocketEntrySerializer,
+    ScotusDocketMetadataSerializer,
+    SCOTUSDocumentListSerializer,
+    SCOTUSDocumentSerializer,
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
@@ -66,6 +71,9 @@ from cl.search.filters import (
     OpinionFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
+    SCOTUSDocketEntryFilter,
+    ScotusDocketMetadataFilter,
+    SCOTUSDocumentFilter,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -80,6 +88,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 
@@ -253,6 +264,97 @@ class RECAPDocumentViewSet(
         .prefetch_related("tags")
         .order_by("-id")
     )
+
+
+class BaseSourceReadOnlyViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
+    """Base read-only viewset for models of a single docket source."""
+
+    permission_classes = (DjangoModelPermissions,)
+    ordering = "-id"
+    ordering_fields: tuple[str, ...] = ("id", "date_created", "date_modified")
+    cursor_ordering_fields = ["id", "date_created", "date_modified"]
+
+
+class ScotusDocketMetadataViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS-specific docket metadata, hidden until its flag is enabled."""
+
+    waffle_flag = "scotus-api"
+    serializer_class = ScotusDocketMetadataSerializer
+    filterset_class = ScotusDocketMetadataFilter
+    queryset = ScotusDocketMetadata.objects.order_by("-id")
+
+
+class SCOTUSDocketEntryViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """SCOTUS docket entries, with their documents nested."""
+
+    waffle_flag = "scotus-api"
+    serializer_class = SCOTUSDocketEntrySerializer
+    filterset_class = SCOTUSDocketEntryFilter
+    # The nested documents' absolute_url needs the docket's slug, so only it
+    # is read from the docket; the entry's own columns are left to
+    # DeferredFieldsMixin. Entries without attachments keep an empty
+    # placeholder document for ES, which isn't a real document, so it's left
+    # out. The nested documents never include plain_text, so it isn't read
+    # either.
+    queryset = (
+        SCOTUSDocketEntry.objects.select_related("docket")
+        .only(
+            *(field.name for field in SCOTUSDocketEntry._meta.concrete_fields),
+            "docket__slug",
+        )
+        .prefetch_related(
+            Prefetch(
+                "scotus_documents",
+                queryset=SCOTUSDocument.objects.exclude(url="").defer(
+                    "plain_text"
+                ),
+            )
+        )
+        .order_by("-id")
+    )
+
+
+class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """Documents filed in SCOTUS docket entries."""
+
+    waffle_flag = "scotus-api"
+    serializer_class = SCOTUSDocumentSerializer
+    filterset_class = SCOTUSDocumentFilter
+    ordering_fields = (
+        *BaseSourceReadOnlyViewSet.ordering_fields,
+        "document_number",
+    )
+    # absolute_url needs the entry's docket_id and the docket's slug, so only
+    # those are read from the joined tables; the document's own columns are
+    # left to DeferredFieldsMixin. Placeholders, the empty documents of
+    # entries without attachments, are left out.
+    queryset = (
+        SCOTUSDocument.objects.exclude(url="")
+        .select_related("docket_entry__docket")
+        .only(
+            *(field.name for field in SCOTUSDocument._meta.concrete_fields),
+            "docket_entry__docket__slug",
+        )
+        .order_by("-id")
+    )
+
+    def get_serializer_class(self) -> type[SCOTUSDocumentSerializer]:
+        """Return a serializer without plain_text for list pages."""
+        if self.action == "list":
+            return SCOTUSDocumentListSerializer
+        return SCOTUSDocumentSerializer
+
+    def get_queryset(self) -> QuerySet[SCOTUSDocument]:
+        """Return the documents, not loading plain_text for list pages."""
+        queryset = super().get_queryset()
+        if self.action == "list":
+            return queryset.defer("plain_text")
+        return queryset
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
@@ -601,7 +703,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         es_list_instance = api_utils.CursorESList(
             main_query, child_docs_query, None, None, cleaned_data, request
         )
-        results_page, cached_response = paginator.paginate_queryset(
+        results_page, cached_response = paginator.paginate_es_list(
             es_list_instance, request
         )
 
@@ -619,7 +721,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         # Note: this isn't precisely a `list[dict]` it is actually a
         # `ReturnList[ReturnDict]`
         result_list = cast(list[dict], serializer.data)
-        return paginator.get_paginated_response(result_list, cached_response)
+        return paginator.get_es_paginated_response(
+            result_list, cached_response
+        )
 
     def list(self, request, *args, **kwargs):
         """Search and return a page of results, or the form's errors with a 400 status."""

@@ -76,7 +76,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("date_created",)
 
-    def validate(self, data):
+    def validate(self, attrs):
         """Validate that the user can create this prayer.
 
         Raises:
@@ -84,7 +84,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
                 has reached their prayer limit.
         """
         user = self.context["request"].user
-        recap_document = data.get("recap_document")
+        recap_document = attrs.get("recap_document")
 
         # Check if a Prayer for the same user and recap_document already exists
         if Prayer.objects.filter(
@@ -99,7 +99,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             raise ValidationError(
                 f"You have reached the maximum number of prayers ({settings.ALLOWED_PRAYER_COUNT}) allowed in the last 24 hours."
             )
-        return data
+        return attrs
 
 
 class EventCountSerializer(serializers.Serializer):

@@ -4,6 +4,8 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from http import HTTPStatus
+from typing import TypedDict
 
 from django.conf import settings
 from django.contrib import messages
@@ -21,6 +23,7 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseRedirect,
+    JsonResponse,
     QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect
@@ -28,7 +31,9 @@ from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.timezone import now
+from django.utils.formats import date_format
+from django.utils.html import format_html
+from django.utils.timezone import localdate, localtime, now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (
     sensitive_post_parameters,
@@ -53,6 +58,12 @@ from cl.api.utils import (
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
+from cl.donate.models import NeonMembership
+from cl.donate.utils import (
+    DONOR_PORTAL_URL,
+    FLP_MEMBERSHIP_URL,
+    get_membership_upgrade_url,
+)
 from cl.favorites.forms import NoteForm
 from cl.favorites.utils import NOTEABLE_MODELS
 from cl.lib.auth import filter_by_email
@@ -66,8 +77,12 @@ from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.es_docket_sources import es_uid
 from cl.search.models import SEARCH_TYPES
-from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
+from cl.users.data_export import (
+    build_user_data_export,
+    claim_daily_export,
+    had_recent_export,
+)
 from cl.users.forms import (
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
@@ -267,14 +282,85 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+class MembershipDetail(TypedDict):
+    """One labelled row in the membership details list."""
+
+    label: str
+    value: str
+
+
+def build_membership_details(
+    membership: NeonMembership,
+) -> list[MembershipDetail]:
+    """Build the Level / Term / Payment / Status rows of the Membership page.
+
+    Values are display-ready. The term end is a ``<time>`` element showing the
+    time in the site's time zone, which ``base.js`` rewrites in the
+    visitor's own time zone. Status comes last, preceded by Payment for
+    inactive memberships, where it usually explains why. An active
+    membership's term always "ends". An inactive one can still have an end
+    date in the future (e.g., a declined renewal payment), so its term row says
+    "ended" only once the date has passed.
+    """
+    is_active = membership.is_active
+    details: list[MembershipDetail] = [
+        {"label": "Level", "value": membership.get_level_display()}
+    ]
+    if termination_date := membership.termination_date:
+        term_ended = not is_active and (
+            localdate(termination_date) < localdate()
+        )
+        details.append(
+            {
+                "label": "Term ended" if term_ended else "Term ends",
+                "value": format_html(
+                    '<time data-local-time datetime="{}">{}</time>',
+                    termination_date.isoformat(),
+                    date_format(
+                        localtime(termination_date), r"F j, Y \a\t g:i A T"
+                    ),
+                ),
+            }
+        )
+    if not is_active:
+        details.append(
+            {
+                "label": "Payment",
+                "value": membership.get_payment_status_display(),
+            }
+        )
+    details.append(
+        {"label": "Status", "value": "Active" if is_active else "Inactive"}
+    )
+    return details
+
+
 @login_required
 @never_cache
-def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Render the user's support page."""
+def view_membership(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show the user's membership level and status, and how to manage it.
+
+    The membership may exist but be inactive (e.g., a failed payment or an
+    ended term), so the template checks ``membership.is_active`` rather than
+    only whether a membership exists.
+    """
+    membership = NeonMembership.objects.filter(user=request.user).first()
     return TemplateResponse(
         request,
-        "profile/donations.html",
-        {"page": "profile_your_support", "private": True},
+        "profile/membership.html",
+        {
+            "page": "profile_your_support",
+            "private": True,
+            "membership": membership,
+            "details": (
+                build_membership_details(membership) if membership else []
+            ),
+            "upgrade_url": (
+                get_membership_upgrade_url(membership) if membership else ""
+            ),
+            "membership_url": FLP_MEMBERSHIP_URL,
+            "donor_portal_url": DONOR_PORTAL_URL,
+        },
     )
 
 
@@ -522,48 +608,52 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
+@sensitive_post_parameters("password")
+@never_cache
 @login_required
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
+@sensitive_variables()
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Request an export of the user's data.
+    """Show the data export page, and download the export on POST.
 
-    On POST, queues a Zoho Desk ticket for the export and redirects to the
-    done page.
+    The user must confirm their password, and gets one export every 24
+    hours. The export is built in memory during the request, which is fine
+    for the small amount of data a typical account holds.
     """
-    if request.method == "POST":
-        user = request.user
-        confirmed = "Yes" if user.profile.email_confirmed else "No"
-        description = (
-            "A user has requested an export of their data in accordance "
-            "with the GDPR/CCPA. Their account details are:<br><br>"
-            f"Logged In As: {user.username} ({user.email})<br>"
-            f"Email Confirmed: {confirmed}"
-        )
-        create_zoho_desk_ticket.delay(
-            subject="User data export request",
-            name=user.get_full_name() or user.username,
-            email=user.email,
-            description=description,
-            request_type="Data Export Request",
-            assignee_id=settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
-                "data_export", ""
-            ),
+    is_post = request.method == "POST"
+    form = PasswordConfirmForm(request, request.POST if is_post else None)
+    if not is_post or not form.is_valid():
+        return TemplateResponse(
+            request, "profile/take_out.html", {"form": form, "private": True}
         )
 
-        return HttpResponseRedirect(reverse("take_out_done"))
+    # Check the limit first so a refused request skips building the export,
+    # but claim the day only once the export is ready, so an error while
+    # building it doesn't stop the user from trying again. The claim is the
+    # atomic step; the check is a shortcut.
+    if not had_recent_export(request.user):
+        response = JsonResponse(
+            build_user_data_export(request.user),
+            json_dumps_params={"indent": 2},
+        )
+        if claim_daily_export(request.user):
+            filename = f"courtlistener-data-{now():%Y-%m-%d}.json"
+            response["Content-Disposition"] = (
+                f'attachment; filename="{filename}"'
+            )
+            return response
 
+    form.add_error(
+        None,
+        "You can download your data once every 24 hours. Please try again "
+        "24 hours after your last download.",
+    )
     return TemplateResponse(
         request,
         "profile/take_out.html",
-        {"private": True},
-    )
-
-
-async def take_out_done(request: HttpRequest) -> HttpResponse:
-    """Render the page confirming the data export was requested."""
-    return TemplateResponse(
-        request,
-        "profile/take_out_done.html",
-        {"private": True},
+        {"form": form, "private": True},
+        status=HTTPStatus.TOO_MANY_REQUESTS,
     )
 
 

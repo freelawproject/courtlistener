@@ -57,8 +57,8 @@ class MinimumWait:
             num if self.min_value is None else min(self.min_value, num)
         )
 
-    def get(self) -> int:
-        """Return the value stored."""
+    def get(self) -> int | None:
+        """Return the value stored, or None if nothing was added."""
         return self.min_value
 
 
