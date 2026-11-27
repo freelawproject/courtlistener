@@ -1,4 +1,4 @@
-{% load text_filters %}
+{% load humanize text_filters %}
 <span id="docket-alert-row-toggle-{{ docket.pk }}" hx-swap-oob="innerHTML">
   {% if has_alert %}
     <span class="flex p-2 rounded-lg bg-primary-600 text-white group-hover:bg-primary-700">
@@ -13,3 +13,6 @@
   {% endif %}
 </span>
 <span id="docket-alerts-status" hx-swap-oob="innerHTML">{{ message }}: {{ docket|best_case_name }}</span>
+{% if quota_reached %}
+  <span id="docket-alerts-quota-count" hx-swap-oob="innerHTML">{{ subscription_count|apnumber }}</span>
+{% endif %}
