@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile, File
 from django.core.management import CommandError, call_command
 from django.db import transaction
-from django.db.models.fields.files import FieldFile
+from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
 from django.utils.timezone import now
 from eyecite import get_citations
@@ -87,8 +87,12 @@ def empty_scan_storage() -> AbstractContextManager[Any]:
     Returns:
         The context manager.
     """
-    storage = OpinionCluster._meta.get_field("filepath_xml_scan").storage
-    return mock.patch.dict(cast(LocMemStorage, storage).cache, clear=True)
+    field = cast(
+        FileField, OpinionCluster._meta.get_field("filepath_xml_scan")
+    )
+    return mock.patch.dict(
+        cast(LocMemStorage, field.storage).cache, clear=True
+    )
 
 
 class ScanXmlHelpersTest(SimpleTestCase):
