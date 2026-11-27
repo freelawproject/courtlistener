@@ -163,6 +163,15 @@
   .tabs-count {
     @apply inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-greyscale-100 text-xs font-normal text-greyscale-600;
   }
+  /* ----------- TABLES ----------- */
+  /* Cell alignment for the align prop of c-data-table and c-flex-table. :where() and
+     the child combinators keep utilities on a cell winning and nested content untouched. */
+  :where(.table-align-center, .table-align-data-center) > * > tr > :is(th, td) {
+    @apply text-center;
+  }
+  :where(.table-align-data-center) > * > tr > :is(th, td):where(:first-child) {
+    @apply text-start;
+  }
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
   .flatpickr-calendar.animate {
