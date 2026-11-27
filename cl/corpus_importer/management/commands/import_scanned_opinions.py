@@ -1562,6 +1562,9 @@ def add_new_case(scan_case: ScanCase, queue: str) -> OpinionCluster:
             )
         elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
+        # An existing RECAP docket is percolated on update, and search alerts
+        # for an old case would only be noise
+        docket.skip_percolator_request = True
         docket.save()
 
         cluster = OpinionCluster(

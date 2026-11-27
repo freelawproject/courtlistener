@@ -1833,6 +1833,41 @@ class ImportScannedOpinionsTest(TestCase):
                 self.assertEqual(OpinionCluster.objects.count(), 0)
                 self.assertIn(message, mock_logger.warning.call_args[0][0])
 
+    def test_existing_docket_is_not_percolated(self) -> None:
+        """Is a reused docket saved without sending search alerts?
+
+        A RECAP docket is percolated on update, and alerts for an old case
+        would only be noise.
+        """
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.RECAP,
+            docket_number="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+        saves: list[tuple[int | None, bool]] = []
+        original_save = Docket.save
+
+        def save(instance: Docket, *args: Any, **kwargs: Any) -> None:
+            """Record whether the save skips the percolator."""
+            saves.append(
+                (
+                    instance.pk,
+                    getattr(instance, "skip_percolator_request", False),
+                )
+            )
+            original_save(instance, *args, **kwargs)
+
+        with mock.patch.object(
+            Docket, "save", autospec=True, side_effect=save
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+        self.assertIn((docket.pk, True), saves)
+        self.assertNotIn((docket.pk, False), saves)
+
+
 class FakeScanningStorage:
     """An in-memory stand-in for the scanning portal's bucket."""
 
