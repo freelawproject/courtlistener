@@ -1057,24 +1057,37 @@ def store_scan_xml(
         scan_case: The parsed scanned opinion.
         update_fields: The other cluster fields to save with the path.
 
+    A stored file that no cluster uses, e.g. one left by a process killed
+    before its commit, is overwritten.
+
     Raises:
-        ValueError: If the cluster has no file yet and its file name is
-            already stored, which rolls the import back. The file is
-            another cluster's: this scan was imported before, but
-            `find_imported_scan` missed it, e.g. because that cluster's
-            citation volume was edited. Overwriting it would make both
-            clusters share one file.
+        ValueError: If the new file name is another cluster's, which rolls
+            the import back. E.g. this scan was imported before, but
+            `find_imported_scan` missed it because that cluster's citation
+            volume was edited. Overwriting the file would make both clusters
+            share it.
     """
     previous_name = cluster.filepath_xml_scan.name
-    if not previous_name:
-        name = cluster.filepath_xml_scan.field.generate_filename(
-            cluster, scan_case.file_name
-        )
-        if cluster.filepath_xml_scan.storage.exists(name):
+    new_name = cluster.filepath_xml_scan.field.generate_filename(
+        cluster, scan_case.file_name
+    )
+    # The storage overwrites, so check a name the cluster doesn't have yet.
+    # The path isn't indexed, so look it up only when the file exists.
+    if new_name != previous_name and cluster.filepath_xml_scan.storage.exists(
+        new_name
+    ):
+        if (
+            OpinionCluster.objects.filter(filepath_xml_scan=new_name)
+            .exclude(pk=cluster.pk)
+            .exists()
+        ):
             raise ValueError(
-                f"The scan XML {name} is already stored for another "
+                f"The scan XML {new_name} is already stored for another "
                 "cluster. Review it before importing this scan again."
             )
+        logger.info(
+            "Overwriting %s, a scan XML that no cluster uses", new_name
+        )
     cluster.filepath_xml_scan.save(
         scan_case.file_name,
         ContentFile(scan_case.xml.encode()),

@@ -1782,6 +1782,84 @@ class ImportScannedOpinionsTest(TestCase):
         with cluster.filepath_xml_scan.storage.open(stored_name) as f:
             self.assertNotIn("an error", f.read().decode())
 
+    def test_import_overwrites_a_file_no_cluster_uses(self) -> None:
+        """Is a stored file without a cluster overwritten by its import?
+
+        Like one left by a run killed before its commit.
+        """
+        field = cast(
+            FileField, OpinionCluster._meta.get_field("filepath_xml_scan")
+        )
+        name = field.generate_filename(
+            OpinionCluster(date_filed=date(2024, 5, 22)),
+            "3593-12-388-so-3d-1.xml",
+        )
+        field.storage.save(name, ContentFile(b"<casebody/>"))
+
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_scan()
+
+        mock_logger.exception.assert_not_called()
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(cluster.filepath_xml_scan.name, name)
+        with field.storage.open(name) as f:
+            self.assertEqual(f.read().decode(), self.scan_xml)
+
+    def test_overwrite_checks_the_new_file_name(self) -> None:
+        """Does an overwrite that renames the file check who uses the name?
+
+        Another cluster's file rolls the overwrite back, and one that no
+        cluster uses is overwritten.
+        """
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        for label, taken in [
+            ("another cluster's file", True),
+            ("a file no cluster uses", False),
+        ]:
+            errors: list[BaseException | None] = []
+            with (
+                self.subTest(label),
+                transaction.atomic(),
+                empty_scan_storage(),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                mock_logger.exception.side_effect = (
+                    lambda *args: errors.append(sys.exc_info()[1])
+                )
+                self.import_scan()
+                cluster = OpinionCluster.objects.get()
+                old_name = cluster.filepath_xml_scan.name
+                # The stored name has the filing date, so a new date renames it
+                cluster.date_filed = date(2024, 5, 23)
+                cluster.save(update_fields=["date_filed"])
+                storage = cluster.filepath_xml_scan.storage
+                new_name = cluster.filepath_xml_scan.field.generate_filename(
+                    cluster, Path(old_name).name
+                )
+                storage.save(new_name, ContentFile(b"<casebody/>"))
+                if taken:
+                    OpinionClusterFactory.create(
+                        docket=cluster.docket, filepath_xml_scan=new_name
+                    )
+
+                self.import_xml(corrected, overwrite=True)
+
+                cluster.refresh_from_db()
+                with storage.open(new_name) as f:
+                    stored = f.read().decode()
+                if taken:
+                    self.assertEqual(len(errors), 1)
+                    self.assertIn("already stored", str(errors[0]))
+                    self.assertEqual(cluster.filepath_xml_scan.name, old_name)
+                    self.assertEqual(stored, "<casebody/>")
+                else:
+                    self.assertEqual(errors, [])
+                    self.assertEqual(cluster.filepath_xml_scan.name, new_name)
+                    self.assertIn("an error", stored)
+                transaction.set_rollback(True)
+
     def test_failed_import_is_rolled_back(self) -> None:
         """Is a failed import rolled back without uploading the XML?"""
         with (
