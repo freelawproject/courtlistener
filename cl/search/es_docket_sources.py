@@ -2,7 +2,7 @@
 
 Used by cl.lib.es_signal_processor and the ES indexing tasks in
 cl.search.tasks. Each source's court_ids also feed the RECAP search court
-picker.
+picker and, with its frontend_search_flag, the RECAP search gate.
 """
 
 from collections.abc import Callable
@@ -81,6 +81,12 @@ class ESDocketSource:
     ``in_alerts_sweep`` is whether the daily RECAP alerts sweep
     (cl_send_recap_alerts) covers this source. Sources outside it only
     trigger alerts through the percolator.
+
+    ``frontend_search_flag`` names the waffle flag that decides whether the
+    search frontend shows this source. Where it's off, RECAP searches leave
+    its courts out (see gated_court_ids), and the search APIs always do
+    unless they include the source themselves. None for sources shown
+    everywhere, like RECAP.
     """
 
     name: str
@@ -95,6 +101,7 @@ class ESDocketSource:
     uid_namespace: str | None = None
     court_ids: frozenset[str] = frozenset()
     in_alerts_sweep: bool = True
+    frontend_search_flag: str | None = None
 
     def has_entries(self, docket: Docket) -> bool:
         """Whether the Docket has any docket entries from this source.
@@ -168,6 +175,7 @@ SCOTUS_ES_SOURCE = ESDocketSource(
     ready_to_index=_scotus_ready_to_index,
     uid_namespace="scotus",
     court_ids=SCOTUS_COURT_IDS,
+    frontend_search_flag="scotus_docket_page",
     # The sweep reads RECAP's integer ids, which SCOTUS documents leave
     # empty; SCOTUS alerts always go through the percolator.
     in_alerts_sweep=False,
@@ -232,23 +240,43 @@ def es_uid(model: type[models.Model], pk: int) -> str | None:
     return f"{source.uid_namespace}_{pk}"
 
 
-def recap_search_courts(include_scotus: bool) -> QuerySet[Court]:
+def gated_court_ids(included_sources: tuple[str, ...]) -> list[str]:
+    """Return the courts RECAP searches must leave out: those of the gated sources (with a frontend_search_flag) other than included_sources.
+
+    :param included_sources: Names of the gated sources the request may see
+    (see frontend_search_sources).
+    """
+    return sorted(
+        court_id
+        for source in ALL_ES_SOURCES
+        if source.frontend_search_flag and source.name not in included_sources
+        for court_id in source.court_ids
+    )
+
+
+def recap_search_courts(
+    included_sources: tuple[str, ...],
+) -> QuerySet[Court]:
     """Return the courts offered in the RECAP search court picker: the PACER courts plus the ones every other registered source adds. Use it only for search; PACER-specific code (scrapers, uploads) must keep using all_pacer_courts(), which excludes non-PACER courts like SCOTUS.
 
-    :param include_scotus: Whether the search can return SCOTUS content
-    (see scotus_frontend_search_enabled). Without it, only the PACER
-    courts are offered. Temporary: remove once SCOTUS launches.
+    :param included_sources: Names of the gated sources the search can
+    return (see frontend_search_sources). Courts of the other gated sources
+    aren't offered.
     """
     # federal_courts is typed as a plain Manager, which hides the
     # FederalCourtsQuerySet methods from the type checker.
     pacer_courts = cast(
         FederalCourtsQuerySet, Court.federal_courts
     ).all_pacer_courts()
-    if not include_scotus:
-        return pacer_courts
+    gated_ids = gated_court_ids(included_sources)
     source_court_ids = [
-        court_id for source in ALL_ES_SOURCES for court_id in source.court_ids
+        court_id
+        for source in ALL_ES_SOURCES
+        for court_id in source.court_ids
+        if court_id not in gated_ids
     ]
+    if not source_court_ids:
+        return pacer_courts
     return (
         Court.objects.filter(pk__in=source_court_ids, in_use=True)
         | pacer_courts

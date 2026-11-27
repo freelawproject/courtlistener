@@ -59,6 +59,7 @@ from cl.search.documents import (
     ParentheticalGroupDocument,
     PersonDocument,
 )
+from cl.search.es_docket_sources import ALL_ES_SOURCES
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
@@ -278,15 +279,21 @@ async def add_depth_counts(
         return None
 
 
-def scotus_frontend_search_enabled(request: HttpRequest) -> bool:
-    """Whether the search frontend (search page, RSS search feed and the create-alert estimate) may include SCOTUS content for this request.
+def frontend_search_sources(request: HttpRequest) -> tuple[str, ...]:
+    """Return the names of the gated sources whose frontend_search_flag is on for this request, which the search frontend (search page, RSS search feed and the create-alert estimate) may show.
 
-    Staff see SCOTUS before launch, everyone after. It uses the same flag
-    as the SCOTUS docket pages, since results link to them. The search
-    APIs don't use it: they keep SCOTUS hidden until their own launch.
-    Temporary: remove once SCOTUS launches.
+    Each source's flag is the same as its docket pages', since results link
+    to them. The search APIs don't use it: they include sources with their
+    own flags. Sorted, so it's stable in cache keys.
     """
-    return bool(flag_is_active(request, "scotus_docket_page"))
+    return tuple(
+        sorted(
+            source.name
+            for source in ALL_ES_SOURCES
+            if source.frontend_search_flag
+            and flag_is_active(request, source.frontend_search_flag)
+        )
+    )
 
 
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
@@ -720,7 +727,7 @@ def do_es_search(
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
     is_semantic_frontend_active: bool = False,
-    include_scotus: bool = False,
+    include_sources: tuple[str, ...] = (),
 ) -> ESSearchResult:
     """Run Elasticsearch searching and filtering and prepare data to display.
 
@@ -736,9 +743,9 @@ def do_es_search(
             an export process.
         courts: QuerySet of courts used in the jurisdiction picker.
         is_semantic_frontend_active: Whether the semantic search frontend is enabled for this request.
-        include_scotus: Whether RECAP results may include SCOTUS content.
-            Off by default; the search page turns it on with
-            scotus_frontend_search_enabled.
+        include_sources: Names of the gated sources RECAP results may
+            include. Empty by default; the search page sets it with
+            frontend_search_sources.
 
     Returns:
         A big dict of variables for use in the search results, homepage, or
@@ -787,7 +794,7 @@ def do_es_search(
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form
         cd = search_form.cleaned_data.copy()
-        cd["include_scotus"] = include_scotus
+        cd["include_sources"] = include_sources
         # Create necessary filters to execute ES query
         search_query = document_type.search()
         try:
@@ -824,9 +831,9 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
-            # Part of the micro-cache key, so results cached with and without
-            # SCOTUS are never served to the other side.
-            cleaned_params["include_scotus"] = include_scotus
+            # Part of the micro-cache key, so results cached for one set of
+            # sources are never served to another.
+            cleaned_params["include_sources"] = include_sources
             # Use a smaller page size for semantic results so the longer
             # chunk previews are less overwhelming to scan.
             if has_semantic_params(cd):

@@ -31,9 +31,9 @@ from cl.lib.ratelimiter import (
 )
 from cl.lib.search_utils import (
     do_es_search,
+    frontend_search_sources,
     make_get_string,
     merge_form_with_courts,
-    scotus_frontend_search_enabled,
     store_search_query,
 )
 from cl.lib.string_utils import trunc
@@ -177,7 +177,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             render_dict.update(
                 do_es_search(
                     request.GET.copy(),
-                    include_scotus=scotus_frontend_search_enabled(request),
+                    include_sources=frontend_search_sources(request),
                 )
             )
             render_dict.update(
@@ -304,17 +304,17 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
 
     if search_type == SEARCH_TYPES.RECAP:
-        include_scotus = scotus_frontend_search_enabled(request)
+        include_sources = frontend_search_sources(request)
         search_results = do_es_search(
             request.GET.copy(),
-            courts=recap_search_courts(include_scotus=include_scotus),
-            include_scotus=include_scotus,
+            courts=recap_search_courts(included_sources=include_sources),
+            include_sources=include_sources,
         )
     else:
         search_results = do_es_search(
             request.GET.copy(),
             is_semantic_frontend_active=is_semantic_active,
-            include_scotus=scotus_frontend_search_enabled(request),
+            include_sources=frontend_search_sources(request),
         )
 
     render_dict.update(search_results)
@@ -364,7 +364,7 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
 
     if search_type == SEARCH_TYPES.RECAP:
         courts_in_use = recap_search_courts(
-            include_scotus=scotus_frontend_search_enabled(request)
+            included_sources=frontend_search_sources(request)
         )
 
     search_form = SearchForm({"type": search_type}, courts=courts)
