@@ -14,9 +14,10 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from enum import Enum
+from enum import Enum, Flag, auto
 from typing import (
     Any,
+    Final,
     cast,
     final,
     overload,
@@ -40,7 +41,6 @@ from model_utils.tracker import DescriptorWrapper
 from cl.corpus_importer.state.utils import MergeResult
 
 from . import state as MergerState
-from .lookup import KeyLookup, RelationLookup
 from .parameters import (
     Create,
     RelatedParams,
@@ -53,12 +53,26 @@ if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
 
     from .base import Merger
+    from .pool import Pool
 
 logger = logging.getLogger(__name__)
 
 type Transformer[Scrape, Params, Database: Model, Transformed] = Callable[
     [Scrape, Params, Database | None], Transformed
 ]
+
+
+class Source(Flag):
+    """The kinds of input an expression reads when it is evaluated.
+
+    Flags combine with `|`, so an expression built from several inputs reports
+    all of them. An expression reading nothing at all is `Source.NONE`.
+    """
+
+    NONE = 0
+    MERGE = auto()
+    DATABASE = auto()
+    CONSTANT = auto()
 
 
 class MergerSpecification[Scrape, Params, Output](ABC):
@@ -68,12 +82,13 @@ class MergerSpecification[Scrape, Params, Output](ABC):
     the attribute's name, which must be a field of the merger's model.
     """
 
-    __slots__ = ("_name", "_uses_scrape", "_db_fields")
+    __slots__ = ("_name", "_sources", "_annotations", "_db_fields")
 
     def __init__(self, /) -> None:
         """Build a specification; its name is set when it is assigned on a merger."""
         self._name: str = ""
-        self._uses_scrape: bool = False
+        self._sources: Source = Source.NONE
+        self._annotations: tuple[str, ...] = ()
         self._db_fields: tuple[str, ...] = ()
 
     def _depend_on(self, *sources: Any) -> None:
@@ -84,8 +99,14 @@ class MergerSpecification[Scrape, Params, Output](ABC):
                 those that are specifications contribute anything.
         """
         specs = [s for s in sources if isinstance(s, MergerSpecification)]
-        self._uses_scrape = self._uses_scrape or any(
-            s._uses_scrape for s in specs
+        for s in specs:
+            self._sources |= s._sources
+        self._annotations = tuple(
+            dict.fromkeys(
+                itertools.chain(
+                    self._annotations, *(s._annotations for s in specs)
+                )
+            )
         )
         self._db_fields = tuple(
             dict.fromkeys(
@@ -229,6 +250,25 @@ class AttributeMerger[Scrape, Params, Transform](
         """
         return _CallProxy(self, args, kwargs)
 
+    # pyrefly: ignore[bad-override]
+    def __eq__(self, other: object) -> Comparison:
+        """Build a comparison of this expression with another one.
+
+        Args:
+            other: The expression to compare with.
+
+        Returns:
+            The comparison of this expression (left) with `other` (right), or
+            `NotImplemented` when `other` is not an expression.
+        """
+        if not isinstance(other, AttributeMerger):
+            return NotImplemented
+        return VerboseComparison(self, other)
+
+    # Defining `__eq__` removes the inherited hash; expressions are hashed and
+    # compared by identity wherever they are collected.
+    __hash__ = object.__hash__
+
     @override
     @final
     def transform[M: Model](
@@ -247,6 +287,153 @@ class AttributeMerger[Scrape, Params, Transform](
         return self._transform(scrape, params, database)
 
 
+class Comparison(ABC):
+    """Base class for comparisons between expressions.
+
+    Attributes:
+        stored: The stored database attribute side of the comparison.
+        field: The stored field, set when `stored` is a bare `Database`. The scraped value is converted by it before it is compared.
+    """
+
+    __slots__ = ("stored", "field")
+
+    def __init__(self, stored: AttributeMerger, field: Field | None):
+        """Shared initialization for comparisons."""
+        self.stored: Final[AttributeMerger] = stored
+        self.field: Final[Field | None] = field
+
+    def stored_value(self, row: Model) -> Any:
+        """Evaluate the stored side on a row.
+
+        Args:
+            row: A stored row, loaded with the pool's annotations if the term reads any.
+
+        Returns:
+            The row's value for the term.
+        """
+        return self.stored.transform(None, None, row)
+
+    @abstractmethod
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        """Evaluate the scraped side for a merger, before the stored field converts it.
+
+        Args:
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
+
+        Returns:
+            The scraped value as the merger has it.
+        """
+
+    def scraped_value(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        """Evaluate the scraped side for a merger.
+
+        Args:
+            merger: The merger being matched; the shorthand reads the value it computed for its attribute.
+            state: The merger's state, whose scrape and params an explicit term is evaluated against.
+
+        Returns:
+            The value to compare with `stored_value`, converted by the stored field when there is one.
+
+        Raises:
+            django.core.exceptions.ValidationError: If the stored field rejects the scraped value.
+        """
+        value = self.scraped_raw(merger, state)
+        if self.field is None:
+            return value
+        return self.field.to_python(value)
+
+
+class VerboseComparison(Comparison):
+    """A term declaring that two expressions must evaluate to equal values.
+
+    Attributes:
+        scraped: The expression for the scraped value.
+    """
+
+    __slots__ = ("scraped",)
+
+    def __init__(self, left: AttributeMerger, right: AttributeMerger):
+        """Initialize an expression requiring that `left == right` after evaluation.
+
+        Raises:
+            ValueError: If both `left` and `right` are sourced from the database or neither is. Or if the the database side of the comparison reads scraped data.
+        """
+        if left._sources & Source.DATABASE == right._sources & Source.DATABASE:
+            raise ValueError(
+                "Exactly one side of a term must read the stored row (Database or Annotation)"
+            )
+        if left._sources & Source.DATABASE:
+            stored = left
+            scraped = right
+        else:
+            stored = right
+            scraped = left
+
+        if stored._sources & Source.MERGE:
+            raise ValueError(
+                "The stored side of a term may only read Database, Annotation and Constant"
+            )
+        super().__init__(
+            stored,
+            stored._field if isinstance(stored, _DatabaseProxy) else None,
+        )
+        self.scraped: Final[AttributeMerger] = scraped
+
+    @override
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        return self.scraped.transform(state.scrape, state.params, None)
+
+
+class ShorthandComparison(Comparison):
+    """A term declaring that a scraped value must be equal to a stored database value.
+
+    Attributes:
+        attribute: The name of the scraped attribute on the merger.
+    """
+
+    __slots__ = ("attribute",)
+
+    def __init__(self, term: str, merger: type[Merger]):
+        """Initialize an expression requiring that `Merger.<term> == Model.<field>` when evaluated.
+
+        Parameters:
+            term: The name of the scraped attribute on the merger.
+            merger: The merger this comparison is being performed on. Used for validation and identifying model fields.
+        """
+        field = next(
+            (
+                f
+                for f in merger.config.model._meta.concrete_fields
+                if term == f.name or term == f.attname
+            ),
+            None,
+        )
+
+        if field is None:
+            raise ValueError(
+                f"{term!r} is not a concrete field of {merger.config.model.__name__}"
+            )
+
+        if term not in merger.config.registry.attr:
+            raise ValueError(f"{merger.__name__} does not compute {term!r}.")
+
+        super().__init__(_DatabaseProxy(field), field)
+        self.attribute: Final[str] = term
+
+    @override
+    def scraped_raw(
+        self, merger: Merger, state: MergerState.Lookup[Any, Any, Any]
+    ) -> Any:
+        return getattr(merger, self.attribute)
+
+
 class _AncestorProxy[M: Model](AttributeMerger):
     """Expression evaluating to the nearest ancestor of a given model type."""
 
@@ -257,6 +444,7 @@ class _AncestorProxy[M: Model](AttributeMerger):
             model: The model class of the ancestor to look up.
         """
         super().__init__()
+        self._sources = Source.MERGE
         self._transform = functools.partial(_ancestor, model)
 
 
@@ -298,6 +486,7 @@ class _ConstantProxy(AttributeMerger):
                 merge, so it should not be mutated.
         """
         super().__init__()
+        self._sources = Source.CONSTANT
         self._transform = lambda s, p, m: value
         self._value = value
 
@@ -308,7 +497,7 @@ class _ScrapeProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the scrape."""
         super().__init__()
-        self._uses_scrape = True
+        self._sources = Source.MERGE
         self._transform = lambda s, p, m: s
 
 
@@ -318,6 +507,7 @@ class _ParamsProxy(AttributeMerger):
     def __init__(self):
         """Create an expression evaluating to the params."""
         super().__init__()
+        self._sources = Source.MERGE
         self._transform = lambda s, p, m: p
 
 
@@ -343,6 +533,7 @@ class _DatabaseProxy(AttributeMerger):
         # fetching the related row.
         getter = operator.attrgetter(field.attname)
         self._field: Field = field
+        self._sources = Source.DATABASE
         self._transform = lambda s, p, m: getter(m) if m is not None else None
         self._db_fields = (*self._db_fields, field.name)
 
@@ -366,6 +557,26 @@ class _DatabaseProxy(AttributeMerger):
             )
 
         return errors
+
+
+class _AnnotationProxy(AttributeMerger):
+    """Expression evaluating to a value a pool annotated onto the matched row."""
+
+    __slots__ = ()
+
+    def __init__(self, key: str) -> None:
+        """Create an expression reading a pool annotation.
+
+        Args:
+            key: The keyword the annotation was given in the pool's `annotate`.
+        """
+        super().__init__()
+        # An annotation is not a column, so it adds nothing to `_db_fields`,
+        # which feeds the columns a pool loads.
+        self._sources = Source.DATABASE
+        self._annotations = (key,)
+        getter = operator.attrgetter(key)
+        self._transform = lambda s, p, m: getter(m)
 
 
 class _AttrProxy(AttributeMerger):
@@ -583,7 +794,8 @@ def Params[T](_: type[T]) -> T:
     return _ParamsProxy()
 
 
-def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]]) -> GT | None:
+# TODO: The `| GT` is required by Pyrefly's odd handling of `_id` fields compared to others
+def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]] | GT) -> GT | None:
     """Start an expression from a model field passed to the merger.
 
     For example, `Database(Docket.docket_number)`.
@@ -598,6 +810,23 @@ def Database[ST, GT](field: _FieldDescriptor[Field[ST, GT]]) -> GT | None:
     """
     # pyrefly: ignore[bad-return,bad-argument-type]
     return _DatabaseProxy(field)
+
+
+def Annotation(key: str) -> Any:
+    """Start an expression from a value a pool annotated onto each row.
+
+    For example, `Annotation("role")` reads what `annotate(role=...)` put on
+    the row. The annotation is not a column, so nothing is loaded for it.
+
+    Args:
+        key: The keyword the annotation was given in the pool's `annotate`.
+
+    Returns:
+        An expression typed `Any`, since the annotation's type is the pool's
+        to know. It has no value until the merge runs, so it is only
+        meaningful as (part of) a merger term.
+    """
+    return _AnnotationProxy(key)
 
 
 def Ancestor[M: Model](model: type[M]) -> M:
@@ -715,19 +944,65 @@ class RelatedMerger[
                         # type: ignore[union-attr]
                     )
                 )
+        errors += self._pool_errors(self.merger, self.pool)
         return errors
 
     @property
+    def _default_pool(self) -> Pool:
+        """The pool the related merger is matched in when it declares none: what the parent holds in the relation."""
+        from .pool import Siblings
+
+        return Siblings()
+
+    @property
+    def pool(self) -> Pool:
+        """The pool the related merger's rows are matched in: the one it declares, or the default for this kind of relation."""
+        return self.merger.pool or self._default_pool
+
+    def _pool_errors(
+        self, merger: type[Merger[Any, Any, Any]], pool: Pool
+    ) -> list[Exception]:
+        """Check a merger that declares no pool against the one this relation gives it.
+
+        Args:
+            merger: The merger of the relation's related objects or through rows.
+            pool: The pool the relation gives the merger.
+
+        Returns:
+            One error for each tier of the merger's match that cannot be
+            queried in `pool`. A merger that declares its own pool was checked
+            against it when its class was created.
+        """
+        if merger.pool is not None:
+            return []
+        return [
+            ValueError(
+                f"{self._name}: {merger.__name__} cannot be matched in "
+                f"{type(pool).__name__}: {error}"
+            )
+            for error in merger.pool_errors(pool)
+        ]
+
+    @property
     def prefetch(self) -> list[Prefetch]:
-        """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for."""
+        """The `prefetch_related` lookups, relative to the parent's model, loading everything that merging this relation looks for.
+
+        A relation is only prefetched when its merger is matched among what the
+        parent holds in it. Any other pool reads rows the relation does not
+        hold.
+        """
+        if not (pool := self.pool).prefetchable:
+            return []
         return [
             Prefetch(
                 self._name,
-                self.merger.config.loading(
+                pool.query(
+                    self.merger,
                     cast(
                         QuerySet[RM],
                         self.merger.config.model._default_manager.all(),
-                    )
+                    ),
+                    self.merger._bound_match.tiers[0].ordering,
                 ),
             )
         ]
@@ -907,6 +1182,8 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        from .match import MatchGroup
+
         if parent is None:
             logger.error("Parent not provided for N to many merging")
             return MergeResult.failed(self.merger.config.model.__name__)
@@ -920,13 +1197,18 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        children = RelationLookup(self.merger, related_manager.all())
+        children = MatchGroup(
+            self.merger,
+            self.pool,
+            relation=related_manager.all(),
+            params=related_params,
+        )
         child_mergers = [
             self.merger(
                 child,
                 params=related_params,
                 manager=related_manager,
-                siblings=children,
+                group=children,
             )
             for child in transformed
         ]
@@ -939,14 +1221,9 @@ class NToManyMerger[Scrape, Params, Child, RM: Model](
         match self.strategy:
             case ManyStrategy.REPLACE:
                 if len(related_objects) == len(child_mergers):
-                    to_keep = {r.pk for r in related_objects}
-                    if stale := {o.pk for o in children.existing()} - to_keep:
-                        # Not through `related_manager`: what a parent was
-                        # loaded with is missing fields, which the deletion
-                        # signals are entitled to.
-                        _ = self.merger.config.model._default_manager.filter(
-                            pk__in=stale
-                        ).delete()
+                    children.prune(
+                        related_manager.all(), {r.pk for r in related_objects}
+                    )
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
             # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
@@ -1069,17 +1346,32 @@ class ManyToManyMerger[
                     )
                 )
 
+            errors += self._pool_errors(self.through, self.through_pool)
+
         return errors
 
     @property
     @override
-    def prefetch(self) -> list[Prefetch]:
-        """The `prefetch_related` lookups loading the related objects, of which there are none with a through merger."""
-        if self.through is not None:
-            # The related objects are looked up among every object of their
-            # model rather than among those the parent already holds.
-            return []
-        return super().prefetch
+    def _default_pool(self) -> Pool:
+        """The pool the related merger is matched in when it declares none.
+
+        With a through merger the related objects are not tied to the parent
+        by the relation alone, so they are matched among every object of their
+        model; without one they are what the parent holds in the relation.
+        """
+        from .pool import Global
+
+        if self.through is None:
+            return super()._default_pool
+        return Global()
+
+    @property
+    def through_pool(self) -> Pool:
+        """The pool the through merger's rows are matched in: the one it declares, or what the parent holds in the through model."""
+        from .pool import Siblings
+
+        declared = None if self.through is None else self.through.pool
+        return declared or Siblings()
 
     def merge(
         self,
@@ -1088,6 +1380,8 @@ class ManyToManyMerger[
         params: Params,
     ) -> MergeResult:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        from .match import MatchGroup
+
         if parent is None:
             logger.error("%s: No parent model specified", self._name)
             return MergeResult.failed(self.merger.config.model.__name__)
@@ -1106,9 +1400,14 @@ class ManyToManyMerger[
 
         # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
         # this case
-        children = KeyLookup(self.merger)
+        children = MatchGroup(
+            self.merger,
+            self.pool,
+            relation=related_manager.all(),
+            params=related_params,
+        )
         child_mergers = [
-            self.merger(child, params=related_params, siblings=children)
+            self.merger(child, params=related_params, group=children)
             for child in transformed
         ]
         merged_children: list[tuple[Transform, RM]] = []
@@ -1133,19 +1432,22 @@ class ManyToManyMerger[
         all_children_merged = len(merged_children) == len(child_mergers)
         if self.strategy is ManyStrategy.REPLACE and all_children_merged:
             # Delete everything we didn't update or create along with associated objects
-            _ = related_manager.exclude(pk__in=children_to_keep).delete()
+            children.prune(related_manager.all(), children_to_keep)
 
         # Only through objects belonging to this parent are matched or
         # pruned; other parents' relationships are out of scope for this
         # merge.
-        throughs = RelationLookup(
-            self.through,
-            cast(
-                QuerySet[ThruM],
-                self.through.config.model._default_manager.filter(
-                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
-                ),
+        through_relation = cast(
+            QuerySet[ThruM],
+            self.through.config.model._default_manager.filter(
+                **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
             ),
+        )
+        throughs = MatchGroup(
+            self.through,
+            self.through_pool,
+            relation=through_relation,
+            params=related_params,
         )
         through_mergers = [
             self.through(
@@ -1158,7 +1460,7 @@ class ManyToManyMerger[
                     target=child,
                     target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
                 ),
-                siblings=throughs,
+                group=throughs,
             )
             for child_scrape, child in merged_children
         ]
@@ -1176,11 +1478,7 @@ class ManyToManyMerger[
             and all_children_merged
             and len(through_objects) == len(through_mergers)
         ):
-            to_keep = {t.pk for t in through_objects}
-            if stale := {t.pk for t in throughs.existing()} - to_keep:
-                _ = self.through.config.model._default_manager.filter(
-                    pk__in=stale
-                ).delete()
+            throughs.prune(through_relation, {t.pk for t in through_objects})
 
         return result
 

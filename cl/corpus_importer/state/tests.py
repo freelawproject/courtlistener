@@ -1,9 +1,8 @@
 import json
-import logging
 import sqlite3
 import time
 from collections.abc import Generator, Iterable, Iterator, Sequence
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, nullcontext
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -21,7 +20,6 @@ from pydantic import BaseModel
 from cl.corpus_importer.management.commands.load_state_scrape import (
     DEFAULT_THROTTLE,
 )
-from cl.corpus_importer.state.ledger import PARTS as LEDGER_PARTS
 from cl.corpus_importer.state.ledger import LoadLedger
 from cl.corpus_importer.state.loader import (
     JKentScrapeLoader,
@@ -59,13 +57,20 @@ from cl.corpus_importer.state.storage import (
     copy_file,
     delete_file,
 )
+from cl.corpus_importer.state.test_helpers import (
+    ARCHIVED_FILE_INSERT,
+    ARCHIVED_FILES_TABLE,
+    RESULTS_TABLE,
+    ArchivedFile,
+    RunDatabaseTestCase,
+    write_run_database,
+)
 from cl.corpus_importer.state.utils import FileTally, MergeResult
 from cl.corpus_importer.tasks import merge_state_scrape_row
 from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import AWSMediaStorage
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory
@@ -73,38 +78,19 @@ from cl.search.models import (
     Court,
     Docket,
 )
-from cl.tests.cases import SimpleTestCase, TestCase
-
-RESULTS_TABLE = (
-    "CREATE TABLE results ("
-    "  id INTEGER PRIMARY KEY,"
-    "  result_type VARCHAR NOT NULL DEFAULT 'TestResult',"
-    "  data_json VARCHAR NOT NULL,"
-    "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
-    ")"
-)
-ARCHIVED_FILES_TABLE = (
-    "CREATE TABLE archived_files ("
-    "  id INTEGER PRIMARY KEY,"
-    "  file_path VARCHAR NOT NULL,"
-    "  content_hash VARCHAR"
-    ")"
-)
-ARCHIVED_FILE_INSERT = (
-    "INSERT INTO archived_files (file_path, content_hash) VALUES (?, ?)"
-)
+from cl.tests.cases import SimpleTestCase
 
 
-def _archived_files(
-    hashes: Sequence[str | None],
-) -> list[tuple[str, str | None]]:
+def _archived_files(hashes: Sequence[str | None]) -> list[ArchivedFile]:
     """The `archived_files` rows for a downloaded file per entry in `hashes`.
 
     Args:
         hashes: One content hash per file. An empty string or `None` stands
             for a file the scraper stored without hashing it.
     """
-    return [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)]
+    return [
+        (f"f{n}.pdf", digest, None, None) for n, digest in enumerate(hashes)
+    ]
 
 
 def _run_database(
@@ -112,11 +98,7 @@ def _run_database(
     payloads: list[dict[str, Any] | str],
     hashes: Sequence[str | None] = (),
 ) -> None:
-    """Write a minimal stand-in for a jkent run database.
-
-    Only the columns `JKentScrapeLoader` and the preflight checks read are
-    created, since the loader's contract is with those tables rather than with
-    the whole schema.
+    """Write a run database of `TestResult` rows for the generic loader.
 
     Args:
         path: Where to write the database.
@@ -124,18 +106,17 @@ def _run_database(
             stored as given, so a test can write a blob that will not decode.
         hashes: One content hash per downloaded file the run archived.
     """
-    with closing(sqlite3.connect(path)) as connection:
-        connection.execute(RESULTS_TABLE)
-        connection.execute(ARCHIVED_FILES_TABLE)
-        connection.executemany(
-            "INSERT INTO results (data_json) VALUES (?)",
-            [
-                (payload if isinstance(payload, str) else json.dumps(payload),)
-                for payload in payloads
-            ],
-        )
-        connection.executemany(ARCHIVED_FILE_INSERT, _archived_files(hashes))
-        connection.commit()
+    write_run_database(
+        path,
+        [
+            (
+                "TestResult",
+                payload if isinstance(payload, str) else json.dumps(payload),
+            )
+            for payload in payloads
+        ],
+        _archived_files(hashes),
+    )
 
 
 class LoaderScrape(BaseModel):
@@ -145,44 +126,19 @@ class LoaderScrape(BaseModel):
     case_name: str = ""
 
 
-class LoaderTestCase(TestCase):
-    """A run database in a temporary directory and a loader over it.
+class LoaderTestCase(RunDatabaseTestCase):
+    """A run database in a temporary directory and a generic loader over it.
 
     The loader is court-agnostic, so its tests exercise it through a throwaway
     scrape model and merger rather than through any one state's loader.
 
     Celery runs eagerly under test, so a load's merges happen inline as it
-    dispatches them and its ledger is full by the time it verifies. The ledger
-    and the checkpoint go to the real Redis, since the point of both is that
-    they outlive the process that wrote them.
+    dispatches them and its ledger is full by the time it verifies.
     """
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory.create()
-
-    def setUp(self) -> None:
-        self.directory = TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.database = Path(self.directory.name) / "run.db"
-        self.key = f"state_scrape_load:test:{self.id()}"
-        self.redis = get_redis_interface("CACHE")
-        self.clear_run_keys()
-        self.addCleanup(self.clear_run_keys)
-
-    def clear_run_keys(self, key: str | None = None) -> None:
-        """Take away a run's checkpoint and every part of its ledger.
-
-        Args:
-            key: The run key to clear, defaulting to the test's own. A load
-                left to key itself off the run database needs its own cleanup.
-        """
-        key = key or self.key
-        self.redis.delete(key, *(f"{key}:{part}" for part in LEDGER_PARTS))
-
-    def ledger(self) -> LoadLedger:
-        """The ledger the test's loads report into."""
-        return LoadLedger(self.key)
 
     def loader_class(
         self, **attributes: Any
@@ -215,11 +171,12 @@ class LoaderTestCase(TestCase):
             def lookup(
                 self, state: MergerState.Lookup[LoaderScrape, None, Docket]
             ) -> MergerState.LookupOutput[LoaderScrape, None, Docket]:
-                return state.resolve(
+                return self.found(
+                    state,
                     Docket.objects.filter(
                         court=test_court,
                         docket_number=state.scrape.docket_number,
-                    )
+                    ).only(*self.config.fields)[:2],
                 )
 
         loader: type[JKentScrapeLoader[Any, Any]] = type(
@@ -236,32 +193,6 @@ class LoaderTestCase(TestCase):
         LOADERS[loader.name] = loader
         self.addCleanup(LOADERS.pop, loader.name, None)
         return loader
-
-    def loader(
-        self,
-        loader_class: type[JKentScrapeLoader[Any, Any]] | None = None,
-        **kwargs: Any,
-    ) -> JKentScrapeLoader[Any, Any]:
-        """A loader over the test database, keeping a ledger by default.
-
-        Neither wait sleeps by default. Celery runs eagerly here, so the
-        merges are already done and the ledger already full; anything a single
-        pass finds outstanding really is outstanding for good, which is what a
-        zero `in_flight_time` says. Tests that want the other exit set
-        `in_flight_time` high and leave `verify_timeout` at zero.
-
-        Args:
-            loader_class: The class to build, defaulting to a fresh
-                `loader_class()`.
-            kwargs: Passed through to the loader.
-
-        Returns:
-            The loader.
-        """
-        kwargs.setdefault("run_key", self.key)
-        kwargs.setdefault("in_flight_time", 0)
-        kwargs.setdefault("verify_timeout", 0)
-        return (loader_class or self.loader_class())(self.database, **kwargs)
 
     def raising_loader(
         self, dockets: set[str], error: Exception | None = None
@@ -286,15 +217,6 @@ class LoaderTestCase(TestCase):
                 return super().merge()
 
         return self.loader_class(merger=RaisingMerger)
-
-    def enable_logging(self) -> None:
-        """Let `assertLogs` see the loader's records for the rest of the test.
-
-        The test settings disable logging, which would otherwise hide every
-        record a test means to assert on.
-        """
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
 
     def merge_retry(self) -> set[str]:
         """The rows the ledger is holding for a merge retry."""
@@ -812,27 +734,6 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             Docket.objects.count(), 2, "The merges ran all the same."
         )
 
-    def test_a_load_given_no_run_key_still_keeps_a_ledger(self) -> None:
-        """Every load is worth being able to check up on, whether or not anyone meant to resume it. Does a loader built without a run key key one off the run database and verify itself out of it?"""
-        # The derived key names the run database, and the suite runs in
-        # parallel against one Redis, so this run needs a name of its own.
-        self.database = self.database.with_name(f"{self.id()}.db")
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        loader = self.loader(run_key=None)
-        self.addCleanup(self.clear_run_keys, loader.run_key)
-
-        report = loader.load()
-
-        self.assertEqual(
-            loader.run_key, f"state_scrape_load:test:{self.database.name}"
-        )
-        self.assertEqual(
-            (report.dispatched, report.merged),
-            (1, 1),
-            "Read back out of the ledger it keyed for itself.",
-        )
-        self.assertEqual(Docket.objects.count(), 1)
-
     def test_report_str_names_every_count(self) -> None:
         """The report is what an operator reads off a load.
 
@@ -1194,10 +1095,16 @@ class PreflightCheckTest(SimpleTestCase):
                 self.assertFalse(result.outcome.stops_the_load)
 
     def test_invalid_rows_are_reported_per_result_type(self) -> None:
-        """The counts are what an operator acts on, and which result type they belong to is what says whether it matters. Is there one finding per type, carrying both counts? The loader's own query passes over these rows, so the rest of the run is still worth loading: is this a partial finding rather than one that stops the load?"""
+        """The counts are what an operator acts on, and which result type they belong to is what says whether it matters. Is there one finding per type with invalid rows, carrying both counts, and none for a type with nothing invalid, which would only bury the ones that are wrong? The loader's own query passes over these rows, so the rest of the run is still worth loading: is this a partial finding rather than one that stops the load?"""
         result = InvalidRows().run(
             self.results(
-                [("Docket", 1), ("Docket", 1), ("Docket", 0), ("File", 0)]
+                [
+                    ("Docket", 1),
+                    ("Docket", 1),
+                    ("Docket", 0),
+                    ("File", 0),
+                    ("Opinion", 1),
+                ]
             )
         )
 
@@ -1211,17 +1118,6 @@ class PreflightCheckTest(SimpleTestCase):
         )
         self.assertFalse(result.outcome.stops_the_load)
         self.assertTrue(result.outcome.is_failure)
-
-    def test_a_result_type_with_nothing_invalid_is_not_reported(self) -> None:
-        """A report naming every result type would bury the one that is wrong.
-
-        Is only the type with invalid rows named?
-        """
-        result = InvalidRows().run(self.results([("Docket", 1), ("File", 0)]))
-
-        self.assertEqual(
-            [error.detail["result_type"] for error in result.errors], ["File"]
-        )
 
     def test_a_question_the_database_cannot_answer_is_a_failure(self) -> None:
         """A column the check names and the database has not got is one the loader's own query names too. Is that reported as a database this loader cannot read, rather than raised out of the check?"""
@@ -1338,20 +1234,7 @@ class LoaderPreflightTest(LoaderTestCase):
         )
 
     def test_the_standard_checks_run_for_every_loader(self) -> None:
-        """A loader that declares no checks of its own still has a run database that can be wrong. Do the standard checks run anyway?"""
-        _run_database(
-            self.database, [{"docket_number": f"A-{n}"} for n in range(3)]
-        )
-
-        report = self.loader().load()
-
-        self.assertEqual(
-            [check.description for check in report.preflight],
-            [check.description for check in STANDARD_CHECKS],
-        )
-
-    def test_a_loader_s_own_checks_run_after_the_standard_ones(self) -> None:
-        """A loader adds checks rather than replacing them, so that one declaring its own cannot drop the standard ones by forgetting to repeat them. Are both run?"""
+        """A loader that declares no checks of its own still has a run database that can be wrong, and one that does adds its checks rather than replacing the standard ones, so it cannot drop them by forgetting to repeat them. Do the standard checks run either way, with a loader's own after them?"""
 
         class Extra(PreflightCheck):
             description = "something only this court can get wrong"
@@ -1361,16 +1244,21 @@ class LoaderPreflightTest(LoaderTestCase):
                 return self.passed()
 
         _run_database(self.database, [{"docket_number": "A-1"}])
+        standard = [check.description for check in STANDARD_CHECKS]
 
-        report = self.loader(self.loader_class(extra_checks=(Extra(),))).load()
+        for label, extra_checks, expected in (
+            ("no checks of its own", (), standard),
+            ("checks of its own", (Extra(),), [*standard, Extra.description]),
+        ):
+            with self.subTest(label):
+                report = self.loader(
+                    self.loader_class(extra_checks=extra_checks)
+                ).load()
 
-        self.assertEqual(
-            [check.description for check in report.preflight],
-            [
-                *(check.description for check in STANDARD_CHECKS),
-                "something only this court can get wrong",
-            ],
-        )
+                self.assertEqual(
+                    [check.description for check in report.preflight],
+                    expected,
+                )
 
     def test_invalid_rows_are_reported_without_stopping_the_load(self) -> None:
         """Rows the scrape marked invalid are dropped inside the loader's own query, so nothing downstream would ever say they were there. Are they reported, with the rest of the run still loaded?"""
@@ -1469,42 +1357,33 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
     work still outstanding after a retry rather than what it held before one.
     """
 
-    def test_a_row_with_no_verdict_is_held_for_retry(self) -> None:
-        """A merge that never reached a verdict leaves nothing in the database to find it by again. Is the row written down so a retry can?"""
-        ledger = self.ledger()
-        ledger.dispatched(4, "A-4")
-
-        ledger.errored(4)
-
-        self.assertEqual(self.merge_retry(), {"4"})
-
-    def test_a_row_that_reached_a_verdict_is_not_held(self) -> None:
-        """A rejected scrape is one to go and fix, not one to re-run, and a merged row wants nothing at all. Is neither held for retry?"""
+    def test_only_a_row_with_no_verdict_is_held_for_retry(self) -> None:
+        """A merge that never reached a verdict leaves nothing in the database to find it by again, so the row has to be written down for a retry. A rejected scrape is one to go and fix, not one to re-run, and a merged row wants nothing at all. Is only the first held?"""
         ledger = self.ledger()
 
         ledger.dispatched(1, "A-1")
         ledger.merged(1, MergeResult())
         ledger.dispatched(2, "A-2")
         ledger.rejected(2, MergeResult(failures={"Docket": [None]}))
+        ledger.dispatched(4, "A-4")
+        ledger.errored(4)
 
-        self.assertEqual(self.merge_retry(), set())
+        self.assertEqual(self.merge_retry(), {"4"})
 
-    def test_a_retry_takes_the_rows_it_reads(self) -> None:
-        """The set is drained rather than pruned as rows succeed.
-
-        Does reading it take it away, so a second retry finds nothing left to
-        do?
-        """
+    def test_a_retry_takes_what_it_reads(self) -> None:
+        """Both retry sets are drained rather than pruned as their work succeeds. Does reading either take it away, so a second retry finds nothing left to do?"""
         ledger = self.ledger()
         ledger.dispatched(1, "A-1")
         ledger.errored(1)
+        ledger.retry_documents([11, 12])
 
-        self.assertEqual(ledger.rows_to_retry().rows, {1})
-        self.assertEqual(
-            ledger.rows_to_retry().rows,
-            set(),
-            "The first retry took them.",
-        )
+        for label, read, held in (
+            ("rows", lambda: ledger.rows_to_retry().rows, {1}),
+            ("documents", ledger.documents_to_retry, {11, 12}),
+        ):
+            with self.subTest(label):
+                self.assertEqual(read(), held)
+                self.assertEqual(read(), set(), "The first retry took them.")
 
     def test_a_retry_also_takes_the_rows_celery_lost(self) -> None:
         """A row that was dispatched and never reported back is the one most worth re-running, and it is still sitting in `pending` rather than in the retry set. Is it drained alongside?"""
@@ -1669,32 +1548,26 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual(self.merge_retry(), set())
 
     def test_a_retry_that_cannot_find_a_row_says_so(self) -> None:
-        """A row held for retry that the run database does not have means the wrong database was handed over. Is that raised rather than passed over in silence?"""
+        """A row held for retry that the run database does not have means the wrong database was handed over. Is that raised rather than passed over in silence? The retry drops such a row, whether celery lost it or it errored: is it withdrawn from the run's counts with it, so later verifications do not keep alerting on a row nothing can retry?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         ledger = self.ledger()
+        ledger.dispatched(98, "A-98")
         ledger.dispatched(99, "A-99")
+        ledger.errored(99)
         self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
         ) as logs:
-            self.loader().retry()
+            report = self.loader().retry()
 
-        self.assertIn("are not in run.db at all", logs.output[0])
+        self.assertIn(
+            "2 rows held for retry are not in run.db", logs.output[0]
+        )
         self.assertEqual(
             logs.records[0].fingerprint,  # type: ignore[attr-defined]
             ["test", LoadPhase.MERGE],
         )
-
-    def test_an_errored_row_the_run_database_lacks_is_withdrawn(self) -> None:
-        """The retry says once that a held row is not in the run database and drops it. Is its error dropped with it, so later verifications do not keep alerting on a row nothing can retry?"""
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        ledger = self.ledger()
-        ledger.dispatched(99, "A-99")
-        ledger.errored(99)
-
-        report = self.loader().retry()
-
         self.assertEqual((report.errored, report.dispatched), (0, 0))
 
 
@@ -1764,14 +1637,6 @@ class JKentScrapeLoaderExtractionRetryTest(ExtractionTestCase):
             2,
             "Only the two the database still calls unextracted were sent.",
         )
-
-    def test_a_retry_takes_the_documents_it_reads(self) -> None:
-        """Does reading the set take it away, so a second retry has nothing left to re-check?"""
-        ledger = self.ledger()
-        ledger.retry_documents([11, 12])
-
-        self.assertEqual(ledger.documents_to_retry(), {11, 12})
-        self.assertEqual(ledger.documents_to_retry(), set())
 
     def test_a_retry_that_lost_its_anchor_keeps_the_documents(self) -> None:
         """Without the moment the run began there is no window to ask `unextracted` about, so the retry cannot tell which of its documents are still outstanding. Are they left in the ledger for a later sweep to find, rather than drained into a retry that cannot check them?"""
@@ -1898,11 +1763,10 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
 
         self.assertEqual(self.checkpoint(), 2, "The real load's position.")
 
-    def test_a_load_given_no_key_checkpoints_under_its_own(self) -> None:
-        """A load nobody named still has to be resumable.
-
-        Does it checkpoint under the key it derived from the run database?
-        """
+    def test_a_load_given_no_key_keys_itself_off_the_run_database(
+        self,
+    ) -> None:
+        """Every load is worth being able to check up on and resume, whether or not anyone named it. Does a loader built without a run key derive one from the run database, keep its ledger and verify itself out of it, and checkpoint under it?"""
         # The derived key names the run database, and the suite runs in
         # parallel against one Redis, so this run needs a name of its own.
         self.database = self.database.with_name(f"{self.id()}.db")
@@ -1916,9 +1780,16 @@ class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
         with patch(
             "cl.corpus_importer.state.loader.log_last_document_indexed"
         ) as log:
-            loader.load()
+            report = loader.load()
 
         key = f"state_scrape_load:test:{self.database.name}"
+        self.assertEqual(loader.run_key, key)
+        self.assertEqual(
+            (report.dispatched, report.merged),
+            (5, 5),
+            "Read back out of the ledger it keyed for itself.",
+        )
+        self.assertEqual(Docket.objects.count(), 5)
         self.assertEqual(loader.checkpointing, key)
         self.assertEqual(
             [call.args[1] for call in log.call_args_list],
@@ -2014,24 +1885,26 @@ class RunDatabaseTest(SimpleTestCase):
     def test_takes_the_download_away_afterwards(self) -> None:
         """A run database is hundreds of megabytes.
 
-        Is the temporary copy cleaned up when the caller is done with it?
+        Is the temporary copy cleaned up when the caller is done with it, even
+        when the caller fails mid-load?
         """
-        with self.download(FakeBucket(), "nycourts_gov/run.db") as database:
-            self.assertTrue(database.exists())
+        for label, error in (
+            ("finished", None),
+            ("raised", ValueError("the load blew up")),
+        ):
+            with self.subTest(label):
+                with (
+                    self.assertRaises(ValueError) if error else nullcontext(),
+                    self.download(
+                        FakeBucket(), "nycourts_gov/run.db"
+                    ) as database,
+                ):
+                    self.assertTrue(database.exists())
+                    if error is not None:
+                        raise error
 
-        self.assertFalse(database.exists())
-        self.assertFalse(database.parent.exists())
-
-    def test_cleans_up_after_a_load_that_raises(self) -> None:
-        """Does the copy go away even when the caller fails mid-load?"""
-        with self.assertRaises(ValueError):
-            with self.download(
-                FakeBucket(), "nycourts_gov/run.db"
-            ) as database:
-                path = database
-                raise ValueError("the load blew up")
-
-        self.assertFalse(path.exists())
+                self.assertFalse(database.exists())
+                self.assertFalse(database.parent.exists())
 
     def test_reports_a_key_that_cannot_be_fetched(self) -> None:
         """A missing key, or credentials that cannot read it, is all an operator can act on. Is it reported with the key named?"""
@@ -2143,45 +2016,26 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
                     self.assertIn(flag, str(raised.exception))
                 self.loader.assert_not_called()
 
-    def test_a_retry_with_no_dockets_leaves_the_run_database_alone(
-        self,
-    ) -> None:
-        """Run databases run to hundreds of megabytes and a retry only wants one for a docket's payload. Is the fetch skipped when the ledger is holding documents but no dockets?"""
-        self.loader.return_value.ledger.retry_counts.return_value = (0, 12)
-        self.loader.return_value.retry.return_value = LoadReport(
-            rows_read=False
-        )
+    def test_a_retry_fetches_the_run_database_only_for_dockets(self) -> None:
+        """Run databases run to hundreds of megabytes, and a retry only wants one for a docket's payload, which has to be read back out of it because a docket held for retry is named by position. Is the fetch made when the ledger is holding dockets, and skipped -- with the loader built on the bucket path -- when it is holding only documents? Either way, is the retry loader built without the `start_row` and `limit` that would each narrow what it re-dispatches behind the ledger's back?"""
+        key = "nycourts_gov/2026-08-08.db"
+        for label, counts, built_on in (
+            ("dockets held", (3, 0), Path("/nonexistent") / key),
+            ("only documents held", (0, 12), key),
+        ):
+            with self.subTest(label):
+                self.loader.reset_mock()
+                self.loader.return_value.ledger.retry_counts.return_value = (
+                    counts
+                )
+                self.loader.return_value.retry.return_value = LoadReport()
 
-        with patch(
-            "cl.corpus_importer.management.commands.load_state_scrape."
-            "downloaded_run_database"
-        ) as download:
-            self.load("--retry")
+                self.load("--retry")
 
-        download.assert_not_called()
-        self.loader.return_value.retry.assert_called_once_with()
-        self.assertEqual(
-            self.loader.call_args.args[0],
-            "nycourts_gov/2026-08-08.db",
-            "The loader is built on the bucket path, since nothing local was "
-            "fetched for it.",
-        )
-
-    def test_a_retry_with_dockets_fetches_the_run_database(self) -> None:
-        """A docket held for retry is named by position, so its payload has to be read back out of the run database. Is it fetched then, and is the retry loader built without the `start_row` and `limit` that would each narrow what it re-dispatches behind the ledger's back?"""
-        self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
-        self.loader.return_value.retry.return_value = LoadReport()
-
-        self.load("--retry")
-
-        self.loader.return_value.retry.assert_called_once_with()
-        self.assertEqual(
-            self.loader.call_args.args[0],
-            Path("/nonexistent") / "nycourts_gov/2026-08-08.db",
-            "Built on the downloaded copy rather than on the bucket path.",
-        )
-        self.assertNotIn("start_row", self.loader.call_args.kwargs)
-        self.assertNotIn("limit", self.loader.call_args.kwargs)
+                self.loader.return_value.retry.assert_called_once_with()
+                self.assertEqual(self.loader.call_args.args[0], built_on)
+                self.assertNotIn("start_row", self.loader.call_args.kwargs)
+                self.assertNotIn("limit", self.loader.call_args.kwargs)
 
     def test_a_run_database_that_fails_its_checks_is_reported(self) -> None:
         """A load that will not run is an operator's problem to act on, and a traceback buries what to act on. Is a failed check reported the way an unfetchable database is?"""

@@ -13,7 +13,7 @@ from typing import (
     cast,
 )
 
-from django.db.models import Model, QuerySet
+from django.db.models import Model
 
 from cl.corpus_importer.state.utils import MergeResult
 
@@ -105,7 +105,7 @@ class _Penultimate[Scrape, Params, M: Model](
 
 
 type LookupOutput[Scrape, Params, M: Model] = (
-    "Resolve[Scrape, Params, M] | Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
+    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
 )
 
 
@@ -114,32 +114,6 @@ class Lookup[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
     """Looking for an existing object to merge into."""
 
     name = "lookup"
-
-    def resolve(
-        self, candidates: QuerySet[M] | Sequence[M]
-    ) -> Resolve[Scrape, Params, M]:
-        """Shorthand to transition to a resolve state."""
-        return Resolve(
-            self.scrape,
-            self.params,
-            self.relation_params,
-            candidates,
-        )
-
-
-type ResolveOutput[Scrape, Params, M: Model] = (
-    "Create[Scrape, Params, M] | Update[Scrape, Params, M] | Failed[Scrape, Params, M]"
-)
-
-
-@dataclass(slots=True, frozen=True)
-class Resolve[Scrape, Params, M: Model](_QueryState[Scrape, Params, M]):
-    """Choosing which of the lookup's candidates to merge into."""
-
-    name = "resolve"
-
-    candidates: QuerySet[M] | Sequence[M]
-    """Objects to choose between"""
 
 
 type CreateOutput[Scrape, Params, M: Model] = (
@@ -246,7 +220,6 @@ class Children[Scrape, Params, M: Model](_Penultimate[Scrape, Params, M]):
 
 type NonTerminal[Scrape, Params, M: Model] = (
     Lookup[Scrape, Params, M]
-    | Resolve[Scrape, Params, M]
     | Create[Scrape, Params, M]
     | Save[Scrape, Params, M]
     | Update[Scrape, Params, M]
@@ -331,12 +304,6 @@ class Machine[Scrape, Params, M: Model](ABC):
         self, state: Lookup[Scrape, Params, M]
     ) -> LookupOutput[Scrape, Params, M]:
         """Attempt to find existing objects for update."""
-
-    @abstractmethod
-    def resolve(
-        self, state: Resolve[Scrape, Params, M]
-    ) -> ResolveOutput[Scrape, Params, M]:
-        """Resolve the output of a lookup into a single object."""
 
     @abstractmethod
     def create(

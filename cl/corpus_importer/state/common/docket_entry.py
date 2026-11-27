@@ -1,7 +1,7 @@
 """Base mergers for scraped docket entries and their documents.
 
 Each state stores entries and documents in its own model, so these bases
-leave ``model`` (and ``key``) to their concrete subclasses, which also
+leave ``model`` (and ``match``) to their concrete subclasses, which also
 declare any state-specific fields and the attachment relation (its name and
 target model are per-state).
 """

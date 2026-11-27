@@ -1,21 +1,25 @@
 """Base mergers for scraped parties, their attorneys, and their roles."""
 
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, cast, override
+from typing import Any, ClassVar
 
+from django.db.models import F
 from juriscraper.state.docket import Party as ScrapeParty
 from juriscraper.state.docket import Representative as ScrapeRepresentative
 
 from cl.corpus_importer.state.merger import (
     Ancestor,
     Fn,
+    Key,
     ManyStrategy,
     ManyToManyRelation,
+    Match,
     Merger,
     MergerConfig,
-    MergerState,
     Params,
+    Pool,
     RelatedParams,
+    Relatives,
     Scrape,
     ThroughParameters,
 )
@@ -40,32 +44,12 @@ class AttorneyMerger[
     """Merger for a scraped party representative into an ``Attorney``."""
 
     config: ClassVar[MergerConfig[Attorney]] = MergerConfig(model=Attorney)
+    # Attorneys have no natural key, so the name is treated as unique within
+    # the docket, like the RECAP mergers do.
+    pool: ClassVar[Pool | None] = Relatives(roles__docket=Ancestor(Docket))
+    match: ClassVar[Match] = Match(Key("name"))
 
     name: str = Scrape(ScrapeRepresentative).name
-
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            AttyType,
-            ParamType,
-            Attorney,
-        ],
-    ) -> MergerState.LookupOutput[
-        AttyType,
-        ParamType,
-        Attorney,
-    ]:
-        """Find attorneys with the representative's name on the parent docket."""
-        # Attorneys have no natural key, so treat the name as unique within
-        # the parent docket, like the RECAP mergers do.
-        docket = cast(Docket, state.params.params.parent)
-
-        return state.resolve(
-            self.manager.filter(
-                name=self.name, roles__docket=docket
-            ).distinct(),
-        )
 
 
 def _party_representatives[RType: ScrapeRepresentative](
@@ -98,38 +82,17 @@ class PartyMerger[
 ](Merger[PType, ParamType, Party]):
     """Merger for a scraped party and its attorneys into a ``Party``."""
 
-    config: ClassVar[MergerConfig[Party]] = MergerConfig(
-        model=Party, key=("name",)
-    )
+    config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
+    # The name is the default identity, like the RECAP mergers use; a source
+    # that identifies parties more reliably declares its own `match`. The role
+    # the party holds on the docket is annotated for matches that read it.
+    pool: ClassVar[Pool | None] = Relatives(
+        party_types__docket=Ancestor(Docket)
+    ).annotate(role=F("party_types__name"))
+    match: ClassVar[Match] = Match(Key("name"))
 
     attorneys: Sequence[Attorney] = AttorneyRelation()
     name: str = Scrape(ScrapeParty).name
-
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            PType,
-            ParamType,
-            Party,
-        ],
-    ) -> MergerState.LookupOutput[
-        PType,
-        ParamType,
-        Party,
-    ]:
-        """Find the party by its natural key within the parent docket.
-
-        The default key is the name, like the RECAP mergers use; a source that
-        identifies parties more reliably sets `key` to that field instead.
-        """
-        docket = cast(Docket, state.params.parent)
-        return state.resolve(
-            self._key_query(state)
-            .filter(party_types__docket=docket)
-            .distinct()
-            .order_by("date_created"),
-        )
 
 
 class PartyTypeMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](

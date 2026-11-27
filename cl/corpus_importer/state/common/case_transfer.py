@@ -10,7 +10,7 @@ both FKs is handled later by ``CaseTransfer.fill_null_dockets``.
 import logging
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar
 
 from juriscraper.state.docket import Docket as ScrapeDocket
 from juriscraper.state.docket import (
@@ -22,19 +22,32 @@ from juriscraper.state.docket import (
 from cl.corpus_importer.state.merger import (
     Ancestor,
     Constant,
+    Database,
     Fn,
+    Global,
+    Key,
     ManyStrategy,
+    Match,
     Merger,
     MergerConfig,
-    MergerState,
     OneToManyRelation,
     Params,
+    Pool,
     RelatedParams,
     Scrape,
 )
 from cl.search.models import CaseTransfer, Docket
 
 logger = logging.getLogger(__name__)
+
+KEY: tuple[str, ...] = (
+    "origin_court_id",
+    "origin_docket_number",
+    "destination_court_id",
+    "destination_docket_number",
+    "transfer_type",
+)
+"""The names of the attributes that identify a transfer: the courts and docket numbers at its two ends, and its type."""
 
 TRANSFER_REASON_MAP: dict[TransferReason, int] = {
     TransferReason.APPEAL: CaseTransfer.APPEAL,
@@ -95,7 +108,7 @@ def _destination_docket_id(
 class CaseTransferMerger[
     TransferType: DocketTransfer,
     ParamType: RelatedParams,
-](Merger[TransferType, ParamType, CaseTransfer]):
+](Merger[TransferType, ParamType, CaseTransfer], abstract=True):
     """Base merger for transfers into the docket being merged.
 
     The destination fields come from the parent docket and the origin docket
@@ -104,14 +117,22 @@ class CaseTransferMerger[
     Juriscraper court ID to a CourtListener one.
     """
 
-    config: ClassVar[MergerConfig] = MergerConfig(
-        model=CaseTransfer,
-        key=(
-            "origin_court_id",
-            "origin_docket_number",
-            "destination_court_id",
-            "destination_docket_number",
-            "transfer_type",
+    config: ClassVar[MergerConfig] = MergerConfig(model=CaseTransfer)
+    # A transfer is looked for among every stored transfer, not only those
+    # attached to the parent docket, because the one to fill in has no
+    # destination docket yet. A transfer missing it is preferred, so a docket
+    # merged after its origin's transfer was recorded completes that transfer
+    # rather than adding a second.
+    pool: ClassVar[Pool | None] = Global()
+    match: ClassVar[Match] = Match(
+        Key(
+            *KEY,
+            Database(CaseTransfer.destination_docket_id) == Constant(None),
+        ),
+        Key(
+            *KEY,
+            Database(CaseTransfer.destination_docket_id)
+            == Ancestor(Docket).pk,
         ),
     )
 
@@ -129,43 +150,6 @@ class CaseTransferMerger[
     # The standard docket format doesn't include transfer dates, so treat the
     # destination docket's filing date as the date the transfer occurred.
     transfer_date: date | None = Ancestor(Docket).date_filed
-
-    @override
-    def lookup(
-        self,
-        state: MergerState.Lookup[
-            TransferType,
-            ParamType,
-            CaseTransfer,
-        ],
-    ) -> MergerState.LookupOutput[
-        TransferType,
-        ParamType,
-        CaseTransfer,
-    ]:
-        """Find an existing transfer to merge into.
-
-        Prefer a partial transfer missing its destination docket FK so the FK
-        can be filled in (see `update`); otherwise match a transfer
-        already attached to the parent docket.
-
-        Returns:
-            The state resolving the candidate transfers.
-        """
-        # `super().lookup()` can't be used here. For a related merger
-        # `self.manager` is the parent docket's reverse FK manager, so it would
-        # constrain the lookup to `destination_docket = parent` and hide the
-        # very partial transfers this method exists to find.
-        candidates = CaseTransfer.objects.filter(
-            **{name: getattr(self, name) for name in self.config.key}
-        )
-        fillable = candidates.filter(destination_docket__isnull=True)
-        if fillable.exists():
-            return state.resolve(fillable)
-
-        return state.resolve(
-            candidates.filter(destination_docket=state.params.parent)
-        )
 
 
 def CaseTransferRelation(
