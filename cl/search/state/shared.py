@@ -112,6 +112,7 @@ class AbstractStateDocument(AbstractPDF):
         # the FK is declared on each subclass; this only tells the type
         # checker it exists.
         docket_entry: Any
+        docket_entry_id: int
 
     url = models.URLField(max_length=250)
     processing_error = models.SmallIntegerField(
@@ -119,6 +120,11 @@ class AbstractStateDocument(AbstractPDF):
         null=True,
         blank=True,
     )
+
+    @property
+    def is_available(self) -> bool:
+        """Whether the document has a local file."""
+        return bool(self.filepath_local)
 
     def build_url(self) -> str | None:
         """Build a URL to fetch the appropriate document from the court website.

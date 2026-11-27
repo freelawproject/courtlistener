@@ -133,6 +133,7 @@ from cl.search.signals import (
     docket_field_mapping,
     scotus_document_field_mapping,
 )
+from cl.search.state.texas.factories import TexasDocumentFactory
 from cl.search.tasks import (
     es_save_document,
     index_docket_parties_in_es,
@@ -6813,6 +6814,60 @@ class ESRECAPDocumentSCOTUSCompatibilityTest(TestCase):
             self.assertEqual(rd.docket_entry_id, recap["docket_entry_id"])
             self.assertIsNone(recap["uid"])
             self.assertIsNone(recap["docket_entry_uid"])
+
+
+class ESRECAPDocumentTexasCompatibilityTest(TestCase):
+    """Confirm ESRECAPDocument.prepare() maps Texas documents, with the RECAP-only fields left empty."""
+
+    def test_texas_document_fields(self) -> None:
+        """Does a Texas document fill description, entry_date_filed, short_description and disposition, and leave the RECAP-only fields empty?"""
+        texas_document = TexasDocumentFactory(
+            docket_entry__docket__court=CourtFactory(id="tex"),
+            docket_entry__description="Relator",
+            docket_entry__disposition="Granted",
+            docket_entry__date_filed=datetime.date(2025, 1, 2),
+            description="Notice",
+        )
+
+        prepared = ESRECAPDocument().prepare(texas_document)
+
+        self.assertEqual(prepared["description"], "Relator")
+        self.assertEqual(
+            prepared["entry_date_filed"], datetime.date(2025, 1, 2)
+        )
+        self.assertEqual(prepared["short_description"], "Notice")
+        self.assertEqual(prepared["disposition"], "Granted")
+        self.assertIs(prepared["is_available"], False)
+        for field in (
+            "entry_number",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "absolute_url",
+            "id",
+            "docket_entry_id",
+        ):
+            with self.subTest(field=field):
+                self.assertIsNone(prepared[field])
+
+    def test_texas_document_with_a_file_is_available(self) -> None:
+        """Is a Texas document with a stored file indexed as available, like a SCOTUS document?"""
+        texas_document = TexasDocumentFactory(
+            docket_entry__docket__court=CourtFactory(id="tex"),
+            filepath_local="texas/26-0051/petition.pdf",
+        )
+
+        prepared = ESRECAPDocument().prepare(texas_document)
+
+        self.assertIs(prepared["is_available"], True)
+
+    def test_texas_child_id_has_its_own_prefix(self) -> None:
+        """Does a Texas document get its own ES _id prefix, so its pk can't collide with a RECAP or SCOTUS document's?"""
+        child_id = ES_CHILD_ID(42)
+        self.assertEqual(child_id.TEXAS, "texasd_42")
+        self.assertEqual(
+            len({child_id.RECAP, child_id.SCOTUS, child_id.TEXAS}), 3
+        )
 
 
 class SCOTUSFieldTrackerTest(SimpleTestCase):
