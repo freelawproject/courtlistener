@@ -863,7 +863,9 @@ class ImportScannedOpinionsTest(TestCase):
             with (
                 self.subTest(message),
                 transaction.atomic(),
-                mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+                mock.patch(
+                    f"{CITATIONS_TASK}.apply_async"
+                ) as mock_find_citations,
                 mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
                 mock.patch(
                     f"{COMMAND_MODULE}.invalidate_cloudfront"
@@ -914,7 +916,9 @@ class ImportScannedOpinionsTest(TestCase):
                 else:
                     mock_invalidate.assert_not_called()
                 if opinion_changed:
-                    mock_find_citations.assert_called_once_with([opinion.pk])
+                    mock_find_citations.assert_called_once_with(
+                        args=([opinion.pk],), queue="celery"
+                    )
                 else:
                     mock_find_citations.assert_not_called()
                 if not file_changed:
@@ -965,13 +969,15 @@ class ImportScannedOpinionsTest(TestCase):
                 f"{COMMAND_MODULE}.invalidate_cloudfront",
                 side_effect=ValueError("boom"),
             ),
-            mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+            mock.patch(f"{CITATIONS_TASK}.apply_async") as mock_find_citations,
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             self.captureOnCommitCallbacks(execute=True),
         ):
             self.import_xml(corrected, overwrite=True)
 
-        mock_find_citations.assert_called_once_with([Opinion.objects.get().pk])
+        mock_find_citations.assert_called_once_with(
+            args=([Opinion.objects.get().pk],), queue="celery"
+        )
         mock_logger.exception.assert_called_once()
 
     def test_overwrite_deletes_a_previous_file_with_another_name(
@@ -1597,7 +1603,11 @@ class ImportScannedOpinionsTest(TestCase):
         )
 
     def test_citation_finding_is_queued(self) -> None:
-        """Are citations found for new and merged opinions after commit?"""
+        """Are citations found for new and merged opinions after commit?
+
+        In the given queue, and without percolating the opinions, which
+        would send search alerts for old cases.
+        """
         cluster = self.make_matching_cluster()
         merged_opinion = cluster.sub_opinions.get()
         new_case_xml = (
@@ -1624,17 +1634,21 @@ class ImportScannedOpinionsTest(TestCase):
         for label, xml, expected_pks in cases:
             with (
                 self.subTest(label),
-                mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+                mock.patch(
+                    f"{CITATIONS_TASK}.apply_async"
+                ) as mock_find_citations,
                 self.captureOnCommitCallbacks(execute=True),
             ):
-                self.import_xml(xml)
-            mock_find_citations.assert_called_once_with(expected_pks())
+                self.import_xml(xml, queue="scans")
+            mock_find_citations.assert_called_once_with(
+                args=(expected_pks(),), queue="scans"
+            )
 
     def test_failed_citation_queue_keeps_the_import(self) -> None:
         """Is an import kept and not reported failed when queuing fails?"""
         with (
             mock.patch(
-                f"{CITATIONS_TASK}.delay", side_effect=ValueError("boom")
+                f"{CITATIONS_TASK}.apply_async", side_effect=ValueError("boom")
             ),
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             mock.patch.object(FieldFile, "save"),
@@ -1658,7 +1672,7 @@ class ImportScannedOpinionsTest(TestCase):
             ),
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             mock.patch.object(FieldFile, "save") as mock_file_save,
-            mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+            mock.patch(f"{CITATIONS_TASK}.apply_async") as mock_find_citations,
             self.captureOnCommitCallbacks(execute=True),
         ):
             self.import_scan()
@@ -1818,7 +1832,6 @@ class ImportScannedOpinionsTest(TestCase):
                 self.import_xml(xml, court_id=court_id)
                 self.assertEqual(OpinionCluster.objects.count(), 0)
                 self.assertIn(message, mock_logger.warning.call_args[0][0])
-
 
 class FakeScanningStorage:
     """An in-memory stand-in for the scanning portal's bucket."""
@@ -1985,3 +1998,137 @@ class ImportFromScanningBucketTest(TestCase):
             )
         mock_logger.exception.assert_called_once()
         self.assertEqual(OpinionCluster.objects.count(), 0)
+
+    def other_case_xml(self, opinion_id: str, name: str, volume: int) -> str:
+        """Make the XML of another case in scan 3593.
+
+        Args:
+            opinion_id: The scan's opinion id.
+            name: The upper case party name that replaces "MERRITT".
+            volume: The reporter volume of the case's citation.
+
+        Returns:
+            The XML.
+        """
+        return (
+            self.scan_xml.replace(
+                'opinion-id="12"', f'opinion-id="{opinion_id}"'
+            )
+            .replace("388 So. 3d 1", f"{volume} So. 3d 5")
+            .replace("MERRITT", name)
+            .replace("4D2023-2459", f"4D2023-{volume}")
+        )
+
+    def test_limit_counts_only_imported_files(self) -> None:
+        """Does --limit stop after that many imports, not counting skips?
+
+        So running it again continues with the next files.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+        }
+        for run, expected_count in enumerate([1, 2], start=1):
+            with (
+                self.subTest(run=run),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_from_bucket(files, scan_id=["3593"], limit=1)
+                self.assertEqual(
+                    OpinionCluster.objects.count(), expected_count
+                )
+                mock_logger.info.assert_any_call(
+                    "Stopping after %s files, the --limit", 1
+                )
+
+    def test_limit_counts_dry_runs_and_overwrites(self) -> None:
+        """Does --limit count what a dry run would import and overwrites?
+
+        An unchanged scan skipped on overwrite doesn't count.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+        }
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                files, scan_id=["3593"], dry_run=True, limit=2
+            )
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        would_add = [
+            c
+            for c in mock_logger.info.call_args_list
+            if c.args[0].startswith("Dry run: would add")
+        ]
+        self.assertEqual(len(would_add), 2)
+
+        self.import_from_bucket(files, scan_id=["3593"])
+        corrected = {
+            key: xml.replace("confession of error", "confession of an error")
+            for key, xml in files.items()
+        }
+        corrected["export/3593/12.xml"] = self.scan_xml
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                corrected, scan_id=["3593"], overwrite=True, limit=1
+            )
+        overwritten = [
+            c.args[2]
+            for c in mock_logger.info.call_args_list
+            if c.args[0].startswith("Overwriting")
+        ]
+        self.assertEqual(overwritten, ["export/3593/13.xml"])
+
+    @override_settings(CELERY_ETL_TASK_QUEUE="etl_tasks")
+    def test_throttles_the_queues(self) -> None:
+        """Does the run wait for the queues after each imported file?
+
+        The ETL queue is watched too, since the search index tasks go there
+        whatever the --queue. Skipped and failed files queue nothing to wait
+        for, and neither does a dry run.
+        """
+        self.import_from_bucket(
+            {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        )
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+            "export/3593/15.xml": "not xml",
+        }
+        cases: list[tuple[str, dict[str, Any], list[str]]] = [
+            ("default queue", {}, ["celery", "etl_tasks"]),
+            ("ETL queue", {"queue": "etl_tasks"}, ["etl_tasks"]),
+            ("dry run", {"dry_run": True}, []),
+        ]
+        for label, options, queues in cases:
+            with (
+                self.subTest(label),
+                transaction.atomic(),
+                mock.patch(f"{COMMAND_MODULE}.logger"),
+                mock.patch(
+                    f"{COMMAND_MODULE}.CeleryThrottle"
+                ) as mock_throttle,
+            ):
+                self.import_from_bucket(
+                    files, scan_id=["3593"], throttle_min_items=5, **options
+                )
+                self.assertEqual(
+                    [c.kwargs for c in mock_throttle.call_args_list],
+                    [{"min_items": 5, "queue_name": q} for q in queues],
+                )
+                # Two files imported, each followed by a wait on every queue
+                self.assertEqual(
+                    mock_throttle.return_value.maybe_wait.call_count,
+                    2 * len(queues),
+                )
+                transaction.set_rollback(True)
+
+    def test_limit_must_be_positive(self) -> None:
+        """Is a --limit below 1 refused?"""
+        for limit in [0, -1]:
+            with self.subTest(limit=limit):
+                with self.assertRaises(CommandError):
+                    self.import_from_bucket({}, all=True, limit=limit)

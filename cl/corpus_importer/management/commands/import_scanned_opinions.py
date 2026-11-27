@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import CommandError, CommandParser
 from django.db import transaction
@@ -39,6 +40,7 @@ from cl.corpus_importer.utils import (
     clean_body_content,
     get_court_id,
 )
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
@@ -83,6 +85,8 @@ FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
 SUPPORTED_SCHEMAS = {"1", "2"}
+# Celery's default queue, used for the citation-finding tasks by default
+DEFAULT_QUEUE = "celery"
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
@@ -997,7 +1001,7 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
-def queue_citation_finding(opinion_pks: list[int]) -> None:
+def queue_citation_finding(opinion_pks: list[int], queue: str) -> None:
     """Find the citations of the opinions once the import is committed.
 
     This builds `html_with_citations` from the scanned XML, replacing the
@@ -1006,14 +1010,18 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
     The import is committed when the task is queued, so a failure to queue
     it is logged with the opinion ids instead of failing the import.
 
+    The opinions aren't percolated, since search alerts for old cases would
+    only be noise.
+
     Args:
         opinion_pks: The ids of the imported opinions.
+        queue: The Celery queue of the citation-finding task.
     """
 
-    def queue() -> None:
+    def queue_task() -> None:
         try:
-            find_citations_and_parentheticals_for_opinion_by_pks.delay(
-                opinion_pks
+            find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                args=(opinion_pks,), queue=queue
             )
         except Exception:
             logger.exception(
@@ -1021,7 +1029,7 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
                 opinion_pks,
             )
 
-    transaction.on_commit(queue)
+    transaction.on_commit(queue_task)
 
 
 def store_scan_xml(
@@ -1445,7 +1453,10 @@ def add_scanned_opinions(
 
 
 def merge_into_cluster(
-    cluster: OpinionCluster, plan: OpinionMergePlan, scan_case: ScanCase
+    cluster: OpinionCluster,
+    plan: OpinionMergePlan,
+    scan_case: ScanCase,
+    queue: str,
 ) -> None:
     """Merge a scanned opinion into an existing cluster.
 
@@ -1458,6 +1469,7 @@ def merge_into_cluster(
         plan: How the scanned opinions go into the cluster, from
             `plan_opinion_merge`.
         scan_case: The parsed scanned opinion.
+        queue: The Celery queue of the citation-finding task.
     """
     with transaction.atomic():
         add_citations_to_cluster(scan_case.citations, cluster.id)
@@ -1500,17 +1512,18 @@ def merge_into_cluster(
         docket.save(update_fields=["source"])
 
         opinions = add_scanned_opinions(cluster, plan, scan_case)
-        queue_citation_finding([opinion.pk for opinion in opinions])
+        queue_citation_finding([opinion.pk for opinion in opinions], queue)
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
 
 
-def add_new_case(scan_case: ScanCase) -> OpinionCluster:
+def add_new_case(scan_case: ScanCase, queue: str) -> OpinionCluster:
     """Create the docket, cluster, citations and opinions of a scanned case.
 
     Args:
         scan_case: The parsed scanned opinion.
+        queue: The Celery queue of the citation-finding task.
 
     Returns:
         The new cluster.
@@ -1573,7 +1586,7 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             opinion.save()
             add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])
-        queue_citation_finding([opinion.pk for opinion in opinions])
+        queue_citation_finding([opinion.pk for opinion in opinions], queue)
     return cluster
 
 
@@ -1656,8 +1669,9 @@ def overwrite_scan(
     cluster: OpinionCluster,
     scan_case: ScanCase,
     file_path: str,
+    queue: str,
     dry_run: bool = False,
-) -> None:
+) -> bool:
     """Overwrite a scan imported before with its new XML.
 
     For a portal schema change or a correction upstream, like a missed
@@ -1672,7 +1686,11 @@ def overwrite_scan(
         scan_case: The parsed scanned opinion.
         file_path: The local path or the S3 key of the XML, used for
             logging.
+        queue: The Celery queue of the citation-finding task.
         dry_run: Only log what would be overwritten.
+
+    Returns:
+        Whether the scan was overwritten, or would be on a dry run.
     """
     citation = scan_case.citation.corrected_citation()
     scanned = list(
@@ -1692,7 +1710,7 @@ def overwrite_scan(
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        return
+        return False
     changed, headmatter = changes
     # Other parts of the XML, like the syllabus, only change the stored file
     if (
@@ -1706,7 +1724,7 @@ def overwrite_scan(
             citation,
             cluster.pk,
         )
-        return
+        return False
     count = len(changed)
     summary = f"{count} opinion{'s' if count != 1 else ''}"
     if headmatter:
@@ -1723,7 +1741,7 @@ def overwrite_scan(
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        return
+        return True
     logger.info(
         "Overwriting %s of %s (%s) in cluster %s: %s%s",
         summary,
@@ -1743,16 +1761,20 @@ def overwrite_scan(
             update_fields.append("headmatter")
         store_scan_xml(cluster, scan_case, update_fields)
         if changed:
-            queue_citation_finding([opinion.pk for opinion, _ in changed])
+            queue_citation_finding(
+                [opinion.pk for opinion, _ in changed], queue
+            )
+    return True
 
 
 def import_scanned_opinion(
     xml: str,
     file_path: str,
     court_id: str | None,
+    queue: str,
     dry_run: bool = False,
     overwrite: bool = False,
-) -> None:
+) -> bool:
     """Import a scanning project final XML into CourtListener.
 
     Skips opinions already imported from the scanning project. Merges into
@@ -1764,32 +1786,37 @@ def import_scanned_opinion(
         file_path: The local path or the S3 key of the XML, used for
             logging.
         court_id: The CL court id, or None to look it up in the XML.
+        queue: The Celery queue of the citation-finding task.
         dry_run: Only log whether the opinion would be skipped, merged or
             added, without writing to the database or uploading files.
         overwrite: Overwrite opinions already imported whose XML changed,
             instead of skipping them (see `overwrite_scan`).
+
+    Returns:
+        Whether the scan was added, merged or overwritten, or would be on
+        a dry run. False when it was skipped.
     """
     logger.info("Processing %s", file_path)
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
-        return
+        return False
     citation = scan_case.citation.corrected_citation()
 
     if cluster_id := find_imported_scan(scan_case):
         if overwrite:
-            overwrite_scan(
+            return overwrite_scan(
                 OpinionCluster.objects.get(pk=cluster_id),
                 scan_case,
                 file_path,
+                queue,
                 dry_run,
             )
-            return
         logger.info(
             "Skipping %s (%s), already imported in cluster %s",
             file_path,
             citation,
             cluster_id,
         )
-        return
+        return False
 
     if cluster := find_existing_cluster(scan_case):
         if cluster.filepath_xml_scan:
@@ -1801,7 +1828,7 @@ def import_scanned_opinion(
                 cluster.id,
                 cluster.filepath_xml_scan.name,
             )
-            return
+            return False
         if not (plan := plan_opinion_merge(cluster, scan_case)):
             # Skip it instead of merging only the cluster metadata, which
             # would be hard to clean up afterwards
@@ -1822,7 +1849,7 @@ def import_scanned_opinion(
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
-            return
+            return False
         if dry_run:
             logger.info(
                 "Dry run: would merge %s (%s) into cluster %s (%s): %s%s",
@@ -1833,7 +1860,7 @@ def import_scanned_opinion(
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
-            return
+            return True
         logger.info(
             "Merging %s (%s) into cluster %s (%s): %s%s",
             file_path,
@@ -1843,8 +1870,8 @@ def import_scanned_opinion(
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        merge_into_cluster(cluster, plan, scan_case)
-        return
+        merge_into_cluster(cluster, plan, scan_case, queue)
+        return True
 
     if dry_run:
         logger.info(
@@ -1852,8 +1879,8 @@ def import_scanned_opinion(
             scan_case.case_name,
             citation,
         )
-        return
-    cluster = add_new_case(scan_case)
+        return True
+    cluster = add_new_case(scan_case, queue)
     logger.info(
         "Added %s (%s) as cluster %s: %s%s",
         scan_case.case_name,
@@ -1862,6 +1889,7 @@ def import_scanned_opinion(
         BASE_URL,
         cluster.get_absolute_url(),
     )
+    return True
 
 
 class Command(VerboseCommand):
@@ -1921,6 +1949,27 @@ class Command(VerboseCommand):
             "e.g. after a schema change or a correction in the portal, "
             "instead of skipping them.",
         )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            help="Stop after adding, merging or overwriting this many files. "
+            "Skipped files don't count, so running it again continues with "
+            "the next ones.",
+        )
+        parser.add_argument(
+            "--queue",
+            type=str,
+            default=DEFAULT_QUEUE,
+            help="The Celery queue of the citation-finding tasks.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            type=int,
+            default=20,
+            help="Wait between files while the Celery queues have more than "
+            "this many tasks. The queues are first measured after twice this "
+            "many files, and each file queues several tasks.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Import every XML file found in the given path."""
@@ -1928,6 +1977,8 @@ class Command(VerboseCommand):
         scan_ids, opinion_id = options["scan_id"], options["opinion_id"]
         if opinion_id and (not scan_ids or len(scan_ids) != 1):
             raise CommandError("--opinion-id needs a single --scan-id.")
+        if (limit := options["limit"]) is not None and limit < 1:
+            raise CommandError("--limit must be at least 1.")
 
         if options["path"]:
             file_paths = xml_file_paths(options["path"])
@@ -1938,15 +1989,38 @@ class Command(VerboseCommand):
             read = partial(read_s3_xml, storage)
         logger.info("Found %s XML files to import", len(file_paths))
 
+        queue = options["queue"]
+        throttles = []
+        if not options["dry_run"]:
+            # Saving an import also sends search index tasks to the ETL
+            # queue, so watch it too
+            throttles = [
+                CeleryThrottle(
+                    min_items=options["throttle_min_items"], queue_name=name
+                )
+                for name in dict.fromkeys(
+                    [queue, settings.CELERY_ETL_TASK_QUEUE]
+                )
+            ]
+        imported = 0
         for file_path in file_paths:
+            if limit is not None and imported >= limit:
+                logger.info("Stopping after %s files, the --limit", limit)
+                break
             try:
-                import_scanned_opinion(
+                if not import_scanned_opinion(
                     read(file_path),
                     file_path,
                     options["court_id"],
+                    queue,
                     options["dry_run"],
                     options["overwrite"],
-                )
+                ):
+                    continue
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
                 logger.exception("Failed to import %s", file_path)
+                continue
+            imported += 1
+            for throttle in throttles:
+                throttle.maybe_wait()
