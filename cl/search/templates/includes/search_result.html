@@ -197,6 +197,14 @@
               </span>
             </div>
           {% endif %}
+          {% if doc.disposition %}
+            <div class="inline-block">
+              <span class="meta-data-header">Disposition:</span>
+              <span class="meta-data-value">
+                {{ doc.disposition|render_string_or_list|safe }}
+              </span>
+            </div>
+          {% endif %}
           <p class="v-offset-above-1">
             {% if doc.plain_text %}
               {% contains_highlights doc.plain_text.0 as highlighted %}

@@ -7212,13 +7212,17 @@ class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        """Create SCOTUS and a circuit court for the Federal Appellate tab."""
+        """Create SCOTUS and a circuit court for the Federal Appellate tab, and two Texas courts for the State tab."""
         for court_id in ["scotus", "ca1"]:
             CourtFactory(
                 id=court_id,
                 jurisdiction=Court.FEDERAL_APPELLATE,
                 end_date=None,
             )
+        CourtFactory(id="tex", jurisdiction=Court.STATE_SUPREME, end_date=None)
+        CourtFactory(
+            id="txctapp1", jurisdiction=Court.STATE_APPELLATE, end_date=None
+        )
 
     def test_recap_pages_offer_scotus_in_federal_appellate_tab(self) -> None:
         """Both the RECAP results page and the RECAP advanced search page render a SCOTUS checkbox in the Federal Appellate tab with the scotus_docket_page flag, and leave it out without it."""
@@ -7239,6 +7243,33 @@ class RECAPSearchCourtPickerTest(ESIndexTestCase, TestCase):
                 self.assertEqual(
                     'id="id_scotus"' in r.content.decode(), active
                 )
+
+    def test_recap_pages_offer_texas_courts_in_state_tab(self) -> None:
+        """Do the RECAP results and advanced pages render a State tab with the Texas courts only with the texas_docket_page flag, without an empty territories heading?"""
+        urls = [
+            f"{reverse('show_results')}?type={SEARCH_TYPES.RECAP}",
+            reverse("advanced_r"),
+        ]
+        for url, active in product(urls, [True, False]):
+            with (
+                self.subTest(url=url, flag=active),
+                override_flag("texas_docket_page", active=active),
+            ):
+                content = self.client.get(url).content.decode()
+
+                self.assertEqual('href="#tab-state"' in content, active)
+                self.assertEqual('id="id_tex"' in content, active)
+                self.assertEqual('id="id_txctapp1"' in content, active)
+                self.assertNotIn("U.S. Territory Courts", content)
+
+    @override_flag("texas_docket_page", active=True)
+    def test_dockets_search_type_keeps_no_state_tab(self) -> None:
+        """Does the dockets search type, whose picker lists every court in use, still leave out the State tab?"""
+        content = self.client.get(
+            reverse("show_results"), {"type": SEARCH_TYPES.DOCKETS}
+        ).content.decode()
+
+        self.assertNotIn('href="#tab-state"', content)
 
 
 class SCOTUSESIndexingSignalTest(
@@ -7961,6 +7992,7 @@ class TexasRECAPSearchTest(
                     id="tex", jurisdiction="S"
                 ),
                 docket_entry__docket__source=Docket.SCRAPER,
+                docket_entry__disposition="Overruled",
                 description="Tied",
             )
             recap_document = RECAPDocumentFactory(
@@ -7976,6 +8008,22 @@ class TexasRECAPSearchTest(
         cls.recap_docket_path = (
             f"/docket/{recap_document.docket_entry.docket_id}/"
         )
+
+    def test_search_page_finds_and_shows_the_disposition(self) -> None:
+        """Does a keyword in a Texas entry's disposition find its document, showing the disposition highlighted, only with the texas_docket_page flag?"""
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Overruled"}
+        with override_flag("texas_docket_page", active=False):
+            hidden = self.client.get(
+                reverse("show_results"), params
+            ).content.decode()
+        shown = self.client.get(
+            reverse("show_results"), params
+        ).content.decode()
+
+        self.assertNotIn(self.texas_docket_path, hidden)
+        self.assertIn(self.texas_docket_path, shown)
+        self.assertIn("Disposition:", shown)
+        self.assertIn("<mark>Overruled</mark>", shown)
 
     def test_search_page_shows_texas_only_with_the_flag(self) -> None:
         """Does the search page show Texas content only to requests with the texas_docket_page flag?"""

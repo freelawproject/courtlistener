@@ -56,11 +56,12 @@
                       │ App. │ Dist. │ Bank. │ State │ More │
                       ├──────┼───────┼───────┼───────┼──────┤
              opinions │   X  │   X   │   X   │   X   │   X  │
-                recap │   X  │   X   │   X   │       │   X  │
+                recap │   X  │   X   │   X   │   *   │   X  │
             oral args │   X  │       │       │       │      │
                people │   X  │   X   │   X   │   X   │   X  │
                       └──────┴───────┴───────┴───────┴──────┘
 
+            * Only when the search can include state courts, such as Texas.
             {% endcomment %}
             <li class="active">
               <a href="#tab-federal-appellate"
@@ -85,7 +86,7 @@
                 </a>
               </li>
             {% endif %}
-            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
+            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE or v == SEARCH_TYPES.RECAP and courts.state.0 %}
               <li>
                 <a href="#tab-state"
                    data-toggle="tab">State</a>
@@ -170,9 +171,9 @@
               </div>
             {% endif %}
 
-            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
+            {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE or v == SEARCH_TYPES.RECAP and courts.state.0 %}
               <div class="tab-pane" id="tab-state">
-                {% for group in courts.state %}
+                {% for group in courts.state %}{% if group %}
                   {% if forloop.counter == 1 %}
                     <h3 class="bottom inline">State Courts</h3>
                   {% elif forloop.counter == 2 %}
@@ -192,7 +193,7 @@
                       </div>
                     {% endfor %}
                   </div>
-                {% endfor %}
+                {% endif %}{% endfor %}
               </div>
             {% endif %}
 
