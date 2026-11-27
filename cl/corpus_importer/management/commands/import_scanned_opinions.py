@@ -1056,8 +1056,25 @@ def store_scan_xml(
         cluster: A cluster with a pk.
         scan_case: The parsed scanned opinion.
         update_fields: The other cluster fields to save with the path.
+
+    Raises:
+        ValueError: If the cluster has no file yet and its file name is
+            already stored, which rolls the import back. The file is
+            another cluster's: this scan was imported before, but
+            `find_imported_scan` missed it, e.g. because that cluster's
+            citation volume was edited. Overwriting it would make both
+            clusters share one file.
     """
     previous_name = cluster.filepath_xml_scan.name
+    if not previous_name:
+        name = cluster.filepath_xml_scan.field.generate_filename(
+            cluster, scan_case.file_name
+        )
+        if cluster.filepath_xml_scan.storage.exists(name):
+            raise ValueError(
+                f"The scan XML {name} is already stored for another "
+                "cluster. Review it before importing this scan again."
+            )
     cluster.filepath_xml_scan.save(
         scan_case.file_name,
         ContentFile(scan_case.xml.encode()),

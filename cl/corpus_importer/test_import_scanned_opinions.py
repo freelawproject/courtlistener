@@ -1,7 +1,9 @@
 import io
 import os
 import re
+import sys
 import tempfile
+from contextlib import AbstractContextManager
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -73,6 +75,20 @@ SCAN_XML_PATH = Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 def make_soup(xml: str) -> BeautifulSoup:
     """Parse XML the same way the importer does."""
     return BeautifulSoup(xml, "lxml-xml")
+
+
+def empty_scan_storage() -> AbstractContextManager[Any]:
+    """Empty the stored scan XML files, and restore them on exit.
+
+    The in-memory storage of the test runner keeps files between tests, and
+    after a database rollback, but an import refuses to overwrite a file it
+    didn't store.
+
+    Returns:
+        The context manager.
+    """
+    storage = OpinionCluster._meta.get_field("filepath_xml_scan").storage
+    return mock.patch.dict(cast(LocMemStorage, storage).cache, clear=True)
 
 
 class ScanXmlHelpersTest(SimpleTestCase):
@@ -629,6 +645,7 @@ class ImportScannedOpinionsTest(TestCase):
         ]:
             patcher.start()
             self.addCleanup(patcher.stop)
+        self.enterContext(empty_scan_storage())
 
     def import_scan(self, **kwargs: str | bool | None) -> None:
         """Run the command over the test XML."""
@@ -863,6 +880,7 @@ class ImportScannedOpinionsTest(TestCase):
             with (
                 self.subTest(message),
                 transaction.atomic(),
+                empty_scan_storage(),
                 mock.patch(
                     f"{CITATIONS_TASK}.apply_async"
                 ) as mock_find_citations,
@@ -1130,7 +1148,11 @@ class ImportScannedOpinionsTest(TestCase):
             (PRECEDENTIAL_STATUS.UNKNOWN, PRECEDENTIAL_STATUS.UNPUBLISHED),
             (PRECEDENTIAL_STATUS.PUBLISHED, PRECEDENTIAL_STATUS.PUBLISHED),
         ]:
-            with self.subTest(current=current), transaction.atomic():
+            with (
+                self.subTest(current=current),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
                 cluster = self.make_matching_cluster()
                 OpinionCluster.objects.filter(pk=cluster.pk).update(
                     precedential_status=current
@@ -1162,7 +1184,11 @@ class ImportScannedOpinionsTest(TestCase):
     def test_merge_keeps_the_version_author_of_the_byline(self) -> None:
         """Is the version's author kept only when the scan names that judge?"""
         for last_name, kept in [("Gerber", True), ("Klein", False)]:
-            with self.subTest(last_name=last_name), transaction.atomic():
+            with (
+                self.subTest(last_name=last_name),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
                 cluster = self.make_matching_cluster()
                 author = PersonFactory.create(name_last=last_name)
                 cluster.sub_opinions.update(
@@ -1663,6 +1689,35 @@ class ImportScannedOpinionsTest(TestCase):
             "Could not queue citation finding for opinions %s",
         )
 
+    def test_import_does_not_overwrite_another_clusters_file(self) -> None:
+        """Is an import rolled back when its file is another cluster's?
+
+        When the citation of the first import was edited, the scan isn't
+        found as imported, and overwriting its file would make two clusters
+        share it.
+        """
+        self.import_scan()
+        cluster = OpinionCluster.objects.get()
+        cluster.citations.update(volume="999")
+        stored_name = cluster.filepath_xml_scan.name
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+
+        errors: list[BaseException | None] = []
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            # The command logs the error it caught
+            mock_logger.exception.side_effect = lambda *args: errors.append(
+                sys.exc_info()[1]
+            )
+            self.import_xml(corrected)
+
+        self.assertEqual(OpinionCluster.objects.count(), 1)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("already stored", str(errors[0]))
+        with cluster.filepath_xml_scan.storage.open(stored_name) as f:
+            self.assertNotIn("an error", f.read().decode())
+
     def test_failed_import_is_rolled_back(self) -> None:
         """Is a failed import rolled back without uploading the XML?"""
         with (
@@ -1712,7 +1767,11 @@ class ImportScannedOpinionsTest(TestCase):
             ("new import", False, True),
             ("overwrite", True, False),
         ]:
-            with self.subTest(message), transaction.atomic():
+            with (
+                self.subTest(message),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
                 if imported_before:
                     with mock.patch.object(
                         FieldFile, "save", autospec=True, side_effect=save_file
@@ -1968,6 +2027,10 @@ class ImportFromScanningBucketTest(TestCase):
         with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
+    def setUp(self) -> None:
+        """Start with no scan XML files stored."""
+        self.enterContext(empty_scan_storage())
+
     def import_from_bucket(
         self, files: dict[str, str], **options: object
     ) -> None:
@@ -2142,6 +2205,7 @@ class ImportFromScanningBucketTest(TestCase):
             with (
                 self.subTest(label),
                 transaction.atomic(),
+                empty_scan_storage(),
                 mock.patch(f"{COMMAND_MODULE}.logger"),
                 mock.patch(
                     f"{COMMAND_MODULE}.CeleryThrottle"
