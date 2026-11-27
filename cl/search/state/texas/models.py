@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Callable
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 import pghistory
 from django.db import models
@@ -60,6 +60,11 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     sequence_number = models.CharField(
         max_length=16,
     )
+
+    if TYPE_CHECKING:
+        # pyrefly can't resolve the "search.Docket" string from this
+        # submodule, so it doesn't add the docket_id column Django creates.
+        docket_id: int
 
     class Meta:
         # Django can't reliably determine what app a model belongs to if it's
