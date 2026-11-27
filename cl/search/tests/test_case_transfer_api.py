@@ -72,7 +72,9 @@ class CaseTransferAPITestCase(TestCase):
             jurisdiction=Court.STATE_APPELLATE
         )
         cls.supreme_court = CourtFactory(jurisdiction=Court.STATE_SUPREME)
-        cls.appellate_docket = DocketFactory(court=cls.appellate_court)
+        cls.appellate_docket = DocketFactory(
+            court=cls.appellate_court, docket_number="03-24-00001-CV"
+        )
         cls.appellate_docket_2 = DocketFactory(court=cls.appellate_court)
         cls.supreme_docket = DocketFactory(court=cls.supreme_court)
 
@@ -306,6 +308,15 @@ class CaseTransferAPIFilterTest(CaseTransferAPITestCase):
             ({"origin_docket": self.appellate_docket.pk}, 1),
             ({"destination_docket": self.appellate_docket.pk}, 1),
             ({"destination_docket__id": self.supreme_docket.pk}, 1),
+            ({"origin_docket__docket_number": "03-24-00001-CV"}, 1),
+            (
+                {
+                    "destination_docket__court__jurisdiction": (
+                        Court.STATE_SUPREME
+                    )
+                },
+                1,
+            ),
             ({"origin_docket__isnull": "true"}, 1),
             ({"origin_docket__isnull": "false"}, 2),
             ({"destination_docket__isnull": "true"}, 1),
@@ -443,15 +454,25 @@ class CaseTransferAPIRelatedFilterTest(CaseTransferAPITestCase):
                 )
                 self.assertEqual(selected, {"id"})
 
-    def test_court_filters_never_read_dockets(self) -> None:
-        """Is filtering a transfer's courts by their dockets refused?
+    def test_filters_never_leave_the_transfer_dockets(self) -> None:
+        """Are filters that reach unrelated dockets or entries refused?
 
-        Filtering courts by their dockets would scan every docket in
-        CourtListener, so the court filters must not offer that relation.
+        Filtering courts by their dockets, or dockets by their entries,
+        would scan tables far bigger than the transfers one, so no path
+        from this endpoint may offer those relations.
         """
         self.client.force_login(self.user)
-        for side in ("origin", "destination"):
-            param = f"{side}_court__dockets__source"
+        params = [
+            f"{side}_{path}"
+            for side in ("origin", "destination")
+            for path in (
+                "court__dockets__source",
+                "docket__court__dockets__source",
+                "docket__docket_entries__entry_number",
+                "docket__nature_of_suit",
+            )
+        ]
+        for param in params:
             with self.subTest(param=param):
                 with CaptureQueriesContext(connection) as ctx:
                     r = self.client.get(self.list_path(), {param: 0})

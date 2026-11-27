@@ -393,12 +393,34 @@ class CaseTransferCourtFilter(NoEmptyFilterSet):
         fields = {"id": ["exact", "in"]}
 
 
+class CaseTransferDocketFilter(NoEmptyFilterSet):
+    """Filters for the dockets at either end of a case transfer.
+
+    Unlike DocketFilter, it only offers indexed docket columns and can't
+    reach other tables through the docket: from the transfers endpoint,
+    paths like docket__court__dockets would scan every docket in a court.
+    """
+
+    court = filters.RelatedFilter(
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
+    )
+
+    class Meta:
+        model = Docket
+        fields = {
+            "id": ["exact", "in"],
+            "docket_number": ["exact"],
+            "docket_number_core": ["exact"],
+            "pacer_case_id": ["exact"],
+        }
+
+
 class CaseTransferFilter(BaseSourceFilter):
     """Filters for case transfers.
 
-    Only indexed columns are filterable. The docket numbers, transfer date
-    and transfer type have no index, so use the court and docket filters
-    instead. A docket filter with isnull finds transfers whose end isn't in
+    Only indexed columns are filterable. The transfer's own docket number
+    columns, transfer date and transfer type have no index, so use the
+    court and docket filters instead. A docket filter with isnull finds transfers whose end isn't in
     CourtListener.
     """
 
@@ -408,13 +430,13 @@ class CaseTransferFilter(BaseSourceFilter):
         CaseTransferCourtFilter, queryset=Court.objects.only("id")
     )
     origin_docket = filters.RelatedFilter(
-        DocketFilter, queryset=Docket.objects.only("id")
+        CaseTransferDocketFilter, queryset=Docket.objects.only("id")
     )
     destination_court = filters.RelatedFilter(
         CaseTransferCourtFilter, queryset=Court.objects.only("id")
     )
     destination_docket = filters.RelatedFilter(
-        DocketFilter, queryset=Docket.objects.only("id")
+        CaseTransferDocketFilter, queryset=Docket.objects.only("id")
     )
 
     class Meta(BaseSourceFilter.Meta):
