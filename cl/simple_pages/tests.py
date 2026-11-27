@@ -1418,6 +1418,11 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
         self.assertIn(self.icon("bell"), html)
         self.assertNotIn(self.icon("circle_check"), html)
 
+    def test_close_button_names_its_toast(self) -> None:
+        """Each close button's name includes its title, so several open toasts are told apart."""
+        html = self.render_component('<c-toast title="Link copied" />')
+        self.assertIn('aria-label="Close: Link copied"', html)
+
     def test_trigger_slot_renders_inside_the_root(self) -> None:
         """A trigger slot renders; a toast opened by an event has none."""
         with_trigger = self.render_component(
@@ -1470,7 +1475,9 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
         html = self.render_component(
             '<c-toast title="Docket blocked"><button>Undo</button></c-toast>'
         )
-        close_button = re.search(r'<button[^>]*aria-label="Close"[^>]*>', html)
+        close_button = re.search(
+            r'<button[^>]*aria-label="Close: Docket blocked"[^>]*>', html
+        )
         self.assertIsNotNone(close_button)
         self.assertIn('x-show="isOpen"', close_button[0])
         action_container = re.search(

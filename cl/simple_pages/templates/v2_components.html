@@ -1867,7 +1867,7 @@ Sample code here.
   {% require_script "js/third_party/htmx" defer=True %}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="toast">
     <h2 class="mt-6 mb-3">Toast</h2>
-    <p>A persistent notification at the bottom of the viewport, announced politely by a <code>role="status"</code> live region. It renders closed and opens when a control in its <code>trigger</code> slot calls <code>open</code>, or when the window event named in its <code>x-on</code> listener fires, from a page script or an htmx response. The user closes it with the button or with <kbd>Escape</kbd>, from anywhere on the page; only one toast is open at a time: opening another closes it.</p>
+    <p>A persistent notification at the bottom of the viewport, announced politely by a <code>role="status"</code> live region. It renders closed and opens when a control in its <code>trigger</code> slot calls <code>open</code>, or when the window event named in its <code>x-on</code> listener fires, from a page script or an htmx response. The user closes it with the button or with <kbd>Escape</kbd>, from anywhere on the page: <kbd>Escape</kbd> closes the toast that contains focus, else the newest one. Several toasts can be open at once: they stack at the bottom of the viewport, the newest lowest. Once open toasts fill 40% of the viewport height, newer ones wait, unannounced, and open as others close.</p>
     <h4 class="mt-3">Accessibility</h4>
     <p>A toast announces its plain-text <code>title</code> and <code>description</code> and never takes focus. The default slot allows any content, commonly one <code>c-button</code> for a related action, rarely more. These elements are not announced but are reachable with <kbd>Tab</kbd> or by navigating. An action may call <code>close</code>.</p>
     <p><span class="font-bold">Avoid</span>: <code>role</code>, <code>aria-live</code> or <code>class</code> on the <code>&lt;c-toast&gt;</code> tag; attributes land on the root, so a role there makes the buttons part of the announcement, and the class is dropped; wrapping the toast in <code>x-if</code> or a hidden ancestor; a live region must be <a class="links-external" href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Guides/Live_regions" target="_blank" rel="noopener noreferrer">in the initial markup</a>.</p>
@@ -1876,7 +1876,7 @@ Sample code here.
     <h3 class="mt-3">Demo</h3>
 
     <h4 class="mt-3">Variants</h4>
-    <p class="text-sm text-greyscale-600 mb-2">Each button is its toast's <code>trigger</code> slot.</p>
+    <p class="text-sm text-greyscale-600 mb-2">Each button is its toast's <code>trigger</code> slot. Open several to see them stack.</p>
     <div class="flex flex-wrap gap-3 items-center">
       <c-toast title="Link copied">
         <c-slot name="trigger"><c-button variant="primary" x-on:click="open">Plain</c-button></c-slot>
