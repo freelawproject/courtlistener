@@ -1,4 +1,4 @@
-{% load component_tags svg_tags %}
+{% load component_tags %}
 {% require_script "js/alpine/components/docket_tags_button.js" %}
 {% require_script "js/alpine/plugins/anchor" defer=True %}
 
@@ -22,7 +22,7 @@
     {# Inside a template because htmx removes script tags from the content it swaps in. #}
     <template data-associations>{{ docket_tags.associations|json_script }}</template>
     <c-button variant="outline" popovertarget="docket-tags-{{ docket.pk }}" x-ref="trigger">
-      {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+      <c-icon name="tag" />
       Tags
     </c-button>
     <div
@@ -58,7 +58,7 @@
     href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
     rel="nofollow"
   >
-    {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+    <c-icon name="tag" />
     Tags
     <span class="sr-only">(sign in required)</span>
   </c-button>
