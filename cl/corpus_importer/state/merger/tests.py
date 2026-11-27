@@ -1,7 +1,8 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any, ClassVar, cast, override
 
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Model, QuerySet
 from django.db.models.signals import post_delete
 from django.test.utils import CaptureQueriesContext
@@ -30,6 +31,7 @@ from cl.corpus_importer.state.merger import (
     Update,
 )
 from cl.corpus_importer.state.merger.specifications import Coalesce, Database
+from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -109,6 +111,27 @@ def merger_test[**P, R](
     return decorator
 
 
+def merged_docket(result: MergeResult) -> Docket:
+    """Fetch the docket a merge created; the merge must have created one."""
+    return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
+
+
+@contextmanager
+def table_row(test: TestCase, label: str) -> Iterator[None]:
+    """Run one row of a case table as its own subtest, rolling back its database writes when it ends.
+
+    Rows that merge the same docket or count rows of a table would otherwise
+    see what an earlier row wrote.
+
+    Args:
+        test: The test running the table.
+        label: The name the row is reported under.
+    """
+    with test.subTest(label), transaction.atomic():
+        yield
+        transaction.set_rollback(True)
+
+
 DOCKET_SAVE_READS = (
     "case_name",
     "slug",
@@ -116,6 +139,38 @@ DOCKET_SAVE_READS = (
     "docket_number_core",
 )
 """The fields saving a docket that has a case name reads."""
+
+
+class SluggedPersonMerger(Merger[dict[str, str], RelatedParams[None], Person]):
+    """A person found by their slug."""
+
+    config: ClassVar[MergerConfig[Person]] = MergerConfig(
+        model=Person, key=("slug",)
+    )
+
+    name_first: str = Scrape(dict)["first"]
+    name_last: str = Scrape(dict)["last"]
+    slug: str = Scrape(dict)["slug"]
+
+
+class NamedPartyMerger(Merger[dict[str, str], RelatedParams[None], Party]):
+    """A party found by its name."""
+
+    config: ClassVar[MergerConfig[Party]] = MergerConfig(
+        model=Party, key=("name",)
+    )
+
+    name: str = Scrape(dict)["name"]
+
+
+class PartyTypeMerger(
+    Merger[dict[str, str], ThroughParameters[None], PartyType]
+):
+    """The type a party appears under on a docket."""
+
+    config: ClassVar[MergerConfig[PartyType]] = MergerConfig(model=PartyType)
+
+    name: str = Scrape(dict)["type"]
 
 
 class BaseMergerTest(TestCase):
@@ -126,16 +181,50 @@ class BaseMergerTest(TestCase):
         # pyrefly:ignore[bad-assignment]
         cls.docket_number: str = cls.docket.docket_number
 
+    def parties_merger(
+        self, strategy: ManyStrategy = ManyStrategy.REPLACE
+    ) -> type[Merger[dict[str, Any], None, Docket]]:
+        """A merger of `self.docket` and the parties on it, each typed through `PartyType`."""
+        docket = self.docket
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
+
+            court: Court = Constant(docket.court)
+            source: int = Constant(docket.source)
+            docket_number: str | None = Constant(docket.docket_number)
+            parties: list[Party] = ManyToManyRelation(
+                NamedPartyMerger,
+                Scrape(dict)["parties"],
+                PartyTypeMerger,
+                strategy=strategy,
+            )
+
+            @override
+            def lookup(
+                self, state: MergerState.Lookup[Any, Any, Docket]
+            ) -> MergerState.LookupOutput[Any, Any, Docket]:
+                return state.resolve(Docket.objects.filter(pk=docket.pk))
+
+        return TestMerger
+
     @merger_test(expected_query_count=1)
     def test_merger_creates_object(self) -> None:
+        """Does a merger whose lookup finds nothing create the object from its specs, calling each mapping once?"""
         start_count = Docket.objects.count()
+        map_calls = 0
+
+        def test_mapping(i: dict[str, str], params: Any) -> str:
+            nonlocal map_calls
+            map_calls += 1
+            return "ABCDEFG"
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
             court: Court = Constant(self.court)
             source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str = Constant("ABCDEFG")
+            docket_number: str = Fn(test_mapping)(Scrape(dict), Params(Any))
 
             @override
             def lookup(
@@ -165,6 +254,7 @@ class BaseMergerTest(TestCase):
             1,
             "Exactly one Docket should be created.",
         )
+        self.assertEqual(map_calls, 1)
         created_docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(created_docket.docket_number, "ABCDEFG")
         self.assertEqual(created_docket.court_id, self.court.id)
@@ -232,34 +322,6 @@ class BaseMergerTest(TestCase):
             self.court.id,
         )
 
-    @merger_test(expected_query_count=1)
-    def test_mappings_called(self) -> None:
-        map_calls = 0
-        dn = "ABCDEFG"
-
-        def test_mapping(i: dict[str, str], params) -> str:
-            nonlocal map_calls
-            map_calls += 1
-            return dn
-
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(self.court)
-            source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str = Fn(test_mapping)(Scrape(dict), Params(Any))
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
-
-        r = TestMerger({}, params=None).merge()
-        self.assertEqual(map_calls, 1)
-        docket = Docket.objects.get(pk=r.creates["Docket"].pop())
-        self.assertEqual(docket.docket_number, dn)
-
     @merger_test(expected_query_count=2)
     def test_related_mergers_1to1(self) -> None:
         class TestRelatedMerger(
@@ -310,9 +372,9 @@ class BaseMergerTest(TestCase):
         self.assertEqual(oci.docket_number, i["mctest"]["sr"])
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
 
-    @merger_test(expected_query_count=5)
-    def test_related_mergers_reverse_1to1_creates(self) -> None:
-        """Does a reverse one-to-one relation, where the OneToOneField lives on the child, create the child pointing at the parent? The child merger does not declare the foreign key; the relation sets it."""
+    @merger_test(expected_query_count=9)
+    def test_related_mergers_reverse_1to1(self) -> None:
+        """Does a reverse one-to-one relation, where the OneToOneField lives on the child, create the child pointing at the parent, then update that row on a later merge instead of creating a second one? The child merger does not declare the foreign key; the relation sets it."""
         tc = self
 
         class TestRelatedMerger(
@@ -347,54 +409,16 @@ class BaseMergerTest(TestCase):
 
         self.assertTrue(result.success)
         self.assertIn("TrialCourtData", result.creates)
-        self.docket.refresh_from_db()
-        self.assertEqual(
-            self.docket.trialcourtdata.docket_number_trial, "CR-123"
-        )
-
-    @merger_test(expected_query_count=5)
-    def test_related_mergers_reverse_1to1_updates(self) -> None:
-        """Does a reverse one-to-one relation update the row the parent already has instead of creating a second one?"""
-        existing = TrialCourtData.objects.create(
-            docket=self.docket, docket_number_trial="CR-000"
-        )
-        tc = self
-
-        class TestRelatedMerger(
-            Merger[dict[str, str], RelatedParams[None], TrialCourtData]
-        ):
-            config: ClassVar[MergerConfig[TrialCourtData]] = MergerConfig(
-                model=TrialCourtData
-            )
-
-            docket_number_trial: str = Scrape(dict)["dn"]
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, reads=DOCKET_SAVE_READS
-            )
-
-            court: Court = Constant(tc.court)
-            source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str | None = Constant(tc.docket.docket_number)
-            trialcourtdata: TrialCourtData = OneToOneRelation(
-                TestRelatedMerger,
-                Scrape(dict)["trial"],
-            )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
+        created = TrialCourtData.objects.get(docket=self.docket)
+        self.assertEqual(created.docket_number_trial, "CR-123")
 
         result = TestMerger({"trial": {"dn": "CR-999"}}, params=None).merge()
 
         self.assertTrue(result.success)
         self.assertNotIn("TrialCourtData", result.creates)
         self.assertEqual(TrialCourtData.objects.count(), 1)
-        existing.refresh_from_db()
-        self.assertEqual(existing.docket_number_trial, "CR-999")
+        created.refresh_from_db()
+        self.assertEqual(created.docket_number_trial, "CR-999")
 
     def test_one_to_one_relation_must_be_a_one_to_one_field(self) -> None:
         """A one-to-one spec reads its direction off the model, so the field it names has to be one-to-one in the first place. Is a spec pointed at anything else refused when the merger is defined?"""
@@ -481,17 +505,7 @@ class BaseMergerTest(TestCase):
     def test_related_mergers_m2m_simple(self) -> None:
         """Does a plain (no-through) many-to-many relation create the targets and link them to the parent? Uses batched candidate lookups so the bulk-linking path is exercised."""
 
-        class TestPersonMerger(
-            Merger[dict[str, str], RelatedParams[None], Person]
-        ):
-            config: ClassVar[MergerConfig[Person]] = MergerConfig(
-                model=Person, key=("slug",)
-            )
-
-            name_first: str = Scrape(dict)["first"]
-            name_last: str = Scrape(dict)["last"]
-            slug: str = Scrape(dict)["slug"]
-
+        class TestPersonMerger(SluggedPersonMerger):
             @classmethod
             def candidates(
                 cls, parent: Model, params: RelatedParams[None]
@@ -531,68 +545,29 @@ class BaseMergerTest(TestCase):
             {"Doe", "Roe"},
         )
 
-    @merger_test(expected_query_count=8)
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_through(self) -> None:
         """Does a many-to-many relation with a `through` model create the targets, link them to the parent, and populate the through row's own fields from the same scrape?"""
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            config: ClassVar[MergerConfig[Party]] = MergerConfig(
-                model=Party, key=("name",)
-            )
-
-            name: str = Scrape(dict)["name"]
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
-                model=PartyType, key=("name",)
-            )
-
-            name: str = Scrape(dict)["type"]
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(self.court)
-            source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str = Constant("M2M-THROUGH")
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                Scrape(dict)["parties"],
-                TestPartyTypeMerger,
-            )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.none())
-
         i = {
             "parties": [
                 {"name": "Alice", "type": "Plaintiff"},
                 {"name": "Bob", "type": "Defendant"},
             ]
         }
-        result = TestMerger(i, params=None).merge()
+        result = self.parties_merger()(i, params=None).merge()
 
         self.assertIn("Party", result.creates)
         self.assertEqual(len(result.creates["Party"]), 2)
         self.assertIn("PartyType", result.creates)
         self.assertEqual(len(result.creates["PartyType"]), 2)
-
-        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
         self.assertEqual(
-            set(docket.parties.values_list("name", flat=True)),
+            set(self.docket.parties.values_list("name", flat=True)),
             {"Alice", "Bob"},
         )
         self.assertEqual(
             {
                 (pt.party.name, pt.name)
-                for pt in PartyType.objects.filter(docket=docket)
+                for pt in PartyType.objects.filter(docket=self.docket)
             },
             {("Alice", "Plaintiff"), ("Bob", "Defendant")},
         )
@@ -604,13 +579,6 @@ class BaseMergerTest(TestCase):
         the relation's actual through model should fail when the merger is
         defined, with an error naming the mismatch.
         """
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            config: ClassVar[MergerConfig[Party]] = MergerConfig(model=Party)
-
-            name: str = Scrape(dict)["name"]
 
         class TestWrongThroughMerger(
             Merger[dict[str, str], ThroughParameters[None], DocketEntry]
@@ -631,7 +599,7 @@ class BaseMergerTest(TestCase):
                 )
 
                 parties: list[Party] = ManyToManyRelation(
-                    TestPartyMerger,
+                    NamedPartyMerger,
                     Scrape(dict)["parties"],
                     TestWrongThroughMerger,
                 )
@@ -643,17 +611,6 @@ class BaseMergerTest(TestCase):
         self.docket.panel.add(stale)
         tc = self
 
-        class TestPersonMerger(
-            Merger[dict[str, str], RelatedParams[None], Person]
-        ):
-            config: ClassVar[MergerConfig[Person]] = MergerConfig(
-                model=Person, key=("slug",)
-            )
-
-            name_first: str = Scrape(dict)["first"]
-            name_last: str = Scrape(dict)["last"]
-            slug: str = Scrape(dict)["slug"]
-
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
 
@@ -661,7 +618,7 @@ class BaseMergerTest(TestCase):
             source: int = Constant(tc.docket.source)
             docket_number: str | None = Constant(tc.docket.docket_number)
             panel: list[Person] = ManyToManyRelation(
-                TestPersonMerger,
+                SluggedPersonMerger,
                 Scrape(dict)["panel"],
                 strategy=ManyStrategy.DISASSOCIATE,
             )
@@ -691,125 +648,40 @@ class BaseMergerTest(TestCase):
             "The stale association should be removed.",
         )
 
-    @merger_test(expected_query_count=10)
-    def test_related_mergers_m2m_through_disassociate(self) -> None:
-        """Does DISASSOCIATE on a through many-to-many prune the stale through rows while keeping the related objects themselves?"""
-        stale_party = Party.objects.create(name="Stale Party")
-        PartyType.objects.create(
-            docket=self.docket, party=stale_party, name="Plaintiff"
-        )
-        tc = self
+    @merger_test(expected_query_count=23)
+    def test_related_mergers_m2m_through_prunes_stale_rows(self) -> None:
+        """Do DISASSOCIATE and REPLACE on a through many-to-many both prune the stale through rows, with DISASSOCIATE keeping the stale related object and REPLACE deleting it outright?"""
+        cases = [
+            ("disassociate", ManyStrategy.DISASSOCIATE, True),
+            ("replace", ManyStrategy.REPLACE, False),
+        ]
+        for name, strategy, party_kept in cases:
+            with self.subTest(name):
+                stale_party = Party.objects.create(name=f"Stale {name}")
+                PartyType.objects.create(
+                    docket=self.docket, party=stale_party, name="Plaintiff"
+                )
 
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            config: ClassVar[MergerConfig[Party]] = MergerConfig(
-                model=Party, key=("name",)
-            )
+                result = self.parties_merger(strategy)(
+                    {"parties": [{"name": "Alice", "type": "Plaintiff"}]},
+                    params=None,
+                ).merge()
 
-            name: str = Scrape(dict)["name"]
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
-                model=PartyType
-            )
-
-            name: str = Scrape(dict)["type"]
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(tc.docket.court)
-            source: int = Constant(tc.docket.source)
-            docket_number: str | None = Constant(tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                Scrape(dict)["parties"],
-                TestPartyTypeMerger,
-                strategy=ManyStrategy.DISASSOCIATE,
-            )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
-
-        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.docket.refresh_from_db()
-        self.assertTrue(
-            Party.objects.filter(pk=stale_party.pk).exists(),
-            "DISASSOCIATE must not delete the stale party itself.",
-        )
-        self.assertFalse(
-            PartyType.objects.filter(
-                docket=self.docket, party=stale_party
-            ).exists(),
-            "The stale party's link to the docket should be removed.",
-        )
-        self.assertEqual(
-            set(self.docket.parties.values_list("name", flat=True)),
-            {"Alice"},
-        )
-
-    @merger_test(expected_query_count=15)
-    def test_related_mergers_m2m_through_replace_deletes(self) -> None:
-        """Characterization: does REPLACE on a through many-to-many delete the stale related objects outright?"""
-        stale_party = Party.objects.create(name="Stale Party")
-        PartyType.objects.create(
-            docket=self.docket, party=stale_party, name="Plaintiff"
-        )
-        tc = self
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            config: ClassVar[MergerConfig[Party]] = MergerConfig(
-                model=Party, key=("name",)
-            )
-
-            name: str = Scrape(dict)["name"]
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
-                model=PartyType
-            )
-
-            name: str = Scrape(dict)["type"]
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(tc.docket.court)
-            source: int = Constant(tc.docket.source)
-            docket_number: str | None = Constant(tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                Scrape(dict)["parties"],
-                TestPartyTypeMerger,
-            )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
-
-        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
-
-        self.assertTrue(result.success)
-        self.assertFalse(
-            Party.objects.filter(pk=stale_party.pk).exists(),
-            "REPLACE deletes stale related objects outright.",
-        )
+                self.assertTrue(result.success)
+                self.assertEqual(
+                    Party.objects.filter(pk=stale_party.pk).exists(),
+                    party_kept,
+                )
+                self.assertFalse(
+                    PartyType.objects.filter(
+                        docket=self.docket, party=stale_party
+                    ).exists(),
+                    "The stale party's link to the docket should be removed.",
+                )
+                self.assertEqual(
+                    set(self.docket.parties.values_list("name", flat=True)),
+                    {"Alice"},
+                )
 
     @merger_test(expected_query_count=4)
     def test_related_mergers_child_replace_keeps_rows_on_invalid_child(
@@ -879,46 +751,9 @@ class BaseMergerTest(TestCase):
         )
         Party.objects.create(name="Ambiguous")
         Party.objects.create(name="Ambiguous")
-        tc = self
-
-        class TestPartyMerger(
-            Merger[dict[str, str], RelatedParams[None], Party]
-        ):
-            config: ClassVar[MergerConfig[Party]] = MergerConfig(
-                model=Party, key=("name",)
-            )
-
-            name: str = Scrape(dict)["name"]
-
-        class TestPartyTypeMerger(
-            Merger[dict[str, str], ThroughParameters[None], PartyType]
-        ):
-            config: ClassVar[MergerConfig[PartyType]] = MergerConfig(
-                model=PartyType
-            )
-
-            name: str = Scrape(dict)["type"]
-
-        class TestMerger(Merger[dict[str, Any], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(model=Docket)
-
-            court: Court = Constant(tc.docket.court)
-            source: int = Constant(tc.docket.source)
-            docket_number: str | None = Constant(tc.docket.docket_number)
-            parties: list[Party] = ManyToManyRelation(
-                TestPartyMerger,
-                Scrape(dict)["parties"],
-                TestPartyTypeMerger,
-            )
-
-            @override
-            def lookup(
-                self, state: MergerState.Lookup[Any, Any, Docket]
-            ) -> MergerState.LookupOutput[Any, Any, Docket]:
-                return state.resolve(Docket.objects.filter(pk=tc.docket.pk))
 
         i = {"parties": [{"name": "Ambiguous", "type": "Plaintiff"}]}
-        result = TestMerger(i, params=None).merge()
+        result = self.parties_merger()(i, params=None).merge()
 
         self.assertFalse(result.success)
         self.assertTrue(
@@ -1450,48 +1285,47 @@ class DatabaseSpecTest(TestCase):
         """Read a docket the way the merger's lookup would."""
         return merger.config.loading(Docket.objects.filter(pk=docket.pk)).get()
 
-    def test_create_reads_no_stored_value(self) -> None:
-        """Does a spec reading the database get nothing when there is no object to read, so the scraped value is used?"""
-        result = self.merger()(
-            {"docket_number": "DB-NEW", "case_name": "Scraped Name"},
-            params=None,
-            existing=Create,
-        ).merge()
-
-        self.assertTrue(result.success, result.failures)
-        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
-        self.assertEqual(docket.case_name, "Scraped Name")
-
-    def test_update_reads_stored_value(self) -> None:
-        """Does a spec reading the database see the object being merged into, so a stored value is kept and nothing is updated?"""
+    def test_reads_object_merged_into(self) -> None:
+        """Does a spec reading the database see the object being merged into, keeping a stored value and falling back to the scrape when there is no object or its value is blank? Is the object updated only when the merged value differs from the stored one?"""
         merger = self.merger()
-        result = merger(
-            {"docket_number": "DB-1", "case_name": "Scraped Name"},
-            params=None,
-            existing=Update(self.loaded(merger, self.docket)),
-        ).merge()
+        cases: list[tuple[str, str, Any, str, bool]] = [
+            ("no object", "DB-NEW", Create, "Scraped Name", False),
+            (
+                "stored",
+                "DB-1",
+                Update(self.loaded(merger, self.docket)),
+                "Stored Name",
+                False,
+            ),
+            (
+                "blank stored",
+                "DB-2",
+                Update(self.loaded(merger, self.blank_docket)),
+                "Scraped Name",
+                True,
+            ),
+        ]
+        for name, docket_number, existing, expected, updated in cases:
+            with self.subTest(name):
+                result = merger(
+                    {
+                        "docket_number": docket_number,
+                        "case_name": "Scraped Name",
+                    },
+                    params=None,
+                    existing=existing,
+                ).merge()
 
-        self.assertTrue(result.success, result.failures)
-        self.assertFalse(result.update)
-        self.docket.refresh_from_db()
-        self.assertEqual(self.docket.case_name, "Stored Name")
+                self.assertTrue(result.success, result.failures)
+                self.assertEqual(result.update, updated)
+                self.assertEqual(
+                    Docket.objects.get(docket_number=docket_number).case_name,
+                    expected,
+                )
 
-    def test_update_falls_back_when_stored_value_is_blank(self) -> None:
-        """Does a spec reading a blank stored value fall back to the scrape and update the object?"""
-        merger = self.merger()
-        result = merger(
-            {"docket_number": "DB-2", "case_name": "Scraped Name"},
-            params=None,
-            existing=Update(self.loaded(merger, self.blank_docket)),
-        ).merge()
-
-        self.assertTrue(result.success, result.failures)
-        self.assertIn(self.blank_docket.pk, result.updates["Docket"])
-        self.blank_docket.refresh_from_db()
-        self.assertEqual(self.blank_docket.case_name, "Scraped Name")
-
-    def test_lookup_matches_on_scraped_value_of_database_spec(self) -> None:
-        """Can an attribute that falls back to the database be the natural key, with the object found by the scraped value?"""
+    def test_lookup_sees_scraped_value_of_database_spec(self) -> None:
+        """Does a lookup see the scraped version of attributes that read the database, so one can be the natural key, and the merger the stored version once the object is found?"""
+        seen: list[str] = []
         court = self.court
 
         class TestMerger(Merger[dict[str, str], None, Docket]):
@@ -1506,30 +1340,6 @@ class DatabaseSpecTest(TestCase):
                 Database(Docket.docket_number),
                 default="",
             )
-            case_name: str = Scrape(dict)["case_name"]
-
-        result = TestMerger(
-            {"docket_number": "DB-1", "case_name": "Scraped Name"},
-            params=None,
-        ).merge()
-
-        self.assertTrue(result.success, result.failures)
-        self.assertFalse(result.create)
-        self.assertIn(self.docket.pk, result.updates["Docket"])
-
-    def test_database_spec_holds_scraped_value_until_update(self) -> None:
-        """Does a lookup see the scraped version of an attribute that reads the database, and the merger the stored one once the object is found?"""
-        seen: list[str] = []
-        court = self.court
-
-        class TestMerger(Merger[dict[str, str], None, Docket]):
-            config: ClassVar[MergerConfig[Docket]] = MergerConfig(
-                model=Docket, key=("docket_number",), reads=DOCKET_SAVE_READS
-            )
-
-            court_id: str = Constant(court.pk)
-            source: int = Constant(DocketSources.SCRAPER)
-            docket_number: str = Scrape(dict)["docket_number"]
             case_name: str = Fn(_prefer_stored)(
                 Database(CASE_NAME), Scrape(dict)["case_name"]
             )
@@ -1548,6 +1358,7 @@ class DatabaseSpecTest(TestCase):
         result = merger.merge()
 
         self.assertTrue(result.success, result.failures)
+        self.assertFalse(result.create)
         self.assertEqual(seen, ["Scraped Name"])
         self.assertEqual(merger.case_name, "Stored Name")
 
@@ -1772,24 +1583,19 @@ class CoalesceSpecTest(SimpleTestCase):
     """Expressions picking the first usable value among several."""
 
     def test_outputs_first_truthy_or_integer_value(self) -> None:
-        """Is the first argument that evaluates to a truthy value or an integer output?"""
+        """Is the first argument that evaluates to a truthy value or an integer output, or the default when there is none?"""
         cases: list[tuple[str, dict[str, Any], Any]] = [
             ("first truthy", {"a": "x", "b": "y"}, "x"),
             ("skips None", {"a": None, "b": "y"}, "y"),
             ("skips empty string", {"a": "", "b": "y"}, "y"),
             ("skips empty list", {"a": [], "b": "y"}, "y"),
             ("keeps zero", {"a": 0, "b": 5}, 0),
+            ("default", {"a": None, "b": ""}, "d"),
         ]
         spec: Any = Coalesce(Scrape(dict)["a"], Scrape(dict)["b"], default="d")
         for name, scrape, expected in cases:
             with self.subTest(name):
                 self.assertEqual(spec.transform(scrape, None, None), expected)
-
-    def test_outputs_default_when_no_value_is_usable(self) -> None:
-        """Is the default output when every argument evaluates to a falsy non-integer?"""
-        spec: Any = Coalesce(Scrape(dict)["a"], Scrape(dict)["b"], default="d")
-
-        self.assertEqual(spec.transform({"a": None, "b": ""}, None, None), "d")
 
     def test_default_defaults_to_none(self) -> None:
         """Is None output when every argument is unusable and no default is given?"""

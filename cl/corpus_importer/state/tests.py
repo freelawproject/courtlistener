@@ -2,7 +2,7 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from contextlib import closing, contextmanager
 from io import StringIO
 from pathlib import Path
@@ -75,34 +75,58 @@ from cl.search.models import (
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
+RESULTS_TABLE = (
+    "CREATE TABLE results ("
+    "  id INTEGER PRIMARY KEY,"
+    "  result_type VARCHAR NOT NULL DEFAULT 'TestResult',"
+    "  data_json VARCHAR NOT NULL,"
+    "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
+    ")"
+)
+ARCHIVED_FILES_TABLE = (
+    "CREATE TABLE archived_files ("
+    "  id INTEGER PRIMARY KEY,"
+    "  file_path VARCHAR NOT NULL,"
+    "  content_hash VARCHAR"
+    ")"
+)
+ARCHIVED_FILE_INSERT = (
+    "INSERT INTO archived_files (file_path, content_hash) VALUES (?, ?)"
+)
 
-def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
+
+def _archived_files(
+    hashes: Sequence[str | None],
+) -> list[tuple[str, str | None]]:
+    """The `archived_files` rows for a downloaded file per entry in `hashes`.
+
+    Args:
+        hashes: One content hash per file. An empty string or `None` stands
+            for a file the scraper stored without hashing it.
+    """
+    return [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)]
+
+
+def _run_database(
+    path: Path,
+    payloads: list[dict[str, Any] | str],
+    hashes: Sequence[str | None] = (),
+) -> None:
     """Write a minimal stand-in for a jkent run database.
 
-    Only the columns `JKentScrapeLoader` reads are created, since the loader's
-    contract is with the `results` table rather than with the whole schema.
+    Only the columns `JKentScrapeLoader` and the preflight checks read are
+    created, since the loader's contract is with those tables rather than with
+    the whole schema.
 
     Args:
         path: Where to write the database.
         payloads: One entry per row. A dict is serialized; a string is
             stored as given, so a test can write a blob that will not decode.
+        hashes: One content hash per downloaded file the run archived.
     """
     with closing(sqlite3.connect(path)) as connection:
-        connection.execute(
-            "CREATE TABLE results ("
-            "  id INTEGER PRIMARY KEY,"
-            "  result_type VARCHAR NOT NULL DEFAULT 'TestResult',"
-            "  data_json VARCHAR NOT NULL,"
-            "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
-            ")"
-        )
-        connection.execute(
-            "CREATE TABLE archived_files ("
-            "  id INTEGER PRIMARY KEY,"
-            "  file_path VARCHAR NOT NULL,"
-            "  content_hash VARCHAR"
-            ")"
-        )
+        connection.execute(RESULTS_TABLE)
+        connection.execute(ARCHIVED_FILES_TABLE)
         connection.executemany(
             "INSERT INTO results (data_json) VALUES (?)",
             [
@@ -110,6 +134,7 @@ def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
                 for payload in payloads
             ],
         )
+        connection.executemany(ARCHIVED_FILE_INSERT, _archived_files(hashes))
         connection.commit()
 
 
@@ -238,6 +263,47 @@ class LoaderTestCase(TestCase):
         kwargs.setdefault("verify_timeout", 0)
         return (loader_class or self.loader_class())(self.database, **kwargs)
 
+    def raising_loader(
+        self, dockets: set[str], error: Exception | None = None
+    ) -> type[JKentScrapeLoader[Any, Any, Any]]:
+        """A loader whose merger raises on the dockets named in `dockets`.
+
+        Args:
+            dockets: Docket numbers to raise on, read at merge time so a test
+                can empty it and retry the same rows successfully.
+            error: What to raise, defaulting to a `DatabaseError`, which the
+                merge task retries before giving up on the row.
+
+        Returns:
+            The loader class.
+        """
+        raised = error or DatabaseError("the database is having none of it")
+
+        class RaisingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
+            def merge(self) -> Any:
+                if self.state.scrape.docket_number in dockets:
+                    raise raised
+                return super().merge()
+
+        return self.loader_class(merger=RaisingMerger)
+
+    def enable_logging(self) -> None:
+        """Let `assertLogs` see the loader's records for the rest of the test.
+
+        The test settings disable logging, which would otherwise hide every
+        record a test means to assert on.
+        """
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable)
+
+    def merge_retry(self) -> set[str]:
+        """The rows the ledger is holding for a merge retry."""
+        return set(self.redis.smembers(f"{self.key}:merge_retry"))
+
+    def extraction_retry(self) -> set[str]:
+        """The documents the ledger is holding for an extraction retry."""
+        return set(self.redis.smembers(f"{self.key}:extraction_retry"))
+
 
 class JKentScrapeLoaderTest(LoaderTestCase):
     """Tests for the generic jkent run-database loader."""
@@ -311,32 +377,23 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertFalse(Docket.objects.exists())
 
     def test_limit_stops_the_run_early(self) -> None:
-        """Does `limit` stop the load after that many rows?"""
+        """Does `limit` stop the load after exactly that many rows, including a limit computed at runtime that came out zero, rather than the one row an off-by-one would let through?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(5)],
         )
 
-        report = self.loader(limit=2).load()
+        for limit in (2, 0):
+            with self.subTest(limit=limit):
+                Docket.objects.all().delete()
 
-        self.assertEqual((report.seen, report.merged), (2, 2))
-        self.assertEqual(Docket.objects.count(), 2)
+                report = self.loader(limit=limit).load()
 
-    def test_limit_of_zero_loads_nothing(self) -> None:
-        """A limit computed at runtime can come out zero.
-
-        Does that load no rows at all, rather than the one row an off-by-one
-        would let through?
-        """
-        _run_database(
-            self.database,
-            [{"docket_number": f"A-{n}"} for n in range(5)],
-        )
-
-        report = self.loader(limit=0).load()
-
-        self.assertEqual((report.seen, report.dispatched), (0, 0))
-        self.assertFalse(Docket.objects.exists())
+                self.assertEqual(
+                    (report.seen, report.dispatched, report.merged),
+                    (limit, limit, limit),
+                )
+                self.assertEqual(Docket.objects.count(), limit)
 
     def test_normalize_returning_none_is_invalid(self) -> None:
         """`normalize` returning `None` is the loader's own judgment that there is nothing to do with a row. Is it counted as invalid, and left undispatched?"""
@@ -384,48 +441,36 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         )
         self.assertFalse(Docket.objects.exists())
 
-    def test_payload_that_does_not_fit_the_model_is_invalid(self) -> None:
-        """A payload the scrape model rejects usually means scraper drift.
-
-        Is it reported rather than raised, so one bad row doesn't cost the run?
-        """
-        _run_database(
-            self.database,
-            [{"case_name": "No docket number here"}, {"docket_number": "A-2"}],
+    def test_a_bad_payload_is_invalid(self) -> None:
+        """A payload the scrape model rejects usually means scraper drift, and a scrape that stopped mid-write leaves a truncated blob behind. Is either counted as invalid rather than raised, so one bad row doesn't cost the run?"""
+        bad_payloads: tuple[tuple[str, dict[str, Any] | str], ...] = (
+            ("does not fit the model", {"case_name": "No docket number here"}),
+            ("will not decode", '{"docket_number": "A-1'),
         )
+        for label, bad_payload in bad_payloads:
+            with self.subTest(label):
+                self.database.unlink(missing_ok=True)
+                Docket.objects.all().delete()
+                _run_database(
+                    self.database, [bad_payload, {"docket_number": "A-2"}]
+                )
 
-        report = self.loader().load()
+                report = self.loader().load()
 
-        self.assertEqual(
-            (report.seen, report.invalid, report.merged), (2, 1, 1)
-        )
-        self.assertEqual(
-            Docket.objects.get().docket_number,
-            "A-2",
-            "The row after the bad one still merges.",
-        )
-
-    def test_a_payload_that_will_not_decode_is_invalid(self) -> None:
-        """A scrape that stopped mid-write leaves a truncated blob behind.
-
-        Is it counted rather than raised, so the rest of the run still loads?
-        """
-        _run_database(
-            self.database,
-            ['{"docket_number": "A-1', {"docket_number": "A-2"}],
-        )
-
-        report = self.loader().load()
-
-        self.assertEqual(
-            (report.seen, report.invalid, report.merged, report.failed),
-            (2, 1, 1, 0),
-        )
-        self.assertEqual(
-            Docket.objects.get().docket_number,
-            "A-2",
-            "The row after the undecodable one still merges.",
-        )
+                self.assertEqual(
+                    (
+                        report.seen,
+                        report.invalid,
+                        report.merged,
+                        report.failed,
+                    ),
+                    (2, 1, 1, 0),
+                )
+                self.assertEqual(
+                    Docket.objects.get().docket_number,
+                    "A-2",
+                    "The row after the bad one still merges.",
+                )
 
     def test_a_bad_row_is_named_in_the_log(self) -> None:
         """A count of bad rows says something drifted; only the row number says where to go and look, and it is what `--start-row` would need to reach that row again. Does the log carry it?"""
@@ -437,8 +482,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
                 {"docket_number": "A-3"},
             ],
         )
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -451,6 +495,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self,
     ) -> None:
         """A row number gets you back to the row, but a docket number is what anybody actually searches for. Does a validation failure carry both where the payload decoded far enough to have a docket number, and fall back to the row number where it did not?"""
+        self.enable_logging()
         for label, payload, expected in (
             (
                 "has a docket number",
@@ -466,8 +511,6 @@ class JKentScrapeLoaderTest(LoaderTestCase):
             with self.subTest(label):
                 self.database.unlink(missing_ok=True)
                 _run_database(self.database, [payload])
-                logging.disable(logging.NOTSET)
-                self.addCleanup(logging.disable)
 
                 with self.assertLogs(
                     "cl.corpus_importer.state.loader", "ERROR"
@@ -506,64 +549,31 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertTrue(report.accounted_for)
         self.assertEqual(Docket.objects.count(), 1)
 
-    def test_a_row_that_raises_does_not_cost_the_run(self) -> None:
-        """Each row is merged in a task of its own.
-
-        Is a merge that raises recorded as a failure while the rest of the run
-        continues?
-        """
-
-        class RaisingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
-            def merge(self) -> Any:
-                if self.state.scrape.docket_number == "A-1":
-                    raise ValueError("boom")
-                return super().merge()
-
+    def test_a_merge_out_of_retries_is_recorded_rather_than_dropped(
+        self,
+    ) -> None:
+        """Celery says nothing when a task's retries run out, which is the whole reason for the ledger. Each row is merged in a task of its own, so is the row written off as failed rather than left looking like it never ran, while the rest of the run continues?"""
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
         )
+        self.enable_logging()
 
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            report = self.loader(
-                self.loader_class(merger=RaisingMerger)
-            ).load()
+        with (
+            patch.object(merge_state_scrape_row, "max_retries", 0),
+            self.assertLogs("cl.corpus_importer.tasks", "ERROR") as logs,
+        ):
+            report = self.loader(self.raising_loader({"A-1"})).load()
 
         self.assertEqual(
-            (report.seen, report.failed, report.merged), (2, 1, 1)
-        )
-        self.assertTrue(
-            report.accounted_for,
-            "A row that failed still reported an outcome.",
+            (report.seen, report.dispatched, report.failed, report.merged),
+            (2, 2, 1, 1),
         )
         self.assertEqual(
             Docket.objects.get().docket_number,
             "A-2",
             "The row after the raising one still merges.",
         )
-
-    def test_a_merge_out_of_retries_is_recorded_rather_than_dropped(
-        self,
-    ) -> None:
-        """Celery says nothing when a task's retries run out, which is the whole reason for the ledger. Is the row written off as failed rather than left looking like it never ran?"""
-
-        class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
-            def merge(self) -> Any:
-                raise DatabaseError("the database is having none of it")
-
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
-
-        with (
-            patch.object(merge_state_scrape_row, "max_retries", 0),
-            self.assertLogs("cl.corpus_importer.tasks", "ERROR") as logs,
-        ):
-            report = self.loader(
-                self.loader_class(merger=RefusingMerger)
-            ).load()
-
-        self.assertEqual((report.dispatched, report.failed), (1, 1))
         self.assertEqual(
             (report.rejected, report.errored),
             (0, 1),
@@ -583,20 +593,17 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
     def test_a_merger_bug_is_not_mistaken_for_a_dropped_task(self) -> None:
         """An exception the task does not expect is a bug in the merger, not a broker that lost a message. Left to propagate it would take its row with it, and reconciliation would report the docket as one celery dropped -- sending somebody to the broker for a fault in the code. Is it written off as a merge failure instead?"""
-
-        class BuggyMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
-            def merge(self) -> Any:
-                raise AttributeError("the merger has a typo in it")
-
         _run_database(
             self.database,
             [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
         )
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
+        buggy = self.raising_loader(
+            {"A-1", "A-2"}, AttributeError("the merger has a typo in it")
+        )
 
         with self.assertLogs("cl.corpus_importer.tasks", "ERROR") as logs:
-            report = self.loader(self.loader_class(merger=BuggyMerger)).load()
+            report = self.loader(buggy).load()
             # Asserted inside the block so that a regression fails on the
             # mis-attribution rather than on the log line that goes with it.
             self.assertEqual(
@@ -639,8 +646,7 @@ class JKentScrapeLoaderTest(LoaderTestCase):
     def test_dropped_rows_get_their_own_sentry_issue(self) -> None:
         """A dropped task is the one failure nothing else in the system reports, so it has to be findable on its own rather than mixed in with the merges that failed loudly. Is it filed under its own fingerprint, keyed on the loader rather than the run?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with (
             patch("cl.corpus_importer.tasks.merge_state_scrape_row.si"),
@@ -763,37 +769,27 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(sleep.call_count, len(counts) - 1)
         rows.assert_not_called()
 
-    def test_a_steady_count_is_a_stall(self) -> None:
-        """A count that stops moving says the work is gone.
+    def test_a_count_that_stops_falling_ends_the_wait(self) -> None:
+        """A count that stops moving within the in-flight time says the work is gone, while giving up at the deadline on a queue that was still working is not a finding. Is the first reported as a conclusive stall, and the second told apart from it as a timeout that says nothing about the work still left?"""
+        for in_flight_time, verify_timeout, expected, conclusive in (
+            (0, 600, WaitOutcome.STALLED, True),
+            (600, 0, WaitOutcome.TIMED_OUT, False),
+        ):
+            with self.subTest(expected=expected):
+                loader = self.loader(
+                    in_flight_time=in_flight_time,
+                    verify_timeout=verify_timeout,
+                )
 
-        Is that reported as a stall rather than waited out to the timeout?
-        """
-        loader = self.loader(in_flight_time=0, verify_timeout=600)
+                with patch.object(
+                    LoadLedger, "outstanding_count", return_value=4
+                ):
+                    outstanding, wait = loader._await_drain(
+                        self.ledger().outstanding_count, poll=1, work="merges"
+                    )
 
-        with patch.object(LoadLedger, "outstanding_count", return_value=4):
-            outstanding, wait = loader._await_drain(
-                self.ledger().outstanding_count, poll=1, work="merges"
-            )
-
-        self.assertEqual((outstanding, wait), (4, WaitOutcome.STALLED))
-        self.assertTrue(wait.conclusive)
-
-    def test_a_count_still_moving_at_the_deadline_times_out(self) -> None:
-        """Giving up on a queue that was still working is not a finding.
-
-        Is it told apart from a stall?
-        """
-        loader = self.loader(in_flight_time=600, verify_timeout=0)
-
-        with patch.object(LoadLedger, "outstanding_count", return_value=4):
-            outstanding, wait = loader._await_drain(
-                self.ledger().outstanding_count, poll=1, work="merges"
-            )
-
-        self.assertEqual((outstanding, wait), (4, WaitOutcome.TIMED_OUT))
-        self.assertFalse(
-            wait.conclusive, "Says nothing about the work still left."
-        )
+                self.assertEqual((outstanding, wait), (4, expected))
+                self.assertEqual(wait.conclusive, conclusive)
 
     def test_skipping_verification_reports_only_what_was_dispatched(
         self,
@@ -863,35 +859,24 @@ class JKentScrapeLoaderTest(LoaderTestCase):
         self.assertEqual(report.failed, 2, "Both, for a caller wanting one.")
 
     def test_db_delay_waits_between_rows(self) -> None:
-        """A long load has to leave the queue room to drain.
-
-        Does `db_delay` wait after each row?
-        """
+        """A long load has to leave the queue room to drain, but the default is to run flat out. Does `db_delay` wait after each row, and does the default zero delay skip the wait rather than sleeping zero seconds three thousand times?"""
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in range(3)],
         )
 
-        with patch("cl.corpus_importer.state.loader.time.sleep") as sleep:
-            self.loader(db_delay=0.25).load()
-
-        self.assertEqual(sleep.call_args_list, [call(0.25)] * 3)
-
-    def test_no_db_delay_does_not_wait(self) -> None:
-        """The default is to run flat out.
-
-        Does a zero delay skip the wait rather than sleeping zero seconds three
-        thousand times?
-        """
-        _run_database(
-            self.database,
-            [{"docket_number": f"A-{n}"} for n in range(3)],
+        cases: tuple[tuple[str, dict[str, Any], list[Any]], ...] = (
+            ("a delay", {"db_delay": 0.25}, [call(0.25)] * 3),
+            ("the default", {}, []),
         )
+        for label, kwargs, expected in cases:
+            with self.subTest(label):
+                with patch(
+                    "cl.corpus_importer.state.loader.time.sleep"
+                ) as sleep:
+                    self.loader(**kwargs).load()
 
-        with patch("cl.corpus_importer.state.loader.time.sleep") as sleep:
-            self.loader().load()
-
-        sleep.assert_not_called()
+                self.assertEqual(sleep.call_args_list, expected)
 
     def test_both_queues_get_a_throttle(self) -> None:
         """Merges dispatch their own extraction, so a load can bury either queue. Is a throttle built for each one it was given a rate for?"""
@@ -931,37 +916,56 @@ class JKentScrapeLoaderTest(LoaderTestCase):
 
         self.assertEqual(throttle_class.return_value.maybe_wait.call_count, 6)
 
-    def test_skipping_extraction_leaves_its_queue_unthrottled(self) -> None:
-        """Building a throttle polls the celery queue.
-
-        Does a load dispatching no extraction leave that queue alone?
-        """
-        loader = self.loader(extract=False, extraction_throttle=6)
-
-        self.assertEqual(loader.throttles, [])
-
-    def test_no_throttle_builds_none(self) -> None:
-        """Does a load that asked for no throttling poll no queues?"""
-        self.assertEqual(self.loader().throttles, [])
+    def test_a_queue_with_nothing_to_hold_back_is_not_throttled(self) -> None:
+        """Building a throttle polls the celery queue. Does a load that asked for no throttling, or that dispatches no extraction for its extraction throttle to hold back, poll no queues?"""
+        cases: tuple[tuple[str, dict[str, Any]], ...] = (
+            ("no throttle", {}),
+            ("no extraction", {"extract": False, "extraction_throttle": 6}),
+        )
+        for label, kwargs in cases:
+            with self.subTest(label):
+                self.assertEqual(self.loader(**kwargs).throttles, [])
 
 
-class JKentScrapeLoaderExtractionTest(LoaderTestCase):
-    """Tests for the documents a load hands to the extraction queue.
+class ExtractionTestCase(LoaderTestCase):
+    """A loader test case with a stand-in for a state document model.
 
-    The document model is a stand-in here: `dispatch_extraction` only names it
-    and reads rows off it. Checking that extraction actually ran takes a real
-    model, and lives with the New York loader's tests.
+    What these tests check is which queries the loader asks the document model
+    and what it does with the answers. Checking that extraction actually ran
+    takes a real model, and lives with the New York loader's tests.
     """
-
-    def document_model(self) -> Any:
-        """A stand-in for a state document model."""
-        return Mock(__name__="Doc")
 
     def document(self, pk: int, dispatched: bool = True) -> Any:
         """A document row that reports whether extraction was dispatched."""
         document = Mock(pk=pk)
         document.extract.return_value = dispatched
         return document
+
+    def document_model(self, outstanding: Sequence[int] = ()) -> Any:
+        """A stand-in document model reporting `outstanding` unextracted PKs.
+
+        Args:
+            outstanding: The PKs `unextracted` reports, both when a load
+                verifies itself and when a retry re-checks.
+
+        Returns:
+            The model.
+        """
+        model = Mock(__name__="Doc")
+        unextracted = model.unextracted.return_value
+        # What the wait polls on, what the report reads, and what a retry
+        # re-checks against, in that order.
+        unextracted.count.return_value = 0
+        unextracted.values_list.return_value = list(outstanding)
+        unextracted.filter.return_value = [
+            self.document(pk) for pk in outstanding
+        ]
+        model.written_since.return_value.filter.return_value.count.return_value = 0
+        return model
+
+
+class JKentScrapeLoaderExtractionTest(ExtractionTestCase):
+    """Tests for the documents a load hands to the extraction queue."""
 
     def test_only_documents_actually_sent_are_expected_back(self) -> None:
         """A document with no file to read is never dispatched and will never change status. Is it left out of what the load waits on?"""
@@ -1026,6 +1030,7 @@ class StateStorageTest(SimpleTestCase):
 
     @staticmethod
     def error(code: str) -> ClientError:
+        """The error S3 raises when it answers a copy with `code`."""
         return ClientError(
             {"Error": {"Code": code, "Message": "nope"}}, "CopyObject"
         )
@@ -1103,13 +1108,40 @@ class PreflightCheckTest(SimpleTestCase):
     def setUp(self) -> None:
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.database = Path(self.directory.name) / "run.db"
         self.database_count = 0
 
-    def results(self, rows: list[tuple[str, int]]) -> sqlite3.Connection:
-        """A run database holding `rows`, open and ready to be checked.
+    def open_database(
+        self,
+        schema: str,
+        insert: str = "",
+        rows: Iterable[tuple[Any, ...]] = (),
+    ) -> sqlite3.Connection:
+        """A fresh run database, open and ready to be checked.
 
         Each call gets a database of its own, so one test can build two.
+
+        Args:
+            schema: The statement creating the database's one table.
+            insert: The statement each of `rows` is inserted with.
+            rows: The table's rows.
+
+        Returns:
+            The open connection.
+        """
+        self.database_count += 1
+        database = Path(self.directory.name) / f"run-{self.database_count}.db"
+        with closing(sqlite3.connect(database)) as connection:
+            connection.execute(schema)
+            if insert:
+                connection.executemany(insert, rows)
+            connection.commit()
+        opened = sqlite3.connect(database)
+        opened.row_factory = sqlite3.Row
+        self.addCleanup(opened.close)
+        return opened
+
+    def results(self, rows: list[tuple[str, int]]) -> sqlite3.Connection:
+        """A run database holding `rows` in its `results` table.
 
         Args:
             rows: One `(result_type, is_valid)` pair per row.
@@ -1117,40 +1149,52 @@ class PreflightCheckTest(SimpleTestCase):
         Returns:
             The open connection.
         """
-        self.database_count += 1
-        self.database = (
-            Path(self.directory.name) / f"run-{self.database_count}.db"
+        return self.open_database(
+            RESULTS_TABLE,
+            "INSERT INTO results (result_type, data_json, is_valid) "
+            "VALUES (?, '{}', ?)",
+            rows,
         )
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.execute(
-                "CREATE TABLE results ("
-                "  id INTEGER PRIMARY KEY,"
-                "  result_type VARCHAR NOT NULL,"
-                "  data_json VARCHAR NOT NULL,"
-                "  is_valid BOOLEAN DEFAULT 1 NOT NULL"
-                ")"
-            )
-            connection.executemany(
-                "INSERT INTO results (result_type, data_json, is_valid) "
-                "VALUES (?, '{}', ?)",
-                rows,
-            )
-            connection.commit()
-        opened = sqlite3.connect(self.database)
-        opened.row_factory = sqlite3.Row
-        self.addCleanup(opened.close)
-        return opened
 
-    def test_a_database_with_nothing_invalid_passes(self) -> None:
-        """Does a clean run database come back as passing, with nothing to report?"""
-        result = InvalidRows().run(self.results([("Docket", 1)] * 3))
+    def archive(self, hashes: list[str | None]) -> sqlite3.Connection:
+        """A run database whose archive holds a file per entry in `hashes`.
 
-        self.assertEqual(result.outcome, CheckOutcome.PASSED)
-        self.assertEqual(result.errors, ())
-        self.assertFalse(result.outcome.stops_the_load)
+        Args:
+            hashes: One content hash per downloaded file. An empty string or
+                `None` stands for a file the scraper stored without hashing
+                it.
+
+        Returns:
+            The open connection.
+        """
+        return self.open_database(
+            ARCHIVED_FILES_TABLE, ARCHIVED_FILE_INSERT, _archived_files(hashes)
+        )
+
+    def test_a_clean_run_database_passes(self) -> None:
+        """Does a run database with nothing invalid, or whose scraper hashed everything it downloaded -- including an empty archive, which must pass rather than divide by nothing -- come back as passing, with nothing to report?"""
+        for label, check, connection in (
+            (
+                "nothing invalid",
+                InvalidRows(),
+                self.results([("Docket", 1)] * 3),
+            ),
+            (
+                "every file hashed",
+                UnhashedFiles(),
+                self.archive(["a" * 64, "b" * 64]),
+            ),
+            ("nothing downloaded", UnhashedFiles(), self.archive([])),
+        ):
+            with self.subTest(label):
+                result = check.run(connection)
+
+                self.assertEqual(result.outcome, CheckOutcome.PASSED)
+                self.assertEqual(result.errors, ())
+                self.assertFalse(result.outcome.stops_the_load)
 
     def test_invalid_rows_are_reported_per_result_type(self) -> None:
-        """The counts are what an operator acts on, and which result type they belong to is what says whether it matters. Is there one finding per type, carrying both counts?"""
+        """The counts are what an operator acts on, and which result type they belong to is what says whether it matters. Is there one finding per type, carrying both counts? The loader's own query passes over these rows, so the rest of the run is still worth loading: is this a partial finding rather than one that stops the load?"""
         result = InvalidRows().run(
             self.results(
                 [("Docket", 1), ("Docket", 1), ("Docket", 0), ("File", 0)]
@@ -1165,6 +1209,8 @@ class PreflightCheckTest(SimpleTestCase):
                 {"result_type": "File", "invalid": 1, "valid": 0},
             ],
         )
+        self.assertFalse(result.outcome.stops_the_load)
+        self.assertTrue(result.outcome.is_failure)
 
     def test_a_result_type_with_nothing_invalid_is_not_reported(self) -> None:
         """A report naming every result type would bury the one that is wrong.
@@ -1177,23 +1223,11 @@ class PreflightCheckTest(SimpleTestCase):
             [error.detail["result_type"] for error in result.errors], ["File"]
         )
 
-    def test_invalid_rows_do_not_stop_a_load(self) -> None:
-        """The loader's own query passes over these rows, so the rest of the run is still worth loading. Is this a partial finding rather than one that stops the load?"""
-        result = InvalidRows().run(self.results([("Docket", 0)]))
-
-        self.assertFalse(result.outcome.stops_the_load)
-        self.assertTrue(result.outcome.is_failure)
-
     def test_a_question_the_database_cannot_answer_is_a_failure(self) -> None:
         """A column the check names and the database has not got is one the loader's own query names too. Is that reported as a database this loader cannot read, rather than raised out of the check?"""
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.execute("CREATE TABLE results (id INTEGER)")
-            connection.commit()
-        opened = sqlite3.connect(self.database)
-        opened.row_factory = sqlite3.Row
-        self.addCleanup(opened.close)
-
-        result = InvalidRows().run(opened)
+        result = InvalidRows().run(
+            self.open_database("CREATE TABLE results (id INTEGER)")
+        )
 
         self.assertTrue(result.outcome.stops_the_load)
         self.assertIn("no such column", str(result.errors[0]))
@@ -1241,99 +1275,23 @@ class PreflightCheckTest(SimpleTestCase):
             [CheckOutcome.FAILED, CheckOutcome.PASSED, CheckOutcome.FAILED],
         )
 
-    def archive(self, hashes: list[str]) -> sqlite3.Connection:
-        """A run database whose archive holds a file per entry in `hashes`.
-
-        Args:
-            hashes: One content hash per downloaded file. An empty string
-                stands for a file the scraper stored without hashing it.
-
-        Returns:
-            The open connection.
-        """
-        self.database_count += 1
-        self.database = (
-            Path(self.directory.name) / f"archive-{self.database_count}.db"
-        )
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.execute(
-                "CREATE TABLE archived_files ("
-                "  id INTEGER PRIMARY KEY,"
-                "  file_path VARCHAR NOT NULL,"
-                "  content_hash VARCHAR"
-                ")"
-            )
-            connection.executemany(
-                "INSERT INTO archived_files (file_path, content_hash) "
-                "VALUES (?, ?)",
-                [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)],
-            )
-            connection.commit()
-        opened = sqlite3.connect(self.database)
-        opened.row_factory = sqlite3.Row
-        self.addCleanup(opened.close)
-        return opened
-
-    def test_every_file_hashed_passes(self) -> None:
-        """Does a run whose scraper hashed everything it downloaded come back clean?"""
-        result = UnhashedFiles().run(self.archive(["a" * 64, "b" * 64]))
-
-        self.assertEqual(result.outcome, CheckOutcome.PASSED)
-
-    def test_a_run_that_downloaded_nothing_passes(self) -> None:
-        """A scrape with no files has no files missing hashes.
-
-        Does an empty archive pass rather than dividing by nothing?
-        """
-        result = UnhashedFiles().run(self.archive([]))
-
-        self.assertEqual(result.outcome, CheckOutcome.PASSED)
-        self.assertEqual(result.errors, ())
-
     def test_anything_short_of_every_file_is_a_finding(self) -> None:
-        """One unhashed file is a document that will be written with no file at all, so the bar is every file rather than most of them. Is a single one reported, with both counts?"""
-        result = UnhashedFiles().run(self.archive(["a" * 64, "", "c" * 64]))
+        """One unhashed file is a document that will be written with no file at all, so the bar is every file rather than most of them. The column is nullable and the scraper may leave it either way: is a single file with an empty or NULL hash reported, with both counts, as a finding that leaves the rest of the run still worth loading?"""
+        for label, unhashed in (("empty", ""), ("NULL", None)):
+            with self.subTest(label):
+                result = UnhashedFiles().run(
+                    self.archive(["a" * 64, unhashed, "c" * 64])
+                )
 
-        self.assertEqual(result.outcome, CheckOutcome.PARTIAL)
-        self.assertEqual(
-            result.errors[0].detail,
-            {"unhashed": 1, "hashed": 2, "total": 3},
-        )
-
-    def test_a_null_hash_counts_as_unhashed(self) -> None:
-        """The column is nullable and the scraper may leave it either way.
-
-        Are NULL and empty string both counted as no hash?
-        """
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.execute(
-                "CREATE TABLE archived_files ("
-                "  id INTEGER PRIMARY KEY,"
-                "  file_path VARCHAR NOT NULL,"
-                "  content_hash VARCHAR"
-                ")"
-            )
-            connection.execute(
-                "INSERT INTO archived_files (file_path, content_hash) "
-                "VALUES ('f0.pdf', NULL)"
-            )
-            connection.commit()
-        opened = sqlite3.connect(self.database)
-        opened.row_factory = sqlite3.Row
-        self.addCleanup(opened.close)
-
-        result = UnhashedFiles().run(opened)
-
-        self.assertEqual(result.errors[0].detail["unhashed"], 1)
-
-    def test_unhashed_files_do_not_stop_a_load(self) -> None:
-        """The documents still merge, they just have no file.
-
-        Is the rest of the run still worth loading?
-        """
-        result = UnhashedFiles().run(self.archive([""]))
-
-        self.assertFalse(result.outcome.stops_the_load)
+                self.assertEqual(result.outcome, CheckOutcome.PARTIAL)
+                self.assertEqual(
+                    result.errors[0].detail,
+                    {"unhashed": 1, "hashed": 2, "total": 3},
+                )
+                self.assertFalse(
+                    result.outcome.stops_the_load,
+                    "The documents still merge, they just have no file.",
+                )
 
     def test_a_result_says_what_was_checked(self) -> None:
         """A report names what ran as well as what it found.
@@ -1361,27 +1319,13 @@ class LoaderPreflightTest(LoaderTestCase):
             )
             connection.commit()
 
-    def archive(self, hashes: list[str]) -> None:
-        """Record a downloaded file per entry in `hashes`.
-
-        Args:
-            hashes: One content hash per file, an empty string standing for
-                a file the scraper stored without hashing it.
-        """
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.executemany(
-                "INSERT INTO archived_files (file_path, content_hash) "
-                "VALUES (?, ?)",
-                [(f"f{n}.pdf", digest) for n, digest in enumerate(hashes)],
-            )
-            connection.commit()
-
     def test_unhashed_files_are_reported_before_any_merge_finds_them(
         self,
     ) -> None:
         """A merge already declines to publish a file it cannot name by content, one file at a time, deep into a run. Does the load say how much of the run is like that before it dispatches anything, and go ahead anyway?"""
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        self.archive(["a" * 64, ""])
+        _run_database(
+            self.database, [{"docket_number": "A-1"}], hashes=["a" * 64, ""]
+        )
 
         report = self.loader().load()
 
@@ -1452,8 +1396,7 @@ class LoaderPreflightTest(LoaderTestCase):
         """A Sentry issue is read by its fields rather than by parsing the summary back apart. Does the finding's detail ride along, under the loader's own issue for a run that will land incomplete?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
         self.invalidate(1)
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -1474,8 +1417,7 @@ class LoaderPreflightTest(LoaderTestCase):
         Is a clean run database reported as having been checked?
         """
         _run_database(self.database, [{"docket_number": "A-1"}])
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "INFO"
@@ -1500,8 +1442,7 @@ class LoaderPreflightTest(LoaderTestCase):
                 )
 
         _run_database(self.database, [{"docket_number": "A-1"}])
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs("cl.corpus_importer.state.loader", "ERROR"):
             with self.assertRaises(PreflightFailed) as raised:
@@ -1527,33 +1468,6 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
     whatever fails again, so most of these check that a set holds exactly the
     work still outstanding after a retry rather than what it held before one.
     """
-
-    def merge_retry(self) -> set[str]:
-        """The rows the ledger is holding for a merge retry."""
-        return set(self.redis.smembers(f"{self.key}:merge_retry"))
-
-    def extraction_retry(self) -> set[str]:
-        """The documents the ledger is holding for an extraction retry."""
-        return set(self.redis.smembers(f"{self.key}:extraction_retry"))
-
-    def failing_loader(self, failing: set[str]) -> Any:
-        """A loader whose merger refuses the dockets named in `failing`.
-
-        Args:
-            failing: Docket numbers to raise on, read at merge time so a
-                test can empty it and retry the same rows successfully.
-
-        Returns:
-            The loader class.
-        """
-
-        class RefusingMerger(self.loader_class().merger):  # type: ignore[misc, name-defined]
-            def merge(self) -> Any:
-                if self.state.scrape.docket_number in failing:
-                    raise DatabaseError("the database is having none of it")
-                return super().merge()
-
-        return self.loader_class(merger=RefusingMerger)
 
     def test_a_row_with_no_verdict_is_held_for_retry(self) -> None:
         """A merge that never reached a verdict leaves nothing in the database to find it by again. Is the row written down so a retry can?"""
@@ -1629,17 +1543,18 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             "Counting is not draining.",
         )
 
-    def test_a_retry_redispatches_only_what_was_held(self) -> None:
-        """Does a retry merge the row that failed, and leave the rows that already merged alone?"""
+    def test_a_row_that_merges_on_retry_is_settled(self) -> None:
+        """Does a retry merge only the row that failed, leaving the rows that already merged alone? The ledger's counters only ever go up and nothing prunes the retry set as rows succeed, so a row that errored and then merged would otherwise go on being counted -- and alerted on -- as a failure, or as dispatched twice, for the rest of the run's life. Is the error taken back, the dispatch left counted once, and the retry set left empty?"""
         failing = {"A-2"}
         _run_database(
             self.database,
             [{"docket_number": f"A-{n}"} for n in (1, 2, 3)],
         )
-        loader_class = self.failing_loader(failing)
+        loader_class = self.raising_loader(failing)
         with patch.object(merge_state_scrape_row, "max_retries", 0):
             self.loader(loader_class).load()
         self.assertEqual(self.merge_retry(), {"2"})
+        self.assertEqual(self.ledger().totals().errored, 1)
         failing.clear()
 
         report = self.loader(loader_class).retry()
@@ -1654,38 +1569,25 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             set(Docket.objects.values_list("docket_number", flat=True)),
             {"A-1", "A-2", "A-3"},
         )
-
-    def test_a_row_that_merges_on_retry_is_not_held_again(self) -> None:
-        """Nothing prunes the set as rows succeed, so a retry that works has to leave it empty by not writing to it. Does it?"""
-        failing = {"A-1"}
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        loader_class = self.failing_loader(failing)
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            self.loader(loader_class).load()
-        failing.clear()
-
-        self.loader(loader_class).retry()
-
+        self.assertEqual(
+            report.errored,
+            0,
+            "The row merged, so it is no longer an error against the run.",
+        )
+        self.assertEqual(report.merged, 3, "Every row is merged now.")
+        self.assertEqual(
+            report.failed, 0, "So the run has nothing left to alert on."
+        )
+        self.assertEqual(
+            (report.dispatched, self.ledger().totals().dispatched),
+            (3, 3),
+            "The row the retry put back was counted when it first went.",
+        )
         self.assertEqual(
             self.merge_retry(),
             set(),
             "A retry that fixed everything leaves nothing behind.",
         )
-
-    def test_a_row_that_errors_again_is_held_again(self) -> None:
-        """A retry that does not settle a row has to leave it retryable.
-
-        Is the row written back by the same path that recorded it first?
-        """
-        _run_database(self.database, [{"docket_number": "A-1"}])
-        loader_class = self.failing_loader({"A-1"})
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            self.loader(loader_class).load()
-
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            self.loader(loader_class).retry()
-
-        self.assertEqual(self.merge_retry(), {"1"})
 
     def test_a_retry_leaves_the_run_s_totals_standing(self) -> None:
         """A retry adds to what the run already did rather than replacing it, so it must not clear the ledger the way a fresh load does. Does the moment the run began survive one?"""
@@ -1722,36 +1624,10 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             "And took the anchor they will be re-checked against with them.",
         )
 
-    def test_a_row_that_merges_on_retry_stops_counting_as_an_error(
-        self,
-    ) -> None:
-        """The ledger's counters only ever go up, and nothing prunes them as rows recover. A row that errored and then merged on retry would go on being counted -- and alerted on -- as a failure for the rest of the run's life. Is the error taken back when the row goes back?"""
-        failing = {"A-2"}
-        _run_database(
-            self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
-        )
-        loader_class = self.failing_loader(failing)
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            self.loader(loader_class).load()
-        self.assertEqual(self.ledger().totals().errored, 1)
-        failing.clear()
-
-        report = self.loader(loader_class).retry()
-
-        self.assertEqual(
-            report.errored,
-            0,
-            "The row merged, so it is no longer an error against the run.",
-        )
-        self.assertEqual(report.merged, 2, "Both rows are merged now.")
-        self.assertEqual(
-            report.failed, 0, "So the run has nothing left to alert on."
-        )
-
     def test_a_row_that_errors_again_still_counts_as_an_error(self) -> None:
-        """Taking the error back as the row is re-dispatched leans on the retry's own merge to count it again if it fails again. Does a row that errored twice report as the one error it still is, rather than as two or as none?"""
+        """Taking the error back as the row is re-dispatched leans on the retry's own merge to count it again if it fails again. Does a row that errored twice report as the one error it still is, rather than as two or as none, and is it written back to the retry set by the same path that recorded it first?"""
         _run_database(self.database, [{"docket_number": "A-1"}])
-        loader_class = self.failing_loader({"A-1"})
+        loader_class = self.raising_loader({"A-1"})
         with patch.object(merge_state_scrape_row, "max_retries", 0):
             self.loader(loader_class).load()
 
@@ -1763,29 +1639,11 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
             self.merge_retry(), {"1"}, "And is still there to be retried."
         )
 
-    def test_a_retry_does_not_count_its_rows_as_dispatched_again(
-        self,
-    ) -> None:
-        """A row a retry puts back was counted as dispatched when it first went. Does the run's total stay at the number of rows it has?"""
-        failing = {"A-2"}
-        _run_database(
-            self.database, [{"docket_number": f"A-{n}"} for n in (1, 2)]
-        )
-        loader_class = self.failing_loader(failing)
-        with patch.object(merge_state_scrape_row, "max_retries", 0):
-            self.loader(loader_class).load()
-        failing.clear()
-
-        report = self.loader(loader_class).retry()
-
-        self.assertEqual(report.dispatched, 2)
-        self.assertEqual(self.ledger().totals().dispatched, 2)
-
     def test_a_row_the_retry_cannot_use_is_withdrawn(self) -> None:
         """A row the retry finds it can no longer use never goes back on the queue, and has been drained from the retry set, so nothing will ever settle it. Is its error taken back, rather than alerted on by every later verification of the run?"""
         unusable: set[str] = set()
 
-        class UnusableOnRetry(self.failing_loader({"A-1"})):  # type: ignore[misc, valid-type]
+        class UnusableOnRetry(self.raising_loader({"A-1"})):  # type: ignore[misc, valid-type]
             def normalize(
                 self, payload: dict[str, Any], row: sqlite3.Row
             ) -> dict[str, Any] | None:
@@ -1815,8 +1673,7 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         _run_database(self.database, [{"docket_number": "A-1"}])
         ledger = self.ledger()
         ledger.dispatched(99, "A-99")
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -1841,41 +1698,8 @@ class JKentScrapeLoaderRetryTest(LoaderTestCase):
         self.assertEqual((report.errored, report.dispatched), (0, 0))
 
 
-class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
-    """Tests for putting back the documents extraction never came back on.
-
-    The document model is a stand-in, as it is for the dispatch tests: what
-    matters here is which query the retry asks and what it does with the
-    answer.
-    """
-
-    def document(self, pk: int, dispatched: bool = True) -> Any:
-        """A document row that reports whether extraction was dispatched."""
-        document = Mock(pk=pk)
-        document.extract.return_value = dispatched
-        return document
-
-    def document_model(self, outstanding: list[int]) -> Any:
-        """A stand-in document model reporting `outstanding` unextracted PKs.
-
-        Args:
-            outstanding: The PKs `unextracted` reports, both when a load
-                verifies itself and when a retry re-checks.
-
-        Returns:
-            The model.
-        """
-        model = Mock(__name__="Doc")
-        unextracted = model.unextracted.return_value
-        # What the wait polls on, what the report reads, and what a retry
-        # re-checks against, in that order.
-        unextracted.count.return_value = 0
-        unextracted.values_list.return_value = outstanding
-        unextracted.filter.return_value = [
-            self.document(pk) for pk in outstanding
-        ]
-        model.written_since.return_value.filter.return_value.count.return_value = 0
-        return model
+class JKentScrapeLoaderExtractionRetryTest(ExtractionTestCase):
+    """Tests for putting back the documents extraction never came back on."""
 
     def verified(self, outstanding: list[int], dispatched: int = 2) -> Any:
         """Run a load's verification over a stand-in document model.
@@ -1902,13 +1726,19 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         return model
 
     def test_outstanding_documents_are_held_for_retry(self) -> None:
-        """A run's verification already asks which of its documents are still unextracted. Are they written down while it has them?"""
-        self.verified([11, 12])
+        """A run's verification already asks which of its documents are still unextracted. Are they written down while it has them, and does a run whose documents all came back extracted leave no retry set behind at all?"""
+        for outstanding, expected in (([11, 12], {"11", "12"}), ([], set())):
+            with self.subTest(outstanding=outstanding):
+                self.clear_run_keys()
 
-        self.assertEqual(
-            set(self.redis.smembers(f"{self.key}:extraction_retry")),
-            {"11", "12"},
-        )
+                self.verified(outstanding)
+
+                self.assertEqual(self.extraction_retry(), expected)
+                self.assertEqual(
+                    self.redis.exists(f"{self.key}:extraction_retry"),
+                    int(bool(expected)),
+                    "An empty set costs the ledger no key at all.",
+                )
 
     def test_a_retry_re_checks_before_dispatching(self) -> None:
         """The set is a snapshot, and by retry time a later load or a sweep may have extracted some of it. Is the batch put back through `unextracted` rather than dispatched as it stands?"""
@@ -1949,8 +1779,7 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
         ledger = self.ledger()
         # Held for retry, but nothing ever recorded when the run began.
         ledger.retry_documents([11, 12])
-        logging.disable(logging.NOTSET)
-        self.addCleanup(logging.disable)
+        self.enable_logging()
 
         with self.assertLogs(
             "cl.corpus_importer.state.loader", "ERROR"
@@ -1958,22 +1787,12 @@ class JKentScrapeLoaderExtractionRetryTest(LoaderTestCase):
             self.loader(self.loader_class(document_model=model)).retry()
 
         self.assertEqual(
-            set(self.redis.smembers(f"{self.key}:extraction_retry")),
+            self.extraction_retry(),
             {"11", "12"},
             "The documents are still there to be swept up.",
         )
         self.assertIn("no longer know when the run began", logs.output[0])
         model.unextracted.return_value.filter.assert_not_called()
-
-    def test_a_run_with_nothing_outstanding_holds_nothing(self) -> None:
-        """A run whose documents all came back extracted should leave no retry set behind at all. Does it?"""
-        self.verified([])
-
-        self.assertEqual(
-            self.redis.exists(f"{self.key}:extraction_retry"),
-            0,
-            "An empty set costs the ledger no key at all.",
-        )
 
 
 class JKentScrapeLoaderCheckpointTest(LoaderTestCase):
@@ -2299,20 +2118,30 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         """The row the load the command built was told to start from."""
         return self.loader.call_args.kwargs["start_row"]
 
-    def test_retry_refuses_the_flags_that_pick_rows_for_it(self) -> None:
-        """A retry works from the rows the ledger is holding, so anything that says which rows to work on instead is asking for something a retry cannot do. Is each one refused rather than quietly ignored?"""
-        for flag in (
-            ("--start-row", "5"),
-            ("--auto-resume",),
-            ("--skip-load",),
-            ("--limit", "10"),
+    def test_contradictory_flags_are_refused(self) -> None:
+        """Some flags each ask for something the other rules out: a retry works from the rows the ledger is holding, so anything that says which rows to work on instead is asking for something a retry cannot do; --start-row and --auto-resume each say to start somewhere the other says not to; and --skip-load with --skip-verification skips the whole command. Is the operator made to pick, with the flags that clash named, rather than one of them being quietly ignored or guessed at?"""
+        for arguments, named in (
+            (("--retry", "--start-row", "5"), ("--start-row",)),
+            (("--retry", "--auto-resume"), ("--auto-resume",)),
+            (("--retry", "--skip-load"), ("--skip-load",)),
+            (("--retry", "--limit", "10"), ("--limit",)),
+            (
+                ("--auto-resume", "--start-row", "5"),
+                # Quotes back the value that has to go.
+                ("--start-row 5", "--auto-resume"),
+            ),
+            (
+                ("--skip-load", "--skip-verification"),
+                ("--skip-load", "--skip-verification"),
+            ),
         ):
-            with self.subTest(flag[0]):
+            with self.subTest(" ".join(arguments)):
                 with self.assertRaises(CommandError) as raised:
-                    self.load("--retry", *flag)
+                    self.load(*arguments)
 
-                self.assertIn(flag[0], str(raised.exception))
-                self.loader.return_value.retry.assert_not_called()
+                for flag in named:
+                    self.assertIn(flag, str(raised.exception))
+                self.loader.assert_not_called()
 
     def test_a_retry_with_no_dockets_leaves_the_run_database_alone(
         self,
@@ -2339,7 +2168,7 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         )
 
     def test_a_retry_with_dockets_fetches_the_run_database(self) -> None:
-        """A docket held for retry is named by position, so its payload has to be read back out of the run database. Is it fetched then?"""
+        """A docket held for retry is named by position, so its payload has to be read back out of the run database. Is it fetched then, and is the retry loader built without the `start_row` and `limit` that would each narrow what it re-dispatches behind the ledger's back?"""
         self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
         self.loader.return_value.retry.return_value = LoadReport()
 
@@ -2351,14 +2180,6 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
             Path("/nonexistent") / "nycourts_gov/2026-08-08.db",
             "Built on the downloaded copy rather than on the bucket path.",
         )
-
-    def test_a_retry_is_not_told_where_to_start(self) -> None:
-        """`start_row` and `limit` would each narrow what a retry re-dispatches behind the ledger's back. Is the retry loader built without them?"""
-        self.loader.return_value.ledger.retry_counts.return_value = (3, 0)
-        self.loader.return_value.retry.return_value = LoadReport()
-
-        self.load("--retry")
-
         self.assertNotIn("start_row", self.loader.call_args.kwargs)
         self.assertNotIn("limit", self.loader.call_args.kwargs)
 
@@ -2372,20 +2193,6 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
             self.load()
 
         self.assertIn("nothing was dispatched", str(raised.exception))
-
-    def test_start_row_and_auto_resume_are_contradictory(self) -> None:
-        """Each says to start somewhere the other says not to, and honouring either one quietly does what the other asked against. Is the operator made to pick, rather than one of them being guessed at?"""
-        with self.assertRaises(CommandError) as raised:
-            self.load("--auto-resume", "--start-row", "5")
-
-        message = str(raised.exception)
-        self.assertIn(
-            "--start-row 5",
-            message,
-            "The message quotes back the value that has to go.",
-        )
-        self.assertIn("--auto-resume", message)
-        self.loader.assert_not_called()
 
     def test_the_report_names_what_was_checked(self) -> None:
         """A check that found nothing is still worth saying ran.
@@ -2435,26 +2242,17 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
 
         self.assertEqual(self.loader.call_args.kwargs["ingest_throttle"], 0)
 
-    def test_auto_resume_starts_from_the_checkpoint(self) -> None:
-        """Does --auto-resume on its own pick the load up where the last one left off?"""
-        self.load("--auto-resume")
+    def test_the_load_starts_where_it_was_told_to(self) -> None:
+        """Does --auto-resume on its own pick the load up where the last one left off, and --start-row on its own start it where it says? --start-row defaults to zero, which asks for nothing: is a zero left out of the objection to combining the two?"""
+        for arguments, expected in (
+            (("--auto-resume",), self.CHECKPOINT),
+            (("--start-row", "5"), 5),
+            (("--auto-resume", "--start-row", "0"), self.CHECKPOINT),
+        ):
+            with self.subTest(" ".join(arguments)):
+                self.load(*arguments)
 
-        self.assertEqual(self.started_at(), self.CHECKPOINT)
-
-    def test_start_row_alone_is_passed_through(self) -> None:
-        """Does --start-row on its own start the load where it says?"""
-        self.load("--start-row", "5")
-
-        self.assertEqual(self.started_at(), 5)
-
-    def test_a_zero_start_row_does_not_stand_in_the_way(self) -> None:
-        """--start-row defaults to zero, which asks for nothing.
-
-        Is it left out of the objection?
-        """
-        self.load("--auto-resume", "--start-row", "0")
-
-        self.assertEqual(self.started_at(), self.CHECKPOINT)
+                self.assertEqual(self.started_at(), expected)
 
     def test_dropped_dockets_are_named(self) -> None:
         """Rows celery lost are the whole reason the load verifies itself.
@@ -2481,9 +2279,9 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
     def test_skip_load_checks_a_stored_ledger_without_a_download(
         self,
     ) -> None:
-        """A run that gave up while its queues were still moving has to be settleable later. Does --skip-load do that from the ledger alone, without fetching a run database that can run to hundreds of megabytes?"""
+        """A run that gave up while its queues were still moving has to be settleable later. Does --skip-load do that from the ledger alone, without fetching a run database that can run to hundreds of megabytes? Printing `0 invalid` for a run whose rows were never opened reads as "no bad rows" when it means "did not look": are those counts left out, and said to be left out?"""
         self.loader.return_value.verify_only.return_value = LoadReport(
-            rows_read=False, dispatched=9, merged=9
+            rows_read=False, dispatched=9, merged=8, rejected=1
         )
 
         with patch(
@@ -2495,15 +2293,6 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         download.assert_not_called()
         self.loader.return_value.verify_only.assert_called_once_with()
         self.loader.return_value.load.assert_not_called()
-
-    def test_skip_load_does_not_claim_rows_it_never_read(self) -> None:
-        """Printing `0 invalid` for a run whose rows were never opened reads as "no bad rows" when it means "did not look". Are those counts left out, and said to be left out?"""
-        self.loader.return_value.verify_only.return_value = LoadReport(
-            rows_read=False, dispatched=9, merged=8, rejected=1
-        )
-
-        self.load("--skip-load")
-
         written = self.output.getvalue()
         summary = written.splitlines()[0]
         self.assertEqual(
@@ -2512,16 +2301,6 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
         self.assertNotIn("seen", summary)
         self.assertNotIn("invalid", summary)
         self.assertIn("no run database was opened", written)
-
-    def test_skipping_both_phases_leaves_nothing_to_do(self) -> None:
-        """The two flags each skip one half of the command, and are otherwise free to combine. Is the operator made to pick when they skip both?"""
-        with self.assertRaises(CommandError) as raised:
-            self.load("--skip-load", "--skip-verification")
-
-        message = str(raised.exception)
-        self.assertIn("--skip-load", message)
-        self.assertIn("--skip-verification", message)
-        self.loader.assert_not_called()
 
     def test_counts_line_up_under_one_another(self) -> None:
         """A run touching several models is read down a column.
@@ -2548,46 +2327,36 @@ class LoadStateScrapeCommandTest(SimpleTestCase):
             ],
         )
 
-    def test_a_timed_out_wait_is_not_reported_as_lost_work(self) -> None:
-        """Giving up on a queue that was still coming down is not a finding.
+    def test_only_a_stalled_wait_is_reported_as_lost_work(self) -> None:
+        """A queue that stopped moving is a finding, and the output should say so rather than hedging; giving up on a queue that was still coming down is not. Does the output name the timeout as the reason it stopped watching, and point only then at the flag that settles it?"""
+        for merge_wait, reported, points_at_skip_load in (
+            (
+                WaitOutcome.TIMED_OUT,
+                "never reported back yet -- timed out",
+                True,
+            ),
+            (
+                WaitOutcome.STALLED,
+                "never reported back -- queue stalled",
+                False,
+            ),
+        ):
+            with self.subTest(merge_wait=merge_wait):
+                self.errors = StringIO()
+                self.loader.return_value.load.return_value = LoadReport(
+                    seen=9,
+                    dispatched=9,
+                    merged=4,
+                    missing_count=5,
+                    missing={5: "APL-2024-00177"},
+                    merge_wait=merge_wait,
+                )
 
-        Does the output name the timeout as the reason it stopped watching, and
-        point at the flag that settles it?
-        """
-        self.loader.return_value.load.return_value = LoadReport(
-            seen=9,
-            dispatched=9,
-            merged=4,
-            missing_count=5,
-            missing={5: "APL-2024-00177"},
-            merge_wait=WaitOutcome.TIMED_OUT,
-        )
+                self.load()
 
-        self.load()
-
-        errors = self.errors.getvalue()
-        self.assertIn("never reported back yet -- timed out", errors)
-        self.assertIn("--skip-load", errors)
-
-    def test_a_stalled_wait_is_reported_as_lost_work(self) -> None:
-        """A queue that stopped moving is a finding.
-
-        Does the output say so rather than hedging?
-        """
-        self.loader.return_value.load.return_value = LoadReport(
-            seen=9,
-            dispatched=9,
-            merged=4,
-            missing_count=5,
-            missing={5: "APL-2024-00177"},
-            merge_wait=WaitOutcome.STALLED,
-        )
-
-        self.load()
-
-        errors = self.errors.getvalue()
-        self.assertIn("never reported back -- queue stalled", errors)
-        self.assertNotIn("--skip-load", errors)
+                errors = self.errors.getvalue()
+                self.assertIn(reported, errors)
+                self.assertEqual("--skip-load" in errors, points_at_skip_load)
 
     def test_the_files_a_run_moved_are_written_out(self) -> None:
         """A load that publishes files does work no row count shows.
