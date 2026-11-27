@@ -3466,6 +3466,29 @@ class ToggleDocketAlertHtmxTest(TestCase):
                 self.assertContains(r, label)
                 self.assertContains(r, message)
 
+    @override_settings(MAX_FREE_DOCKET_ALERTS=1)
+    def test_table_refusal_fills_the_quota_dialog_count(self) -> None:
+        """A refused toggle from the alerts table fills the page's dialog count.
+
+        The button stays on "Enable", and the count is spelled out the way
+        the dialog's text reads.
+        """
+        DocketAlertFactory(
+            user=self.profile.user, docket=DocketFactory(source=Docket.RECAP)
+        )
+        r = self.toggle(source="docket_alerts_table")
+        self.assertTemplateUsed(r, self.TABLE_FRAGMENT)
+        self.assertEqual(self.subscriptions(), 0)
+        self.assertEqual(
+            r["HX-Trigger-After-Swap"], "docket-alert-quota-reached"
+        )
+        self.assertContains(r, "Enable alert for")
+        self.assertContains(
+            r,
+            '<span id="docket-alerts-quota-count" hx-swap-oob="innerHTML">one</span>',
+            html=True,
+        )
+
     def test_htmx_without_id_is_a_bad_request(self) -> None:
         """A missing or malformed docket id is the caller's error.
 
