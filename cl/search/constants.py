@@ -88,6 +88,7 @@ SEARCH_RECAP_CHILD_QUERY_FIELDS = [
     "short_description",
     "plain_text",
     "document_type",
+    "disposition",
 ]
 SEARCH_RECAP_PARENT_QUERY_FIELDS = [
     "case_name_full",
@@ -168,6 +169,7 @@ SEARCH_ALERTS_OPINION_HL_FIELDS = {
 SEARCH_RECAP_CHILD_HL_FIELDS = {
     "short_description": 0,
     "description": 0,
+    "disposition": 0,
     "plain_text": 100,
 }
 SEARCH_OPINION_CHILD_HL_FIELDS = {
