@@ -3125,11 +3125,11 @@ class RecapDocketFetchApiTest(TestCase):
     )
     def test_fetch_acms_court_docket_not_on_acms_uses_appellate_report(
         self,
-        mock_fetch_appellate_docket,
-        mock_acms_query,
-        mock_court_accessible,
-        mock_cookies,
-    ):
+        mock_fetch_appellate_docket: MagicMock,
+        mock_acms_query: mock.AsyncMock,
+        mock_court_accessible: MagicMock,
+        mock_cookies: MagicMock,
+    ) -> None:
         """A pre-ACMS case in an ACMS court comes from the classic report."""
         fq = PacerFetchQueue.objects.create(
             user=self.user,
@@ -3174,11 +3174,11 @@ class RecapDocketFetchApiTest(TestCase):
     )
     def test_fetch_appellate_docket_rejected_fails_without_retry(
         self,
-        mock_acms_query,
-        mock_appellate_docket_report,
-        mock_court_accessible,
-        mock_cookies,
-    ):
+        mock_acms_query: mock.AsyncMock,
+        mock_appellate_docket_report: MagicMock,
+        mock_court_accessible: MagicMock,
+        mock_cookies: MagicMock,
+    ) -> None:
         """A 401 or 403 from the court fails the fetch on the first attempt."""
         for status in (401, 403):
             with self.subTest(status=status):
@@ -3214,11 +3214,11 @@ class RecapDocketFetchApiTest(TestCase):
     )
     def test_fetch_appellate_docket_server_error_is_retried(
         self,
-        mock_acms_query,
-        mock_appellate_docket_report,
-        mock_court_accessible,
-        mock_cookies,
-    ):
+        mock_acms_query: mock.AsyncMock,
+        mock_appellate_docket_report: MagicMock,
+        mock_court_accessible: MagicMock,
+        mock_cookies: MagicMock,
+    ) -> None:
         """A 503 from the court keeps the retry behaviour."""
         mock_acms_query.side_effect = self._acms_http_error(503)
         fq = PacerFetchQueue.objects.create(

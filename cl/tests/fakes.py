@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any
 from unittest.mock import MagicMock
 
 from httpx import HTTPStatusError, Request, Response, TimeoutException
@@ -71,8 +72,8 @@ class FakeAcmsCaseSearch(FakeDocketReport):
 
 
 class FakeAcmsDocketReport(FakeDocketReport):
-    async def query_by_docket_number(self, *args, **kwargs):
-        pass
+    async def query_by_docket_number(self, docket_number: str) -> None:
+        """Pretend the ACMS lookup ran; ``data`` serves the fake docket."""
 
     @property
     def data(self):
@@ -107,7 +108,8 @@ class FakeEmptyAcmsDocketReport(FakeAcmsDocketReport):
     """An ACMS court that has no case for the requested docket number."""
 
     @property
-    def data(self):
+    def data(self) -> dict[str, Any]:
+        """Empty, as the real report answers when no case matches."""
         return {}
 
 
