@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django import forms
@@ -48,7 +48,7 @@ from django.utils.safestring import SafeString
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.etree import _Attrib, _Element
-from lxml.html import fromstring
+from lxml.html import fragments_fromstring, fromstring
 from waffle.models import Flag
 from waffle.testutils import override_flag
 
@@ -59,6 +59,9 @@ from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
 from cl.citations.utils import slugify_reporter
+from cl.favorites import forms_v2 as favorites_forms_v2
+from cl.favorites.factories import NoteFactory
+from cl.favorites.forms import NoteForm
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
@@ -91,6 +94,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    PartyGroup,
     build_case_transfer_metadata,
     build_citation_string,
     build_docket_metadata,
@@ -114,13 +118,22 @@ from cl.opinion_page.views import (
     view_recap_document,
 )
 from cl.people_db.factories import (
+    AttorneyFactory,
+    AttorneyOrganizationFactory,
     PartyFactory,
     PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PositionFactory,
+    RoleFactory,
 )
-from cl.people_db.models import Person
+from cl.people_db.models import (
+    CriminalCount,
+    Party,
+    PartyType,
+    Person,
+    Role,
+)
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
@@ -789,18 +802,15 @@ class ViewRecapDocumentTest(TestCase):
         )
         await add_docket_entries(docket, de_data["docket_entries"])
 
-        att_data = cast(
-            dict[str, Any],
-            await sync_to_async(AppellateAttachmentPageFactory)(
-                attachments=[
-                    AppellateAttachmentFactory(
-                        attachment_number=1, pacer_doc_id="288651"
-                    ),
-                    AppellateAttachmentFactory(),
-                ],
-                pacer_doc_id="288651",
-                pacer_case_id="104490",
-            ),
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1, pacer_doc_id="288651"
+                ),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="288651",
+            pacer_case_id="104490",
         )
         await merge_attachment_page_data(
             court,
@@ -4461,6 +4471,74 @@ class TestBlockSearchItemAjax(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    async def _block_docket_with_htmx(
+        self, user: User
+    ) -> _MonkeyPatchedASGIResponse:
+        """Posts an htmx request to block the fixture docket as user."""
+        client = AsyncClient()
+        await client.aforce_login(user=user)
+        return await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"HX-Request": "true"},
+        )
+
+    async def test_htmx_request_blocks_docket(self) -> None:
+        """An htmx request from a user with change_docket blocks the docket."""
+        await self._block_docket_with_htmx(self.docket_only.user)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+    async def test_htmx_response_fills_the_docket_swap_targets(self) -> None:
+        """An htmx request is answered with out-of-band swaps for the badge and status nodes of the blocked docket."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        docket_pk = self.cluster.docket.pk
+        swaps = {
+            el.get("id"): el.get("hx-swap-oob")
+            for el in fragments_fromstring(response.content.decode())
+        }
+        self.assertEqual(
+            swaps,
+            {
+                f"docket-block-{docket_pk}": "innerHTML",
+                f"docket-block-status-{docket_pk}": "innerHTML",
+            },
+        )
+
+    async def test_htmx_response_badge_takes_the_button_id(self) -> None:
+        """The badge swapped in carries the Block button's id and is focusable from script, so htmx can move focus to it."""
+        response = await self._block_docket_with_htmx(self.docket_only.user)
+
+        docket_pk = self.cluster.docket.pk
+        target, _ = fragments_fromstring(response.content.decode())
+        self.assertEqual(
+            [
+                (el.get("id"), el.get("tabindex"))
+                for el in target.iterdescendants()
+            ],
+            [(f"docket-block-control-{docket_pk}", "-1")],
+        )
+
+    async def test_htmx_request_must_be_a_post(self) -> None:
+        """An htmx request with another method gets a 405."""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.get(
+            reverse("block_item"), headers={"HX-Request": "true"}
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
+
+    async def test_htmx_request_denied_without_permission(self) -> None:
+        """An htmx request from a user without change_docket gets a 403 and leaves the docket unblocked."""
+        response = await self._block_docket_with_htmx(self.viewer.user)
+
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        await self.cluster.docket.arefresh_from_db()
+        self.assertFalse(self.cluster.docket.blocked)
+
 
 class TestAdminButtonsVisibility(TestCase):
     """Test that admin buttons are shown or hidden based on user permissions across the opinion, docket, and RECAP document pages."""
@@ -5861,7 +5939,7 @@ class BuildDocketTabsTest(SimpleTestCase):
             icons,
             {
                 "entries": "file_text",
-                "parties": "group",
+                "parties": "people",
                 "idb": "circle_question_mark",
                 "authorities": "court",
             },
@@ -5982,6 +6060,462 @@ class DocketIdbV2TemplateTest(TestCase):
         ]
         self.assertEqual(len(current), 1)
         self.assertIn("FJC Integrated Database", current[0].text_content())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_context_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPartiesContextTest(TestCase):
+    """The party groups the parties tab hands the v2 template.
+
+    Built from the view's prefetched party types.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        # lookup_key is unique, so every firm sets its own.
+        cls.firm = AttorneyOrganizationFactory(
+            lookup_key="relman",
+            name="Relman Colfax",
+            address1="1225 19th St. NW",
+            address2="",
+            city="Washington",
+            state="DC",
+            zip_code="20036",
+        )
+        cls.lead = AttorneyFactory(
+            name="Sasha Samberg-Champion",
+            phone="(202) 728-1888",
+            fax="(202) 728-0000",
+            docket=cls.docket,
+            organizations=[cls.firm],
+        )
+        cls.other = AttorneyFactory(
+            name="Bruce D. Brown",
+            docket=cls.docket,
+            organizations=[AttorneyOrganizationFactory(lookup_key="rcfp")],
+        )
+        # Inserted before the plaintiff that sorts first, so a name-ordered
+        # result can only come from the view. PACER names carry HTML entities.
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="M&amp;B CAPITAL ADVISERS",
+                docket=cls.docket,
+                attorneys=[cls.other],
+            ),
+            name="Plaintiff",
+        )
+        # PartyFactory links each attorney through a role with no type.
+        plaintiff = PartyFactory(
+            name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            docket=cls.docket,
+            attorneys=[cls.lead, cls.other],
+        )
+        for role, role_raw, date_action in (
+            (Role.ATTORNEY_LEAD, "", None),
+            (Role.PRO_HAC_VICE, "PRO HAC VICE", None),
+            (Role.TERMINATED, "TERMINATED: 06/03/2021", date(2021, 6, 3)),
+        ):
+            RoleFactory(
+                party=plaintiff,
+                attorney=cls.lead,
+                docket=cls.docket,
+                role=role,
+                role_raw=role_raw,
+                date_action=date_action,
+            )
+        RoleFactory(
+            party=plaintiff,
+            attorney=cls.other,
+            docket=cls.docket,
+            role=Role.UNKNOWN,
+        )
+        PartyTypeFactory(
+            docket=cls.docket,
+            party=plaintiff,
+            name="Plaintiff",
+            date_terminated=date(2016, 4, 21),
+        )
+        defendant_type = PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="UNITED STATES OF AMERICA", docket=cls.docket
+            ),
+            name="Defendant",
+            highest_offense_level_opening="Felony",
+        )
+        CriminalCount.objects.create(
+            party_type=defendant_type,
+            name="18:1001 False Statements",
+            disposition="",
+            status=CriminalCount.PENDING,
+        )
+
+    async def get_party_groups(self) -> list[PartyGroup]:
+        """Requests the parties tab and returns its party groups."""
+        r = await self.async_client.get(
+            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return r.context["party_groups"]
+
+    async def test_parties_group_by_type_in_name_order(self) -> None:
+        """One group per party type, types and parties in name order.
+
+        Names come unescaped.
+        """
+        groups = await self.get_party_groups()
+        self.assertEqual(
+            [group["name"] for group in groups], ["Defendant", "Plaintiff"]
+        )
+        self.assertEqual(
+            [party["name"] for party in groups[1]["parties"]],
+            ["AMERICAN ASSOCIATION OF LAW LIBRARIES", "M&B CAPITAL ADVISERS"],
+        )
+
+    async def test_termination_date_is_formatted_or_empty(self) -> None:
+        """A terminated party carries its date in the site format.
+
+        An active one carries an empty string.
+        """
+        groups = await self.get_party_groups()
+        defendant, plaintiff = (group["parties"][0] for group in groups)
+        self.assertEqual(plaintiff["date_terminated"], "April 21, 2016")
+        self.assertEqual(defendant["date_terminated"], "")
+
+    async def test_attorneys_are_display_ready(self) -> None:
+        """Attorneys come sorted by name with their firm's address as lines.
+
+        Role lines use the raw PACER value when set and the choice label
+        otherwise, followed by the action date; a role with neither reads
+        "None" and unknown roles are left out.
+        """
+        groups = await self.get_party_groups()
+        attorneys = groups[1]["parties"][0]["attorneys"]
+        self.assertEqual(
+            [attorney["name"] for attorney in attorneys],
+            ["Bruce D. Brown", "Sasha Samberg-Champion"],
+        )
+        other, lead = attorneys
+        self.assertEqual(lead["phone"], "(202) 728-1888")
+        self.assertEqual(lead["fax"], "(202) 728-0000")
+        self.assertEqual(
+            lead["roles"],
+            [
+                "Lead attorney",
+                "PRO HAC VICE",
+                "TERMINATED: 06/03/2021 (June 3, 2021)",
+                "None",
+            ],
+        )
+        self.assertEqual(
+            lead["firms"],
+            [
+                {
+                    "pk": self.firm.pk,
+                    "name": "Relman Colfax",
+                    "label": "Relman Colfax",
+                    "address_lines": [
+                        "1225 19th St. NW",
+                        "Washington, DC 20036",
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(other["roles"], ["None"])
+
+    async def test_criminal_data_only_for_parties_that_have_it(self) -> None:
+        """A party with any criminal data gets the criminal table.
+
+        Counts, complaints or offense levels all qualify; the table carries
+        "None" rows for the kinds the party lacks.
+        """
+        groups = await self.get_party_groups()
+        defendant, plaintiff = (group["parties"][0] for group in groups)
+        self.assertNotIn("criminal", plaintiff)
+        criminal = defendant["criminal"]
+        self.assertEqual(
+            criminal["rows"],
+            [
+                {
+                    "label": "Pending Count",
+                    "name": "18:1001 False Statements",
+                    "disposition": "None",
+                },
+                {"label": "Complaint", "name": "None", "disposition": "None"},
+            ],
+        )
+        self.assertEqual(criminal["highest_offense_level_opening"], "Felony")
+        self.assertEqual(criminal["highest_offense_level_terminated"], "None")
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_pages_waffle")
+class DocketPartiesPaginationTest(TestCase):
+    """Both designs of the parties tab serve 1,000 party types per page."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        # Bulk inserts: the factories would create an attorney and a firm
+        # per party, far more than a page boundary needs.
+        parties = Party.objects.bulk_create(
+            Party(name=f"PARTY {i:04d}") for i in range(1001)
+        )
+        PartyType.objects.bulk_create(
+            PartyType(
+                docket=cls.docket,
+                party=party,
+                name="Defendant" if i < 1000 else "Plaintiff",
+            )
+            for i, party in enumerate(parties)
+        )
+
+    def get_page(self, page: int) -> HttpResponse:
+        """Requests one page of the parties tab."""
+        url = reverse(
+            "docket_parties", args=[self.docket.pk, self.docket.slug]
+        )
+        r = self.client.get(url, {"page": page})
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        return r
+
+    @override_flag("use_new_design", active=True)
+    def test_v2_pages_the_party_types(self) -> None:
+        """The v2 tab renders one page of parties and its pager."""
+        r = self.get_page(1)
+        self.assertTemplateUsed(r, "v2_docket_parties.html")
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Defendant"])
+        self.assertEqual(len(groups[0]["parties"]), 1000)
+        self.assertEqual(r.context["parties_paginator"].paginator.num_pages, 2)
+
+        r = self.get_page(2)
+        groups = r.context["party_groups"]
+        self.assertEqual([group["name"] for group in groups], ["Plaintiff"])
+        self.assertEqual(groups[0]["parties"][0]["name"], "PARTY 1000")
+
+    @override_flag("use_new_design", active=False)
+    def test_legacy_pages_the_party_types(self) -> None:
+        """The legacy tab gets its parties grouped by type for one page."""
+        r = self.get_page(2)
+        self.assertTemplateUsed(r, "docket_parties.html")
+        self.assertTemplateNotUsed(r, "v2_docket_parties.html")
+        self.assertEqual(list(r.context["parties"]), ["Plaintiff"])
+        self.assertEqual(
+            [pt.party.name for pt in r.context["parties"]["Plaintiff"]],
+            ["PARTY 1000"],
+        )
+        self.assertEqual(r.context["parties_paginator"].number, 2)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_parties_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPartiesV2TemplateTest(TestCase):
+    """The v2 Parties and Attorneys tab.
+
+    `WAFFLE_CACHE_PREFIX` isolates the flag cache from parallel workers, as
+    in DocketPageV2TemplateTest.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            source=Docket.RECAP,
+        )
+        cls.firm = AttorneyOrganizationFactory(
+            name="Relman Colfax",
+            city="Washington",
+            state="DC",
+            zip_code="20036",
+        )
+        # PACER contact blocks without a recipient line leave the firm nameless.
+        cls.nameless_firm = AttorneyOrganizationFactory(
+            lookup_key="nameless", name="", address1="625 Indiana Avenue, NW"
+        )
+        cls.attorney = AttorneyFactory(
+            name="Sasha Samberg-Champion",
+            docket=cls.docket,
+            organizations=[cls.firm, cls.nameless_firm],
+        )
+        cls.party = PartyFactory(
+            name="AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            docket=cls.docket,
+            attorneys=[cls.attorney],
+        )
+        PartyTypeFactory(docket=cls.docket, party=cls.party, name="Amicus")
+        RoleFactory(
+            party=cls.party,
+            docket=cls.docket,
+            attorney=AttorneyFactory(
+                name="Thomas &lt;Unknown&gt; &amp; Sons",
+                docket=cls.docket,
+                organizations=[
+                    AttorneyOrganizationFactory(
+                        lookup_key="mb", name="M&amp;B Capital"
+                    )
+                ],
+            ),
+        )
+        charged = PartyTypeFactory(
+            docket=cls.docket,
+            party=PartyFactory(
+                name="UNITED STATES OF AMERICA",
+                docket=cls.docket,
+                attorneys=[cls.attorney],
+            ),
+            name="Defendant",
+            highest_offense_level_opening="Felony",
+        )
+        CriminalCount.objects.create(
+            party_type=charged,
+            name="18:1001 False Statements",
+            disposition="",
+            status=CriminalCount.PENDING,
+        )
+        cls.editor = UserProfileWithParentsFactory(
+            user__username="parties_editor",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        change_perms = Permission.objects.filter(
+            content_type__app_label="people_db",
+            codename__in=[
+                "change_party",
+                "change_attorney",
+                "change_attorneyorganization",
+            ],
+        )
+        cls.editor.user.user_permissions.add(*change_perms)
+
+    async def get_page(self) -> HttpResponse:
+        """Requests the parties tab and checks it rendered through v2."""
+        r = await self.async_client.get(
+            reverse("docket_parties", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket_parties.html")
+        return r
+
+    async def test_renders_groups_parties_and_attorneys(self) -> None:
+        """Party types are h3 headings and parties h4 headings.
+
+        They sit under the tab's own h2. Each party with attorneys gets one
+        "Represented By:" heading and each charged party one "Criminal
+        Charges:" heading with its data.
+        """
+        content = (await self.get_page()).content.decode()
+        card = fromstring(content).get_element_by_id("tab-content")
+        self.assertEqual(
+            [h.text_content().strip() for h in card.iter("h3")],
+            ["Amicus", "Defendant"],
+        )
+        self.assertIn(
+            "AMERICAN ASSOCIATION OF LAW LIBRARIES",
+            [h.text_content().strip() for h in card.iter("h4")],
+        )
+        self.assertEqual(content.count("Represented By:"), 2)
+        self.assertEqual(content.count("Criminal Charges:"), 1)
+        self.assertIn("Sasha Samberg-Champion", content)
+        self.assertIn("Washington, DC 20036", content)
+        self.assertIn("18:1001 False Statements", content)
+        self.assertEqual(
+            [dd.text_content().strip() for dd in card.iter("dd")],
+            ["Felony", "None"],
+        )
+
+    async def test_names_are_decoded_once_then_escaped(self) -> None:
+        """Names stored with HTML entities render decoded once, then escaped.
+
+        M&amp;B reads M&B, and a name in angle brackets shows as text
+        instead of disappearing as a tag.
+        """
+        content = (await self.get_page()).content.decode()
+        self.assertIn("Thomas &lt;Unknown&gt; &amp; Sons", content)
+        self.assertIn("M&amp;B Capital", content)
+        self.assertNotIn("<Unknown>", content)
+        self.assertNotIn("&amp;amp;", content)
+        self.assertNotIn("&amp;lt;", content)
+
+    async def test_party_blocks_are_named_groups(self) -> None:
+        """Each party and its sub-blocks are groups named by their headings.
+
+        Assistive technology can then announce and skip them as units.
+        """
+        tree = fromstring((await self.get_page()).content.decode())
+        groups = tree.xpath(
+            '//*[@id="tab-content"]//*[@role="group"][@aria-labelledby]'
+        )
+        headings = [
+            tree.get_element_by_id(group.get("aria-labelledby"))
+            for group in groups
+        ]
+        self.assertEqual(
+            [
+                (h.tag, h.get("aria-label") or h.text_content().strip())
+                for h in headings
+            ],
+            [
+                ("h4", "AMERICAN ASSOCIATION OF LAW LIBRARIES"),
+                ("h5", "Represented By:"),
+                ("h4", "UNITED STATES OF AMERICA"),
+                ("h5", "Represented By:"),
+                ("h5", "Criminal Charges:"),
+            ],
+        )
+        self.assertIn(groups[1], groups[0].iterdescendants())
+        self.assertIn(groups[3], groups[2].iterdescendants())
+        self.assertIn(groups[4], groups[2].iterdescendants())
+
+    async def test_parties_tab_is_current(self) -> None:
+        """The tab navigation marks the parties tab as the current page."""
+        content = (await self.get_page()).content.decode()
+        current = [
+            el
+            for el in fromstring(content).iter("a")
+            if el.get("aria-current") == "page"
+        ]
+        self.assertEqual(len(current), 1)
+        self.assertIn("Parties and Attorneys", current[0].text_content())
+
+    async def test_edit_links_follow_the_change_permissions(self) -> None:
+        """Only users with the change permissions get the admin links.
+
+        Parties, attorneys and firms each need their own permission;
+        nameless firms get a link too.
+        """
+        admin_urls = [
+            reverse("admin:people_db_party_change", args=[self.party.pk]),
+            reverse(
+                "admin:people_db_attorney_change", args=[self.attorney.pk]
+            ),
+            reverse(
+                "admin:people_db_attorneyorganization_change",
+                args=[self.firm.pk],
+            ),
+            reverse(
+                "admin:people_db_attorneyorganization_change",
+                args=[self.nameless_firm.pk],
+            ),
+        ]
+        content = (await self.get_page()).content.decode()
+        for url in admin_urls:
+            self.assertNotIn(url, content)
+
+        await self.async_client.aforce_login(self.editor.user)
+        content = (await self.get_page()).content.decode()
+        for url in admin_urls:
+            self.assertIn(url, content)
+        self.assertIn(
+            f'aria-label="Edit firm {self.nameless_firm.pk}"', content
+        )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
@@ -6203,15 +6737,16 @@ class DocketPageV2StaffLinksTest(TestCase):
         return user
 
     async def _get_docket_page(
-        self, user: User | None = None
+        self, user: User | None = None, docket: Docket | None = None
     ) -> _MonkeyPatchedASGIResponse:
-        """Loads the v2 docket page, logged in as user when given and anonymously otherwise, whatever the client's previous login."""
+        """Loads the v2 page of docket, the fixture docket by default, logged in as user when given and anonymously otherwise, whatever the client's previous login."""
+        docket = docket or self.docket
         if user is None:
             await self.async_client.alogout()
         else:
             await self.async_client.aforce_login(user)
         r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+            reverse("view_docket", args=[docket.pk, docket.slug])
         )
         self.assertTemplateUsed(r, "v2_docket.html")
         return r
@@ -6285,6 +6820,74 @@ class DocketPageV2StaffLinksTest(TestCase):
             with self.subTest(recording=audio.pk):
                 href = reverse("admin:audio_audio_change", args=[audio.pk])
                 self.assertIn(audio.case_name, links[href])
+
+    @staticmethod
+    def _block_buttons(html: str) -> list[_Element]:
+        """Controls on the page that post to the block endpoint."""
+        return [
+            el
+            for el in fromstring(html).iter()
+            if el.get("hx-post") == reverse("block_item")
+        ]
+
+    async def test_change_docket_shows_the_block_button(self) -> None:
+        """change_docket shows one Block button that posts this docket to the block endpoint."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        r = await self._get_docket_page(user)
+        buttons = self._block_buttons(r.content.decode())
+        self.assertEqual(
+            [json.loads(button.get("hx-vals")) for button in buttons],
+            [{"id": str(self.docket.pk), "type": "docket"}],
+        )
+
+    async def test_failed_block_request_opens_the_error_toast(self) -> None:
+        """The Block button sits inside a toast that opens when its htmx request gets an error response or cannot be sent."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        r = await self._get_docket_page(user)
+        (button,) = self._block_buttons(r.content.decode())
+        toasts = [
+            el for el in button.iterancestors() if el.get("x-data") == "toast"
+        ]
+        self.assertEqual(
+            [
+                (
+                    toast.get("x-on:htmx:response-error"),
+                    toast.get("x-on:htmx:send-error"),
+                )
+                for toast in toasts
+            ],
+            [("open", "open")],
+        )
+
+    async def test_block_button_needs_change_docket(self) -> None:
+        """Users who cannot change dockets see no Block button, even with another docket permission."""
+        for label, user in (
+            ("anonymous", None),
+            ("no permissions", self.no_perms_user),
+            (
+                "view only",
+                await sync_to_async(self._user_with)("search.view_docket"),
+            ),
+        ):
+            with self.subTest(user=label):
+                r = await self._get_docket_page(user)
+                self.assertEqual(self._block_buttons(r.content.decode()), [])
+
+    async def test_blocked_docket_shows_the_badge_instead_of_the_button(
+        self,
+    ) -> None:
+        """A blocked docket shows change_docket users the Blocked badge in the button's place, and no Block button."""
+        user = await sync_to_async(self._user_with)("search.change_docket")
+        blocked = await sync_to_async(DocketFactory)(
+            court=self.docket.court, source=Docket.RECAP, blocked=True
+        )
+        r = await self._get_docket_page(user, blocked)
+        html = r.content.decode()
+        self.assertEqual(self._block_buttons(html), [])
+        target = fromstring(html).get_element_by_id(
+            f"docket-block-{blocked.pk}"
+        )
+        self.assertEqual(" ".join(target.text_content().split()), "Blocked")
 
     async def test_users_without_permissions_see_no_admin_links(
         self,
@@ -6690,6 +7293,12 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertEqual(link.get("href"), download_path)
         self.assertEqual(link.get("rel"), "nofollow")
         self.assertEqual(link.get("x-on:click.prevent"), "start")
+        self.assertEqual(link.get("x-bind:aria-busy"), "busy")
+        busy_button = link.xpath("ancestor::*[@x-busy-button]")
+        self.assertEqual(len(busy_button), 1)
+        status = busy_button[0].xpath('./*[@role="status"]')
+        self.assertEqual(len(status), 1)
+        self.assertTrue(status[0].get("data-busy-text"))
         self.assertIsNone(link.get("hx-get"))
         self.assertNotIn("sign in required", link.text_content())
         component = link.xpath('ancestor::*[@x-data="download"]')
@@ -7144,3 +7753,129 @@ class DocketFilterPaginationWiringTest(TestCase):
             "210",
             f"range total should be the paginator count; nav text={nav_text}",
         )
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_note_form_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketNoteFormV2Test(TestCase):
+    """Test that docket pages get the note form matching their template.
+
+    The legacy modal's JS finds its inputs by id, so a legacy template must
+    never receive the v2 form. `WAFFLE_CACHE_PREFIX` isolates this class's
+    `use_new_design` cache namespace from parallel test workers, as in
+    `DocketPageV2TemplateTest`.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(
+            source=Docket.RECAP, idb_data=FjcIntegratedDatabaseFactory()
+        )
+        OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(docket=cls.docket)
+            ),
+            cited_opinion=OpinionWithParentsFactory(),
+        )
+
+    async def test_docket_page_gets_the_v2_note_form(self) -> None:
+        """Does the v2 docket page get the v2 note form?"""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIs(
+            type(r.context["note_form"]), favorites_forms_v2.NoteForm
+        )
+
+    async def test_tabs_with_a_v2_template_get_the_v2_note_form(self) -> None:
+        """Do the tabs that have a v2 template get the v2 form?"""
+        for url_name, template in (
+            ("docket_idb_data", "v2_docket_idb_data.html"),
+            ("docket_parties", "v2_docket_parties.html"),
+        ):
+            with self.subTest(tab=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, args=[self.docket.pk, self.docket.slug])
+                )
+
+                self.assertTemplateUsed(r, template)
+                self.assertIs(
+                    type(r.context["note_form"]), favorites_forms_v2.NoteForm
+                )
+
+    async def test_tab_without_a_v2_template_keeps_the_v1_form(self) -> None:
+        """Does a tab with no v2 template keep the v1 form?
+
+        It must, even with the flag on, since it still renders the legacy
+        modal.
+        """
+        r = await self.async_client.get(
+            reverse(
+                "docket_authorities", args=[self.docket.pk, self.docket.slug]
+            )
+        )
+
+        self.assertTemplateUsed(r, "docket_authorities.html")
+        self.assertIs(type(r.context["note_form"]), NoteForm)
+
+    async def test_logged_out_user_gets_sign_in_links(self) -> None:
+        """Does a logged-out user see sign-in and register links?
+
+        The links return to the docket, and no note form is shown.
+        """
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+
+        r = await self.async_client.get(url)
+
+        content = r.content.decode()
+        self.assertIn("Add Note", content)
+        self.assertIn(f"{reverse('sign-in')}?next={quote(url)}", content)
+        self.assertIn(f"{reverse('register')}?next={quote(url)}", content)
+        self.assertNotIn(reverse("save_or_update_note"), content)
+
+    async def test_logged_in_user_gets_the_form_for_their_note(self) -> None:
+        """Does a logged-in user get the form for their note?
+
+        They see "Add Note", the save form and no Delete button until they
+        have a note, and then "Edit Note", their saved values and a Delete
+        button.
+        """
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await self.async_client.aforce_login(user)
+        url = reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+
+        content = (await self.async_client.get(url)).content.decode()
+        self.assertIn("Add Note", content)
+        self.assertNotIn("Edit Note", content)
+        self.assertIn(reverse("save_or_update_note"), content)
+        self.assertNotIn(reverse("delete_note"), content)
+
+        await sync_to_async(NoteFactory)(
+            content_object=self.docket, user=user, name="My saved note"
+        )
+        content = (await self.async_client.get(url)).content.decode()
+        self.assertIn("Edit Note", content)
+        self.assertIn("My saved note", content)
+        self.assertIn(reverse("delete_note"), content)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_note_form_v1_waffle")
+@override_flag("use_new_design", active=False)
+class DocketNoteFormV1Test(TestCase):
+    """Test that the legacy docket page keeps the v1 note form."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory(source=Docket.RECAP)
+
+    async def test_docket_page_gets_the_v1_note_form(self) -> None:
+        """Does the legacy docket page keep the v1 note form?"""
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+
+        self.assertTemplateUsed(r, "docket.html")
+        self.assertTemplateNotUsed(r, "v2_docket.html")
+        self.assertIs(type(r.context["note_form"]), NoteForm)

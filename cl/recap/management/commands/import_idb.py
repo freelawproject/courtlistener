@@ -64,7 +64,7 @@ def create_or_update_row(
         # Didn't hit a break b/c too many matches.
         logger.warning(
             "Got %s results when looking up row by filters: %s",
-            existing_row_count,
+            existing_rows.count(),
             fjc_filter,
         )
         fjc_row = None
@@ -112,7 +112,7 @@ class Command(VerboseCommand, CommandUtils):
         self.bool_fields = []
         self.date_fields = []
         self.court_fields = []
-        self.nullable_fields = None
+        self.nullable_fields = []
 
     @staticmethod
     def ensure_filetype_ok(filetype: int) -> None:
@@ -193,11 +193,10 @@ class Command(VerboseCommand, CommandUtils):
                 row.append(value)
 
         # Convert to dict with column headers as keys.
-        row_dict = {}
-        for row_value, col_header in zip(row, col_headers):
-            row_dict[col_header] = row_value
-
-        return row_dict
+        return {
+            col_header: row_value
+            for row_value, col_header in zip(row, col_headers)
+        }
 
     def handle(self, *args, **options):
         """Import each line of the file from the start line on.

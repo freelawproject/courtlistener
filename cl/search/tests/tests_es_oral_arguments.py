@@ -1836,8 +1836,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                     page=page + 1,
                     rows_per_page=page_size,
                 )
-                for result in hits.hits:
-                    ids_in_results.append(result.id)
+
+                ids_in_results.extend(result.id for result in hits.hits)
             self.assertEqual(len(ids_in_results), total_audios)
 
         # Test pagination requests.

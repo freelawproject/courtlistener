@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from multiprocessing import process
-from typing import Any, TypedDict, Unpack, overload
+from typing import Any, Never, TypedDict, Unpack, overload
 from zipfile import ZipFile
 
 import httpx
@@ -40,6 +40,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
+from juriscraper.pacer.attachment_page import AttachmentPageData
 from juriscraper.pacer.email import NotificationEmailData
 from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
@@ -844,7 +845,9 @@ async def process_recap_docket(pk):
 
 async def get_att_data_from_pq(
     pq: ProcessingQueue,
-) -> tuple[ProcessingQueue, dict, str | None]:
+) -> tuple[
+    ProcessingQueue, AttachmentPageData | dict[Never, Never], str | None
+]:
     """Extract attachment data from a ProcessingQueue object.
 
     Args:
@@ -1721,7 +1724,7 @@ async def process_recap_acms_appellate_attachment(
         return None
     logger.info("Parsing completed of item %s", pq)
 
-    if data == {}:
+    if not data:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid acms appellate attachment page upload."
         await mark_pq_status(pq, text, PROCESSING_STATUS.INVALID_CONTENT)
@@ -1794,7 +1797,7 @@ async def process_recap_appellate_attachment(
     att_data = get_data_from_appellate_att_report(text, pq.court_id)
     logger.info("Parsing completed for item %s", pq)
 
-    if att_data == {}:
+    if not att_data:
         # Bad attachment page.
         msg = "Not a valid appellate attachment page upload."
         pq_status, msg = await mark_pq_status(
@@ -2401,7 +2404,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         att_data = r.data
         text = json.dumps(r.data, default=str)
 
-    if att_data == {}:
+    if not att_data:
         msg = "Not a valid attachment page upload"
         async_to_sync(mark_fq_status)(
             fq, msg, PROCESSING_STATUS.INVALID_CONTENT
@@ -3022,7 +3025,7 @@ async def get_attachment_page_by_url(
     async with httpx.AsyncClient(follow_redirects=True, http2=True) as client:
         att_response = await client.get(att_page_url, timeout=req_timeout)
     att_data = get_data_from_att_report(att_response.text, court_id)
-    if att_data == {}:
+    if not att_data:
         msg = "Not a valid attachment page upload for recap.email"
         logger.warning(msg)
         return None
@@ -3257,11 +3260,14 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.error_message = ""
                 pq.save()
                 return pq
-
-        if is_bankr_short_doc_id:
-            r_msg = "Invalid short pacer_doc_id for bankruptcy court."
-        if not magic_number:
+        elif not magic_number:
             r_msg = "No magic number available to download the document."
+        elif is_bankr_short_doc_id:
+            r_msg = "Invalid short pacer_doc_id for bankruptcy court."
+        else:
+            # An existing PQ that isn't eligible for a retry.
+            return pq
+
         if created or should_download:
             async_to_sync(mark_pq_status)(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
@@ -3611,25 +3617,21 @@ def process_recap_email(
         return None
 
     dockets = data["dockets"]
-    # Look for the main docket that has the valid magic number
-    magic_number = pacer_doc_id = pacer_case_id = document_url = None
-    for docket_data in dockets:
-        docket_entry = docket_data["docket_entries"][0]
-        if docket_entry["pacer_magic_num"] is not None:
-            magic_number = docket_entry["pacer_magic_num"]
-            pacer_doc_id = docket_entry["pacer_doc_id"]
-            pacer_case_id = docket_entry["pacer_case_id"]
-            document_url = docket_entry["document_url"]
-            pacer_seq_no = docket_entry["pacer_seq_no"]
-            break
-
-    # Some notifications don't contain a magic number at all, assign the
-    # pacer_doc_id, pacer_case_id and document_url from the first docket entry.
-    if magic_number is None:
-        pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
-        pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
-        document_url = dockets[0]["docket_entries"][0]["document_url"]
-        pacer_seq_no = dockets[0]["docket_entries"][0]["pacer_seq_no"]
+    # Use the main docket that has the valid magic number. Some notifications
+    # don't contain a magic number at all; fall back to the first docket entry.
+    main_entry = next(
+        (
+            docket_data["docket_entries"][0]
+            for docket_data in dockets
+            if docket_data["docket_entries"][0]["pacer_magic_num"] is not None
+        ),
+        dockets[0]["docket_entries"][0],
+    )
+    magic_number = main_entry["pacer_magic_num"]
+    pacer_doc_id = main_entry["pacer_doc_id"]
+    pacer_case_id = main_entry["pacer_case_id"]
+    document_url = main_entry["document_url"]
+    pacer_seq_no = main_entry["pacer_seq_no"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.
@@ -4179,66 +4181,82 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
-    if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
-        if scotus_email.data["data"] is None:
-            raise TypeError("SCOTUS email parsed data is unexpectedly none")
-        handling_result = fetch_and_archive_scotus_docket_followup(
-            scotus_email.court_id,
-            scotus_email.data["data"],
-            scotus_email.data["followup_url"],
-        )
-    else:
-        handling_result = async_to_sync(scotus_email.handle_email)()
-    email_type = handling_result["email_type"]
-    data = handling_result["data"]
-
-    if email_type == SCOTUSEmailType.INVALID.value:
-        async_to_sync(mark_pq_status)(
-            epq,
-            "SCOTUS email format is invalid or not recognized.",
-            PROCESSING_STATUS.INVALID_CONTENT,
-            "status_message",
-        )
-        self.request.chain = None
-        return
-
-    if email_type == SCOTUSEmailType.CONFIRMATION.value:
-        if data == SCOTUSConfirmationResult.Success.value:
+    match scotus_email.email_type:
+        case SCOTUSEmailType.DOCKET_ENTRY:
+            if scotus_email.data["data"] is None:
+                raise TypeError(
+                    "SCOTUS email parsed data is unexpectedly none"
+                )
+            handling_result = fetch_and_archive_scotus_docket_followup(
+                scotus_email.court_id,
+                scotus_email.data["data"],
+                scotus_email.data["followup_url"],
+            )
+        case SCOTUSEmailType.CONFIRMATION:
+            handling_result = async_to_sync(scotus_email.handle_email)()
+        case SCOTUSEmailType.INVALID:
             async_to_sync(mark_pq_status)(
                 epq,
-                "Successfully confirmed SCOTUS subscription.",
-                PROCESSING_STATUS.SUCCESSFUL,
+                "SCOTUS email format is invalid or not recognized.",
+                PROCESSING_STATUS.INVALID_CONTENT,
                 "status_message",
             )
             self.request.chain = None
             return
 
-        async_to_sync(mark_pq_status)(
-            epq,
-            "Failed to confirm SCOTUS subscription.",
-            PROCESSING_STATUS.FAILED,
-            "status_message",
-        )
-        self.request.chain = None
-        return
-    try:
-        d, _, doc_pks = merge_scotus_docket(data)
-    except Exception as e:
-        async_to_sync(mark_pq_status)(
-            epq,
-            f"SCOTUS docket update error: {e}",
-            PROCESSING_STATUS.FAILED,
-            "status_message",
-        )
-    else:
-        async_to_sync(associate_related_instances)(
-            epq,
-            rd_id=doc_pks,
-            model_name="search.SCOTUSDocument",
-        )
-        msg = f"SCOTUS docket {d.docket_number} updated successfully."
-        status = PROCESSING_STATUS.SUCCESSFUL
-        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
+    match handling_result["email_type"]:
+        case SCOTUSEmailType.CONFIRMATION.value:
+            data = handling_result["data"]
+            if data == SCOTUSConfirmationResult.Success.value:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    "Successfully confirmed SCOTUS subscription.",
+                    PROCESSING_STATUS.SUCCESSFUL,
+                    "status_message",
+                )
+                self.request.chain = None
+                return
+
+            async_to_sync(mark_pq_status)(
+                epq,
+                "Failed to confirm SCOTUS subscription.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            self.request.chain = None
+            return
+        case SCOTUSEmailType.DOCKET_ENTRY.value:
+            data = handling_result["data"]
+            if not data:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    "SCOTUS docket result could not be processed.",
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                    "status_message",
+                )
+                self.request.chain = None
+                return
+            try:
+                d, _, doc_pks = merge_scotus_docket(data)
+            except Exception as e:
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    f"SCOTUS docket update error: {e}",
+                    PROCESSING_STATUS.FAILED,
+                    "status_message",
+                )
+            else:
+                async_to_sync(associate_related_instances)(
+                    epq,
+                    rd_id=doc_pks,
+                    model_name="search.SCOTUSDocument",
+                )
+                async_to_sync(mark_pq_status)(
+                    epq,
+                    f"SCOTUS docket {d.docket_number} updated successfully.",
+                    PROCESSING_STATUS.SUCCESSFUL,
+                    "status_message",
+                )
 
     return
 

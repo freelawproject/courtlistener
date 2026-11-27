@@ -182,12 +182,12 @@ class EmailBackend(BaseEmailBackend):
             msg_count = 0
             for email_message in email_messages:
                 original_recipients = normalize_addresses(email_message.to)
-                recipient_list = []
-
                 # Verify a recipient's email address is banned.
-                for email_address in original_recipients:
-                    if is_not_email_banned(email_address):
-                        recipient_list.append(email_address)
+                recipient_list = [
+                    email_address
+                    for email_address in original_recipients
+                    if is_not_email_banned(email_address)
+                ]
 
                 # If all recipients are banned, the message is discarded
                 if not recipient_list:

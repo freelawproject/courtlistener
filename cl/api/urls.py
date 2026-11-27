@@ -6,6 +6,7 @@ from rest_framework.routers import DefaultRouter
 
 from cl.alerts import api_views as alert_views
 from cl.api import views
+from cl.api.drf_routers import WaffleFlagRouter
 from cl.api.wiki_redirects import wiki_redirect_urlpatterns
 from cl.audio import api_views as audio_views
 from cl.citations import api_views as citations_views
@@ -193,8 +194,9 @@ router.register(
 
 API_TITLE = "CourtListener Legal Data API"
 
-# Version 4 Router
-router_v4 = DefaultRouter()
+# Version 4 Router. Its root hides the routes of flagged viewsets until their
+# flag is enabled.
+router_v4 = WaffleFlagRouter()
 router_v4.register(r"search", search_views.SearchV4ViewSet, basename="search")
 
 for prefix, viewset, basename in router.registry:
@@ -203,6 +205,23 @@ for prefix, viewset, basename in router.registry:
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
 router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
+
+# SCOTUS content (v4 only)
+router_v4.register(
+    r"scotus-docket-metadata",
+    search_views.ScotusDocketMetadataViewSet,
+    basename="scotusdocketmetadata",
+)
+router_v4.register(
+    r"scotus-docket-entries",
+    search_views.SCOTUSDocketEntryViewSet,
+    basename="scotusdocketentry",
+)
+router_v4.register(
+    r"scotus-documents",
+    search_views.SCOTUSDocumentViewSet,
+    basename="scotusdocument",
+)
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below

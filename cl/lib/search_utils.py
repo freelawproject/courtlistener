@@ -74,6 +74,7 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
+from cl.search.types import ESDocumentType
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -749,7 +750,7 @@ def do_es_search(
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
-    document_type = None
+    document_type: type[ESDocumentType] | None
     error_message = ""
     suggested_query = ""
     total_child_results: int | None = 0
@@ -780,6 +781,8 @@ def do_es_search(
             )
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
+        case _:
+            document_type = None
 
     if search_form.is_valid() and document_type:
         # Copy cleaned_data to preserve the original data when displaying the form

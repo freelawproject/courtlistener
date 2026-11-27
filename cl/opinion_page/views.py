@@ -59,8 +59,9 @@ from cl.citations.utils import (
     slugify_reporter,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites import forms_v2 as favorites_forms_v2
 from cl.favorites.decorators import track_view_counter
-from cl.favorites.forms import get_note_form_for
+from cl.favorites.forms import NoteForm, get_note_form_for
 from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
@@ -101,6 +102,7 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     build_idb_rows,
+    build_party_groups,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -380,12 +382,20 @@ async def view_docket(
     Shows 100 entries per page.
     """
     sort_order_asc = True
-    docket, context = await core_docket_data(request, pk)
+    use_new_design = await sync_to_async(flag_is_active)(
+        request, "use_new_design"
+    )
+    note_form_class = (
+        favorites_forms_v2.NoteForm if use_new_design else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, pk, note_form_class=note_form_class
+    )
 
     source = docket.get_entry_source()
     form_class = (
         forms_v2.DocketEntryFilterForm
-        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        if use_new_design
         else DocketEntryFilterForm
     )
     form = form_class(
@@ -493,9 +503,17 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket with pagination."""
-    page = request.GET.get("page", 1)
-    docket, context = await core_docket_data(request, docket_id)
+    """Show the parties and attorneys tab, 1,000 party types per page."""
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
@@ -527,6 +545,8 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
+    page = request.GET.get("page", 1)
+
     @sync_to_async
     def paginate_parties(
         party_queryset: QuerySet[PartyType], parties_page: int | str
@@ -540,15 +560,19 @@ async def view_parties(
             return paginator.page(paginator.num_pages)
 
     party_types_paginator = await paginate_parties(party_types, page)
-    parties: dict[str, list] = {}
     # Page.object_list is typed as _SupportsPagination, but here it is the
     # sliced QuerySet, which supports async iteration.
-    async for party_type in cast(
-        QuerySet[PartyType], party_types_paginator.object_list
-    ):
-        if party_type.name not in parties:
-            parties[party_type.name] = []
-        parties[party_type.name].append(party_type)
+    party_types_on_page = [
+        party_type
+        async for party_type in cast(
+            QuerySet[PartyType], party_types_paginator.object_list
+        )
+    ]
+    # TODO: Remove the legacy parties dict once new design is completely
+    # rolled out.
+    parties: dict[str, list] = {}
+    for party_type in party_types_on_page:
+        parties.setdefault(party_type.name, []).append(party_type)
 
     return TemplateResponse(
         request,
@@ -556,6 +580,9 @@ async def view_parties(
         context
         | {
             "parties": parties,
+            "party_groups": await sync_to_async(build_party_groups)(
+                party_types_on_page
+            ),
             "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
         },
@@ -573,7 +600,16 @@ async def docket_idb_data(
     Raises:
         Http404: If the docket has no IDB data.
     """
-    docket, context = await core_docket_data(request, docket_id)
+    # Temporary: this tab has a v2 template, so it picks the v2 note form
+    # itself until core_docket_data can choose it for every tab.
+    note_form_class = (
+        favorites_forms_v2.NoteForm
+        if await sync_to_async(flag_is_active)(request, "use_new_design")
+        else NoteForm
+    )
+    docket, context = await core_docket_data(
+        request, docket_id, note_form_class=note_form_class
+    )
     try:
         idb_data = await FjcIntegratedDatabase.objects.aget(
             pk=docket.idb_data_id
@@ -946,14 +982,14 @@ def get_attachment_values(
             end = rd_index + 1 + max_after  # Doesn't matter if this is over
         # Build each sibling's URL directly from its (docket_id, slug,
         # doc_num, attachment_number) - no need to modify `rd`.
-        for rdv in rd_values[start:end]:
-            attachments.append(
-                {
-                    "attachment_number": rdv[1],
-                    "url": document_url(docket_id, slug, doc_num, rdv[1]),
-                    "description": rdv[2],
-                }
-            )
+        attachments.extend(
+            {
+                "attachment_number": rdv[1],
+                "url": document_url(docket_id, slug, doc_num, rdv[1]),
+                "description": rdv[2],
+            }
+            for rdv in rd_values[start:end]
+        )
 
         if end < doc_len:
             attachments.append(
@@ -1810,8 +1846,16 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 
 @ensure_csrf_cookie
 async def block_item(request: HttpRequest) -> HttpResponse:
-    """Block an item from search results using AJAX."""
-    if not is_ajax(request):
+    """Block an item from search results using AJAX or htmx.
+
+    htmx requests are answered with a partial that swaps the Blocked badge
+    and a status message into the v2 docket page; AJAX requests get plain
+    text.
+
+    TODO: Remove all ajax logic once v2 is rolled out globally
+    """
+    is_htmx = "HX-Request" in request.headers
+    if request.method != "POST" or not (is_htmx or is_ajax(request)):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
@@ -1864,4 +1908,10 @@ async def block_item(request: HttpRequest) -> HttpResponse:
     d.date_blocked = now()
     await d.asave()
 
+    if is_htmx:
+        return TemplateResponse(
+            request,
+            "v2_includes/docket_block_htmx/blocked.html",
+            {"docket": d},
+        )
     return HttpResponse("It worked")

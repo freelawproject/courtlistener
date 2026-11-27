@@ -2,18 +2,22 @@ import io
 import os
 import re
 import tempfile
-from datetime import date
+from contextlib import AbstractContextManager
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from unittest import mock
 
+import time_machine
 from bs4 import BeautifulSoup
+from django.core.files.base import File
 from django.core.management import CommandError, call_command
 from django.db import transaction
-from django.db.models.fields.files import FieldFile
+from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from override_storage.storage import LocMemStorage
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_case_names,
@@ -28,7 +32,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     parse_citations,
     s3_xml_keys,
 )
-from cl.lib.storage import ScanningFinalXmlStorage
+from cl.lib.storage import ScanningFinalXmlStorage, get_name_by_incrementing
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import GRANULARITY_DAY, Person
@@ -69,6 +73,23 @@ SCAN_XML_PATH = Path(__file__).parent / "test_assets" / "scanned_opinion.xml"
 def make_soup(xml: str) -> BeautifulSoup:
     """Parse XML the same way the importer does."""
     return BeautifulSoup(xml, "lxml-xml")
+
+
+def empty_scan_storage() -> AbstractContextManager[Any]:
+    """Empty the stored scan XML files, and restore them on exit.
+
+    The in-memory storage of the test runner keeps files between tests, and
+    after a database rollback, and a name that is taken gets a number added.
+
+    Returns:
+        The context manager.
+    """
+    field = cast(
+        FileField, OpinionCluster._meta.get_field("filepath_xml_scan")
+    )
+    return mock.patch.dict(
+        cast(LocMemStorage, field.storage).cache, clear=True
+    )
 
 
 class ScanXmlHelpersTest(SimpleTestCase):
@@ -286,6 +307,51 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "<syllabus>Shown from its field</syllabus>"
                 "<opinion><p>Text</p></opinion></casebody>",
                 "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
+            ),
+            (
+                # The heading of the syllabus is left out, not its page
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<heading><page-number label="2">*2</page-number>'
+                "<em>Syllabus by the Court</em></heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<heading>Appeal from the Circuit Court</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n'
+                "<heading>Appeal from the Circuit Court</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # Nor the mark of the syllabus note
+                "<casebody><heading>Syllabus <footnotemark>*</footnotemark>"
+                "</heading><syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<footnotemark>*</footnotemark>\n</headmatter>",
+            ),
+            (
+                # A page that starts inside the syllabus is still marked
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>First point</syllabus>"
+                '<syllabus>Second <page-number label="2">*2</page-number>'
+                "point</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n</headmatter>',
+            ),
+            (
+                # A heading with other words before the syllabus is kept
+                "<casebody><heading>On Motion for Rehearing</heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>On Motion for Rehearing</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # So is a "Syllabus" heading with no syllabus after it
+                "<casebody><heading>Syllabus</heading><court>A Court</court>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>Syllabus</heading>\n"
+                "<court>A Court</court>\n</headmatter>",
             ),
             ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
             ("<court>No casebody</court>", ""),
@@ -553,6 +619,19 @@ class ImportScannedOpinionsTest(TestCase):
         with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
+    def setUp(self) -> None:
+        """Make the test storage number its files, like the scan XML's.
+
+        The in-memory storage of the test runner adds a random suffix to a
+        name that exists instead of `_1`, `_2`, etc.
+        """
+        self.enterContext(
+            mock.patch.object(
+                LocMemStorage, "get_available_name", get_name_by_incrementing
+            )
+        )
+        self.enterContext(empty_scan_storage())
+
     def import_scan(self, **kwargs: str | bool | None) -> None:
         """Run the command over the test XML."""
         options = {
@@ -644,7 +723,7 @@ class ImportScannedOpinionsTest(TestCase):
         content = OpinionContent.objects.get(opinion=opinion)
         self.assertEqual(content.content, opinion.xml_scan)
         self.assertEqual(content.source, OpinionContent.FLP_SCANNING)
-        self.assertEqual(content.extraction_type, OpinionContent.OCR)
+        self.assertEqual(content.extraction_type, OpinionContent.OCR_ENSEMBLE)
         self.assertTrue(content.is_main_version)
         self.assertEqual(len(content.sha1), 40)
         self.assertEqual(content.page_count, 4)
@@ -710,6 +789,29 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertIn("The syllabus.", cluster.syllabus)
         self.assertNotIn("syllabus", cluster.headmatter)
 
+    def test_import_schema_2(self) -> None:
+        """Is a schema 2 file, with its syllabus under a heading, imported?"""
+        xml = self.scan_xml.replace('schema="1"', 'schema="2"').replace(
+            "<court>",
+            '<heading><page-number label="1">*1</page-number>'
+            "<em>Syllabus by the Court</em></heading>"
+            "<syllabus>1. The first point.</syllabus>"
+            "<syllabus>2. The second point.</syllabus><court>",
+            1,
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.syllabus,
+            "<p>1. The first point.</p> <p>2. The second point.</p>",
+        )
+        self.assertNotIn("syllabus", cluster.headmatter.lower())
+        self.assertIn(
+            '<page-number label="1">*1</page-number>', cluster.headmatter
+        )
+
     def test_merge_links_the_judges_it_fills(self) -> None:
         """Are the judges a merge fills in linked, keeping set authors?"""
         judges = self.make_judges()
@@ -731,6 +833,280 @@ class ImportScannedOpinionsTest(TestCase):
 
         other.refresh_from_db()
         self.assertFalse(other.panel.exists())
+
+    def test_overwrite(self) -> None:
+        """Does --overwrite replace the XML of a scan that changed?"""
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        # A schema change can reorganize the head matter alone
+        reorganized = self.scan_xml.replace(
+            "<attorneys>Larry B. Merritt", "<attorneys> Larry B. Merritt"
+        )
+        # Other parts of the XML only change the stored file
+        new_syllabus = self.scan_xml.replace(
+            "<court>", "<syllabus>The syllabus.</syllabus><court>", 1
+        )
+        cases = [
+            ("opinion corrected", corrected, True, False, True),
+            ("head matter reorganized", reorganized, False, True, True),
+            ("syllabus added", new_syllabus, False, False, True),
+            ("unchanged", self.scan_xml, False, False, False),
+        ]
+        imported_at = datetime(2026, 3, 16, 12, tzinfo=UTC)
+        overwritten_at = datetime(2026, 3, 17, 12, tzinfo=UTC)
+        for (
+            message,
+            xml,
+            opinion_changed,
+            headmatter_changed,
+            file_changed,
+        ) in cases:
+            with (
+                self.subTest(message),
+                transaction.atomic(),
+                empty_scan_storage(),
+                mock.patch(
+                    f"{CITATIONS_TASK}.apply_async"
+                ) as mock_find_citations,
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                with time_machine.travel(imported_at, tick=False):
+                    self.import_scan()
+                cluster = OpinionCluster.objects.get()
+                name = cluster.filepath_xml_scan.name
+                opinion = cluster.sub_opinions.get()
+                headmatter = cluster.headmatter
+                mock_find_citations.reset_mock()
+
+                with (
+                    time_machine.travel(overwritten_at, tick=False),
+                    self.captureOnCommitCallbacks(execute=True),
+                ):
+                    self.import_xml(xml, overwrite=True)
+
+                cluster.refresh_from_db()
+                opinion.refresh_from_db()
+                contents = opinion.contents.order_by("pk")
+                self.assertEqual(
+                    "an error" in opinion.xml_scan, opinion_changed
+                )
+                self.assertEqual(contents.count(), 2 if opinion_changed else 1)
+                self.assertEqual(
+                    [c.is_main_version for c in contents],
+                    [False, True] if opinion_changed else [True],
+                )
+                self.assertEqual(
+                    opinion.contents.get(is_main_version=True).content,
+                    opinion.xml_scan,
+                )
+                self.assertEqual(
+                    cluster.headmatter != headmatter, headmatter_changed
+                )
+                self.assertEqual(
+                    cluster.filepath_xml_scan.read().decode(), xml
+                )
+                self.assertEqual(
+                    cluster.date_modified,
+                    overwritten_at if file_changed else imported_at,
+                )
+                # A changed file is a new version, next to the previous one
+                self.assertEqual(
+                    cluster.filepath_xml_scan.name,
+                    name.replace(".xml", "_1.xml") if file_changed else name,
+                )
+                with cluster.filepath_xml_scan.storage.open(name) as f:
+                    self.assertEqual(f.read().decode(), self.scan_xml)
+                if opinion_changed:
+                    mock_find_citations.assert_called_once_with(
+                        args=([opinion.pk],), queue="celery"
+                    )
+                else:
+                    mock_find_citations.assert_not_called()
+                if not file_changed:
+                    self.assertIn(
+                        "unchanged", mock_logger.info.call_args[0][0]
+                    )
+                transaction.set_rollback(True)
+
+    def test_overwrite_finds_the_scan_after_a_citation_correction(
+        self,
+    ) -> None:
+        """Is a scan whose citation page was corrected found, not added?
+
+        The cluster's citations aren't updated, so a warning names the
+        corrected one for review, also when it's one of parallel citations.
+        """
+        parallel = self.scan_xml.replace(
+            "<citation>388 So. 3d 1</citation>",
+            "<citation>388 So. 3d 1</citation>"
+            "<citation>2024 WL 2312345</citation>",
+        )
+        self.import_xml(parallel)
+        cases = [
+            (
+                "citation corrected",
+                parallel.replace("388 So. 3d 1<", "388 So. 3d 2<"),
+                "388 So. 3d 2",
+            ),
+            (
+                "parallel citation corrected",
+                parallel.replace("2312345", "2312346"),
+                "2024 WL 2312346",
+            ),
+        ]
+        for label, xml, missing in cases:
+            for overwrite in [False, True]:
+                with (
+                    self.subTest(label, overwrite=overwrite),
+                    mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                ):
+                    self.import_xml(xml, overwrite=overwrite)
+
+                    self.assertEqual(OpinionCluster.objects.count(), 1)
+                    self.assertEqual(
+                        sorted(str(c) for c in Citation.objects.all()),
+                        ["2024 WL 2312345", "388 So. 3d 1"],
+                    )
+                    warned = [
+                        c.args[2]
+                        for c in mock_logger.warning.call_args_list
+                        if "doesn't have the citations" in c.args[0]
+                    ]
+                    self.assertEqual(warned, [missing])
+
+    def test_overwrites_keep_the_previous_files(self) -> None:
+        """Does each overwrite store a numbered file and keep the others?
+
+        The previous versions allow rolling a cluster back.
+        """
+        versions = [
+            self.scan_xml,
+            self.scan_xml.replace(
+                "confession of error", "confession of an error"
+            ),
+            self.scan_xml.replace("confession of error", "confessed error"),
+        ]
+        self.import_scan()
+        cluster = OpinionCluster.objects.get()
+        name = cluster.filepath_xml_scan.name
+        for xml in versions[1:]:
+            self.import_xml(xml, overwrite=True)
+
+        cluster.refresh_from_db()
+        names = [name, *(name.replace(".xml", f"_{i}.xml") for i in (1, 2))]
+        self.assertEqual(cluster.filepath_xml_scan.name, names[-1])
+        for stored_name, xml in zip(names, versions, strict=True):
+            with cluster.filepath_xml_scan.storage.open(stored_name) as f:
+                self.assertEqual(f.read().decode(), xml)
+
+    def test_overwrite_needs_the_flag_and_writes_nothing_in_dry_run(
+        self,
+    ) -> None:
+        """Is a changed scan only overwritten with --overwrite, not dry?"""
+        self.import_scan()
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        for options in [{}, {"overwrite": True, "dry_run": True}]:
+            with (
+                self.subTest(options=options),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_xml(corrected, **options)
+
+                self.assertEqual(OpinionContent.objects.count(), 1)
+                self.assertNotIn("an error", Opinion.objects.get().xml_scan)
+                self.assertIn(
+                    "would overwrite" if options else "already imported",
+                    mock_logger.info.call_args[0][0],
+                )
+
+    def test_overwrite_keeps_head_matter_from_another_source(self) -> None:
+        """Is the head matter of a merged cluster kept when it isn't the scan's?"""
+        self.import_scan()
+        OpinionCluster.objects.update(headmatter="<p>Harvard head matter</p>")
+        reorganized = self.scan_xml.replace(
+            "<attorneys>Larry B. Merritt", "<attorneys> Larry B. Merritt"
+        )
+
+        self.import_xml(reorganized, overwrite=True)
+
+        self.assertEqual(
+            OpinionCluster.objects.get().headmatter,
+            "<p>Harvard head matter</p>",
+        )
+
+    def test_overwrite_adds_and_removes_the_scan_head_matter(self) -> None:
+        """Does a correction add head matter to a cluster without any?
+
+        And clear the scan's when the correction removes it. An empty head
+        matter is the scan's, since the import fills it from the scan.
+        """
+        self.import_scan()
+        scan_headmatter = OpinionCluster.objects.get().headmatter
+        OpinionCluster.objects.update(headmatter="")
+
+        with mock.patch(f"{COMMAND_MODULE}.logger"):
+            self.import_scan(overwrite=True)
+        self.assertEqual(
+            OpinionCluster.objects.get().headmatter, scan_headmatter
+        )
+
+        with (
+            mock.patch(f"{COMMAND_MODULE}.logger"),
+            mock.patch(f"{COMMAND_MODULE}.get_headmatter", return_value=""),
+        ):
+            self.import_scan(overwrite=True)
+        self.assertEqual(OpinionCluster.objects.get().headmatter, "")
+
+    def test_overwrite_logs_a_changed_byline_for_review(self) -> None:
+        """Is a corrected byline logged for review instead of applied?
+
+        An overwrite only replaces the opinion's XML and contents.
+        """
+        self.import_scan()
+        opinion = Opinion.objects.get()
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        cases = [
+            ("text corrected", corrected, []),
+            (
+                "byline corrected",
+                corrected.replace(
+                    "<author>Gerber, J.</author>", "<author>Klein, J.</author>"
+                ),
+                ["author_str"],
+            ),
+        ]
+        for label, xml, fields in cases:
+            with (
+                self.subTest(label),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_xml(xml, overwrite=True)
+                warnings = [
+                    c.args[1]
+                    for c in mock_logger.warning.call_args_list
+                    if c.args[0].startswith("The %s of opinion")
+                ]
+                self.assertEqual(
+                    warnings, [", ".join(fields)] if fields else []
+                )
+                opinion.refresh_from_db()
+                self.assertEqual(opinion.author_str, "Gerber")
+
+    def test_overwrite_skipped_when_opinions_count_changed(self) -> None:
+        """Is a scan whose number of opinions changed left for review?"""
+        self.import_scan()
+
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_xml(self.scan_with_dissent(), overwrite=True)
+
+        self.assertEqual(Opinion.objects.count(), 1)
+        self.assertEqual(OpinionContent.objects.count(), 1)
+        self.assertIn("Not overwriting", mock_logger.warning.call_args[0][0])
 
     def test_reimport_is_skipped(self) -> None:
         """Is an already imported scanned opinion skipped?"""
@@ -804,7 +1180,11 @@ class ImportScannedOpinionsTest(TestCase):
             (PRECEDENTIAL_STATUS.UNKNOWN, PRECEDENTIAL_STATUS.UNPUBLISHED),
             (PRECEDENTIAL_STATUS.PUBLISHED, PRECEDENTIAL_STATUS.PUBLISHED),
         ]:
-            with self.subTest(current=current), transaction.atomic():
+            with (
+                self.subTest(current=current),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
                 cluster = self.make_matching_cluster()
                 OpinionCluster.objects.filter(pk=cluster.pk).update(
                     precedential_status=current
@@ -836,7 +1216,11 @@ class ImportScannedOpinionsTest(TestCase):
     def test_merge_keeps_the_version_author_of_the_byline(self) -> None:
         """Is the version's author kept only when the scan names that judge?"""
         for last_name, kept in [("Gerber", True), ("Klein", False)]:
-            with self.subTest(last_name=last_name), transaction.atomic():
+            with (
+                self.subTest(last_name=last_name),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
                 cluster = self.make_matching_cluster()
                 author = PersonFactory.create(name_last=last_name)
                 cluster.sub_opinions.update(
@@ -1277,7 +1661,11 @@ class ImportScannedOpinionsTest(TestCase):
         )
 
     def test_citation_finding_is_queued(self) -> None:
-        """Are citations found for new and merged opinions after commit?"""
+        """Are citations found for new and merged opinions after commit?
+
+        In the given queue, and without percolating the opinions, which
+        would send search alerts for old cases.
+        """
         cluster = self.make_matching_cluster()
         merged_opinion = cluster.sub_opinions.get()
         new_case_xml = (
@@ -1304,17 +1692,21 @@ class ImportScannedOpinionsTest(TestCase):
         for label, xml, expected_pks in cases:
             with (
                 self.subTest(label),
-                mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+                mock.patch(
+                    f"{CITATIONS_TASK}.apply_async"
+                ) as mock_find_citations,
                 self.captureOnCommitCallbacks(execute=True),
             ):
-                self.import_xml(xml)
-            mock_find_citations.assert_called_once_with(expected_pks())
+                self.import_xml(xml, queue="scans")
+            mock_find_citations.assert_called_once_with(
+                args=(expected_pks(),), queue="scans"
+            )
 
     def test_failed_citation_queue_keeps_the_import(self) -> None:
         """Is an import kept and not reported failed when queuing fails?"""
         with (
             mock.patch(
-                f"{CITATIONS_TASK}.delay", side_effect=ValueError("boom")
+                f"{CITATIONS_TASK}.apply_async", side_effect=ValueError("boom")
             ),
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             mock.patch.object(FieldFile, "save"),
@@ -1338,7 +1730,7 @@ class ImportScannedOpinionsTest(TestCase):
             ),
             mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
             mock.patch.object(FieldFile, "save") as mock_file_save,
-            mock.patch(f"{CITATIONS_TASK}.delay") as mock_find_citations,
+            mock.patch(f"{CITATIONS_TASK}.apply_async") as mock_find_citations,
             self.captureOnCommitCallbacks(execute=True),
         ):
             self.import_scan()
@@ -1350,31 +1742,65 @@ class ImportScannedOpinionsTest(TestCase):
         mock_logger.exception.assert_called_once()
 
     def test_failed_xml_path_save_deletes_the_upload(self) -> None:
-        """Is the uploaded XML deleted when saving its path fails?"""
+        """Is the upload deleted when saving its path fails?
+
+        Also on an overwrite, where the upload is a new numbered file.
+        """
         cluster_save = OpinionCluster.save
 
-        def fail_path_save(cluster, *args, **kwargs):
-            if kwargs.get("update_fields") == ["filepath_xml_scan"]:
+        def fail_path_save(
+            cluster: OpinionCluster, *args: Any, **kwargs: Any
+        ) -> None:
+            """Fail the cluster save that stores the XML path."""
+            if "filepath_xml_scan" in (kwargs.get("update_fields") or []):
                 raise ValueError("boom")
-            return cluster_save(cluster, *args, **kwargs)
+            cluster_save(cluster, *args, **kwargs)
 
-        with (
-            mock.patch.object(
-                OpinionCluster,
-                "save",
-                autospec=True,
-                side_effect=fail_path_save,
-            ),
-            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-            mock.patch.object(FieldFile, "save") as mock_file_save,
-            mock.patch.object(FieldFile, "delete") as mock_file_delete,
-        ):
-            self.import_scan()
+        def save_file(
+            field_file: FieldFile, name: str, content: File, save: bool = True
+        ) -> None:
+            """Set the uploaded file's name without storing it."""
+            field_file.name = f"xml/2024/05/22/{name}"
 
-        self.assertEqual(OpinionCluster.objects.count(), 0)
-        mock_file_save.assert_called_once()
-        mock_file_delete.assert_called_once_with(save=False)
-        mock_logger.exception.assert_called_once()
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        for message, imported_before in [
+            ("new import", False),
+            ("overwrite", True),
+        ]:
+            with (
+                self.subTest(message),
+                transaction.atomic(),
+                empty_scan_storage(),
+            ):
+                if imported_before:
+                    with mock.patch.object(
+                        FieldFile, "save", autospec=True, side_effect=save_file
+                    ):
+                        self.import_scan()
+                with (
+                    mock.patch.object(
+                        OpinionCluster,
+                        "save",
+                        autospec=True,
+                        side_effect=fail_path_save,
+                    ),
+                    mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+                    mock.patch.object(
+                        FieldFile, "save", autospec=True, side_effect=save_file
+                    ) as mock_file_save,
+                    mock.patch.object(FieldFile, "delete") as mock_file_delete,
+                ):
+                    self.import_xml(corrected, overwrite=imported_before)
+
+                self.assertEqual(
+                    OpinionCluster.objects.count(), int(imported_before)
+                )
+                mock_file_save.assert_called_once()
+                mock_file_delete.assert_called_once()
+                mock_logger.exception.assert_called_once()
+                transaction.set_rollback(True)
 
     def test_failed_file_does_not_stop_the_run(self) -> None:
         """Does the command continue with the next file after a failure?"""
@@ -1467,6 +1893,40 @@ class ImportScannedOpinionsTest(TestCase):
                 self.import_xml(xml, court_id=court_id)
                 self.assertEqual(OpinionCluster.objects.count(), 0)
                 self.assertIn(message, mock_logger.warning.call_args[0][0])
+
+    def test_existing_docket_is_not_percolated(self) -> None:
+        """Is a reused docket saved without sending search alerts?
+
+        A RECAP docket is percolated on update, and alerts for an old case
+        would only be noise.
+        """
+        docket = DocketFactory.create(
+            court=self.court,
+            source=Docket.RECAP,
+            docket_number="4D2023-2459",
+            case_name="Merritt v. State",
+        )
+        saves: list[tuple[int | None, bool]] = []
+        original_save = Docket.save
+
+        def save(instance: Docket, *args: Any, **kwargs: Any) -> None:
+            """Record whether the save skips the percolator."""
+            saves.append(
+                (
+                    instance.pk,
+                    getattr(instance, "skip_percolator_request", False),
+                )
+            )
+            original_save(instance, *args, **kwargs)
+
+        with mock.patch.object(
+            Docket, "save", autospec=True, side_effect=save
+        ):
+            self.import_scan()
+
+        self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+        self.assertIn((docket.pk, True), saves)
+        self.assertNotIn((docket.pk, False), saves)
 
 
 class FakeScanningStorage:
@@ -1569,6 +2029,10 @@ class ImportFromScanningBucketTest(TestCase):
         with SCAN_XML_PATH.open(encoding="utf-8") as f:
             cls.scan_xml = f.read()
 
+    def setUp(self) -> None:
+        """Start with no scan XML files stored."""
+        self.enterContext(empty_scan_storage())
+
     def import_from_bucket(
         self, files: dict[str, str], **options: object
     ) -> None:
@@ -1634,3 +2098,144 @@ class ImportFromScanningBucketTest(TestCase):
             )
         mock_logger.exception.assert_called_once()
         self.assertEqual(OpinionCluster.objects.count(), 0)
+
+    def other_case_xml(self, opinion_id: str, name: str, volume: int) -> str:
+        """Make the XML of another case in scan 3593.
+
+        Args:
+            opinion_id: The scan's opinion id.
+            name: The upper case party name that replaces "MERRITT".
+            volume: The reporter volume of the case's citation.
+
+        Returns:
+            The XML.
+        """
+        return (
+            self.scan_xml.replace(
+                'opinion-id="12"', f'opinion-id="{opinion_id}"'
+            )
+            .replace("388 So. 3d 1", f"{volume} So. 3d 5")
+            .replace("MERRITT", name)
+            .replace("4D2023-2459", f"4D2023-{volume}")
+        )
+
+    def test_limit_counts_only_imported_files(self) -> None:
+        """Does --limit stop after that many imports, not counting skips?
+
+        So running it again continues with the next files.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+        }
+        for run, expected_count in enumerate([1, 2], start=1):
+            with (
+                self.subTest(run=run),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_from_bucket(files, scan_id=["3593"], limit=1)
+                self.assertEqual(
+                    OpinionCluster.objects.count(), expected_count
+                )
+                mock_logger.info.assert_any_call(
+                    "Stopping after %s files, the --limit", 1
+                )
+
+    def test_limit_counts_dry_runs_and_overwrites(self) -> None:
+        """Does --limit count what a dry run would import and overwrites?
+
+        An unchanged scan skipped on overwrite doesn't count.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+        }
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                files, scan_id=["3593"], dry_run=True, limit=2
+            )
+        self.assertEqual(OpinionCluster.objects.count(), 0)
+        would_add = [
+            c
+            for c in mock_logger.info.call_args_list
+            if c.args[0].startswith("Dry run: would add")
+        ]
+        self.assertEqual(len(would_add), 2)
+
+        self.import_from_bucket(files, scan_id=["3593"])
+        corrected = {
+            key: xml.replace("confession of error", "confession of an error")
+            for key, xml in files.items()
+        }
+        corrected["export/3593/12.xml"] = self.scan_xml
+        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
+            self.import_from_bucket(
+                corrected, scan_id=["3593"], overwrite=True, limit=1
+            )
+        overwritten = [
+            c.args[2]
+            for c in mock_logger.info.call_args_list
+            if c.args[0].startswith("Overwriting")
+        ]
+        self.assertEqual(overwritten, ["export/3593/13.xml"])
+
+    @override_settings(CELERY_ETL_TASK_QUEUE="etl_tasks")
+    def test_throttles_the_queues(self) -> None:
+        """Does the run wait for the queues after each imported file?
+
+        The ETL queue is watched too, since the search index tasks go there
+        whatever the --queue. Skipped and failed files queue nothing to wait
+        for, and neither does a dry run.
+        """
+        self.import_from_bucket(
+            {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        )
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+            "export/3593/14.xml": self.other_case_xml("14", "CARVER", 391),
+            "export/3593/15.xml": "not xml",
+        }
+        cases: list[tuple[str, dict[str, Any], list[str]]] = [
+            ("default queue", {}, ["celery", "etl_tasks"]),
+            ("ETL queue", {"queue": "etl_tasks"}, ["etl_tasks"]),
+            ("dry run", {"dry_run": True}, []),
+        ]
+        for label, options, queues in cases:
+            with (
+                self.subTest(label),
+                transaction.atomic(),
+                empty_scan_storage(),
+                mock.patch(f"{COMMAND_MODULE}.logger"),
+                mock.patch(
+                    f"{COMMAND_MODULE}.CeleryThrottle"
+                ) as mock_throttle,
+            ):
+                self.import_from_bucket(
+                    files, scan_id=["3593"], throttle_min_items=5, **options
+                )
+                self.assertEqual(
+                    [c.kwargs for c in mock_throttle.call_args_list],
+                    [{"min_items": 5, "queue_name": q} for q in queues],
+                )
+                # Two files imported, each followed by a wait on every queue
+                self.assertEqual(
+                    mock_throttle.return_value.maybe_wait.call_count,
+                    2 * len(queues),
+                )
+                transaction.set_rollback(True)
+
+    def test_limits_must_be_positive(self) -> None:
+        """Are a --limit or a --throttle-min-items below 1 refused?
+
+        A throttle below 1 would wait forever after the first file.
+        """
+        for option in ["limit", "throttle_min_items"]:
+            for value in [0, -1]:
+                with self.subTest(option=option, value=value):
+                    with self.assertRaises(CommandError):
+                        self.import_from_bucket(
+                            {}, all=True, **{option: value}
+                        )
