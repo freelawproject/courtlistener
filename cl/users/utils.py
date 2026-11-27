@@ -1,16 +1,23 @@
-"""Helpers for stub accounts, deleting users' data, and account emails."""
+"""Helpers for stub accounts, deleting users' data, account emails, and the profile pages' display data."""
+
+from collections.abc import Iterable
+from typing import TypedDict
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.urls import reverse
+from django.utils.formats import date_format
+from django.utils.timezone import localtime
 from rest_framework.authtoken.models import Token
 
-from cl.alerts.models import AlertEvent, DocketAlertEvent
+from cl.alerts.models import AlertEvent, DocketAlert, DocketAlertEvent
 from cl.api.models import (
     APIThrottleEvent,
     WebhookHistoryEvent,
 )
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import (
     DocketTagEvent,
     NoteEvent,
@@ -19,7 +26,7 @@ from cl.favorites.models import (
 )
 from cl.lib.crypto import md5
 from cl.lib.decorators import tiered_cache
-from cl.lib.types import EmailType
+from cl.lib.types import EmailType, TabItem
 from cl.users.models import (
     UserGroupsEvent,
     UserPermissionsEvent,
@@ -453,3 +460,94 @@ def is_search_history_on_cached(user_pk: int) -> bool:
     return UserProfile.objects.values_list(
         "save_query_history", flat=True
     ).get(user_id=user_pk)
+
+
+class DocketAlertRow(TypedDict):
+    """One row of the docket alerts table on the user's alerts page.
+
+    Display values are ready-made strings, so the template prints them as
+    they are.
+
+    Attributes:
+        case_name: The docket's best case name.
+        date_filed: The date the case was filed, in the site's date format,
+            or "Not provided" if it's unknown.
+        docket_pk: The docket's primary key, which the alert toggle posts to
+            identify the docket.
+        docket_number: The docket number, or "Not provided" if it's unknown.
+        court: The court's short name.
+        last_hit: When the alert last triggered, in the site's date and time
+            format, or "Never" if it hasn't yet.
+        url: The docket's page, with its newest entries first.
+    """
+
+    case_name: str
+    date_filed: str
+    docket_pk: int
+    docket_number: str
+    court: str
+    last_hit: str
+    url: str
+
+
+def build_docket_alert_rows(
+    alerts: Iterable[DocketAlert],
+) -> list[DocketAlertRow]:
+    """Build the rows of the docket alerts table on the user's alerts page.
+
+    Returns one row per alert, in the order given, so the caller's sorting
+    is kept. No alerts give an empty list.
+
+    Pass alerts loaded with `select_related("docket__court")`: each row
+    reads the alert's docket and that docket's court, which otherwise costs
+    two queries per alert.
+    """
+    not_provided = "Not provided"
+    docket_rows: list[DocketAlertRow] = []
+
+    for alert in alerts:
+        docket = alert.docket
+        docket_rows.append(
+            {
+                "case_name": best_case_name(docket),
+                "date_filed": (
+                    date_format(docket.date_filed)
+                    if docket.date_filed
+                    else not_provided
+                ),
+                "docket_number": docket.docket_number or not_provided,
+                "docket_pk": docket.pk,
+                "court": docket.court.short_name,
+                "last_hit": (
+                    date_format(
+                        localtime(alert.date_last_hit), "DATETIME_FORMAT"
+                    )
+                    if alert.date_last_hit
+                    else "Never"
+                ),
+                "url": f"{docket.get_absolute_url()}?order_by=desc",
+            }
+        )
+    return docket_rows
+
+
+def build_alerts_tabs() -> list[TabItem]:
+    """Build the entries of the tabs on the user's alerts pages.
+
+    Entries are in display order. Each key matches the `page` value its view
+    passes, so the template can use `page` as the tabs' `active_tab`.
+    """
+    return [
+        {
+            "key": "search_alerts",
+            "label": "Search Alerts",
+            "url": reverse("profile_search_alerts"),
+            "icon": "magnifier",
+        },
+        {
+            "key": "docket_alerts",
+            "label": "Docket Alerts",
+            "url": reverse("profile_docket_alerts"),
+            "icon": "file_text",
+        },
+    ]
