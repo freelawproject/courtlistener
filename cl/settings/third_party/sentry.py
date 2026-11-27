@@ -1,5 +1,9 @@
 """Settings for Sentry, initializing it when a DSN is configured."""
 
+import sys
+from contextvars import ContextVar
+from typing import TYPE_CHECKING, Any, cast
+
 import environ
 import sentry_sdk
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
@@ -7,6 +11,10 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.types import Event, Hint
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
 
 env = environ.FileAwareEnv()
 SENTRY_DSN = env("SENTRY_DSN", default="")
@@ -45,6 +53,164 @@ def fingerprint_sentry_error(event: dict, hint: dict) -> dict:
     return event
 
 
+# The frames Django's @sensitive_variables and @sensitive_post_parameters
+# decorators put around the (sync) functions they mark, as (module, function).
+_SENSITIVE_VARIABLES_FRAME = (
+    "django.views.decorators.debug",
+    "sensitive_variables_wrapper",
+)
+_SENSITIVE_POST_PARAMETERS_FRAME = (
+    "django.views.decorators.debug",
+    "sensitive_post_parameters_wrapper",
+)
+
+# The request being handled, set by cl.lib.middleware.SentryRequestMiddleware.
+# It lets the hook see the mark @sensitive_post_parameters leaves on the
+# request, which outlives the decorated call (e.g. while Django renders the
+# view's TemplateResponse).
+sentry_request: ContextVar[HttpRequest | None] = ContextVar(
+    "sentry_request", default=None
+)
+
+
+def _stacks(event: dict[str, Any], key: str) -> list[list[dict[str, Any]]]:
+    """Return the frame lists of an event's exceptions or threads."""
+    return [
+        (value.get("stacktrace") or {}).get("frames", [])
+        for value in (event.get(key) or {}).get("values", [])
+    ]
+
+
+def _first(frames: list[dict[str, Any]], location: tuple[str, str]) -> int:
+    """Return the index of the first frame at a location, or -1 if none is."""
+    for i, frame in enumerate(frames):
+        if (frame.get("module"), frame.get("function")) == location:
+            return i
+    return -1
+
+
+def _running_under(location: tuple[str, str]) -> bool:
+    """Is the code running right now called from a frame at a location?
+
+    Sentry calls before_send in the thread that captured the event, while the
+    capturing code is still running, so this sees the wrappers around an
+    error that was caught and logged inside a marked function. Its own
+    traceback starts where it was caught, below the wrapper.
+    """
+    module, function = location
+    frame = sys._getframe()
+    while frame is not None:
+        if (
+            frame.f_code.co_name == function
+            and frame.f_globals.get("__name__") == module
+        ):
+            return True
+        frame = frame.f_back
+    return False
+
+
+def _scrub_exception_variables(exceptions: list[list[dict[str, Any]]]) -> None:
+    """Drop the local variables of exception frames under @sensitive_variables.
+
+    Takes the frame lists of an event's exceptions, ordered the way Sentry
+    orders them: the earliest cause first, the exception that was raised last.
+    """
+    if _running_under(_SENSITIVE_VARIABLES_FRAME):
+        # Captured inside a marked function, so every exception in the event
+        # was caught there and its frames are all on the marked side.
+        for frames in exceptions:
+            for frame in frames:
+                frame.pop("vars", None)
+        return
+
+    if not any(
+        _first(frames, _SENSITIVE_VARIABLES_FRAME) >= 0
+        for frames in exceptions
+    ):
+        return
+
+    # A chained exception only has the frames from where it was raised to
+    # where it was caught. Those can belong to a marked function even when
+    # they sit before a wrapper, e.g. a marked function that catches an error
+    # from another marked function. So chained exceptions are scrubbed in
+    # full. Only the last exception, which propagated out, keeps the frames
+    # before its wrapper: those are the callers of the marked function.
+    *chained, last = exceptions
+    for frames in chained:
+        for frame in frames:
+            frame.pop("vars", None)
+    start = _first(last, _SENSITIVE_VARIABLES_FRAME)
+    for frame in last[max(start, 0) :]:
+        frame.pop("vars", None)
+
+
+def scrub_sensitive_data(event: dict[str, Any]) -> dict[str, Any]:
+    """Hide data marked with Django's sensitive_* decorators from Sentry.
+
+    Django hides what these decorators mark in its own error reports, but
+    Sentry doesn't know about them. This applies them to Sentry events, more
+    strictly than Django does:
+
+    - Under @sensitive_variables, every local variable is dropped, in the
+      decorated function and in everything it calls (e.g. Django's
+      serializer), not just the named variables. That covers errors raised
+      through the function, errors it catches and logs, and every exception
+      chained to them.
+    - Under @sensitive_post_parameters, the whole request body is dropped,
+      not just the named fields. That holds for the rest of the request,
+      including errors while rendering the view's response.
+
+    Caveats: Django tracks async functions differently, so this only works on
+    sync functions. The request body check needs SentryRequestMiddleware to
+    cover errors raised after the decorated view returns.
+
+    Args:
+        event: event dict to be sent to Sentry
+
+    Returns:
+        the same event, with the sensitive data removed
+    """
+    exceptions = _stacks(event, "exception")
+    threads = _stacks(event, "threads")
+
+    _scrub_exception_variables(exceptions)
+    for frames in threads:
+        start = _first(frames, _SENSITIVE_VARIABLES_FRAME)
+        if start < 0:
+            continue
+        # Frames run from the outermost call to the innermost, so every frame
+        # after the wrapper was called on the marked function's behalf.
+        for frame in frames[start:]:
+            frame.pop("vars", None)
+
+    request = event.get("request") or {}
+    if "data" in request and (
+        getattr(sentry_request.get(), "sensitive_post_parameters", None)
+        or _running_under(_SENSITIVE_POST_PARAMETERS_FRAME)
+        or any(
+            _first(frames, _SENSITIVE_POST_PARAMETERS_FRAME) >= 0
+            for frames in exceptions + threads
+        )
+    ):
+        request["data"] = "[Filtered]"
+    return event
+
+
+def before_send(event: Event, hint: Hint) -> Event:
+    """Prepare an event for Sentry: scrub sensitive data, then fingerprint it.
+
+    Args:
+        event: event dict to be sent to Sentry
+        hint: dict with extra information about the event
+
+    Returns:
+        the event that will be sent to Sentry
+    """
+    # Event is a TypedDict over the plain dict the helpers work on.
+    scrubbed = scrub_sensitive_data(cast(dict[str, Any], event))
+    return cast(Event, fingerprint_sentry_error(scrubbed, hint))
+
+
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
@@ -55,6 +221,6 @@ if SENTRY_DSN:
             RedisIntegration(),
         ],
         ignore_errors=[KeyboardInterrupt],
-        before_send=fingerprint_sentry_error,
+        before_send=before_send,
         attach_stacktrace=True,
     )

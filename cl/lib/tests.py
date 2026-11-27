@@ -1,8 +1,11 @@
 import datetime
+import logging
 import pickle
+import sys
 import tempfile
 import threading
 import time
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from pathlib import Path
@@ -11,6 +14,7 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import httpx
+import sentry_sdk
 import time_machine
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
@@ -19,14 +23,23 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase
 from django.template.response import TemplateResponse
 from django.test import RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
 from django.utils.functional import SimpleLazyObject
+from django.views.decorators.debug import (
+    sensitive_post_parameters,
+    sensitive_variables,
+)
 from django_ratelimit.exceptions import Ratelimited
 from django_ratelimit.middleware import RatelimitMiddleware
 from requests.cookies import RequestsCookieJar
+from sentry_sdk.consts import DEFAULT_OPTIONS as SENTRY_DEFAULT_OPTIONS
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.transport import Transport
+from sentry_sdk.utils import event_from_exception
 from waffle.testutils import override_flag
 
 from cl.lib.auth import filter_by_email
@@ -54,6 +67,7 @@ from cl.lib.middleware import (
     V2_PARTIALS_PREFIX,
     WIP_PROPS,
     IncrementalNewTemplateMiddleware,
+    SentryRequestMiddleware,
 )
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -115,6 +129,7 @@ from cl.search.factories import (
     OpinionClusterWithMultipleOpinionsFactory,
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.settings.third_party.sentry import before_send, scrub_sensitive_data
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserFactory
 
@@ -3398,3 +3413,357 @@ class ResolveActiveTabTest(SimpleTestCase):
                 self.assertEqual(
                     resolve_active_tab(self.tabs, requested), expected
                 )
+
+
+class MemoryTransport(Transport):
+    """A Sentry transport that keeps events in memory instead of sending them."""
+
+    def __init__(self) -> None:
+        """Start with no events."""
+        super().__init__()
+        self.events: list[dict] = []
+
+    def capture_envelope(self, envelope: Envelope) -> None:
+        """Keep the events in an envelope."""
+        for item in envelope.items:
+            if item.type == "event" and item.payload.json:
+                self.events.append(item.payload.json)
+
+
+class SentryScrubTest(SimpleTestCase):
+    """Tests for applying Django's sensitive_* decorators to Sentry events."""
+
+    VARIABLES_WRAPPER = (
+        "django.views.decorators.debug",
+        "sensitive_variables_wrapper",
+    )
+    POST_WRAPPER = (
+        "django.views.decorators.debug",
+        "sensitive_post_parameters_wrapper",
+    )
+
+    @staticmethod
+    def frame(module: str, function: str) -> dict:
+        """Make a Sentry stack frame that has local variables."""
+        return {"module": module, "function": function, "vars": {"x": "1"}}
+
+    @staticmethod
+    def event(key: str, frames: list[dict]) -> dict:
+        """Make a Sentry event with one stack and a form submission."""
+        return {
+            key: {"values": [{"stacktrace": {"frames": frames}}]},
+            "request": {"data": {"password1": "hunter2"}},
+        }
+
+    def test_scrubs_variables_under_sensitive_variables(self) -> None:
+        """Are the marked function, and everything it called, scrubbed?"""
+        for key in ("exception", "threads"):
+            with self.subTest(key=key):
+                frames = [
+                    self.frame("django.core.handlers.base", "_get_response"),
+                    self.frame(*self.VARIABLES_WRAPPER),
+                    self.frame("cl.users.views", "register"),
+                    self.frame("django.forms.forms", "full_clean"),
+                ]
+                event = self.event(key, frames)
+
+                scrub_sensitive_data(event)
+
+                self.assertEqual(
+                    ["vars" in frame for frame in frames],
+                    [True, False, False, False],
+                )
+                self.assertEqual(
+                    event["request"]["data"], {"password1": "hunter2"}
+                )
+
+    def test_scrubs_body_under_sensitive_post_parameters(self) -> None:
+        """Is the request body dropped when the view marks POST data?"""
+        frames = [
+            self.frame(*self.POST_WRAPPER),
+            self.frame("cl.users.views", "password_change"),
+        ]
+        event = self.event("exception", frames)
+
+        scrub_sensitive_data(event)
+
+        self.assertEqual(event["request"]["data"], "[Filtered]")
+        self.assertTrue(all("vars" in frame for frame in frames))
+
+    def test_scrubs_chained_exceptions(self) -> None:
+        """Is an exception chained under a marked function scrubbed too?"""
+
+        def fail() -> None:
+            """Raise an error from a frame with a local for Sentry to read."""
+            secret = "x"  # noqa: F841  # read by Sentry, not by us
+            raise KeyError
+
+        @sensitive_variables()
+        def marked() -> None:
+            """Chain a new error to the one fail() raises."""
+            try:
+                fail()
+            except KeyError as err:
+                # The KeyError's own stack starts here, below the wrapper.
+                raise RuntimeError from err
+
+        try:
+            marked()
+        except RuntimeError:
+            event, _ = event_from_exception(
+                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
+            )
+        else:
+            self.fail("marked() didn't raise")
+
+        scrub_sensitive_data(cast(dict, event))
+
+        frames = {
+            frame["function"]: frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        }
+        self.assertNotIn("vars", frames["fail"])
+        self.assertIn("vars", frames["test_scrubs_chained_exceptions"])
+
+    def test_scrubs_errors_logged_inside_marked_function(self) -> None:
+        """Is an error caught and logged inside a marked function scrubbed?
+
+        Its traceback starts where it was caught, below the wrapper, as when
+        register logs an IntegrityError.
+        """
+
+        def fail() -> None:
+            """Raise an error from a frame with a local for Sentry to read."""
+            secret = "x"  # noqa: F841  # read by Sentry, not by us
+            raise KeyError
+
+        @sensitive_variables()
+        def marked() -> dict:
+            """Catch fail()'s error and capture it, like logger.exception."""
+            try:
+                fail()
+            except KeyError:
+                event, _ = event_from_exception(
+                    sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
+                )
+                # Sentry runs before_send right here, during the capture.
+                return scrub_sensitive_data(cast(dict, event))
+            raise AssertionError("fail() didn't raise")
+
+        event = marked()
+
+        frames = [
+            frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        ]
+        self.assertEqual(
+            [frame["function"] for frame in frames], ["marked", "fail"]
+        )
+        self.assertFalse(any("vars" in frame for frame in frames))
+
+    def test_scrubs_error_logged_through_sentry_logging(self) -> None:
+        """Does an error logged inside a marked function reach Sentry scrubbed?
+
+        Runs the real path: logger.exception, Sentry's logging integration
+        and our before_send hook, which also has to keep fingerprinting.
+        """
+        transport = MemoryTransport()
+        client = sentry_sdk.Client(
+            dsn="http://public@localhost/1",
+            transport=transport,
+            before_send=before_send,
+            attach_stacktrace=True,
+            default_integrations=False,
+            integrations=[LoggingIntegration()],
+        )
+        logger = logging.getLogger("cl.lib.tests.sentry")
+        # The test runner disables logging unless asked not to.
+        self.addCleanup(logging.disable, logging.root.manager.disable)
+        logging.disable(logging.NOTSET)
+
+        def fail() -> None:
+            """Raise an error from a frame with a local for Sentry to read."""
+            secret = "x"  # noqa: F841  # read by Sentry, not by us
+            raise KeyError
+
+        @sensitive_variables()
+        def marked() -> None:
+            """Catch fail()'s error and log it, like register does."""
+            try:
+                fail()
+            except KeyError:
+                logger.exception(
+                    "Unexpected error", extra={"fingerprint": ["scrub-test"]}
+                )
+
+        with sentry_sdk.new_scope() as scope, self.assertLogs(logger, "ERROR"):
+            scope.set_client(client)
+            marked()
+        client.close()
+
+        self.assertEqual(len(transport.events), 1)
+        event = transport.events[0]
+        frames = [
+            frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        ]
+        self.assertEqual(
+            [frame["function"] for frame in frames], ["marked", "fail"]
+        )
+        self.assertFalse(any("vars" in frame for frame in frames))
+        self.assertEqual(event["fingerprint"], ["scrub-test"])
+
+    def test_scrubs_marked_frames_in_nested_causes(self) -> None:
+        """Is a marked function scrubbed in every exception it shows up in?
+
+        When a marked function catches an error from another marked function
+        and raises a new one, the cause holds a copy of the outer function's
+        frame that sits before the inner wrapper.
+        """
+
+        @sensitive_variables()
+        def inner() -> None:
+            """Raise an error from a marked function."""
+            raise KeyError
+
+        @sensitive_variables("activation_key")
+        def outer() -> None:
+            """Chain a new error to the one inner() raises."""
+            activation_key = "x"  # noqa: F841  # read by Sentry, not by us
+            try:
+                inner()
+            except KeyError as err:
+                raise RuntimeError from err
+
+        try:
+            outer()
+        except RuntimeError:
+            event, _ = event_from_exception(
+                sys.exc_info(), client_options=SENTRY_DEFAULT_OPTIONS
+            )
+        else:
+            self.fail("outer() didn't raise")
+
+        scrub_sensitive_data(cast(dict, event))
+
+        frames = [
+            frame
+            for value in event["exception"]["values"]
+            for frame in value["stacktrace"]["frames"]
+        ]
+        outer_frames = [f for f in frames if f["function"] == "outer"]
+        self.assertEqual(len(outer_frames), 2)
+        self.assertFalse(any("vars" in frame for frame in outer_frames))
+        caller = [
+            f
+            for f in frames
+            if f["function"] == "test_scrubs_marked_frames_in_nested_causes"
+        ]
+        self.assertEqual(len(caller), 1)
+        self.assertIn("vars", caller[0])
+
+    def test_scrubs_body_after_marked_view_returns(self) -> None:
+        """Is a marked request's body dropped after its view returns?
+
+        Django renders a view's TemplateResponse after the view returns, so a
+        rendering error's stack has no wrapper. The middleware lets the hook
+        check the mark the decorator leaves on the request instead.
+        """
+
+        @sensitive_post_parameters("new_password1")
+        def marked_view(request: HttpRequest) -> HttpResponse:
+            """Stand in for a view that marks its POST data."""
+            return HttpResponse()
+
+        def unmarked_view(request: HttpRequest) -> HttpResponse:
+            """Stand in for a view that doesn't mark its POST data."""
+            return HttpResponse()
+
+        def capture_after(
+            view: Callable[[HttpRequest], HttpResponse],
+        ) -> dict:
+            """Capture an event after a view returns, as a failed render would.
+
+            The view runs through SentryRequestMiddleware.
+            """
+            events: list[dict] = []
+
+            def get_response(request: HttpRequest) -> HttpResponse:
+                """Call the view, then capture an event."""
+                response = view(request)
+                events.append(
+                    scrub_sensitive_data(self.event("exception", []))
+                )
+                return response
+
+            request = RequestFactory().post("/", {"new_password1": "x"})
+            SentryRequestMiddleware(get_response)(request)
+            return events[0]
+
+        with self.subTest("marked view"):
+            event = capture_after(marked_view)
+            self.assertEqual(event["request"]["data"], "[Filtered]")
+
+        with self.subTest("unmarked view"):
+            event = capture_after(unmarked_view)
+            self.assertEqual(
+                event["request"]["data"], {"password1": "hunter2"}
+            )
+
+        with self.subTest("after the request"):
+            capture_after(marked_view)
+            event = scrub_sensitive_data(self.event("exception", []))
+            self.assertEqual(
+                event["request"]["data"], {"password1": "hunter2"}
+            )
+
+    def test_scrubs_body_after_marked_view_returns_async(self) -> None:
+        """Does the middleware expose the request in async mode too?
+
+        Production serves requests through ASGI, where the middleware runs
+        async.
+        """
+
+        @sensitive_post_parameters("new_password1")
+        def marked_view(request: HttpRequest) -> HttpResponse:
+            """Stand in for a view that marks its POST data."""
+            return HttpResponse()
+
+        events: list[dict] = []
+
+        async def get_response(request: HttpRequest) -> HttpResponse:
+            """Call the view, then capture an event, as a failed render would."""
+            response = marked_view(request)
+            events.append(scrub_sensitive_data(self.event("exception", [])))
+            return response
+
+        middleware = SentryRequestMiddleware(get_response)
+        self.assertTrue(middleware.async_mode)
+
+        async def handle() -> None:
+            """Run a request through the middleware, then capture an event."""
+            request = RequestFactory().post("/", {"new_password1": "x"})
+            await cast(Awaitable[HttpResponseBase], middleware(request))
+            events.append(scrub_sensitive_data(self.event("exception", [])))
+
+        async_to_sync(handle)()
+
+        during, after = events
+        self.assertEqual(during["request"]["data"], "[Filtered]")
+        self.assertEqual(after["request"]["data"], {"password1": "hunter2"})
+
+    def test_leaves_unmarked_code_alone(self) -> None:
+        """Do events from code without the decorators keep their data?"""
+        frames = [
+            self.frame("cl.users.views", "view_api"),
+            self.frame("cl.search.models", "save"),
+        ]
+        event = self.event("exception", frames)
+
+        scrub_sensitive_data(event)
+
+        self.assertTrue(all("vars" in frame for frame in frames))
+        self.assertEqual(event["request"]["data"], {"password1": "hunter2"})

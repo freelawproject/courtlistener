@@ -1,4 +1,4 @@
-"""Middleware for robots headers and serving new-design templates."""
+"""Middleware for robots headers, new-design templates, and Sentry."""
 
 from collections.abc import Awaitable, Callable
 from inspect import iscoroutinefunction
@@ -12,6 +12,7 @@ from django.template.response import TemplateResponse
 from waffle import flag_is_active
 
 from cl.search.forms import CorpusSearchForm
+from cl.settings.third_party.sentry import sentry_request
 
 # Templates a view returns on their own (htmx partials) live under this
 # prefix. .github/scripts/frontend_checks.py mirrors it in is_v2_partial.
@@ -86,6 +87,58 @@ class RobotsHeaderMiddleware:
                 "noindex, noarchive, noimageindex"
             )
         return response
+
+
+class SentryRequestMiddleware:
+    """Makes the request being handled visible to the Sentry before_send hook.
+
+    @sensitive_post_parameters marks the request, but the mark only shows up
+    in a stack trace while the decorated view is running. Errors raised after
+    it returns, such as while Django renders its TemplateResponse, would send
+    the request body to Sentry. With the request at hand, the hook checks the
+    mark itself. See cl.settings.third_party.sentry.scrub_sensitive_data.
+
+    Place it near the top of MIDDLEWARE, so it covers everything below.
+    """
+
+    sync_capable = True
+    async_capable = True
+
+    def __init__(
+        self,
+        get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ],
+    ):
+        """Wrap ``get_response``, running in async mode if it is a coroutine function."""
+        self.get_response: Callable[
+            [HttpRequest], HttpResponseBase | Awaitable[HttpResponseBase]
+        ] = get_response
+        self.async_mode: bool = iscoroutinefunction(self.get_response)
+        if self.async_mode:
+            markcoroutinefunction(self)
+
+    def __call__(
+        self, request: HttpRequest
+    ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
+        """Handle the request with it set as the one Sentry should check."""
+        if self.async_mode:
+            return self.__acall__(request)
+        token = sentry_request.set(request)
+        try:
+            return self.get_response(request)
+        finally:
+            sentry_request.reset(token)
+
+    async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
+        """Handle the request asynchronously, like ``__call__``."""
+        token = sentry_request.set(request)
+        try:
+            return await cast(
+                Awaitable[HttpResponseBase], self.get_response(request)
+            )
+        finally:
+            sentry_request.reset(token)
 
 
 class IncrementalNewTemplateMiddleware:
