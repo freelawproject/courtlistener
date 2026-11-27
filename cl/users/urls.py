@@ -152,7 +152,6 @@ urlpatterns = [
         name="delete_profile_done",
     ),
     path("profile/take-out/", views.take_out, name="take_out"),
-    path("profile/take-out/done/", views.take_out_done, name="take_out_done"),
     path(
         "register/",
         views.register,

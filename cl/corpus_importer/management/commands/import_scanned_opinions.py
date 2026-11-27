@@ -82,7 +82,7 @@ cnt = CaseNameTweaker()
 FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
-SUPPORTED_SCHEMAS = {"1"}
+SUPPORTED_SCHEMAS = {"1", "2"}
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
@@ -170,6 +170,9 @@ UNPUBLISHED_NOTICE_SPAN = 2000
 # Head matter elements kept out of `OpinionCluster.headmatter`, since the
 # opinion page shows them from their own field
 HEADMATTER_EXCLUDED = {"syllabus"}
+# The words of the heading the books print above the syllabus, lowercase
+# and without punctuation. The same headings open a syllabus in the portal.
+SYLLABUS_HEADINGS = {"syllabus", "syllabus by the court"}
 
 # Cluster fields that come from the head matter of the XML. When merging
 # into an existing cluster, only empty values are filled from the scan.
@@ -541,13 +544,38 @@ def get_case_names(soup: BeautifulSoup) -> tuple[str, str]:
     return case_name, normalize_case_name_caps(caption.strip(". "))
 
 
+def is_syllabus_heading(element: Tag) -> bool:
+    """Tell whether an element is the heading printed above the syllabus.
+
+    Only a `<heading>` right before a `<syllabus>` element, with the words
+    of SYLLABUS_HEADINGS, is one. Any other heading before a syllabus, like
+    "On Motion for Rehearing", is not.
+
+    Args:
+        element: An element of the head matter.
+
+    Returns:
+        True if it is the heading of the syllabus.
+    """
+    if element.name != "heading":
+        return False
+    following = element.find_next_sibling()
+    if not isinstance(following, Tag) or following.name != "syllabus":
+        return False
+    words = re.sub(r"[^a-z]+", " ", element.get_text(" ").lower()).split()
+    return " ".join(words) in SYLLABUS_HEADINGS
+
+
 def get_headmatter(soup: BeautifulSoup) -> str:
     """Get the head matter: the `<casebody>` elements before its opinions.
 
     Wrapped in `<headmatter>` for `OpinionCluster.headmatter`, so the
     citation, parties, docket number, court, dates, attorneys and the rest
     can be shown above the opinions. Their values are also stored in their
-    own fields. Elements in HEADMATTER_EXCLUDED are left out.
+    own fields. Elements in HEADMATTER_EXCLUDED are left out, and so is the
+    heading of the syllabus, since the opinion page titles the syllabus
+    itself. Their page numbers are kept in their place, and so is the
+    footnote mark of the heading, since the page links both.
 
     Caveat: call it before `parse_extra_fields`, which removes the page
     numbers from the elements it reads.
@@ -564,8 +592,21 @@ def get_headmatter(soup: BeautifulSoup) -> str:
     for element in casebody.find_all(recursive=False):
         if element.name == "opinion":
             break
-        if element.name not in HEADMATTER_EXCLUDED:
-            elements.append(str(element))
+        if element.name in HEADMATTER_EXCLUDED:
+            # The field of the element has no page numbers, and the pages
+            # that start in it still have to be marked
+            elements.extend(str(p) for p in element.select("page-number"))
+            continue
+        if is_syllabus_heading(element):
+            # Besides its page, keep the mark of the syllabus note: the
+            # note stays in the opinion, and the page only links the notes
+            # when it finds as many marks as notes
+            elements.extend(
+                str(kept)
+                for kept in element.select("page-number, footnotemark")
+            )
+            continue
+        elements.append(str(element))
     if not elements:
         return ""
     return "<headmatter>\n{}\n</headmatter>".format("\n".join(elements))

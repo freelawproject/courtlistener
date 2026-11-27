@@ -291,6 +291,51 @@ class ScanXmlHelpersTest(SimpleTestCase):
                 "<opinion><p>Text</p></opinion></casebody>",
                 "<headmatter>\n<citation>1 So. 3d 1</citation>\n</headmatter>",
             ),
+            (
+                # The heading of the syllabus is left out, not its page
+                "<casebody><citation>1 So. 3d 1</citation>"
+                '<heading><page-number label="2">*2</page-number>'
+                "<em>Syllabus by the Court</em></heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<heading>Appeal from the Circuit Court</heading>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n'
+                "<heading>Appeal from the Circuit Court</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # Nor the mark of the syllabus note
+                "<casebody><heading>Syllabus <footnotemark>*</footnotemark>"
+                "</heading><syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<footnotemark>*</footnotemark>\n</headmatter>",
+            ),
+            (
+                # A page that starts inside the syllabus is still marked
+                "<casebody><citation>1 So. 3d 1</citation>"
+                "<syllabus>First point</syllabus>"
+                '<syllabus>Second <page-number label="2">*2</page-number>'
+                "point</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<citation>1 So. 3d 1</citation>\n"
+                '<page-number label="2">*2</page-number>\n</headmatter>',
+            ),
+            (
+                # A heading with other words before the syllabus is kept
+                "<casebody><heading>On Motion for Rehearing</heading>"
+                "<syllabus>Shown from its field</syllabus>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>On Motion for Rehearing</heading>\n"
+                "</headmatter>",
+            ),
+            (
+                # So is a "Syllabus" heading with no syllabus after it
+                "<casebody><heading>Syllabus</heading><court>A Court</court>"
+                "<opinion><p>Text</p></opinion></casebody>",
+                "<headmatter>\n<heading>Syllabus</heading>\n"
+                "<court>A Court</court>\n</headmatter>",
+            ),
             ("<casebody><opinion><p>Text</p></opinion></casebody>", ""),
             ("<court>No casebody</court>", ""),
         ]
@@ -741,6 +786,29 @@ class ImportScannedOpinionsTest(TestCase):
         cluster = OpinionCluster.objects.get()
         self.assertIn("The syllabus.", cluster.syllabus)
         self.assertNotIn("syllabus", cluster.headmatter)
+
+    def test_import_schema_2(self) -> None:
+        """Is a schema 2 file, with its syllabus under a heading, imported?"""
+        xml = self.scan_xml.replace('schema="1"', 'schema="2"').replace(
+            "<court>",
+            '<heading><page-number label="1">*1</page-number>'
+            "<em>Syllabus by the Court</em></heading>"
+            "<syllabus>1. The first point.</syllabus>"
+            "<syllabus>2. The second point.</syllabus><court>",
+            1,
+        )
+
+        self.import_xml(xml)
+
+        cluster = OpinionCluster.objects.get()
+        self.assertEqual(
+            cluster.syllabus,
+            "<p>1. The first point.</p> <p>2. The second point.</p>",
+        )
+        self.assertNotIn("syllabus", cluster.headmatter.lower())
+        self.assertIn(
+            '<page-number label="1">*1</page-number>', cluster.headmatter
+        )
 
     def test_merge_links_the_judges_it_fills(self) -> None:
         """Are the judges a merge fills in linked, keeping set authors?"""
