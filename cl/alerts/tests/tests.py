@@ -1359,7 +1359,7 @@ class DocketAlertTexasTest(TestCase):
     def test_alert_email_shows_the_tames_text_and_no_webhook_goes_out(
         self, mock_webhooks: mock.MagicMock
     ) -> None:
-        """Does one email go out with the entry's type, description, disposition and remarks and a TAMES link for the document, with scraped markup escaped in the HTML part and no webhook queued?"""
+        """Does one email go out with the entry's type, description, disposition and remarks, a link to the document through its page with the TAMES fallback, scraped markup escaped in the HTML part, and no webhook queued?"""
         entry = TexasDocketEntryFactory(
             docket=self.docket,
             entry_type="Petition for Review filed",
@@ -1367,7 +1367,7 @@ class DocketAlertTexasTest(TestCase):
             disposition="Granted",
             remarks="<script>alert(1)</script>",
         )
-        TexasDocumentFactory(
+        document = TexasDocumentFactory(
             docket_entry=entry,
             description="Petition",
             url="https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
@@ -1378,18 +1378,23 @@ class DocketAlertTexasTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         html = message.alternatives[0][0]
+        # Like the SCOTUS email, the link goes through the document page,
+        # which serves our copy once we have it and falls back to TAMES.
+        fallback_url = (
+            f"https://www.courtlistener.com{document.get_absolute_url()}"
+            "?redirect_to_download=True"
+        )
         for part in (message.body, html):
             self.assertIn("Petition for Review filed", part)
             self.assertIn("Disposition: Granted", part)
-            self.assertIn(
-                "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1", part
-            )
+            self.assertIn(fallback_url, part)
+            self.assertNotIn("search.txcourts.gov", part)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertNotIn("<script>alert(1)</script>", html)
         self.assertNotIn("Document<br>Number", html)
-        self.assertIn(">From TAMES</a>", html)
+        self.assertIn(">From RECAP with TAMES fallback</a>", html)
         self.assertIn(
-            "Download from TAMES: https://search.txcourts.gov/SearchMedia.aspx?MediaID=1",
+            f"Download from RECAP with TAMES fallback: {fallback_url}",
             message.body,
         )
         mock_webhooks.delay.assert_not_called()

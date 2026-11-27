@@ -69,6 +69,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     SCOTUSDocketEntry,
+    TexasDocketEntry,
     TrialCourtData,
 )
 
@@ -99,12 +100,13 @@ def _person_item(
 
 
 def build_citation_string(
-    obj: Docket | DocketEntry | SCOTUSDocketEntry,
+    obj: Docket | DocketEntry | SCOTUSDocketEntry | TexasDocketEntry,
 ) -> str:
     """Build a Bluebook-style citation string for a docket or docket entry.
 
     For dockets: name, docket_number, (court)
     For docket entries: name, docket_number, (court date) ECF No. N
+    For Texas entries, which have no number: name, docket_number, (court date)
     """
     if isinstance(obj, Docket):
         docket = obj
@@ -114,6 +116,10 @@ def build_citation_string(
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
+    elif isinstance(obj, TexasDocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = ""
     else:
         raise NotImplementedError(f"Object not recognized in {__name__}")
 

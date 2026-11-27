@@ -7,9 +7,9 @@ unrelated docket *data* sources in ``cl.search.docket_sources``
 (``Docket.RECAP_SOURCES()``, ``Docket.RECAP``).
 """
 
+import uuid
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 from typing import Any, NamedTuple, NotRequired, TypedDict, cast
 
 from django.db.models import (
@@ -198,6 +198,21 @@ def _download_pdf_label(document: Any) -> str:
     return "Download PDF"
 
 
+def _pdf_format_label(document: Any) -> str:
+    """Return the format name the document page shows for a source whose stored files are always PDFs."""
+    return "PDF"
+
+
+def _numbered_document_reference(document: Any) -> str:
+    """Return how the document page title refers to a numbered document, like "#12" or "#12, Att. #3"."""
+    attachment = (
+        f", Att. #{document.attachment_number}"
+        if document.attachment_number
+        else ""
+    )
+    return f"#{document.document_number}{attachment}"
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries and documents for one 'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first override. A future state-specific model plugs in by adding one more instance and mapping its court ids below.
@@ -277,6 +292,14 @@ class DocketEntrySource:
     on ``document.download_label``. It's "Download PDF" unless the source
     stores other formats.
 
+    ``document_format_label`` names the stored file's format, like "PDF",
+    for the document page's tab and links. ``attach_display_fields`` puts
+    it on ``document.format_label``.
+
+    ``document_reference`` returns how the document page title refers to a
+    document: "#12, Att. #3" by default, for sources that number their
+    documents.
+
     ``document_display_description`` does the same for each document's
     description, which ``attach_display_fields`` puts on
     ``document.display_description``. The legacy stack renders it unescaped
@@ -331,6 +354,8 @@ class DocketEntrySource:
     entry_display_text: Callable[[Any], str] = _entry_description
     document_display_description: Callable[[Any], str] = _document_description
     document_download_label: Callable[[Any], str] = _download_pdf_label
+    document_format_label: Callable[[Any], str] = _pdf_format_label
+    document_reference: Callable[[Any], str] = _numbered_document_reference
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -344,6 +369,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
         document
     )
     document.download_label = source.document_download_label(document)
+    document.format_label = source.document_format_label(document)
 
 
 # RECAP
@@ -788,16 +814,25 @@ def _texas_document_display_description(document: TexasDocument) -> str:
     return conditional_escape(document.description)
 
 
-def _texas_document_download_label(document: TexasDocument) -> str:
-    """Return the download button's label, named after the stored file's format.
+def _texas_document_format_label(document: TexasDocument) -> str:
+    """Return the stored file's format, like "PDF" or "MP3", or "File" when there's no file.
 
     TAMES serves PDFs but also HTML, WordPerfect and MP3 files, which are
-    stored as they came, so "Download PDF" would be wrong for those.
+    stored as they came, so "PDF" would be wrong for those.
     """
-    extension = PurePosixPath(document.filepath_local.name).suffix
-    if not extension:
-        return "Download File"
-    return f"Download {extension.lstrip('.').upper()}"
+    if not document.file_extension:
+        return "File"
+    return document.file_extension.lstrip(".").upper()
+
+
+def _texas_document_download_label(document: TexasDocument) -> str:
+    """Return the download button's label, named after the stored file's format."""
+    return f"Download {_texas_document_format_label(document)}"
+
+
+def _texas_document_reference(document: TexasDocument) -> str:
+    """Return "Document": TAMES numbers neither documents nor attachments, so the page title can't refer to one by number."""
+    return "Document"
 
 
 # The fifteen Texas Courts of Appeals: every TAMES court but the two courts
@@ -918,23 +953,37 @@ def _texas_main_docs_prefetch() -> Prefetch:
 def _texas_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet[TexasDocument]:
-    """Return no documents: Texas documents have no document number, so they have no detail page to look up.
+    """Return the docket's documents whose media_id is doc_num, which is how Texas document pages are keyed.
 
     The detail page reads attachment_number from the rows, which
-    TexasDocument doesn't have, so the empty queryset still provides it and
-    the page answers 404 instead of failing.
+    TexasDocument doesn't have, so it's annotated as None: every Texas
+    document is served at the main document URL.
+
+    doc_num MUST be a UUID in its canonical form, lowercase with hyphens, as
+    get_absolute_url writes it. Anything else returns no documents, so the
+    page answers 404: a malformed UUID would make the query raise, and other
+    spellings of a valid one would serve the same page at several URLs.
+
+    media_id is only unique per entry, so in the rare case two entries of a
+    docket share one, both rows are returned and the page shows the first
+    by pk.
     """
-    return TexasDocument.objects.none().annotate(
+    documents = TexasDocument.objects.annotate(
         attachment_number=Value(None, output_field=IntegerField())
+    )
+    try:
+        media_id = uuid.UUID(doc_num)
+    except ValueError:
+        return documents.none()
+    if str(media_id) != doc_num:
+        return documents.none()
+    return documents.filter(
+        docket_entry__docket_id=docket_id, media_id=media_id
     )
 
 
 async def _get_texas_document_for_render(pk: int) -> TexasDocument:
-    """Fetch a single TexasDocument with the docket/court relation already loaded.
-
-    Texas documents have no detail page yet, so the docket page never calls
-    this; the source still needs it to fill the DocketEntrySource contract.
-    """
+    """Fetch a single TexasDocument for its detail page, with the docket/court relation already loaded."""
     return await TexasDocument.objects.select_related(
         "docket_entry__docket__court"
     ).aget(pk=pk)
@@ -955,8 +1004,10 @@ def _texas_document_label(document: TexasDocument) -> str:
 
 
 def _texas_document_detail_url(document: TexasDocument) -> str | None:
-    """Return None: Texas documents have no CourtListener page, since the page URLs need a document number."""
-    return None
+    """Return the URL of the CourtListener page for one Texas document, or None if we don't have the file yet, as for SCOTUS."""
+    if not document.filepath_local:
+        return None
+    return document.get_absolute_url()
 
 
 def _texas_document_external_url(document: TexasDocument) -> str | None:
@@ -979,15 +1030,15 @@ def _texas_initial_document_buttons(
     """Return the initial-document button of each Texas docket.
 
     The initial document is the first document of the docket's earliest
-    entry that has documents. Texas documents have no CourtListener page
-    yet, so the button links to the document on TAMES.
+    entry that has documents. Like SCOTUS, the button links to our copy's
+    page when we have the file and to TAMES otherwise.
     """
     # distinct() on the docket keeps the first row of each docket in the
     # order_by below: its earliest entry, then its first document. pk
     # breaks ties, so the same document wins on every search.
     initial_documents = (
         TexasDocument.objects.filter(docket_entry__docket_id__in=docket_ids)
-        .select_related("docket_entry")
+        .select_related("docket_entry__docket")
         .order_by(
             "docket_entry__docket_id",
             "docket_entry__sequence_number",
@@ -995,14 +1046,26 @@ def _texas_initial_document_buttons(
             "pk",
         )
         .distinct("docket_entry__docket_id")
-        .only("pk", "url", "docket_entry__docket_id")
+        .only(
+            "pk",
+            "url",
+            "filepath_local",
+            "media_id",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+        )
     )
     buttons: dict[int, InitialDocumentButton] = {}
     for initial_document in initial_documents:
-        if external_url := _texas_document_external_url(initial_document):
-            buttons[initial_document.docket_entry.docket_id] = (
-                InitialDocumentButton(None, external_url, "Initial Document")
-            )
+        url = _texas_document_detail_url(initial_document)
+        external_url = (
+            None if url else _texas_document_external_url(initial_document)
+        )
+        if not url and not external_url:
+            continue
+        buttons[initial_document.docket_entry.docket_id] = (
+            InitialDocumentButton(url, external_url, "Initial Document")
+        )
     return buttons
 
 
@@ -1037,6 +1100,8 @@ TEXAS: DocketEntrySource = DocketEntrySource(
     entry_display_text=_texas_entry_display_text,
     document_display_description=_texas_document_display_description,
     document_download_label=_texas_document_download_label,
+    document_format_label=_texas_document_format_label,
+    document_reference=_texas_document_reference,
     metadata_sections=_texas_metadata_sections,
 )
 

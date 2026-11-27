@@ -93,10 +93,10 @@
       <br>
 
       <div>
-        {% if rd.docket_entry.description %}
+        {% if rd.docket_entry.display_text %}
         <div class="well well-sm">
             <h4>Description</h4>
-            <p>{{ rd.docket_entry.description }}</p>
+            <p>{{ rd.docket_entry.display_text }}</p>
         </div>
         {% endif %}
 
@@ -106,7 +106,7 @@
               <a href="#pdf"
                  aria-controls="home"
                  role="tab"
-                 data-toggle="tab">PDF</a>
+                 data-toggle="tab">{{ rd.format_label }}</a>
             </li>
             <li role="presentation">
               <a href="#text"
@@ -123,38 +123,20 @@
           </ul>
           <div class="tab-content">
             <div role="tabpanel" class="tab-pane {% block content-pdf %}active{% endblock %}" id="pdf">
-              <div class="embed-responsive embed-responsive-8by11">
-                <object data="{{ rd.filepath_local.url }}?no-og=true"
-                        type="application/pdf"
-                        width="100%"
-                        height="100%">
-                  <div class="row">
-                    <div class="col-sm-1 col-md-2 col-lg-3"></div>
-                    <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
-                      <p>Oops! Your browser does not support embedded PDF viewing.
-                      </p>
-                      <p>
-                        <div class="v-offset-below-1 v-offset-above-1">
-                          {% include "includes/document_download_button/index.html" %}
-                        </div>
-                      </p>
-                    </div>
-                  </div>
-                </object>
-              </div>
+              {% include "includes/document_embed/index.html" %}
             </div>
 
             <div role="tabpanel" class="tab-pane" id="text">
               {% if rd.ocr_status and rd.ocr_status != rd.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
                   {% if rd.ocr_status == rd.OCR_COMPLETE %}
-                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="{{ rd.filepath_local.url }}" class="visitable">reading the original PDF</a>.
+                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="{{ rd.filepath_local.url }}" class="visitable">reading the original {{ rd.format_label }}</a>.
                     </p>
                   {% elif rd.ocr_status == rd.OCR_FAILED %}
-                    <p class="bottom">We were unable to extract text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
+                    <p class="bottom">We were unable to extract text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original {{ rd.format_label }}</a>.
                     </p>
                   {% elif rd.ocr_status == rd.OCR_NEEDED %}
-                    <p class="bottom">We have not yet extracted text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
+                    <p class="bottom">We have not yet extracted text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original {{ rd.format_label }}</a>.
                     </p>
                   {% endif %}
                 </div>
@@ -167,7 +149,7 @@
                     <pre>{{ rd.plain_text }}</pre>
                   {% else %}
                     <div class="col-sm-12 alert-warning alert">
-                      <p>Text not yet extracted from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
+                      <p>Text not yet extracted from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original {{ rd.format_label }}</a>.
                       </p>
                     </div>
                   {% endif %}

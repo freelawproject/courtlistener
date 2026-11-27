@@ -80,6 +80,8 @@ from cl.opinion_page.docket_entry_sources import (
     MetadataItem,
     _recap_document_detail_url,
     _scotus_document_detail_url,
+    _texas_document_detail_url,
+    attach_display_fields,
     build_scotus_metadata,
     document_url,
 )
@@ -94,6 +96,7 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.utils import (
     PartyGroup,
     build_case_transfer_metadata,
+    build_citation_string,
     build_docket_metadata,
     build_docket_tabs,
     build_idb_rows,
@@ -108,8 +111,10 @@ from cl.opinion_page.utils import (
 )
 from cl.opinion_page.views import (
     fetch_docket_entries,
+    get_attachment_values,
     get_downloads_context,
     get_prev_next_volumes,
+    make_rd_title,
     view_recap_document,
 )
 from cl.people_db.factories import (
@@ -822,6 +827,64 @@ class ViewRecapDocumentTest(TestCase):
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    def test_title_refers_to_the_document_and_attachment_numbers(
+        self,
+    ) -> None:
+        """Does the title still refer to a RECAP document by its number, and to an attachment by both numbers?"""
+        rd = RECAPDocumentFactory(
+            docket_entry__docket=self.docket,
+            description="Motion",
+            document_number="5",
+        )
+        attachment = RECAPAttachmentFactory(
+            docket_entry=rd.docket_entry,
+            description="Exhibit",
+            document_number="5",
+            attachment_number=2,
+        )
+        docket = self.docket
+        suffix = (
+            f" in {docket.case_name} ({docket.court.citation_string}, "
+            f"{docket.docket_number})"
+        )
+        cases = [
+            (rd, f"Motion &ndash; #5{suffix}"),
+            (attachment, f"Exhibit &ndash; #5, Att. #2{suffix}"),
+        ]
+        for document, expected in cases:
+            with self.subTest(document=document.description):
+                self.assertEqual(
+                    make_rd_title(document, docket_entry_sources.RECAP),
+                    expected,
+                )
+
+    async def test_entry_description_is_escaped(self) -> None:
+        """Is the entry's description still escaped on the document page?"""
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket,
+            docket_entry__description="<b>Order</b>",
+        )
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number
+        )
+        self.assertContains(r, "<p>&lt;b&gt;Order&lt;/b&gt;</p>")
+        self.assertNotContains(r, "<p><b>Order</b></p>")
+
+    def test_attachment_window_finds_the_document_by_pk(self) -> None:
+        """Does the attachments window center on the document by its pk, so it also works for documents without an attachment number?"""
+        rd_values: list[tuple[int, int | None, str]] = [
+            (pk, None, f"Doc {pk}") for pk in range(30)
+        ]
+        # TexasDocument has no attachment_number attribute at all.
+        attachments = get_attachment_values(
+            TexasDocument(pk=15), rd_values, self.docket.pk, "slug", "uuid"
+        )
+        self.assertEqual(attachments[0]["description"], "...and 9 previous")
+        self.assertEqual(
+            [a["description"] for a in attachments[1:]],
+            [f"Doc {pk}" for pk in range(9, 30)],
+        )
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_document_page_waffle")
 @override_flag("scotus_docket_page", active=True)
@@ -1057,6 +1120,214 @@ class ScotusDocumentFlagDisabledTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_document_page_waffle")
+@override_flag("texas_docket_page", active=True)
+class ViewTexasDocumentTest(TestCase):
+    """Does view_recap_document render TexasDocument records, keyed by media_id, with each kind of file TAMES serves?"""
+
+    TAMES_URL = "https://search.txcourts.gov/SearchMedia.aspx?MediaID=1"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a Texas docket whose entry has a stored PDF, MP3 and WordPerfect file, plus a document we don't have yet."""
+        cls.court = CourtFactory(id="tex", jurisdiction="S")
+        cls.docket = DocketFactory(
+            court=cls.court, source=Docket.SCRAPER, docket_number="26-0999"
+        )
+        cls.entry = TexasDocketEntryFactory(
+            docket=cls.docket,
+            entry_type="Brief filed",
+            description="",
+            disposition="Granted",
+            remarks="<script>alert(1)</script>",
+            date_filed=date(2026, 10, 1),
+            sequence_number="2026-10-01.001",
+        )
+        cls.pdf, cls.mp3, cls.wpd, cls.missing = (
+            TexasDocumentFactory(
+                docket_entry=cls.entry,
+                description=description,
+                filepath_local=path,
+                url=cls.TAMES_URL,
+            )
+            for description, path in (
+                ("Brief", "texas/brief.pdf"),
+                ("Oral argument", "texas/argument.mp3"),
+                ("Order", "texas/order.wpd"),
+                ("Response", ""),
+            )
+        )
+
+    def get(self, document: TexasDocument, params: str = "") -> HttpResponse:
+        """Request a document's page, with an optional query string."""
+        return self.client.get(f"{document.get_absolute_url()}{params}")
+
+    def test_pdf_document_renders_on_its_page(self) -> None:
+        """Is a stored PDF shown in the viewer, with its entry's text escaped, a TAMES download option, and none of RECAP's search or PACER parts?"""
+        r = self.get(self.pdf)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertIs(r.context["docket_source"], docket_entry_sources.TEXAS)
+        self.assertEqual(r.context["rd"], self.pdf)
+        self.assertNotIn("#None", r.context["title"])
+        self.assertContains(r, 'type="application/pdf"')
+        self.assertContains(r, "Download PDF")
+        self.assertContains(r, f'href="{self.TAMES_URL}"')
+        self.assertContains(r, "From TAMES")
+        self.assertContains(r, "Brief filed<br>Disposition: Granted")
+        self.assertContains(r, "&lt;script&gt;alert(1)&lt;/script&gt;")
+        self.assertNotContains(r, "<script>alert(1)</script>")
+        self.assertContains(
+            r,
+            f"{self.docket.get_absolute_url()}?filed_after=10/01/2026"
+            f"#minute-entry-{self.entry.pk}",
+        )
+        self.assertContains(r, "Oct 01, 2026")
+        self.assertNotContains(r, "Search this PDF")
+        self.assertNotContains(r, "Document #")
+        self.assertNotContains(r, "pray_and_pay.js")
+
+    def test_heading_link_reaches_an_entry_past_the_first_page(self) -> None:
+        """On a docket longer than one page, does the heading's link open a page holding the document's entry, in both stacks?"""
+        docket = DocketFactory(court=self.court, source=Docket.SCRAPER)
+        entries = TexasDocketEntry.objects.bulk_create(
+            TexasDocketEntry(
+                docket=docket,
+                entry_type=f"Event {i}",
+                date_filed=date(2026, 1, 1) + datetime.timedelta(days=i),
+                sequence_number=f"{i:03}",
+            )
+            for i in range(130)
+        )
+        entry = entries[120]
+        document = TexasDocumentFactory(docket_entry=entry)
+        anchor = f'id="minute-entry-{entry.pk}"'
+        link = (
+            f"{docket.get_absolute_url()}"
+            f"?filed_after={entry.date_filed:%m/%d/%Y}"
+        )
+        self.assertContains(self.get(document), f"{link}#minute-entry-")
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("use_new_design", active=new_design),
+            ):
+                self.assertNotContains(
+                    self.client.get(docket.get_absolute_url()), anchor
+                )
+                self.assertContains(self.client.get(link), anchor)
+
+    def test_heading_link_of_an_undated_entry_has_no_date_filter(self) -> None:
+        """Does the heading skip the date filter for an entry with no filing date, which that filter would hide?"""
+        entry = TexasDocketEntryFactory(
+            docket=self.docket, date_filed=None, sequence_number="undated.001"
+        )
+        document = TexasDocumentFactory(docket_entry=entry)
+        self.assertContains(
+            self.get(document),
+            f'href="{self.docket.get_absolute_url()}#minute-entry-{entry.pk}"',
+        )
+
+    def test_mp3_gets_an_audio_player(self) -> None:
+        """Is a stored MP3 played in an audio player and downloaded as an MP3, never put in the PDF viewer?"""
+        r = self.get(self.mp3)
+        self.assertContains(r, "<audio")
+        self.assertContains(r, "Download MP3")
+        self.assertNotContains(r, 'type="application/pdf"')
+
+    def test_other_files_can_only_be_downloaded(self) -> None:
+        """Can a WordPerfect file, which browsers can't show, only be downloaded?"""
+        r = self.get(self.wpd)
+        self.assertContains(r, "This WPD file can't be shown in your browser")
+        self.assertContains(r, "Download WPD")
+        self.assertNotContains(r, 'type="application/pdf"')
+        self.assertNotContains(r, "<audio")
+
+    def test_document_we_dont_have_yet_links_to_tames(self) -> None:
+        """Does a document without a stored file say we don't have it yet and offer it on TAMES?"""
+        r = self.get(self.missing)
+        self.assertContains(r, "have a copy of this document yet")
+        self.assertContains(r, "View on TAMES")
+        self.assertContains(r, f'href="{self.TAMES_URL}"')
+        self.assertNotContains(r, 'role="tablist"')
+
+    def test_other_urls_on_the_docket_return_404(self) -> None:
+        """Do a malformed media_id, another spelling of a real one and the attachment route all answer 404?"""
+        media_id = str(self.pdf.media_id)
+        urls = [
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": doc_num,
+                    "slug": self.docket.slug,
+                },
+            )
+            for doc_num in ("not-a-uuid", media_id.upper())
+        ] + [
+            reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": self.docket.pk,
+                    "doc_num": media_id,
+                    "att_num": 1,
+                    "slug": self.docket.slug,
+                },
+            )
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_redirect_to_download_falls_back_to_tames(self) -> None:
+        """Does redirect_to_download send a stored file's page to the file, and a missing one's to TAMES?"""
+        cases = [
+            (self.pdf, self.pdf.filepath_local.url),
+            (self.missing, self.TAMES_URL),
+        ]
+        for document, expected in cases:
+            with self.subTest(document=document.description):
+                r = self.get(document, "?redirect_to_download=True")
+                self.assertRedirects(
+                    r, expected, fetch_redirect_response=False
+                )
+
+    def test_admin_toolbar_links_to_texas_admin_pages(self) -> None:
+        """Does the staff toolbar link to the Texas entry and document admin pages, not RECAP's?"""
+        self.client.force_login(UserFactory(is_staff=True, is_superuser=True))
+        content = self.get(self.pdf).content.decode()
+        self.assertIn(
+            reverse(
+                "admin:search_texasdocketentry_change", args=[self.entry.pk]
+            ),
+            content,
+        )
+        self.assertIn(
+            reverse("admin:search_texasdocument_change", args=[self.pdf.pk]),
+            content,
+        )
+        self.assertNotIn("search_recapdocument_change", content)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_texas_document_flag_waffle")
+@override_flag("texas_docket_page", active=False)
+class TexasDocumentFlagDisabledTest(TestCase):
+    """With texas_docket_page off, does a Texas document page answer 404, both the page and its download redirect?"""
+
+    def test_document_page_returns_404(self) -> None:
+        """Is the page of a real Texas document hidden while the flag is off?"""
+        document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=DocketFactory(court=CourtFactory(id="tex"))
+            ),
+            filepath_local="texas/brief.pdf",
+        )
+        for params in ("", "?redirect_to_download=True"):
+            with self.subTest(params=params):
+                r = self.client.get(f"{document.get_absolute_url()}{params}")
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
 
 class CitationRedirectorTest(TestCase):
@@ -2040,6 +2311,9 @@ class DocketSourceComponentTest(SimpleTestCase):
             "docket_source_li",
             "document_download_button",
             "document_unavailable_message",
+            "document_heading",
+            "document_search_button",
+            "document_embed",
         ),
     }
 
@@ -2138,6 +2412,158 @@ class TexasDocketUrlTest(SimpleTestCase):
             with self.subTest(court_id=court_id, docket_number=docket_number):
                 docket = Docket(court_id=court_id, docket_number=docket_number)
                 self.assertEqual(docket.texas_docket_url, expected)
+
+
+class TexasDocumentModelTest(TestCase):
+    """Does TexasDocument know its page URL and what kind of file it stores?"""
+
+    def test_get_absolute_url_is_keyed_by_media_id(self) -> None:
+        """Is the page URL the main document route with the media_id in place of a document number?"""
+        docket = DocketFactory(court=CourtFactory(id="tex"))
+        document = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(docket=docket)
+        )
+        self.assertEqual(
+            document.get_absolute_url(),
+            reverse(
+                "view_recap_document",
+                kwargs={
+                    "docket_id": docket.pk,
+                    "doc_num": str(document.media_id),
+                    "slug": docket.slug,
+                },
+            ),
+        )
+
+    def test_has_valid_pdf_only_for_stored_pdfs(self) -> None:
+        """Is a document a valid PDF only when its stored file is a PDF, whatever the extension's case?"""
+        cases = [
+            ("texas/brief.pdf", True, ".pdf", True),
+            ("texas/brief.PDF", True, ".pdf", True),
+            ("texas/argument.mp3", True, ".mp3", False),
+            ("texas/order.wpd", True, ".wpd", False),
+            ("", False, "", False),
+        ]
+        for path, available, extension, valid_pdf in cases:
+            with self.subTest(path=path):
+                document = TexasDocument(filepath_local=path)
+                self.assertEqual(document.is_available, available)
+                self.assertEqual(document.file_extension, extension)
+                self.assertEqual(document.has_valid_pdf, valid_pdf)
+
+
+class TexasDocumentLookupTest(TestCase):
+    """Does the Texas source find a document page's document by media_id, and name and cite it without numbers?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create a Texas docket with one document, and a second docket of the same court."""
+        cls.court = CourtFactory(id="tex", jurisdiction="S")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            case_name="Smith v. Texas",
+            docket_number="26-0999",
+        )
+        cls.entry = TexasDocketEntryFactory(
+            docket=cls.docket,
+            date_filed=date(2026, 10, 1),
+            sequence_number="2026-10-01.001",
+        )
+        cls.document = TexasDocumentFactory(
+            docket_entry=cls.entry, description="Brief"
+        )
+        cls.document.refresh_from_db()
+        cls.other_docket = DocketFactory(court=cls.court)
+
+    def lookup(self, docket_id: int, doc_num: str) -> list[TexasDocument]:
+        """Return the rows the document page would read for this URL."""
+        return list(
+            docket_entry_sources.TEXAS.documents_for_docket_and_number(
+                docket_id, doc_num
+            ).order_by("pk")
+        )
+
+    def test_finds_the_document_by_its_canonical_media_id(self) -> None:
+        """Is the document found by its media_id, with no attachment number, as the page's main document route expects?"""
+        rows = self.lookup(self.docket.pk, str(self.document.media_id))
+        self.assertEqual(rows, [self.document])
+        self.assertIsNone(rows[0].attachment_number)
+
+    def test_other_spellings_and_dockets_find_nothing(self) -> None:
+        """Do a malformed UUID, other spellings of the right one and the right one on another docket all find nothing, so the page answers 404?"""
+        media_id = str(self.document.media_id)
+        cases = {
+            "not a uuid": (self.docket.pk, "1"),
+            "uppercase": (self.docket.pk, media_id.upper()),
+            "no hyphens": (self.docket.pk, media_id.replace("-", "")),
+            "braces": (self.docket.pk, f"{{{media_id}}}"),
+            "other docket": (self.other_docket.pk, media_id),
+        }
+        for name, (docket_id, doc_num) in cases.items():
+            with self.subTest(case=name):
+                self.assertEqual(self.lookup(docket_id, doc_num), [])
+
+    def test_a_media_id_shared_by_two_entries_returns_both_by_pk(
+        self,
+    ) -> None:
+        """When two entries of a docket hold the same media_id, are both rows returned oldest first, so the page shows the first one?"""
+        duplicate = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=self.docket, sequence_number="2026-10-02.001"
+            ),
+            media_id=self.document.media_id,
+        )
+        self.assertEqual(
+            self.lookup(self.docket.pk, str(self.document.media_id)),
+            [self.document, duplicate],
+        )
+
+    def test_title_refers_to_the_document_without_a_number(self) -> None:
+        """Does the page title call it "Document" rather than a number TAMES doesn't have?"""
+        self.assertEqual(
+            make_rd_title(self.document, docket_entry_sources.TEXAS),
+            "Brief &ndash; Document in Smith v. Texas "
+            f"({self.court.citation_string}, 26-0999)",
+        )
+
+    def test_format_label_follows_the_stored_file(self) -> None:
+        """Is the format named after the stored file, and "File" when there's none?"""
+        cases = [
+            ("texas/brief.pdf", "PDF"),
+            ("texas/argument.mp3", "MP3"),
+            ("", "File"),
+        ]
+        for path, expected in cases:
+            with self.subTest(path=path):
+                self.assertEqual(
+                    docket_entry_sources.TEXAS.document_format_label(
+                        TexasDocument(filepath_local=path)
+                    ),
+                    expected,
+                )
+
+    def test_citation_has_a_date_but_no_entry_number(self) -> None:
+        """Is a Texas entry cited with its filing date and no ECF number, while RECAP entries keep theirs?"""
+        recap_entry = DocketEntryFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Doe v. Roe",
+                docket_number="1:26-cv-1",
+            ),
+            date_filed=date(2026, 10, 1),
+            entry_number=7,
+        )
+        court = self.court.citation_string
+        cases = [
+            (self.entry, f"Smith v. Texas, 26-0999, ({court} Oct 01, 2026)"),
+            (
+                recap_entry,
+                f"Doe v. Roe, 1:26-cv-1, ({court} Oct 01, 2026) ECF No. 7",
+            ),
+        ]
+        for entry, expected in cases:
+            with self.subTest(entry=type(entry).__name__):
+                self.assertEqual(build_citation_string(entry), expected)
 
 
 class TexasEntryDisplayTextTest(SimpleTestCase):
@@ -2389,13 +2815,14 @@ class TexasDocketEntrySourceTest(TestCase):
         )
 
     def test_entries_and_documents_load_in_two_queries(self) -> None:
-        """Do the docket page's entries and their documents take two queries, however many entries there are?"""
+        """Do the docket page's entries and their documents, links included, take two queries, however many entries there are?"""
         docket = DocketFactory(court=CourtFactory(id="tex"))
         for n in (1, 2, 3):
             TexasDocumentFactory(
                 docket_entry=TexasDocketEntryFactory(
                     docket=docket, sequence_number=f"2026-10-0{n}.001"
-                )
+                ),
+                filepath_local=f"texas/{n}.pdf",
             )
         source = docket_entry_sources.TEXAS
         with self.assertNumQueries(2):
@@ -2404,7 +2831,24 @@ class TexasDocketEntrySourceTest(TestCase):
                 for entry in source.entries_queryset(docket)
                 for document in source.documents_for_entry(entry)
             ]
+            for document in documents:
+                attach_display_fields(source, document)
         self.assertEqual(len(documents), 3)
+        self.assertTrue(all(document.detail_url for document in documents))
+
+    def test_texas_document_detail_urls_are_internal(self) -> None:
+        """Does a document link to its own CourtListener page once we have its file, and to no page before?"""
+        entry = TexasDocketEntryFactory(
+            docket=DocketFactory(court=CourtFactory(id="tex"))
+        )
+        with_file = TexasDocumentFactory(
+            docket_entry=entry, filepath_local="texas/brief.pdf"
+        )
+        without_file = TexasDocumentFactory(docket_entry=entry)
+        self.assertEqual(
+            _texas_document_detail_url(with_file), with_file.get_absolute_url()
+        )
+        self.assertIsNone(_texas_document_detail_url(without_file))
 
     def test_entries_reuse_their_docket(self) -> None:
         """Do the entries come with their docket already loaded, so reading entry.docket, as the RSS feed does for each item, takes no extra query?"""
@@ -2422,9 +2866,10 @@ class TexasDocketEntrySourceTest(TestCase):
             urls = {entry.docket.get_absolute_url() for entry in entries}
         self.assertEqual(urls, {docket.get_absolute_url()})
 
-    def test_initial_document_buttons_link_to_tames(self) -> None:
-        """Does the initial-document button point at the first document of the earliest entry, on TAMES, in one query?"""
-        docket = DocketFactory(court=CourtFactory(id="tex"))
+    def test_initial_document_buttons_prefer_our_page(self) -> None:
+        """Does the initial-document button point at the first document of the earliest entry, on its CourtListener page when we have the file and on TAMES otherwise, in one query for every docket?"""
+        court = CourtFactory(id="tex")
+        docket = DocketFactory(court=court)
         later = TexasDocketEntryFactory(
             docket=docket, sequence_number="2026-10-02.001"
         )
@@ -2435,16 +2880,27 @@ class TexasDocketEntrySourceTest(TestCase):
         TexasDocumentFactory(
             docket_entry=earliest, url="https://example.com/a"
         )
+        stored = TexasDocumentFactory(
+            docket_entry=TexasDocketEntryFactory(
+                docket=DocketFactory(court=court)
+            ),
+            filepath_local="texas/petition.pdf",
+            url="https://example.com/c",
+        )
+        stored_docket_id = stored.docket_entry.docket_id
         with self.assertNumQueries(1):
             buttons = docket_entry_sources.TEXAS.initial_document_buttons(
-                [docket.pk]
+                [docket.pk, stored_docket_id]
             )
         self.assertEqual(
             buttons,
             {
                 docket.pk: docket_entry_sources.InitialDocumentButton(
                     None, "https://example.com/a", "Initial Document"
-                )
+                ),
+                stored_docket_id: docket_entry_sources.InitialDocumentButton(
+                    stored.get_absolute_url(), None, "Initial Document"
+                ),
             },
         )
 
@@ -2593,7 +3049,7 @@ class TexasDocketPageTest(TestCase):
                 self.assertNotIn("<script>alert(1)</script>", content)
 
     def test_document_urls_return_404(self) -> None:
-        """Texas documents have no detail page: does a document or attachment URL on a Texas docket answer 404 rather than fail?"""
+        """Texas document pages are keyed by media_id: does a numbered document or attachment URL on a Texas docket answer 404 rather than fail?"""
         urls = [
             reverse(
                 "view_recap_document",
@@ -2618,6 +3074,23 @@ class TexasDocketPageTest(TestCase):
                 with self.subTest(url=url):
                     r = self.client.get(url)
                     self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    def test_entry_row_links_to_the_document_page(self) -> None:
+        """Does each stack link a document we have the file of to its CourtListener page?"""
+        TexasDocument.objects.filter(pk=self.document.pk).update(
+            filepath_local="texas/petition.pdf"
+        )
+        document_url = TexasDocument.objects.get(
+            pk=self.document.pk
+        ).get_absolute_url()
+        for new_design in (False, True):
+            with (
+                self.subTest(new_design=new_design),
+                override_flag("texas_docket_page", active=True),
+                override_flag("use_new_design", active=new_design),
+            ):
+                content = self.client.get(self.url).content.decode()
+                self.assertIn(f'href="{document_url}"', content)
 
     def test_document_description_is_escaped(self) -> None:
         """Does each stack escape a scraped document description, even where the legacy stack renders descriptions unescaped?"""

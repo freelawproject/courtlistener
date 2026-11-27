@@ -1,0 +1,19 @@
+<div class="embed-responsive embed-responsive-8by11">
+  <object data="{{ rd.filepath_local.url }}?no-og=true"
+          type="application/pdf"
+          width="100%"
+          height="100%">
+    <div class="row">
+      <div class="col-sm-1 col-md-2 col-lg-3"></div>
+      <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+        <p>Oops! Your browser does not support embedded PDF viewing.
+        </p>
+        <p>
+          <div class="v-offset-below-1 v-offset-above-1">
+            {% include "includes/document_download_button/index.html" %}
+          </div>
+        </p>
+      </div>
+    </div>
+  </object>
+</div>
