@@ -2674,6 +2674,14 @@ class DeferredFieldsMixin:
         # Prepare to rebuild prefetch_related in correct order
         nested_prefetches = []
         existing_simple_lookups = list(qs._prefetch_related_lookups)
+        # Prefetch objects the view declared, by relation. The deferral builds
+        # on their querysets instead of replacing them, so their filters and
+        # ordering survive the fields and omit params.
+        declared_prefetches = {
+            lookup.prefetch_to: lookup
+            for lookup in existing_simple_lookups
+            if isinstance(lookup, Prefetch)
+        }
         parent_model = serializer.Meta.model
         for parent_field, (child_model, child_fields) in nested_map.items():
             # Look for FKs in the child serializer linked to the parent model.
@@ -2686,13 +2694,19 @@ class DeferredFieldsMixin:
                 and getattr(f.remote_field, "model", None) == parent_model
             }
             child_fields = [f for f in child_fields if f not in fk_names]
-            if child_fields:
-                nested_prefetches.append(
-                    Prefetch(
-                        parent_field,
-                        queryset=child_model.objects.defer(*child_fields),  # type: ignore[attr-defined]
-                    )
-                )
+            if not child_fields:
+                continue
+            declared = declared_prefetches.get(parent_field)
+            if declared is not None and declared.queryset is not None:
+                # Django rejects two Prefetches of one relation with
+                # different querysets, so replace the declared one.
+                existing_simple_lookups.remove(declared)
+                child_qs = declared.queryset
+            else:
+                child_qs = child_model.objects.all()  # type: ignore[attr-defined]
+            nested_prefetches.append(
+                Prefetch(parent_field, queryset=child_qs.defer(*child_fields))
+            )
 
         new_qs = qs._clone()
         # Apply prefetches in the correct order to prevent conflicts.
