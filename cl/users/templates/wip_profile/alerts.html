@@ -1,7 +1,6 @@
 {% extends "new_base.html" %}
 {% block title %}{{ page_title }} &ndash; CourtListener.com{% endblock %}
 
-
 {% block content_wrapper %}
   <div class="capped-width py-4 md:pt-6 md:pb-15">
     <c-profile-section-shell
@@ -11,77 +10,77 @@
       only>
       <c-tabs label="Alert types" :tabs="tabs" :active_tab="page">
         {% if page == "docket_alerts" %}
-            <div class="py-6 flex flex-col gap-2.5">
-                <h2 class="text-2xl font-medium text-greyscale-900">RECAP Docket Alerts for PACER Cases</h2>
-                {% if docket_alerts_rows %}
-                    {% if user.profile.unlimited_docket_alerts %}
-                    <p class="text-sm text-greyscale-600 uppercase">Your account has unlimited docket alerts</p>
-                    {% elif user.profile.email_grants_unlimited_docket_alerts %}
-                    <p class="text-sm text-greyscale-600 uppercase">Your email address provides you unlimited docket alerts</p>
-                    {% elif user.profile.is_member %}
-                    <p class="text-sm text-greyscale-600 uppercase">As a member you get unlimited docket alerts. Thanks!</p>
-                    {% else %}
-                    <p class="text-sm text-greyscale-600 uppercase">
-                        Members get unlimited docket alerts.
-                        <a href="https://free.law/membership/"
-                        class="links-external font-semibold"
-                        target="_blank"
-                        rel="noopener noreferrer">Join FLP</a>
-                    </p>
-                    {% endif %}
-                {% endif %}
-            </div>
+          <div class="py-6 flex flex-col gap-2.5">
+            <h2 class="text-2xl font-medium text-greyscale-900">RECAP Docket Alerts for PACER Cases</h2>
             {% if docket_alerts_rows %}
-                <c-flex-table
-                    caption="Your Docket Alerts"
-                    :columns="[
-                        {'label': 'Case Name'},
-                        {'label': 'Court'},
-                        {'label': 'Docket Number'},
-                        {'label': 'Date Filed'},
-                        {'label': 'Last Hit'},
-                        {'label': 'Enable/disable Alerts', 'sr_only': True},
-                    ]"
-                >
-                {% for row in docket_alerts_rows %}
-                <tr class="text-greyscale-800">
-                    <c-flex-cell header>
-                        <a href="{{row.url}}" class="font-medium">{{ row.case_name }}</a>
-                    </c-flex-cell>
-                    <c-flex-cell>{{ row.court }}</c-flex-cell>
-                    <c-flex-cell>{{ row.docket_number }}</c-flex-cell>
-                    <c-flex-cell>{{ row.date_filed }}</c-flex-cell>
-                    <c-flex-cell>{{ row.last_hit }}</c-flex-cell>
-                    <c-flex-cell class="text-center">
-                        <c-button
-                            class="group rounded-lg outline-none focus-visible:ring-4 focus-visible:ring-primary-300"
-                            hx-post="{% url 'toggle_docket_alert' %}"
-                            hx-vals='{"id": "{{ row.docket_pk }}", "source": "docket_alerts_table"}'
-                            hx-swap="none"
-                            hx-sync="this:drop"
-                        >
-                        <span id="docket-alert-row-toggle-{{ row.docket_pk }}" class="contents">
-                            <span class="flex p-2 rounded-lg bg-primary-600 text-white group-hover:bg-primary-700">
-                                <c-icon name="bell_slash" size="md"/>
-                                <span class="sr-only">Disable alert for {{row.case_name}}</span>
-                            </span>
-                        </span>
-                        </c-button>
-                    </c-flex-cell>
-                </tr>
-                {% endfor %}
-                </c-flex-table>
-                <p id="docket-alerts-status" class="sr-only" role="status"></p>
-                <c-docket-alert-quota-dialog count_id="docket-alerts-quota-count" />
-                <c-button variant="outline" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer" class="mt-4">
-                    Learn More About RECAP Alerts
-                </c-button>
-            {% else %}
-                {# Here goes the empty state feature. #}
-                <p class="py-4">You don't have active alerts.</p>
+              {% if user.profile.unlimited_docket_alerts %}
+                <p class="text-sm text-greyscale-600 uppercase">Your account has unlimited docket alerts</p>
+              {% elif user.profile.email_grants_unlimited_docket_alerts %}
+                <p class="text-sm text-greyscale-600 uppercase">Your email address provides you unlimited docket alerts</p>
+              {% elif user.profile.is_member %}
+                <p class="text-sm text-greyscale-600 uppercase">As a member you get unlimited docket alerts. Thanks!</p>
+              {% else %}
+                <p class="text-sm text-greyscale-600 uppercase">
+                  Members get unlimited docket alerts.
+                  <a href="https://free.law/membership/"
+                    class="links-external font-semibold"
+                    target="_blank"
+                    rel="noopener noreferrer">Join FLP</a>
+                </p>
+              {% endif %}
             {% endif %}
+          </div>
+          {% if docket_alerts_rows %}
+            <c-flex-table
+              caption="Your Docket Alerts"
+              :columns="[
+                {'label': 'Case Name'},
+                {'label': 'Court'},
+                {'label': 'Docket Number'},
+                {'label': 'Date Filed'},
+                {'label': 'Last Hit'},
+                {'label': 'Enable/disable Alerts', 'sr_only': True},
+              ]"
+            >
+              {% for row in docket_alerts_rows %}
+                <tr class="text-greyscale-800">
+                  <c-flex-cell header>
+                    <a href="{{ row.url }}" class="font-medium">{{ row.case_name }}</a>
+                  </c-flex-cell>
+                  <c-flex-cell>{{ row.court }}</c-flex-cell>
+                  <c-flex-cell>{{ row.docket_number }}</c-flex-cell>
+                  <c-flex-cell>{{ row.date_filed }}</c-flex-cell>
+                  <c-flex-cell>{{ row.last_hit }}</c-flex-cell>
+                  <c-flex-cell class="text-center">
+                    <c-button
+                      class="group rounded-lg outline-none focus-visible:ring-4 focus-visible:ring-primary-300"
+                      hx-post="{% url 'toggle_docket_alert' %}"
+                      hx-vals='{"id": "{{ row.docket_pk }}", "source": "docket_alerts_table"}'
+                      hx-swap="none"
+                      hx-sync="this:drop"
+                    >
+                      <span id="docket-alert-row-toggle-{{ row.docket_pk }}" class="contents">
+                        <span class="flex p-2 rounded-lg bg-primary-600 text-white group-hover:bg-primary-700">
+                          <c-icon name="bell_slash" size="md" />
+                          <span class="sr-only">Disable alert for {{ row.case_name }}</span>
+                        </span>
+                      </span>
+                    </c-button>
+                  </c-flex-cell>
+                </tr>
+              {% endfor %}
+            </c-flex-table>
+            <p id="docket-alerts-status" class="sr-only" role="status"></p>
+            <c-docket-alert-quota-dialog count_id="docket-alerts-quota-count" />
+            <c-button variant="outline" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer" class="mt-4">
+              Learn More About RECAP Alerts
+            </c-button>
+          {% else %}
+            {# Here goes the empty state feature. #}
+            <p class="py-4">You don't have active alerts.</p>
+          {% endif %}
         {% else %}
-            {# Here goes the Search page #}
+          {# Here goes the Search page #}
         {% endif %}
       </c-tabs>
     </c-profile-section-shell>
