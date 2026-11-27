@@ -41,6 +41,7 @@
         {'href': '#docket-source-button', 'text': 'Docket source button'},
         {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
         {'href': '#docket-alert-label', 'text': 'Docket alert label'},
+        {'href': '#docket-alert-quota-dialog', 'text': 'Docket alert quota dialog'},
         {'href': '#add-note', 'text': 'Add note'},
         {'href': '#pray-button', 'text': 'Pray button'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
@@ -985,7 +986,7 @@ Sample code here.
       :columns="[
         {'label': 'Service', 'field': 'first'},
         {'label': 'Speed', 'field': 'second'},
-        {'label': 'Fidelity', 'field': 'third'},
+        {'label': 'Fidelity', 'field': 'third', 'sr_only': True},
       ]"
       :footer="[
         {
@@ -1015,7 +1016,7 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>c-flex-table</code>: <code>columns</code></c-slot>
         <c-slot name="description">
-          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column). An optional <code>title</code> is rendered as the header's tooltip.
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column). An optional <code>title</code> is rendered as the header's tooltip. An optional <code>sr_only</code> set to <code>True</code> hides the label visually but keeps it for screen readers.
         </c-slot>
       </c-library.item>
 
@@ -2189,6 +2190,29 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-docket-alert-label :has_alert="has_alert" icon_class="w-4 h-4 text-greyscale-500" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET ALERT QUOTA DIALOG #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-alert-quota-dialog">
+    <h2 class="mt-6 mb-3">Docket alert quota dialog</h2>
+    <p>The dialog that explains a refused docket alert toggle: the free limit, the RECAP bonus, the user's current alert count, and links to become a member or install RECAP. It is rendered closed and has no trigger. The toggle view refuses with the header <code>HX-Trigger-After-Swap: docket-alert-quota-reached</code>, which opens it, and its response fills the alert count out of band. The docket page and the docket alerts table both use it.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>count_id</code></c-slot>
+        <c-slot name="description">The id of the element that shows the user's alert count. The toggle response fills it with <code>hx-swap-oob</code>, so it must match the id that response targets.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-alert-quota-dialog count_id="docket-alerts-quota-count" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>

@@ -20,7 +20,11 @@
           "
           {% if column.title %}title="{{ column.title }}"{% endif %}
         >
-          {{ column.label }}
+          {% if column.sr_only %}
+            <span class="sr-only">{{ column.label }}</span>
+          {% else %}
+            {{ column.label }}
+          {% endif %}
         </th>
       {% endfor %}
     </tr>
