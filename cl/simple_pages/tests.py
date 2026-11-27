@@ -1495,16 +1495,20 @@ class FlexTableComponentTest(CottonComponentMixin, SimpleTestCase):
     def render_table(
         self, rows: list[str], attributes: str = "", slots: str = ""
     ) -> HtmlElement:
-        """Renders a two-column table with a row per item and parses it."""
+        """Renders a two-column table with a row per item and parses it.
+
+        The loop sits on its own indented lines, so a table without rows
+        gets a whitespace-only body.
+        """
         return fromstring(
             self.render_component(
                 '<c-flex-table caption="Saved notes"'
                 " :columns=\"[{'label': 'Name'}, {'label': 'Note'}]\""
-                f" {attributes}>"
-                "{% for row in rows %}"
-                "<tr><td>{{ row }}</td><td>Saved</td></tr>"
-                "{% endfor %}"
-                f"{slots}</c-flex-table>",
+                f" {attributes}>\n"
+                "  {% for row in rows %}\n"
+                "    <tr><td>{{ row }}</td><td>Saved</td></tr>\n"
+                "  {% endfor %}\n"
+                f"  {slots}\n</c-flex-table>",
                 {"rows": rows},
             )
         )
