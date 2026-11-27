@@ -35,7 +35,9 @@ from cl.corpus_importer.state.common.party import (
 )
 from cl.corpus_importer.state.merger import (
     Ancestor,
+    Coalesce,
     Constant,
+    Database,
     Fn,
     ManyStrategy,
     Merger,
@@ -45,8 +47,6 @@ from cl.corpus_importer.state.merger import (
     OneToOneRelation,
     RelatedParams,
     Scrape,
-    WithStrategy,
-    overwrite_if_present,
 )
 from cl.corpus_importer.state.new_york.nycourts_gov import (
     NYCoAAttorney,
@@ -125,32 +125,6 @@ def _storable_number(
     return None
 
 
-def _keep_stored_file(scrape: FieldFile, db: FieldFile) -> str:
-    """Merge strategy that keeps the path already stored for a document when this scrape has no published one to put there.
-
-    Args:
-        scrape: The path this scrape published to, if any.
-        db: The path already stored for the document.
-
-    Returns:
-        The path to store.
-    """
-    return (scrape.name or "") or (db.name or "")
-
-
-def _keep_downloaded[T](scrape: T | None, db: T | None) -> T | None:
-    """Merge strategy for scraped files.
-
-    Args:
-        scrape: What this scrape's download established, if it made one.
-        db: What is already stored for the document.
-
-    Returns:
-        The value to store.
-    """
-    return db if scrape is None or scrape == "" else scrape
-
-
 def _stated(reading: CourtVocabulary | Unclassified) -> str:
     """The Court-PASS value to store for a field read off a file name.
 
@@ -178,6 +152,41 @@ def is_publishable(file: NYCoAFile) -> bool:
     :return: Whether the file may be stored for publishing.
     """
     return is_scraped(file.local_path) and bool(file.content_hash)
+
+
+def _vouched[T](file: NYCoAFile, value: T) -> T | None:
+    """A value describing a scraped file, unless the scrape cannot vouch for the file it downloaded.
+
+    Args:
+        file: The file Court-PASS listed.
+        value: What the scrape read about the file's download.
+
+    Returns:
+        `value`, or `None` when the scrape downloaded a file that is not
+        publishable, so that whatever is already stored is kept.
+    """
+    return value if not file.local_path or is_publishable(file) else None
+
+
+def _republished_path(
+    file: NYCoAFile, stored: FieldFile | None, stored_hash: str | None
+) -> str | None:
+    """The published path of a file this scrape downloaded again unchanged.
+
+    Args:
+        file: The file Court-PASS listed.
+        stored: The file already stored for the document, if any.
+        stored_hash: The hash already stored for the document, if any.
+
+    Returns:
+        The stored path when the document has already published the file this
+        scrape downloaded, or `None` otherwise.
+    """
+    if stored is None or not (file.local_path and file.content_hash):
+        return None
+    if stored_hash != file.content_hash or not is_published(stored.name or ""):
+        return None
+    return stored.name
 
 
 class NYCoADocumentMerger[ParamType](
@@ -213,14 +222,28 @@ class NYCoADocumentMerger[ParamType](
     part: int | None = Fn(_storable_number)(
         Scrape(NYCoAFile).part, "part", Scrape(NYCoAFile)
     )
-    filepath_local: str = WithStrategy(
-        Scrape(NYCoAFile).local_path, _keep_stored_file
+    # Normally the scraper's key in the private bucket, which the loader
+    # publishes after the merge. A file this document has already published is
+    # kept where it is, and a file the scrape cannot vouch for is not stored,
+    # leaving the document with whatever file it already has.
+    filepath_local: str = Coalesce(
+        Fn(_republished_path)(
+            Scrape(NYCoAFile),
+            Database(NYCoADocument.filepath_local),
+            Database(NYCoADocument.sha256),
+        ),
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).local_path),
+        Database(NYCoADocument.filepath_local),
+        default="",
     )
-    sha256: str = WithStrategy(
-        Scrape(NYCoAFile).content_hash, _keep_downloaded
+    sha256: str = Coalesce(
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).content_hash),
+        Database(NYCoADocument.sha256),
+        default="",
     )
-    file_size: int | None = WithStrategy(
-        Scrape(NYCoAFile).file_size, _keep_downloaded
+    file_size: int | None = Coalesce(
+        Fn(_vouched)(Scrape(NYCoAFile), Scrape(NYCoAFile).file_size),
+        Database(NYCoADocument.file_size),
     )
 
     @override
@@ -232,8 +255,8 @@ class NYCoADocumentMerger[ParamType](
     ) -> MergerState.CreateOutput[
         NYCoAFile, RelatedParams[ParamType], NYCoADocument
     ]:
-        """Settle which path to store for the file, then write the document."""
-        self._accept_file(state.scrape, None)
+        """Dispose of the scraper's copy of the file, then write the document."""
+        self._dispose_of_scraped_copy(state.scrape, None)
         return super().create(state)
 
     @override
@@ -245,27 +268,34 @@ class NYCoADocumentMerger[ParamType](
     ) -> MergerState.UpdateOutput[
         NYCoAFile, RelatedParams[ParamType], NYCoADocument
     ]:
-        """Settle which path to store for the file, then write the document."""
-        self._accept_file(state.scrape, state.instance)
-        return super().update(state)
+        """Dispose of the scraper's copy of the file, then write the document."""
+        self._dispose_of_scraped_copy(state.scrape, state.instance)
 
-    def _scrub_fileinfo(self) -> None:
-        """Remove info relevant to file."""
-        self.filepath_local = ""
-        self.sha256 = ""
-        self.file_size = None
+        save_state = super().update(state)
 
-    def _accept_file(
+        if not isinstance(save_state, MergerState.Save):
+            return save_state
+
+        instance = save_state.operation.instance
+        updated_fields = list(save_state.operation.fields)
+
+        if "filepath_local" not in updated_fields:
+            return save_state
+
+        instance.page_count = None
+        instance.ocr_status = None
+        updated_fields += ["page_count", "ocr_status"]
+
+        return state.save(instance, updated_fields, save_state.result)
+
+    def _dispose_of_scraped_copy(
         self, scrape: NYCoAFile, existing: NYCoADocument | None
     ) -> None:
-        """Decide what the document's `filepath_local` should hold.
+        """Handle a scraped copy of the file that the document will not store.
 
-        Normally that is the scraper's key in the private bucket, which the
-        loader publishes after the merge. Two exceptions: a file this document
-        has already published is kept where it is, and the scraper's copy of it
-        is deleted once the merge commits, since nothing will ever point at it;
-        and a file the scrape cannot vouch for is not stored at all, which
-        leaves the document with whatever file it already has.
+        A copy of a file this document has already published is deleted once
+        the merge commits, since nothing will ever point at it. A copy the
+        scrape cannot vouch for is logged.
 
         Args:
             scrape: The file Court-PASS listed.
@@ -274,14 +304,9 @@ class NYCoADocumentMerger[ParamType](
         private_key = scrape.local_path
         if not private_key:
             return
-        stored = (existing.filepath_local.name or "") if existing else ""
-        if (
-            existing is not None
-            and scrape.content_hash
-            and existing.sha256 == scrape.content_hash
-            and is_published(stored)
+        if existing is not None and _republished_path(
+            scrape, existing.filepath_local, existing.sha256
         ):
-            self.filepath_local = stored
             if is_scraped(private_key):
                 transaction.on_commit(
                     partial(
@@ -299,20 +324,6 @@ class NYCoADocumentMerger[ParamType](
             scrape.file_name,
             private_key,
         )
-        self._scrub_fileinfo()
-
-    @override
-    def pre_update(self, updated_fields: list[str]) -> list[str]:
-        """Send a document whose file has moved back for extraction."""
-        updated = super().pre_update(updated_fields)
-        if not isinstance(self.state, MergerState.Update):
-            return updated
-        if "filepath_local" not in updated_fields + updated:
-            return updated
-        self.state.instance.page_count = None
-        self.state.instance.ocr_status = None
-        updated += ["page_count", "ocr_status"]
-        return updated
 
 
 def _served_attachments(
@@ -365,11 +376,6 @@ def _entry_party_id(entry: NYCoDocketEntry, docket: Docket) -> int | None:
     return matched[0] if by_role is None else by_role
 
 
-def _keep_party_name(scrape: str | None, db: str | None) -> str:
-    """Merge strategy that keeps the party name an earlier scrape recorded when this one read none, rather than blanking it."""
-    return scrape or db or ""
-
-
 class NYCoADocketEntryMerger[ParamType](
     Merger[NYCoDocketEntry, RelatedParams[ParamType], NYCoADocketEntry]
 ):
@@ -401,15 +407,18 @@ class NYCoADocketEntryMerger[ParamType](
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
-    party_id: int | None = WithStrategy(
+    party_id: int | None = Coalesce(
         Fn(_entry_party_id)(Scrape(NYCoDocketEntry), Ancestor(Docket)),
-        overwrite_if_present,
+        # pyrefly:ignore[bad-argument-type]
+        Database(cast(int | None, NYCoADocketEntry.party_id)),
     )
     # The name Court-PASS printed, kept whether or not `party_id` resolved --
     # on a filing by a party with no attorney of record it is the only record
     # of who filed.
-    party_name: str = WithStrategy(
-        Scrape(NYCoDocketEntry).party, _keep_party_name
+    party_name: str = Coalesce(
+        Scrape(NYCoDocketEntry).party,
+        Database(NYCoADocketEntry.party_name),
+        default="",
     )
     # Court-PASS lists every file it has for a case, so a file that is gone
     # from the list -- or that it has stopped serving -- is gone from the
@@ -833,11 +842,11 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     docket_number_core: str = Fn(make_docket_number_core)(
         Scrape(NYCoACase).docket_number
     )
-    date_filed: date | None = WithStrategy(
-        Scrape(NYCoACase).date_filed, overwrite_if_present
+    date_filed: date | None = Coalesce(
+        Scrape(NYCoACase).date_filed, Database(Docket.date_filed)
     )
-    date_argued: date | None = WithStrategy(
-        Scrape(NYCoACase).argument_date, overwrite_if_present
+    date_argued: date | None = Coalesce(
+        Scrape(NYCoACase).argument_date, Database(Docket.date_argued)
     )
     date_last_filing: date | None = Fn(_date_last_filing)(Scrape(NYCoACase))
 

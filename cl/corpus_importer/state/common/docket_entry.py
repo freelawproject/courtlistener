@@ -8,7 +8,7 @@ target model are per-state).
 
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, ClassVar, cast, override
+from typing import Any, ClassVar, override
 
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
@@ -40,9 +40,9 @@ def _entry_attachments[DocType: ScrapeDocument](
 
 class DocumentMerger[
     DocType: ScrapeDocument,
-    ParamType,
+    Params,
     M: AbstractStateDocument,
-](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
+](Merger[DocType, RelatedParams[Params], M], abstract=True):
     """Base merger for a scraped state document.
 
     When a document's URL changes, its stored file and OCR status are reset
@@ -57,34 +57,41 @@ class DocumentMerger[
     url: str = Scrape(ScrapeDocument).url
 
     @override
-    def needs_update(self) -> bool:
-        """Force the update path for a document with no stored file and no recorded processing error -- its download failed transiently, and reporting an update gets the download re-dispatched on re-ingest."""
-        if not isinstance(state := self.state, MergerState.Update):
-            return False
-        document = cast(AbstractStateDocument, state.instance)
-        return (
-            not document.filepath_local and document.processing_error is None
-        )
+    def update(
+        self, state: MergerState.Update[DocType, RelatedParams[Params], M]
+    ) -> MergerState.UpdateOutput[DocType, RelatedParams[Params], M]:
+        if not isinstance(
+            save_state := super().update(state), MergerState.Save
+        ):
+            return save_state
 
-    @override
-    def pre_update(self, updated_fields: list[str]) -> list[str]:
-        updated = super().pre_update(updated_fields)
-        # This hook only runs on the update path; the guard narrows the type.
-        if not isinstance(self.state, MergerState.Update):
-            return updated
+        document = state.instance
+        if not save_state.operation.fields and (
+            document.filepath_local or document.processing_error is not None
+        ):
+            return save_state
+
+        existing = save_state.operation.instance
+        updated_fields = list(save_state.operation.fields)
+
         if "url" not in updated_fields:
-            return updated
-        existing = cast(AbstractStateDocument, self.state.instance)
+            return state.save(
+                existing, updated_fields, save_state.result, force=True
+            )
+
         if existing.processing_error == ProcessingError.BAD_URL:
             existing.processing_error = None
-            updated.append("processing_error")
+            updated_fields.append("processing_error")
+
         if existing.filepath_local:
             existing.filepath_local.delete(save=False)
-            updated.append("filepath_local")
+            updated_fields.append("filepath_local")
+
         existing.filepath_local = ""
         existing.ocr_status = None
-        updated.append("ocr_status")
-        return updated
+        updated_fields.append("ocr_status")
+
+        return state.save(existing, updated_fields, save_state.result)
 
 
 def AttachmentRelation(
