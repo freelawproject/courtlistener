@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import CommandError, CommandParser
 from django.db import transaction
@@ -39,6 +40,7 @@ from cl.corpus_importer.utils import (
     clean_body_content,
     get_court_id,
 )
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
@@ -62,6 +64,7 @@ from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    Citation,
     Court,
     Docket,
     Opinion,
@@ -81,6 +84,8 @@ FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
 SUPPORTED_SCHEMAS = {"1", "2"}
+# Celery's default queue, used for the citation-finding tasks by default
+DEFAULT_QUEUE = "celery"
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
@@ -860,8 +865,12 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     """Find the id of the cluster this scanned opinion was imported into.
 
     The stored XML file name starts with the scan and opinion ids, so it is
-    looked for in the clusters with one of the opinion's citations, which
-    are indexed, unlike the file path.
+    looked for in the clusters with the volume and reporter of one of the
+    opinion's citations, which are indexed, unlike the file path. The page
+    is left out, since a correction in the portal can change it. The
+    cluster's citations aren't updated then, so a warning names the scan's
+    citations that the cluster lacks, for review. It also names one that the
+    import skipped because the cluster had another from that reporter.
 
     Caveat: a merged cluster that didn't get any of the scan's citations
     isn't found here; `find_existing_cluster` matches it again, and the
@@ -877,17 +886,16 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
     Returns:
         The cluster id, or None if it was not imported yet.
     """
-    citations = Q()
+    volumes = Q()
     for cite in scan_case.parsed_citations:
-        citations |= Q(
+        volumes |= Q(
             citations__volume=cite.groups["volume"],
             citations__reporter=cite.corrected_reporter(),
-            citations__page=cite.groups["page"],
         )
     # The citations join returns a cluster once per matching citation
     cluster_ids = list(
         OpinionCluster.objects.filter(
-            citations,
+            volumes,
             filepath_xml_scan__contains=f"/{scan_case.file_name_prefix}",
         )
         .order_by("pk")
@@ -900,7 +908,31 @@ def find_imported_scan(scan_case: ScanCase) -> int | None:
             scan_case.file_name_prefix,
             cluster_ids,
         )
-    return cluster_ids[0] if cluster_ids else None
+    if not cluster_ids:
+        return None
+    cluster_id = cluster_ids[0]
+    # Check each citation, since a correction can change one of several
+    # parallel citations
+    if missing := [
+        cite.corrected_citation()
+        for cite in scan_case.parsed_citations
+        if not Citation.objects.filter(
+            cluster_id=cluster_id,
+            volume=cite.groups["volume"],
+            reporter=cite.corrected_reporter(),
+            page=cite.groups["page"],
+        ).exists()
+    ]:
+        logger.warning(
+            "Cluster %s doesn't have the citations %s of scanned opinion %s. "
+            "Review it: %s%s",
+            cluster_id,
+            "; ".join(missing),
+            scan_case.file_name_prefix,
+            BASE_URL,
+            OpinionCluster.objects.get(pk=cluster_id).get_absolute_url(),
+        )
+    return cluster_id
 
 
 def find_existing_cluster(scan_case: ScanCase) -> OpinionCluster | None:
@@ -979,7 +1011,7 @@ def make_opinion(op: Tag, cluster_id: int) -> Opinion:
     )
 
 
-def queue_citation_finding(opinion_pks: list[int]) -> None:
+def queue_citation_finding(opinion_pks: list[int], queue: str) -> None:
     """Find the citations of the opinions once the import is committed.
 
     This builds `html_with_citations` from the scanned XML, replacing the
@@ -988,14 +1020,18 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
     The import is committed when the task is queued, so a failure to queue
     it is logged with the opinion ids instead of failing the import.
 
+    The opinions aren't percolated, since search alerts for old cases would
+    only be noise.
+
     Args:
         opinion_pks: The ids of the imported opinions.
+        queue: The Celery queue of the citation-finding task.
     """
 
-    def queue() -> None:
+    def queue_task() -> None:
         try:
-            find_citations_and_parentheticals_for_opinion_by_pks.delay(
-                opinion_pks
+            find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
+                args=(opinion_pks,), queue=queue
             )
         except Exception:
             logger.exception(
@@ -1003,7 +1039,7 @@ def queue_citation_finding(opinion_pks: list[int]) -> None:
                 opinion_pks,
             )
 
-    transaction.on_commit(queue)
+    transaction.on_commit(queue_task)
 
 
 def store_scan_xml(
@@ -1017,6 +1053,10 @@ def store_scan_xml(
     write rolls back before the file is uploaded. The upload comes before the
     cluster save that stores its path, so the file is deleted if that save
     fails, and no orphan is left.
+
+    The storage never overwrites: when the name is taken, it adds `_1`,
+    `_2`, etc. A scan imported again gets a new file, and the previous ones
+    are kept, so the cluster can be rolled back to an earlier version.
 
     Args:
         cluster: A cluster with a pk.
@@ -1385,7 +1425,10 @@ def add_scanned_opinions(
 
 
 def merge_into_cluster(
-    cluster: OpinionCluster, plan: OpinionMergePlan, scan_case: ScanCase
+    cluster: OpinionCluster,
+    plan: OpinionMergePlan,
+    scan_case: ScanCase,
+    queue: str,
 ) -> None:
     """Merge a scanned opinion into an existing cluster.
 
@@ -1398,6 +1441,7 @@ def merge_into_cluster(
         plan: How the scanned opinions go into the cluster, from
             `plan_opinion_merge`.
         scan_case: The parsed scanned opinion.
+        queue: The Celery queue of the citation-finding task.
     """
     with transaction.atomic():
         add_citations_to_cluster(scan_case.citations, cluster.id)
@@ -1440,17 +1484,18 @@ def merge_into_cluster(
         docket.save(update_fields=["source"])
 
         opinions = add_scanned_opinions(cluster, plan, scan_case)
-        queue_citation_finding([opinion.pk for opinion in opinions])
+        queue_citation_finding([opinion.pk for opinion in opinions], queue)
 
         # Saves the cluster changes above too
         store_scan_xml(cluster, scan_case, update_fields)
 
 
-def add_new_case(scan_case: ScanCase) -> OpinionCluster:
+def add_new_case(scan_case: ScanCase, queue: str) -> OpinionCluster:
     """Create the docket, cluster, citations and opinions of a scanned case.
 
     Args:
         scan_case: The parsed scanned opinion.
+        queue: The Celery queue of the citation-finding task.
 
     Returns:
         The new cluster.
@@ -1489,6 +1534,9 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             )
         elif docket.pk:
             logger.info("Using existing docket %s", docket.pk)
+        # An existing RECAP docket is percolated on update, and search alerts
+        # for an old case would only be noise
+        docket.skip_percolator_request = True
         docket.save()
 
         cluster = OpinionCluster(
@@ -1513,13 +1561,247 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             opinion.save()
             add_opinion_content(opinion, scan_case)
         store_scan_xml(cluster, scan_case, update_fields=[])
-        queue_citation_finding([opinion.pk for opinion in opinions])
+        queue_citation_finding([opinion.pk for opinion in opinions], queue)
     return cluster
 
 
-def import_scanned_opinion(
-    xml: str, file_path: str, court_id: str | None, dry_run: bool = False
+def read_stored_scan_xml(cluster: OpinionCluster) -> str:
+    """Read the scan XML stored for a cluster.
+
+    Args:
+        cluster: A cluster imported from a scan.
+
+    Returns:
+        The stored XML, or an empty string if the file is missing.
+    """
+    if not cluster.filepath_xml_scan:
+        return ""
+    try:
+        with cluster.filepath_xml_scan.open("rb") as f:
+            return f.read().decode("utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+def get_overwrite_changes(
+    cluster: OpinionCluster, scanned: list[Opinion], scan_case: ScanCase
+) -> tuple[list[tuple[Opinion, str]], str | None] | None:
+    """Get what changed in a scan imported before, to overwrite it.
+
+    The new XML's opinions are paired with the cluster's scanned opinions
+    by order, since it is the same scanned opinion of the portal. The head
+    matter is only compared when the cluster's came from a scan, since a
+    merged cluster can keep the head matter of another source, like
+    Harvard's. An empty one counts as the scan's, since an import fills it
+    when the scan has head matter, so a correction can add or remove it.
+
+    Args:
+        cluster: The cluster the scan was imported into.
+        scanned: The cluster's scanned opinions, in order.
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The (opinion, new XML) pairs whose XML changed, and the new head
+        matter, which is empty when the correction removed it, or None if
+        it's unchanged or not the scan's. None instead of both if the number
+        of opinions changed, which needs a review.
+    """
+    new_xmls = [str(op) for op in scan_case.opinions]
+    if len(scanned) != len(new_xmls):
+        return None
+    changed = [
+        (opinion, xml)
+        for opinion, xml in zip(scanned, new_xmls, strict=True)
+        if opinion.xml_scan != xml
+    ]
+    headmatter: str | None = scan_case.cluster_fields.get("headmatter", "")
+    current = cluster.headmatter
+    if (current and not current.startswith("<headmatter>")) or (
+        current == headmatter
+    ):
+        headmatter = None
+    return changed, headmatter
+
+
+# The opinion fields that `make_opinion` takes from the `<opinion>` element,
+# which an overwrite doesn't update
+BYLINE_FIELDS = ("type", "author_str", "per_curiam")
+
+
+def get_byline_changes(
+    old_xml: str, new_xml: str, cluster_id: int
+) -> list[str]:
+    """Get the byline fields that a corrected `<opinion>` derives differently.
+
+    The fields are derived from both XMLs, not read from the opinion, since a
+    merge can keep the author of the court's version.
+
+    Args:
+        old_xml: The opinion's stored `<opinion>` XML.
+        new_xml: Its corrected `<opinion>` XML.
+        cluster_id: The id of the opinion's cluster.
+
+    Returns:
+        The names of the fields in BYLINE_FIELDS that differ.
+    """
+    derived = []
+    for xml in (old_xml, new_xml):
+        if (
+            op := BeautifulSoup(xml, "lxml-xml").select_one("opinion")
+        ) is None:
+            return []
+        derived.append(make_opinion(op, cluster_id))
+    old, new = derived
+    return [
+        name
+        for name in BYLINE_FIELDS
+        if getattr(old, name) != getattr(new, name)
+    ]
+
+
+def replace_opinion_content(
+    opinion: Opinion, xml: str, scan_case: ScanCase
 ) -> None:
+    """Store the corrected XML of a scanned opinion as its main version.
+
+    The previous contents are kept as older versions, so the corrections
+    can be followed.
+
+    Args:
+        opinion: The saved scanned opinion.
+        xml: Its new `<opinion>` XML.
+        scan_case: The parsed scanned opinion.
+    """
+    opinion.xml_scan = xml
+    opinion.save(update_fields=["xml_scan"])
+    opinion.contents.filter(is_main_version=True).update(is_main_version=False)
+    add_opinion_content(opinion, scan_case)
+
+
+def overwrite_scan(
+    cluster: OpinionCluster,
+    scan_case: ScanCase,
+    file_path: str,
+    queue: str,
+    dry_run: bool = False,
+) -> bool:
+    """Overwrite a scan imported before with its new XML.
+
+    For a portal schema change or a correction upstream, like a missed
+    footnote: the opinions' XML and contents, and the head matter when it
+    came from the scan or is empty, are replaced, the XML is stored as a new
+    numbered file next to the previous ones (see `store_scan_xml`), and the
+    citations are found again. Other fields aren't changed, so a change
+    elsewhere in the XML, like the syllabus, only stores the new file.
+    Nothing is written when the XML didn't change. A changed byline or
+    opinion type is only logged for review.
+
+    Args:
+        cluster: The cluster the scan was imported into.
+        scan_case: The parsed scanned opinion.
+        file_path: The local path or the S3 key of the XML, used for
+            logging.
+        queue: The Celery queue of the citation-finding task.
+        dry_run: Only log what would be overwritten.
+
+    Returns:
+        Whether the scan was overwritten, or would be on a dry run.
+    """
+    citation = scan_case.citation.corrected_citation()
+    scanned = list(
+        cluster.sub_opinions.filter(main_version__isnull=True)
+        .exclude(xml_scan="")
+        .order_by("ordering_key", "pk")
+    )
+    if (changes := get_overwrite_changes(cluster, scanned, scan_case)) is None:
+        logger.warning(
+            "Not overwriting %s (%s): cluster %s has %s scanned opinions "
+            "and the scan has %s. Skipping it for review: %s%s",
+            file_path,
+            citation,
+            cluster.pk,
+            len(scanned),
+            len(scan_case.opinions),
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return False
+    changed, headmatter = changes
+    # Other parts of the XML, like the syllabus, only change the stored file
+    if (
+        not changed
+        and headmatter is None
+        and (read_stored_scan_xml(cluster) == scan_case.xml)
+    ):
+        logger.info(
+            "Skipping %s (%s), unchanged since its import in cluster %s",
+            file_path,
+            citation,
+            cluster.pk,
+        )
+        return False
+    count = len(changed)
+    summary = f"{count} opinion{'s' if count != 1 else ''}"
+    if headmatter is not None:
+        summary += " and the head matter"
+    if not changed and headmatter is None:
+        summary = "the stored XML"
+    for opinion, xml in changed:
+        if fields := get_byline_changes(opinion.xml_scan, xml, cluster.pk):
+            logger.warning(
+                "The %s of opinion %s changed in %s (%s), but an overwrite "
+                "doesn't update them. Review them: %s%s",
+                ", ".join(fields),
+                opinion.pk,
+                file_path,
+                citation,
+                BASE_URL,
+                cluster.get_absolute_url(),
+            )
+    if dry_run:
+        logger.info(
+            "Dry run: would overwrite %s of %s (%s) in cluster %s: %s%s",
+            summary,
+            file_path,
+            citation,
+            cluster.pk,
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return True
+    logger.info(
+        "Overwriting %s of %s (%s) in cluster %s: %s%s",
+        summary,
+        file_path,
+        citation,
+        cluster.pk,
+        BASE_URL,
+        cluster.get_absolute_url(),
+    )
+    with transaction.atomic():
+        for opinion, xml in changed:
+            replace_opinion_content(opinion, xml, scan_case)
+        # The stored XML always changes, so date_modified is always saved
+        update_fields = ["date_modified"]
+        if headmatter is not None:
+            cluster.headmatter = headmatter
+            update_fields.append("headmatter")
+        store_scan_xml(cluster, scan_case, update_fields)
+        if changed:
+            queue_citation_finding(
+                [opinion.pk for opinion, _ in changed], queue
+            )
+    return True
+
+
+def import_scanned_opinion(
+    xml: str,
+    file_path: str,
+    court_id: str | None,
+    queue: str,
+    dry_run: bool = False,
+    overwrite: bool = False,
+) -> bool:
     """Import a scanning project final XML into CourtListener.
 
     Skips opinions already imported from the scanning project. Merges into
@@ -1531,22 +1813,37 @@ def import_scanned_opinion(
         file_path: The local path or the S3 key of the XML, used for
             logging.
         court_id: The CL court id, or None to look it up in the XML.
+        queue: The Celery queue of the citation-finding task.
         dry_run: Only log whether the opinion would be skipped, merged or
             added, without writing to the database or uploading files.
+        overwrite: Overwrite opinions already imported whose XML changed,
+            instead of skipping them (see `overwrite_scan`).
+
+    Returns:
+        Whether the scan was added, merged or overwritten, or would be on
+        a dry run. False when it was skipped.
     """
     logger.info("Processing %s", file_path)
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
-        return
+        return False
     citation = scan_case.citation.corrected_citation()
 
     if cluster_id := find_imported_scan(scan_case):
+        if overwrite:
+            return overwrite_scan(
+                OpinionCluster.objects.get(pk=cluster_id),
+                scan_case,
+                file_path,
+                queue,
+                dry_run,
+            )
         logger.info(
             "Skipping %s (%s), already imported in cluster %s",
             file_path,
             citation,
             cluster_id,
         )
-        return
+        return False
 
     if cluster := find_existing_cluster(scan_case):
         if cluster.filepath_xml_scan:
@@ -1558,7 +1855,7 @@ def import_scanned_opinion(
                 cluster.id,
                 cluster.filepath_xml_scan.name,
             )
-            return
+            return False
         if not (plan := plan_opinion_merge(cluster, scan_case)):
             # Skip it instead of merging only the cluster metadata, which
             # would be hard to clean up afterwards
@@ -1579,7 +1876,7 @@ def import_scanned_opinion(
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
-            return
+            return False
         if dry_run:
             logger.info(
                 "Dry run: would merge %s (%s) into cluster %s (%s): %s%s",
@@ -1590,7 +1887,7 @@ def import_scanned_opinion(
                 BASE_URL,
                 cluster.get_absolute_url(),
             )
-            return
+            return True
         logger.info(
             "Merging %s (%s) into cluster %s (%s): %s%s",
             file_path,
@@ -1600,8 +1897,8 @@ def import_scanned_opinion(
             BASE_URL,
             cluster.get_absolute_url(),
         )
-        merge_into_cluster(cluster, plan, scan_case)
-        return
+        merge_into_cluster(cluster, plan, scan_case, queue)
+        return True
 
     if dry_run:
         logger.info(
@@ -1609,8 +1906,8 @@ def import_scanned_opinion(
             scan_case.case_name,
             citation,
         )
-        return
-    cluster = add_new_case(scan_case)
+        return True
+    cluster = add_new_case(scan_case, queue)
     logger.info(
         "Added %s (%s) as cluster %s: %s%s",
         scan_case.case_name,
@@ -1619,6 +1916,7 @@ def import_scanned_opinion(
         BASE_URL,
         cluster.get_absolute_url(),
     )
+    return True
 
 
 class Command(VerboseCommand):
@@ -1671,6 +1969,34 @@ class Command(VerboseCommand):
             help="Log what would be skipped, merged or added without "
             "changing anything.",
         )
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="Overwrite the opinions already imported whose XML changed, "
+            "e.g. after a schema change or a correction in the portal, "
+            "instead of skipping them.",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            help="Stop after adding, merging or overwriting this many files. "
+            "Skipped files don't count, so running it again continues with "
+            "the next ones.",
+        )
+        parser.add_argument(
+            "--queue",
+            type=str,
+            default=DEFAULT_QUEUE,
+            help="The Celery queue of the citation-finding tasks.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            type=int,
+            default=20,
+            help="Wait between files while the Celery queues have more than "
+            "this many tasks. The queues are first measured after twice this "
+            "many files, and each file queues several tasks.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Import every XML file found in the given path."""
@@ -1678,6 +2004,10 @@ class Command(VerboseCommand):
         scan_ids, opinion_id = options["scan_id"], options["opinion_id"]
         if opinion_id and (not scan_ids or len(scan_ids) != 1):
             raise CommandError("--opinion-id needs a single --scan-id.")
+        if (limit := options["limit"]) is not None and limit < 1:
+            raise CommandError("--limit must be at least 1.")
+        if options["throttle_min_items"] < 1:
+            raise CommandError("--throttle-min-items must be at least 1.")
 
         if options["path"]:
             file_paths = xml_file_paths(options["path"])
@@ -1688,14 +2018,38 @@ class Command(VerboseCommand):
             read = partial(read_s3_xml, storage)
         logger.info("Found %s XML files to import", len(file_paths))
 
+        queue = options["queue"]
+        throttles = []
+        if not options["dry_run"]:
+            # Saving an import also sends search index tasks to the ETL
+            # queue, so watch it too
+            throttles = [
+                CeleryThrottle(
+                    min_items=options["throttle_min_items"], queue_name=name
+                )
+                for name in dict.fromkeys(
+                    [queue, settings.CELERY_ETL_TASK_QUEUE]
+                )
+            ]
+        imported = 0
         for file_path in file_paths:
+            if limit is not None and imported >= limit:
+                logger.info("Stopping after %s files, the --limit", limit)
+                break
             try:
-                import_scanned_opinion(
+                if not import_scanned_opinion(
                     read(file_path),
                     file_path,
                     options["court_id"],
+                    queue,
                     options["dry_run"],
-                )
+                    options["overwrite"],
+                ):
+                    continue
             except Exception:
                 # Keep going; one bad file shouldn't stop a volume import
                 logger.exception("Failed to import %s", file_path)
+                continue
+            imported += 1
+            for throttle in throttles:
+                throttle.maybe_wait()
