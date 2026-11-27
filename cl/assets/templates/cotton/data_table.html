@@ -1,23 +1,16 @@
 {% load extras %}
 
-<c-vars columns rows footer align caption="Data table" safe></c-vars>
+{# Slots: no_data replaces no_data_label in the row shown when there are no rows. #}
+<c-vars columns rows footer align caption="Data table" safe no_data_label="No data available"></c-vars>
 
 <div class="overflow-auto">
-  <table class="w-full">
+  <table class="w-full{% if align == "center" %} table-align-center{% elif align == "data-center" %} table-align-data-center{% endif %}">
     <caption class="sr-only">{{ caption }}</caption>
     <thead>
     <tr class="border-none">
       {% for column in columns %}
         <th
-          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg
-            {% if align == "data-center" %}
-              text-center first:text-start
-            {% elif align == "center" %}
-              text-center
-            {% else %}
-              text-start
-            {% endif %}
-        ">
+          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg">
           {{ column.label }}
         </th>
       {% endfor %}
@@ -27,15 +20,7 @@
     {% for row in rows %}
       <tr class="border-b-greyscale-200 border-b">
         {% for column in columns %}
-          <td class="align-top text-sm font-normal p-2
-            {% if align == "data-center" %}
-              text-center first:text-start
-            {% elif align == "center" %}
-              text-center
-            {% else %}
-              text-start
-            {% endif %}
-          ">
+          <td class="align-top text-sm font-normal p-2">
             {% if safe %}
               {{ row|get:column.field|safe }}
             {% else %}
@@ -44,21 +29,24 @@
           </td>
         {% endfor %}
       </tr>
+    {% empty %}
+      <tr>
+        <td colspan="{{ columns|length }}">
+          {% if no_data %}
+            {{ no_data }}
+          {% else %}
+            <p class="px-4 py-8 text-center text-sm text-greyscale-700">{{ no_data_label }}</p>
+          {% endif %}
+        </td>
+      </tr>
     {% endfor %}
+    </tbody>
     {% if footer %}
       <tfoot>
       {% for item in footer %}
         <tr>
           {% for column in columns %}
-            <td class="align-top text-sm p-2
-              {% if align == "data-center" %}
-                text-center first:text-start
-              {% elif align == "center" %}
-                text-center
-              {% else %}
-                text-start
-              {% endif %}
-            ">
+            <td class="align-top text-sm p-2">
               <strong>
                 {% if safe %}
                   {{ item|get:column.field|safe }}

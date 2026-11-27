@@ -1487,6 +1487,150 @@ class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
         self.assertIn('x-on:docket-blocked.window="open"', html)
 
 
+class FlexTableComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-flex-table component renders a no-data row when it has no rows."""
+
+    NO_DATA_SLOT = '<c-slot name="no_data"><a href="/">Browse</a></c-slot>'
+
+    def render_table(
+        self, rows: list[str], attributes: str = "", slots: str = ""
+    ) -> HtmlElement:
+        """Renders a two-column table with a row per item and parses it.
+
+        The loop sits on its own indented lines, so a table without rows
+        gets a whitespace-only body.
+        """
+        return fromstring(
+            self.render_component(
+                '<c-flex-table caption="Saved notes"'
+                " :columns=\"[{'label': 'Name'}, {'label': 'Note'}]\""
+                f" {attributes}>\n"
+                "  {% for row in rows %}\n"
+                "    <tr><td>{{ row }}</td><td>Saved</td></tr>\n"
+                "  {% endfor %}\n"
+                f"  {slots}\n</c-flex-table>",
+                {"rows": rows},
+            )
+        )
+
+    @staticmethod
+    def body_text(root: HtmlElement) -> str:
+        """The text of the table body, with whitespace collapsed."""
+        return " ".join(root.xpath("//tbody")[0].text_content().split())
+
+    def test_rows_are_the_only_body_content(self) -> None:
+        """A table with rows renders them and no no-data row."""
+        root = self.render_table(["First note"])
+        self.assertEqual(
+            root.xpath("//tbody/tr/td/text()"), ["First note", "Saved"]
+        )
+
+    def test_no_rows_render_the_default_label_in_the_body(self) -> None:
+        """Without rows the body holds the default label."""
+        root = self.render_table([])
+        self.assertEqual(self.body_text(root), "No data available")
+
+    def test_no_rows_keep_the_caption_and_headers(self) -> None:
+        """A table without rows still renders its caption and column headers."""
+        root = self.render_table([])
+        self.assertEqual(root.xpath("//caption/text()"), ["Saved notes"])
+        headers = [
+            th.text_content().strip() for th in root.xpath("//thead//th")
+        ]
+        self.assertEqual(headers, ["Name", "Note"])
+
+    def test_no_data_cell_spans_every_column(self) -> None:
+        """The no-data row is one cell as wide as the table."""
+        root = self.render_table([])
+        self.assertEqual(root.xpath("//tbody/tr/td/@colspan"), ["2"])
+
+    def test_no_data_label_replaces_the_default_label(self) -> None:
+        """The no_data_label prop is the text shown without rows."""
+        root = self.render_table([], 'no_data_label="No notes yet"')
+        self.assertEqual(self.body_text(root), "No notes yet")
+
+    def test_no_data_slot_replaces_the_label(self) -> None:
+        """A no_data slot renders in the no-data row in place of the label."""
+        root = self.render_table([], slots=self.NO_DATA_SLOT)
+        self.assertEqual(root.xpath("//tbody/tr/td/a/text()"), ["Browse"])
+        self.assertEqual(self.body_text(root), "Browse")
+
+    def test_no_data_slot_is_not_rendered_with_rows(self) -> None:
+        """A no_data slot stays out of a table that has rows."""
+        root = self.render_table(["First note"], slots=self.NO_DATA_SLOT)
+        self.assertEqual(root.xpath("//a"), [])
+
+
+class DataTableComponentTest(CottonComponentMixin, SimpleTestCase):
+    """The c-data-table component renders a no-data row when it has no rows."""
+
+    NO_DATA_SLOT = '<c-slot name="no_data"><a href="/">Browse</a></c-slot>'
+
+    def render_table(
+        self, rows: list[dict[str, str]], attributes: str = "", slots: str = ""
+    ) -> HtmlElement:
+        """Renders a two-column table of the given rows and parses it."""
+        return fromstring(
+            self.render_component(
+                '<c-data-table caption="Saved notes" :rows="rows"'
+                " :columns=\"[{'label': 'Name', 'field': 'name'},"
+                " {'label': 'Note', 'field': 'note'}]\""
+                f" {attributes}>{slots}</c-data-table>",
+                {"rows": rows},
+            )
+        )
+
+    @staticmethod
+    def body_cells(root: HtmlElement) -> list[str]:
+        """The text of each body cell, with whitespace collapsed."""
+        return [
+            " ".join(cell.text_content().split())
+            for cell in root.xpath("//tbody/tr/td")
+        ]
+
+    def test_rows_are_the_only_body_content(self) -> None:
+        """A table with rows renders them and no no-data row."""
+        root = self.render_table([{"name": "First note", "note": "Saved"}])
+        self.assertEqual(self.body_cells(root), ["First note", "Saved"])
+
+    def test_no_rows_render_the_default_label_in_the_body(self) -> None:
+        """Without rows the body holds the default label."""
+        root = self.render_table([])
+        self.assertEqual(self.body_cells(root), ["No data available"])
+
+    def test_no_rows_keep_the_caption_and_headers(self) -> None:
+        """A table without rows still renders its caption and column headers."""
+        root = self.render_table([])
+        self.assertEqual(root.xpath("//caption/text()"), ["Saved notes"])
+        headers = [
+            th.text_content().strip() for th in root.xpath("//thead//th")
+        ]
+        self.assertEqual(headers, ["Name", "Note"])
+
+    def test_no_data_cell_spans_every_column(self) -> None:
+        """The no-data row is one cell as wide as the table."""
+        root = self.render_table([])
+        self.assertEqual(root.xpath("//tbody/tr/td/@colspan"), ["2"])
+
+    def test_no_data_label_replaces_the_default_label(self) -> None:
+        """The no_data_label prop is the text shown without rows."""
+        root = self.render_table([], 'no_data_label="No notes yet"')
+        self.assertEqual(self.body_cells(root), ["No notes yet"])
+
+    def test_no_data_slot_replaces_the_label(self) -> None:
+        """A no_data slot renders in the no-data row in place of the label."""
+        root = self.render_table([], slots=self.NO_DATA_SLOT)
+        self.assertEqual(root.xpath("//tbody/tr/td/a/text()"), ["Browse"])
+        self.assertEqual(self.body_cells(root), ["Browse"])
+
+    def test_no_data_slot_is_not_rendered_with_rows(self) -> None:
+        """A no_data slot stays out of a table that has rows."""
+        root = self.render_table(
+            [{"name": "First note", "note": "Saved"}], slots=self.NO_DATA_SLOT
+        )
+        self.assertEqual(root.xpath("//a"), [])
+
+
 class ComponentsToastDemoTest(TestCase):
     """The components view answers the server-rendered toast demo's htmx request."""
 

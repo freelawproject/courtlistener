@@ -1,23 +1,17 @@
 {% load extras %}
 
-<c-vars align="" caption="Options table"></c-vars>
+{# Slots: the default slot holds the body rows; no_data replaces no_data_label in the row shown when there are none. #}
+<c-vars columns footer align="" caption="Options table" no_data_label="No data available"></c-vars>
 
+{% with has_rows=slot.strip %}
 <div class="overflow-auto">
-  <table class="w-full">
+  <table class="w-full{% if align == "center" %} table-align-center{% elif align == "data-center" %} table-align-data-center{% endif %}">
     <caption class="sr-only">{{ caption }}</caption>
     <thead>
     <tr class="border-none">
       {% for column in columns %}
         <th
-          class="text-sm px-2.5 py-1.5 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg [&:not(:first-child)]:max-w-[120px]
-            {% if align == "data-center" %}
-              text-center first:text-start
-            {% elif align == "center" %}
-              text-center
-            {% else %}
-              text-start
-            {% endif %}
-          "
+          class="text-sm px-2.5 py-1.5 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg [&:not(:first-child)]:max-w-[120px]"
           {% if column.title %}title="{{ column.title }}"{% endif %}
         >
           {{ column.label }}
@@ -26,22 +20,26 @@
     </tr>
     </thead>
     <tbody>
+      {% if has_rows %}
         {{ slot }}
+      {% else %}
+        <tr>
+          <td colspan="{{ columns|length }}">
+            {% if no_data %}
+              {{ no_data }}
+            {% else %}
+              <p class="px-4 py-8 text-center text-sm text-greyscale-700">{{ no_data_label }}</p>
+            {% endif %}
+          </td>
+        </tr>
+      {% endif %}
     </tbody>
     {% if footer %}
       <tfoot>
       {% for item in footer %}
         <tr>
           {% for column in columns %}
-            <td class="align-top text-sm p-2
-              {% if align == "data-center" %}
-                text-center first:text-start
-              {% elif align == "center" %}
-                text-center
-              {% else %}
-                text-start
-              {% endif %}
-            ">
+            <td class="align-top text-sm p-2">
               <strong>
                 {{ item|get:column.field }}
               </strong>
@@ -53,3 +51,4 @@
     {% endif %}
   </table>
 </div>
+{% endwith %}
