@@ -2161,9 +2161,15 @@ class ImportFromScanningBucketTest(TestCase):
                 )
                 transaction.set_rollback(True)
 
-    def test_limit_must_be_positive(self) -> None:
-        """Is a --limit below 1 refused?"""
-        for limit in [0, -1]:
-            with self.subTest(limit=limit):
-                with self.assertRaises(CommandError):
-                    self.import_from_bucket({}, all=True, limit=limit)
+    def test_limits_must_be_positive(self) -> None:
+        """Are a --limit or a --throttle-min-items below 1 refused?
+
+        A throttle below 1 would wait forever after the first file.
+        """
+        for option in ["limit", "throttle_min_items"]:
+            for value in [0, -1]:
+                with self.subTest(option=option, value=value):
+                    with self.assertRaises(CommandError):
+                        self.import_from_bucket(
+                            {}, all=True, **{option: value}
+                        )

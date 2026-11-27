@@ -1982,6 +1982,8 @@ class Command(VerboseCommand):
             raise CommandError("--opinion-id needs a single --scan-id.")
         if (limit := options["limit"]) is not None and limit < 1:
             raise CommandError("--limit must be at least 1.")
+        if options["throttle_min_items"] < 1:
+            raise CommandError("--throttle-min-items must be at least 1.")
 
         if options["path"]:
             file_paths = xml_file_paths(options["path"])
