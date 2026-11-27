@@ -1,7 +1,6 @@
 import io
 import os
 import re
-import sys
 import tempfile
 from contextlib import AbstractContextManager
 from datetime import UTC, date, datetime
@@ -11,15 +10,14 @@ from unittest import mock
 
 import time_machine
 from bs4 import BeautifulSoup
-from django.core.files.base import ContentFile, File
+from django.core.files.base import File
 from django.core.management import CommandError, call_command
 from django.db import transaction
 from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
-from django.utils.timezone import now
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
-from override_storage.storage import FakeContent, LocMemStorage
+from override_storage.storage import LocMemStorage
 
 from cl.corpus_importer.management.commands.import_scanned_opinions import (
     get_case_names,
@@ -34,7 +32,7 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     parse_citations,
     s3_xml_keys,
 )
-from cl.lib.storage import ScanningFinalXmlStorage
+from cl.lib.storage import ScanningFinalXmlStorage, get_name_by_incrementing
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import GRANULARITY_DAY, Person
@@ -81,8 +79,7 @@ def empty_scan_storage() -> AbstractContextManager[Any]:
     """Empty the stored scan XML files, and restore them on exit.
 
     The in-memory storage of the test runner keeps files between tests, and
-    after a database rollback, but an import refuses to overwrite a file it
-    didn't store.
+    after a database rollback, and a name that is taken gets a number added.
 
     Returns:
         The context manager.
@@ -623,32 +620,16 @@ class ImportScannedOpinionsTest(TestCase):
             cls.scan_xml = f.read()
 
     def setUp(self) -> None:
-        """Make the test storage overwrite files, like the scan XML's.
+        """Make the test storage number its files, like the scan XML's.
 
-        The in-memory storage of the test runner adds a suffix to a name
-        that exists instead.
+        The in-memory storage of the test runner adds a random suffix to a
+        name that exists instead of `_1`, `_2`, etc.
         """
-
-        def save_overwriting(
-            storage: LocMemStorage, name: str, content: File
-        ) -> str:
-            """Store a file under its name, replacing an existing one."""
-            data = content.read()
-            storage.cache[name] = FakeContent(
-                data.encode() if isinstance(data, str) else data, now()
-            )
-            return name
-
-        for patcher in [
+        self.enterContext(
             mock.patch.object(
-                LocMemStorage,
-                "get_available_name",
-                lambda storage, name, max_length=None: name,
-            ),
-            mock.patch.object(LocMemStorage, "_save", save_overwriting),
-        ]:
-            patcher.start()
-            self.addCleanup(patcher.stop)
+                LocMemStorage, "get_available_name", get_name_by_incrementing
+            )
+        )
         self.enterContext(empty_scan_storage())
 
     def import_scan(self, **kwargs: str | bool | None) -> None:
@@ -889,13 +870,11 @@ class ImportScannedOpinionsTest(TestCase):
                     f"{CITATIONS_TASK}.apply_async"
                 ) as mock_find_citations,
                 mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-                mock.patch(
-                    f"{COMMAND_MODULE}.invalidate_cloudfront"
-                ) as mock_invalidate,
             ):
                 with time_machine.travel(imported_at, tick=False):
                     self.import_scan()
                 cluster = OpinionCluster.objects.get()
+                name = cluster.filepath_xml_scan.name
                 opinion = cluster.sub_opinions.get()
                 headmatter = cluster.headmatter
                 mock_find_citations.reset_mock()
@@ -931,12 +910,13 @@ class ImportScannedOpinionsTest(TestCase):
                     cluster.date_modified,
                     overwritten_at if file_changed else imported_at,
                 )
-                if file_changed:
-                    mock_invalidate.assert_called_once_with(
-                        [f"/{cluster.filepath_xml_scan.name}"]
-                    )
-                else:
-                    mock_invalidate.assert_not_called()
+                # A changed file is a new version, next to the previous one
+                self.assertEqual(
+                    cluster.filepath_xml_scan.name,
+                    name.replace(".xml", "_1.xml") if file_changed else name,
+                )
+                with cluster.filepath_xml_scan.storage.open(name) as f:
+                    self.assertEqual(f.read().decode(), self.scan_xml)
                 if opinion_changed:
                     mock_find_citations.assert_called_once_with(
                         args=([opinion.pk],), queue="celery"
@@ -980,7 +960,6 @@ class ImportScannedOpinionsTest(TestCase):
                 with (
                     self.subTest(label, overwrite=overwrite),
                     mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-                    mock.patch(f"{COMMAND_MODULE}.invalidate_cloudfront"),
                 ):
                     self.import_xml(xml, overwrite=overwrite)
 
@@ -996,61 +975,30 @@ class ImportScannedOpinionsTest(TestCase):
                     ]
                     self.assertEqual(warned, [missing])
 
-    def test_overwrite_cleanup_failure_still_finds_citations(self) -> None:
-        """Does a failed CloudFront invalidation let citation finding run?
+    def test_overwrites_keep_the_previous_files(self) -> None:
+        """Does each overwrite store a numbered file and keep the others?
 
-        The overwrite already committed, so the failure is only logged.
+        The previous versions allow rolling a cluster back.
         """
-        self.import_scan()
-        corrected = self.scan_xml.replace(
-            "confession of error", "confession of an error"
-        )
-
-        with (
-            mock.patch(
-                f"{COMMAND_MODULE}.invalidate_cloudfront",
-                side_effect=ValueError("boom"),
+        versions = [
+            self.scan_xml,
+            self.scan_xml.replace(
+                "confession of error", "confession of an error"
             ),
-            mock.patch(f"{CITATIONS_TASK}.apply_async") as mock_find_citations,
-            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            self.import_xml(corrected, overwrite=True)
-
-        mock_find_citations.assert_called_once_with(
-            args=([Opinion.objects.get().pk],), queue="celery"
-        )
-        mock_logger.exception.assert_called_once()
-
-    def test_overwrite_deletes_a_previous_file_with_another_name(
-        self,
-    ) -> None:
-        """Is a previous file with another name deleted after an overwrite?
-
-        Older imports could store the file with a `_1` suffix.
-        """
+            self.scan_xml.replace("confession of error", "confessed error"),
+        ]
         self.import_scan()
         cluster = OpinionCluster.objects.get()
         name = cluster.filepath_xml_scan.name
-        storage = cluster.filepath_xml_scan.storage
-        old_name = storage.save(
-            name.replace(".xml", "_1.xml"), ContentFile(b"<old/>")
-        )
-        OpinionCluster.objects.update(filepath_xml_scan=old_name)
-        corrected = self.scan_xml.replace(
-            "confession of error", "confession of an error"
-        )
-
-        with (
-            mock.patch(f"{COMMAND_MODULE}.invalidate_cloudfront") as mock_inv,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            self.import_xml(corrected, overwrite=True)
+        for xml in versions[1:]:
+            self.import_xml(xml, overwrite=True)
 
         cluster.refresh_from_db()
-        self.assertEqual(cluster.filepath_xml_scan.name, name)
-        self.assertFalse(storage.exists(old_name))
-        mock_inv.assert_called_once_with(sorted([f"/{name}", f"/{old_name}"]))
+        names = [name, *(name.replace(".xml", f"_{i}.xml") for i in (1, 2))]
+        self.assertEqual(cluster.filepath_xml_scan.name, names[-1])
+        for stored_name, xml in zip(names, versions, strict=True):
+            with cluster.filepath_xml_scan.storage.open(stored_name) as f:
+                self.assertEqual(f.read().decode(), xml)
 
     def test_overwrite_needs_the_flag_and_writes_nothing_in_dry_run(
         self,
@@ -1773,113 +1721,6 @@ class ImportScannedOpinionsTest(TestCase):
             "Could not queue citation finding for opinions %s",
         )
 
-    def test_import_does_not_overwrite_another_clusters_file(self) -> None:
-        """Is an import rolled back when its file is another cluster's?
-
-        When the citation of the first import was edited, the scan isn't
-        found as imported, and overwriting its file would make two clusters
-        share it.
-        """
-        self.import_scan()
-        cluster = OpinionCluster.objects.get()
-        cluster.citations.update(volume="999")
-        stored_name = cluster.filepath_xml_scan.name
-        corrected = self.scan_xml.replace(
-            "confession of error", "confession of an error"
-        )
-
-        errors: list[BaseException | None] = []
-        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
-            # The command logs the error it caught
-            mock_logger.exception.side_effect = lambda *args: errors.append(
-                sys.exc_info()[1]
-            )
-            self.import_xml(corrected)
-
-        self.assertEqual(OpinionCluster.objects.count(), 1)
-        self.assertEqual(len(errors), 1)
-        self.assertIn("already stored", str(errors[0]))
-        with cluster.filepath_xml_scan.storage.open(stored_name) as f:
-            self.assertNotIn("an error", f.read().decode())
-
-    def test_import_overwrites_a_file_no_cluster_uses(self) -> None:
-        """Is a stored file without a cluster overwritten by its import?
-
-        Like one left by a run killed before its commit.
-        """
-        field = cast(
-            FileField, OpinionCluster._meta.get_field("filepath_xml_scan")
-        )
-        name = field.generate_filename(
-            OpinionCluster(date_filed=date(2024, 5, 22)),
-            "3593-12-388-so-3d-1.xml",
-        )
-        field.storage.save(name, ContentFile(b"<casebody/>"))
-
-        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
-            self.import_scan()
-
-        mock_logger.exception.assert_not_called()
-        cluster = OpinionCluster.objects.get()
-        self.assertEqual(cluster.filepath_xml_scan.name, name)
-        with field.storage.open(name) as f:
-            self.assertEqual(f.read().decode(), self.scan_xml)
-
-    def test_overwrite_checks_the_new_file_name(self) -> None:
-        """Does an overwrite that renames the file check who uses the name?
-
-        Another cluster's file rolls the overwrite back, and one that no
-        cluster uses is overwritten.
-        """
-        corrected = self.scan_xml.replace(
-            "confession of error", "confession of an error"
-        )
-        for label, taken in [
-            ("another cluster's file", True),
-            ("a file no cluster uses", False),
-        ]:
-            errors: list[BaseException | None] = []
-            with (
-                self.subTest(label),
-                transaction.atomic(),
-                empty_scan_storage(),
-                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-            ):
-                mock_logger.exception.side_effect = (
-                    lambda *args: errors.append(sys.exc_info()[1])
-                )
-                self.import_scan()
-                cluster = OpinionCluster.objects.get()
-                old_name = cluster.filepath_xml_scan.name
-                # The stored name has the filing date, so a new date renames it
-                cluster.date_filed = date(2024, 5, 23)
-                cluster.save(update_fields=["date_filed"])
-                storage = cluster.filepath_xml_scan.storage
-                new_name = cluster.filepath_xml_scan.field.generate_filename(
-                    cluster, Path(old_name).name
-                )
-                storage.save(new_name, ContentFile(b"<casebody/>"))
-                if taken:
-                    OpinionClusterFactory.create(
-                        docket=cluster.docket, filepath_xml_scan=new_name
-                    )
-
-                self.import_xml(corrected, overwrite=True)
-
-                cluster.refresh_from_db()
-                with storage.open(new_name) as f:
-                    stored = f.read().decode()
-                if taken:
-                    self.assertEqual(len(errors), 1)
-                    self.assertIn("already stored", str(errors[0]))
-                    self.assertEqual(cluster.filepath_xml_scan.name, old_name)
-                    self.assertEqual(stored, "<casebody/>")
-                else:
-                    self.assertEqual(errors, [])
-                    self.assertEqual(cluster.filepath_xml_scan.name, new_name)
-                    self.assertIn("an error", stored)
-                transaction.set_rollback(True)
-
     def test_failed_import_is_rolled_back(self) -> None:
         """Is a failed import rolled back without uploading the XML?"""
         with (
@@ -1901,10 +1742,9 @@ class ImportScannedOpinionsTest(TestCase):
         mock_logger.exception.assert_called_once()
 
     def test_failed_xml_path_save_deletes_the_upload(self) -> None:
-        """Is a new upload deleted when saving its path fails?
+        """Is the upload deleted when saving its path fails?
 
-        An upload that overwrote the cluster's file is still its file, so
-        it's kept.
+        Also on an overwrite, where the upload is a new numbered file.
         """
         cluster_save = OpinionCluster.save
 
@@ -1925,9 +1765,9 @@ class ImportScannedOpinionsTest(TestCase):
         corrected = self.scan_xml.replace(
             "confession of error", "confession of an error"
         )
-        for message, imported_before, deleted in [
-            ("new import", False, True),
-            ("overwrite", True, False),
+        for message, imported_before in [
+            ("new import", False),
+            ("overwrite", True),
         ]:
             with (
                 self.subTest(message),
@@ -1958,7 +1798,7 @@ class ImportScannedOpinionsTest(TestCase):
                     OpinionCluster.objects.count(), int(imported_before)
                 )
                 mock_file_save.assert_called_once()
-                self.assertEqual(mock_file_delete.called, deleted)
+                mock_file_delete.assert_called_once()
                 mock_logger.exception.assert_called_once()
                 transaction.set_rollback(True)
 

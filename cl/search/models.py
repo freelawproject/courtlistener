@@ -75,11 +75,7 @@ from cl.lib.recap_utils import (
     make_recap_style_path,
     scotus_document_number_segments,
 )
-from cl.lib.storage import (
-    IncrementingAWSMediaStorage,
-    S3PrivateUUIDStorage,
-    ScanXmlStorage,
-)
+from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
@@ -2682,9 +2678,7 @@ class OpinionCluster(AbstractDateTimeModel):
     filepath_xml_scan = models.FileField(
         help_text="The XML obtained from LLM containing all available metadata and opinion(s).",
         upload_to=make_upload_path,
-        # Overwritten when the scan is imported again: the file name has
-        # the scan and opinion ids, so it is unique to the scanned opinion
-        storage=ScanXmlStorage(),
+        storage=IncrementingAWSMediaStorage(),
         blank=True,
     )
     filepath_pdf_scan = models.FileField(

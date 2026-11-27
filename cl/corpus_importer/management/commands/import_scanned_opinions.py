@@ -41,7 +41,6 @@ from cl.corpus_importer.utils import (
     get_court_id,
 )
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.storage import ScanningFinalXmlStorage
@@ -1055,50 +1054,15 @@ def store_scan_xml(
     cluster save that stores its path, so the file is deleted if that save
     fails, and no orphan is left.
 
-    When the scan is imported again, the file overwrites the previous one.
-    Once the transaction commits, a previous file with another name, e.g.
-    one with a `_1` suffix from an older import, is deleted, and the
-    CloudFront cache of the files is invalidated, since they are public with
-    a long cache lifetime.
-
-    Caveat: an overwritten file isn't restored if the save fails.
+    The storage never overwrites: when the name is taken, it adds `_1`,
+    `_2`, etc. A scan imported again gets a new file, and the previous ones
+    are kept, so the cluster can be rolled back to an earlier version.
 
     Args:
         cluster: A cluster with a pk.
         scan_case: The parsed scanned opinion.
         update_fields: The other cluster fields to save with the path.
-
-    A stored file that no cluster uses, e.g. one left by a process killed
-    before its commit, is overwritten.
-
-    Raises:
-        ValueError: If the new file name is another cluster's, which rolls
-            the import back. E.g. this scan was imported before, but
-            `find_imported_scan` missed it because that cluster's citation
-            volume was edited. Overwriting the file would make both clusters
-            share it.
     """
-    previous_name = cluster.filepath_xml_scan.name
-    new_name = cluster.filepath_xml_scan.field.generate_filename(
-        cluster, scan_case.file_name
-    )
-    # The storage overwrites, so check a name the cluster doesn't have yet.
-    # The path isn't indexed, so look it up only when the file exists.
-    if new_name != previous_name and cluster.filepath_xml_scan.storage.exists(
-        new_name
-    ):
-        if (
-            OpinionCluster.objects.filter(filepath_xml_scan=new_name)
-            .exclude(pk=cluster.pk)
-            .exists()
-        ):
-            raise ValueError(
-                f"The scan XML {new_name} is already stored for another "
-                "cluster. Review it before importing this scan again."
-            )
-        logger.info(
-            "Overwriting %s, a scan XML that no cluster uses", new_name
-        )
     cluster.filepath_xml_scan.save(
         scan_case.file_name,
         ContentFile(scan_case.xml.encode()),
@@ -1107,41 +1071,8 @@ def store_scan_xml(
     try:
         cluster.save(update_fields=["filepath_xml_scan", *update_fields])
     except Exception:
-        # A new file is an orphan without the save, but an overwritten one
-        # is still the cluster's file
-        if cluster.filepath_xml_scan.name != previous_name:
-            cluster.filepath_xml_scan.delete(save=False)
+        cluster.filepath_xml_scan.delete(save=False)
         raise
-    if not previous_name:
-        return
-
-    name = cluster.filepath_xml_scan.name
-    storage = cluster.filepath_xml_scan.storage
-
-    def clean_up_previous_file() -> None:
-        """Delete a renamed previous file and invalidate the cached ones.
-
-        Errors are logged instead of raised: the overwrite already
-        committed, and raising would stop the later commit callbacks, like
-        citation finding. A stale cached copy expires within a day (see
-        `ScanXmlStorage`).
-        """
-        paths = sorted({f"/{previous_name}", f"/{name}"})
-        try:
-            if previous_name != name:
-                storage.delete(previous_name)
-            invalidate_cloudfront(paths)
-        except Exception:
-            logger.exception(
-                "Failed to clean up the previous scan XML of cluster %s. "
-                "Check that %s is deleted if renamed, and invalidate %s",
-                cluster.pk,
-                previous_name,
-                paths,
-            )
-
-    # Until the commit, the cluster still points to the previous file
-    transaction.on_commit(clean_up_previous_file)
 
 
 def add_opinion_content(
@@ -1757,10 +1688,11 @@ def overwrite_scan(
     """Overwrite a scan imported before with its new XML.
 
     For a portal schema change or a correction upstream, like a missed
-    footnote: the opinions' XML and contents, the head matter when it came
-    from the scan or is empty, and the stored file are replaced, and the
+    footnote: the opinions' XML and contents, and the head matter when it
+    came from the scan or is empty, are replaced, the XML is stored as a new
+    numbered file next to the previous ones (see `store_scan_xml`), and the
     citations are found again. Other fields aren't changed, so a change
-    elsewhere in the XML, like the syllabus, only rewrites the stored file.
+    elsewhere in the XML, like the syllabus, only stores the new file.
     Nothing is written when the XML didn't change. A changed byline or
     opinion type is only logged for review.
 
