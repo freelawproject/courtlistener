@@ -4108,6 +4108,55 @@ class CacheListApiResponseTest(TestCase):
         # Confirm the cache key still does not exist after the request
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
+    def test_empty_dynamic_fields_not_cached(
+        self,
+        mock_get_logging_prefix: MagicMock,
+        mock_cache_key_method: MagicMock,
+    ) -> None:
+        """Empty `fields` or `omit` parameters skip the cache too."""
+        fake_cache_key = "cache_empty_dynamic_fields"
+        mock_cache_key_method.return_value = fake_cache_key
+        path = reverse("docket-list", kwargs={"version": "v4"})
+
+        for param in ("fields", "omit"):
+            with self.subTest(param=param):
+                response = self.client.get(path, {param: ""})
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertFalse(self.cache.has_key(fake_cache_key))
+
+    def test_empty_fields_does_not_share_cache_with_full_list(
+        self,
+        mock_get_logging_prefix: MagicMock,
+        mock_cache_key_method: MagicMock,
+    ) -> None:
+        """An empty `fields` request neither fills nor reads the list cache.
+
+        `?fields=` strips every field, so sharing the cache key would hand
+        empty objects to the next user who asks for the full list, or full
+        objects to someone who asked for none.
+        """
+        fake_cache_key = "cache_empty_fields_vs_full_list"
+        mock_cache_key_method.return_value = fake_cache_key
+        self.addCleanup(self.cache.delete, fake_cache_key)
+        docket = DocketFactory()
+        other_user = UserFactory()
+        path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # Cold cache: the empty request runs first, then another user asks
+        # for the full list.
+        empty = self.client.get(path, {"fields": ""}).json()["results"]
+        self.assertEqual(empty, [{}])
+        self.client.force_login(other_user)
+        full = self.client.get(path).json()["results"]
+        self.assertEqual(full[0].get("id"), docket.pk)
+
+        # Warm cache: the full list is now cached, but the empty request
+        # still gets empty objects.
+        self.assertTrue(self.cache.has_key(fake_cache_key))
+        self.client.force_login(self.user)
+        empty = self.client.get(path, {"fields": ""}).json()["results"]
+        self.assertEqual(empty, [{}])
+
 
 class EventCountApiTest(TestCase):
     @classmethod
