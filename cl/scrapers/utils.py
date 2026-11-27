@@ -390,6 +390,7 @@ def update_or_create_docket(
 
     # Read before the loop, since the loop may set `docket.blocked`
     was_blocked = docket.blocked
+    keeps_case_name = False
     for field, value in docket_fields.items():
         # do not use blanket `if not value:`, since
         # blocked and ia_needs_upload are booleans and would be skipped
@@ -399,6 +400,11 @@ def update_or_create_docket(
         # Never unblock an existing docket, and keep its original
         # date_blocked
         if was_blocked and field in ("blocked", "date_blocked"):
+            continue
+
+        # The short and full names come after `case_name` and belong to the
+        # same caption, so they are left alone when it was too different
+        if keeps_case_name and field in ("case_name_short", "case_name_full"):
             continue
 
         if (
@@ -417,6 +423,7 @@ def update_or_create_docket(
                     court_id,
                     docket.pk,
                 )
+                keeps_case_name = True
                 continue
 
             # Most times, we find updated values for case_name that may

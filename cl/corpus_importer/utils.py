@@ -30,9 +30,11 @@ from juriscraper.state.texas.common import (
     CourtType,
     TexasOriginatingCourt,
 )
+from unidecode import unidecode
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
+from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import (
     find_all_judges,
@@ -919,8 +921,9 @@ def winnow_case_name(case_name: str) -> set:
         "|".join(map(re.escape, false_positive_strings))
     )
 
-    # Fix case name to be cleaner
-    case_name = harmonize(case_name)
+    # Fix case name to be cleaner. Accents are dropped because sources
+    # disagree on them, e.g. "Dejesús" in a reporter and "DeJesus" in a scrape
+    case_name = unidecode(harmonize(case_name))
 
     # Join abbreviations/acronyms
     # e.g.
@@ -1110,9 +1113,10 @@ def cosine_similarity_too_different(
     """
     similarities = []
     for title in [case_name_full, case_name_abbreviation]:
-        # Lowercased: scrapers can store names in capitals
+        # Lowercased: scrapers can store names in capitals. Without
+        # accents, since sources disagree on them
         similarity = get_cosine_similarity(
-            title.lower(), case.case_name.lower()
+            unidecode(title.lower()), unidecode(case.case_name.lower())
         )
         similarities.append(similarity)
     max_similarity = max(similarities)
@@ -1120,6 +1124,35 @@ def cosine_similarity_too_different(
     if max_similarity < 0.3:
         return True
     return False
+
+
+def has_same_docket_number_core(
+    case: OpinionCluster, docket_number: str, court_id: str | None
+) -> bool:
+    """Check if a cluster's docket has the docket number of a file/source.
+
+    Only true in federal appellate courts, where a docket number like
+    "20-30019" identifies a case within the court. Elsewhere different
+    cases can share a core docket number, e.g. the civil and criminal
+    cases of a district court.
+
+    Args:
+        case: The case opinion cluster
+        docket_number: The docket number from file/source to compare
+        court_id: The court of the file/source, or None if unknown
+
+    Returns:
+        Whether both are in the same federal appellate court and have the
+        same, non-empty, core docket number
+    """
+    docket = case.docket
+    if (
+        docket.court_id != court_id
+        or docket.court.jurisdiction != Court.FEDERAL_APPELLATE
+    ):
+        return False
+    core = make_docket_number_core(docket_number)
+    return bool(core) and core == docket.docket_number_core
 
 
 def has_too_similar_citation(
@@ -1158,6 +1191,7 @@ def match_based_text(
     possible_clusters: QuerySet[OpinionCluster],
     case_name_abbreviation: str,
     citation: FullCaseCitation,
+    court_id: str | None = None,
 ) -> OpinionCluster | None:
     """Compare CL text to file content to establish duplicates.
 
@@ -1169,18 +1203,30 @@ def match_based_text(
         case_name_full: The full case name
         case_name_abbreviation: The case name abbreviation
         citation: The citation obtained from file/source to compare
+        court_id: The court of the file/source. When given, case names
+            aren't compared with a cluster of that court that has the
+            file's docket number, if it's a federal appellate court
 
     Returns:
         OpinionCluster or None
     """
-    # The docket is read by the content check and by callers of the match
-    for case in possible_clusters.select_related("docket"):
+    # The docket is read by the content check and by callers of the match,
+    # and its court by the docket number check
+    for case in possible_clusters.select_related("docket__court"):
         cl_case_body = get_opinion_text(case)
         cl_characters = clean_body_content(cl_case_body)
 
         if len(cl_characters) == 0:
             logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
+
+        # Courts and reporters can caption a case with different parties,
+        # e.g. consolidated appeals or a substituted public official, so the
+        # names aren't compared when the docket number already ties the
+        # cluster to the file. The content still has to match.
+        same_docket = has_same_docket_number_core(
+            case, docket_number, court_id
+        )
 
         # Checked in this order, cheapest first, until one fails
         checks: list[tuple[str, Callable[[], bool]]] = [
@@ -1193,14 +1239,20 @@ def match_based_text(
             ("citation", lambda: has_too_similar_citation(case, citation)),
             (
                 "case name overlap",
-                lambda: case_names_dont_overlap(
-                    case, case_name_full, case_name_abbreviation
+                lambda: (
+                    not same_docket
+                    and case_names_dont_overlap(
+                        case, case_name_full, case_name_abbreviation
+                    )
                 ),
             ),
             (
                 "case name similarity",
-                lambda: cosine_similarity_too_different(
-                    case, case_name_full, case_name_abbreviation
+                lambda: (
+                    not same_docket
+                    and cosine_similarity_too_different(
+                        case, case_name_full, case_name_abbreviation
+                    )
                 ),
             ),
             (
@@ -1229,24 +1281,28 @@ def get_court_id(raw_court: str) -> list[str]:
         raw_court: Court name
 
     Returns:
-        court id or None
+        The ids of the courts found, or an empty list
     """
     # Replace double spaces,
     court_text = re.sub(" +", " ", raw_court)
     # Replace \n and remove dot at end
     court_text = court_text.replace("\n", "").strip(".")
 
-    for bankruptcy in [False, True]:
-        # Remove dot at end, try to get a partial string match, try with and
-        # without bankruptcy flag
-        found_court = find_court(
-            court_text,
-            bankruptcy=bankruptcy,
-            location=None,
-            allow_partial_matches=True,
-        )
-        if found_court:
-            return found_court
+    # Some courts-db patterns don't allow the comma that reporters print,
+    # e.g. "United States Court of Appeals, Eleventh Circuit", so the name
+    # is tried again without commas when nothing is found
+    for text in dict.fromkeys([court_text, court_text.replace(",", "")]):
+        for bankruptcy in [False, True]:
+            # Try to get a partial string match, try with and without
+            # bankruptcy flag
+            found_court = find_court(
+                text,
+                bankruptcy=bankruptcy,
+                location=None,
+                allow_partial_matches=True,
+            )
+            if found_court:
+                return found_court
 
     return []
 
