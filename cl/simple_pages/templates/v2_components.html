@@ -807,6 +807,7 @@ Sample code here.
     <h4 class="my-3">Demo</h4>
     <c-data-table
       safe
+      align="data-center"
       caption="Usage example of data table component"
       :columns="[
         {'label': 'First header', 'field': 'first'},
@@ -930,7 +931,7 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>align</code></c-slot>
         <c-slot name="description">
-          Default is to align table contents to the left. Use <code>center</code> to align everything in the middle. Use <code>data-center</code> to keep the first column left, but center the rest of the table.
+          Alignment for every cell of the table. The only values are <code>center</code>, which centers them all, and <code>data-center</code>, which keeps the first column left-aligned and centers the rest. Without it, or with any other value, cells are left-aligned.
         </c-slot>
       </c-library.item>
 
@@ -1075,17 +1076,17 @@ Sample code here.
       ]"
     >
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell class="text-center first:text-start">First service</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Fast</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Great</c-flex-cell>
+        <c-flex-cell>First service</c-flex-cell>
+        <c-flex-cell>Fast</c-flex-cell>
+        <c-flex-cell>Great</c-flex-cell>
       </tr>
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell class="text-center first:text-start">Second service</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Slow</c-flex-cell>
-        <c-flex-cell class="text-center first:text-start">Good</c-flex-cell>
+        <c-flex-cell>Second service</c-flex-cell>
+        <c-flex-cell>Slow</c-flex-cell>
+        <c-flex-cell>Good</c-flex-cell>
       </tr>
       <tr>
-        <c-flex-cell class="text-center first:text-start">Third service</c-flex-cell>
+        <c-flex-cell>Third service</c-flex-cell>
         <td class="align-top text-sm font-normal p-2 text-start" colspan="2">This cell spans two columns using a raw td with colspan.</td>
       </tr>
     </c-flex-table>
@@ -1151,7 +1152,7 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>c-flex-table</code>: <code>align</code></c-slot>
         <c-slot name="description">
-          Alignment for table headers. Use <code>center</code> to center all headers. Use <code>data-center</code> to keep the first column left-aligned and center the rest. Defaults to left-aligned.
+          Alignment for every cell of the table. The only values are <code>center</code>, which centers them all, and <code>data-center</code>, which keeps the first column left-aligned and centers the rest. Without it, or with any other value, cells are left-aligned. A text alignment class on a cell overrides it.
         </c-slot>
       </c-library.item>
 
@@ -1229,17 +1230,17 @@ Sample code here.
   ]"
 &gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;First service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Fast&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Great&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;First service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Fast&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Great&lt;/c-flex-cell&gt;
   &lt;/tr&gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Second service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Slow&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Good&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Second service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Slow&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Good&lt;/c-flex-cell&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;c-flex-cell class="text-center first:text-start"&gt;Third service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell&gt;Third service&lt;/c-flex-cell&gt;
     &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
   &lt;/tr&gt;
 &lt;/c-flex-table&gt;
