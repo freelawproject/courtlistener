@@ -1065,6 +1065,29 @@ class ImportScannedOpinionsTest(TestCase):
             "<p>Harvard head matter</p>",
         )
 
+    def test_overwrite_adds_and_removes_the_scan_head_matter(self) -> None:
+        """Does a correction add head matter to a cluster without any?
+
+        And clear the scan's when the correction removes it. An empty head
+        matter is the scan's, since the import fills it from the scan.
+        """
+        self.import_scan()
+        scan_headmatter = OpinionCluster.objects.get().headmatter
+        OpinionCluster.objects.update(headmatter="")
+
+        with mock.patch(f"{COMMAND_MODULE}.logger"):
+            self.import_scan(overwrite=True)
+        self.assertEqual(
+            OpinionCluster.objects.get().headmatter, scan_headmatter
+        )
+
+        with (
+            mock.patch(f"{COMMAND_MODULE}.logger"),
+            mock.patch(f"{COMMAND_MODULE}.get_headmatter", return_value=""),
+        ):
+            self.import_scan(overwrite=True)
+        self.assertEqual(OpinionCluster.objects.get().headmatter, "")
+
     def test_overwrite_skipped_when_opinions_count_changed(self) -> None:
         """Is a scan whose number of opinions changed left for review?"""
         self.import_scan()

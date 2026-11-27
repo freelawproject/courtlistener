@@ -1630,14 +1630,15 @@ def read_stored_scan_xml(cluster: OpinionCluster) -> str:
 
 def get_overwrite_changes(
     cluster: OpinionCluster, scanned: list[Opinion], scan_case: ScanCase
-) -> tuple[list[tuple[Opinion, str]], str] | None:
+) -> tuple[list[tuple[Opinion, str]], str | None] | None:
     """Get what changed in a scan imported before, to overwrite it.
 
     The new XML's opinions are paired with the cluster's scanned opinions
     by order, since it is the same scanned opinion of the portal. The head
     matter is only compared when the cluster's came from a scan, since a
     merged cluster can keep the head matter of another source, like
-    Harvard's.
+    Harvard's. An empty one counts as the scan's, since an import fills it
+    when the scan has head matter, so a correction can add or remove it.
 
     Args:
         cluster: The cluster the scan was imported into.
@@ -1646,8 +1647,9 @@ def get_overwrite_changes(
 
     Returns:
         The (opinion, new XML) pairs whose XML changed, and the new head
-        matter, or an empty string if it's unchanged or not the scan's. None
-        if the number of opinions changed, which needs a review.
+        matter, which is empty when the correction removed it, or None if
+        it's unchanged or not the scan's. None instead of both if the number
+        of opinions changed, which needs a review.
     """
     new_xmls = [str(op) for op in scan_case.opinions]
     if len(scanned) != len(new_xmls):
@@ -1657,12 +1659,12 @@ def get_overwrite_changes(
         for opinion, xml in zip(scanned, new_xmls, strict=True)
         if opinion.xml_scan != xml
     ]
-    headmatter = scan_case.cluster_fields.get("headmatter", "")
-    if (
-        not cluster.headmatter.startswith("<headmatter>")
-        or cluster.headmatter == headmatter
+    headmatter: str | None = scan_case.cluster_fields.get("headmatter", "")
+    current = cluster.headmatter
+    if (current and not current.startswith("<headmatter>")) or (
+        current == headmatter
     ):
-        headmatter = ""
+        headmatter = None
     return changed, headmatter
 
 
@@ -1696,10 +1698,10 @@ def overwrite_scan(
 
     For a portal schema change or a correction upstream, like a missed
     footnote: the opinions' XML and contents, the head matter when it came
-    from the scan, and the stored file are replaced, and the citations are
-    found again. Other fields aren't changed, so a change elsewhere in the
-    XML, like the syllabus, only rewrites the stored file. Nothing is
-    written when the XML didn't change.
+    from the scan or is empty, and the stored file are replaced, and the
+    citations are found again. Other fields aren't changed, so a change
+    elsewhere in the XML, like the syllabus, only rewrites the stored file.
+    Nothing is written when the XML didn't change.
 
     Args:
         cluster: The cluster the scan was imported into.
@@ -1735,7 +1737,7 @@ def overwrite_scan(
     # Other parts of the XML, like the syllabus, only change the stored file
     if (
         not changed
-        and not headmatter
+        and headmatter is None
         and (read_stored_scan_xml(cluster) == scan_case.xml)
     ):
         logger.info(
@@ -1747,9 +1749,9 @@ def overwrite_scan(
         return False
     count = len(changed)
     summary = f"{count} opinion{'s' if count != 1 else ''}"
-    if headmatter:
+    if headmatter is not None:
         summary += " and the head matter"
-    if not changed and not headmatter:
+    if not changed and headmatter is None:
         summary = "the stored XML"
     if dry_run:
         logger.info(
@@ -1776,7 +1778,7 @@ def overwrite_scan(
             replace_opinion_content(opinion, xml, scan_case)
         # The stored XML always changes, so date_modified is always saved
         update_fields = ["date_modified"]
-        if headmatter:
+        if headmatter is not None:
             cluster.headmatter = headmatter
             update_fields.append("headmatter")
         store_scan_xml(cluster, scan_case, update_fields)
