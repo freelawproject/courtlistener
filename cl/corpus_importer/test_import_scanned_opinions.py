@@ -1088,6 +1088,43 @@ class ImportScannedOpinionsTest(TestCase):
             self.import_scan(overwrite=True)
         self.assertEqual(OpinionCluster.objects.get().headmatter, "")
 
+    def test_overwrite_logs_a_changed_byline_for_review(self) -> None:
+        """Is a corrected byline logged for review instead of applied?
+
+        An overwrite only replaces the opinion's XML and contents.
+        """
+        self.import_scan()
+        opinion = Opinion.objects.get()
+        corrected = self.scan_xml.replace(
+            "confession of error", "confession of an error"
+        )
+        cases = [
+            ("text corrected", corrected, []),
+            (
+                "byline corrected",
+                corrected.replace(
+                    "<author>Gerber, J.</author>", "<author>Klein, J.</author>"
+                ),
+                ["author_str"],
+            ),
+        ]
+        for label, xml, fields in cases:
+            with (
+                self.subTest(label),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_xml(xml, overwrite=True)
+                warnings = [
+                    c.args[1]
+                    for c in mock_logger.warning.call_args_list
+                    if c.args[0].startswith("The %s of opinion")
+                ]
+                self.assertEqual(
+                    warnings, [", ".join(fields)] if fields else []
+                )
+                opinion.refresh_from_db()
+                self.assertEqual(opinion.author_str, "Gerber")
+
     def test_overwrite_skipped_when_opinions_count_changed(self) -> None:
         """Is a scan whose number of opinions changed left for review?"""
         self.import_scan()

@@ -1668,6 +1668,42 @@ def get_overwrite_changes(
     return changed, headmatter
 
 
+# The opinion fields that `make_opinion` takes from the `<opinion>` element,
+# which an overwrite doesn't update
+BYLINE_FIELDS = ("type", "author_str", "per_curiam")
+
+
+def get_byline_changes(
+    old_xml: str, new_xml: str, cluster_id: int
+) -> list[str]:
+    """Get the byline fields that a corrected `<opinion>` derives differently.
+
+    The fields are derived from both XMLs, not read from the opinion, since a
+    merge can keep the author of the court's version.
+
+    Args:
+        old_xml: The opinion's stored `<opinion>` XML.
+        new_xml: Its corrected `<opinion>` XML.
+        cluster_id: The id of the opinion's cluster.
+
+    Returns:
+        The names of the fields in BYLINE_FIELDS that differ.
+    """
+    derived = []
+    for xml in (old_xml, new_xml):
+        if (
+            op := BeautifulSoup(xml, "lxml-xml").select_one("opinion")
+        ) is None:
+            return []
+        derived.append(make_opinion(op, cluster_id))
+    old, new = derived
+    return [
+        name
+        for name in BYLINE_FIELDS
+        if getattr(old, name) != getattr(new, name)
+    ]
+
+
 def replace_opinion_content(
     opinion: Opinion, xml: str, scan_case: ScanCase
 ) -> None:
@@ -1701,7 +1737,8 @@ def overwrite_scan(
     from the scan or is empty, and the stored file are replaced, and the
     citations are found again. Other fields aren't changed, so a change
     elsewhere in the XML, like the syllabus, only rewrites the stored file.
-    Nothing is written when the XML didn't change.
+    Nothing is written when the XML didn't change. A changed byline or
+    opinion type is only logged for review.
 
     Args:
         cluster: The cluster the scan was imported into.
@@ -1753,6 +1790,18 @@ def overwrite_scan(
         summary += " and the head matter"
     if not changed and headmatter is None:
         summary = "the stored XML"
+    for opinion, xml in changed:
+        if fields := get_byline_changes(opinion.xml_scan, xml, cluster.pk):
+            logger.warning(
+                "The %s of opinion %s changed in %s (%s), but an overwrite "
+                "doesn't update them. Review them: %s%s",
+                ", ".join(fields),
+                opinion.pk,
+                file_path,
+                citation,
+                BASE_URL,
+                cluster.get_absolute_url(),
+            )
     if dry_run:
         logger.info(
             "Dry run: would overwrite %s of %s (%s) in cluster %s: %s%s",
