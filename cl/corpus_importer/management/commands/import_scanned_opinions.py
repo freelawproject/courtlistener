@@ -1466,8 +1466,19 @@ def add_new_case(scan_case: ScanCase) -> OpinionCluster:
             case_name_full=scan_case.case_name_full,
             ia_needs_upload=False,
         )
-        if docket.pk and case_names_are_too_different(
-            docket.case_name, scan_case.case_name
+        # A federal appellate docket number like "20-35453" identifies the
+        # case, even when the docket has another caption, e.g. after a
+        # public official is substituted
+        number_identifies_case = bool(
+            docket.docket_number_core
+            and scan_case.court.jurisdiction == Court.FEDERAL_APPELLATE
+        )
+        if (
+            docket.pk
+            and not number_identifies_case
+            and case_names_are_too_different(
+                docket.case_name, scan_case.case_name
+            )
         ):
             # Old reporters reuse short docket numbers like "No. 12", so a
             # docket found by number alone can be an unrelated case

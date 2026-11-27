@@ -129,6 +129,7 @@ from cl.corpus_importer.utils import (
     compute_blocked_court_wait,
     compute_next_binary_probe,
     create_docket_entry_sequence_numbers,
+    get_court_id,
     get_start_of_quarter,
     merge_case_names,
     merge_docket_numbers,
@@ -303,6 +304,16 @@ class CourtMatchingTest(SimpleTestCase):
             print(f"Testing: {test['q']}, expecting: {test['a']}")
             got = match_court_string(test["q"], federal_appeals=True)
             self.assertEqual(test["a"], got)
+
+    def test_get_court_id_with_reporter_court_names(self) -> None:
+        """Are courts found from the names reporters print, with commas?"""
+        for court_name, court_id in [
+            ("United States Court of Appeals, Ninth Circuit.", "ca9"),
+            ("United States Court of Appeals, Eleventh Circuit.", "ca11"),
+            ("United States District Court, S.D. New York.", "nysd"),
+        ]:
+            with self.subTest(court_name=court_name):
+                self.assertEqual(get_court_id(court_name), [court_id])
 
 
 @override_settings(
@@ -1435,6 +1446,14 @@ label="194">*194</page-number>
             harvard_case
         )
         self.assertEqual(len(overlap), 0)
+
+    def test_case_name_winnowing_ignores_accents(self) -> None:
+        """Do names that only differ in their accents overlap?"""
+        self.assertEqual(
+            winnow_case_name("United States v. Frankie Dejesús")
+            & winnow_case_name("United States v. DeJesus"),
+            {"dejesus"},
+        )
 
     def test_case_names_with_abbreviations(self):
         """Test what happens when the case name contains abbreviations."""

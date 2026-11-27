@@ -1269,6 +1269,71 @@ class ImportScannedOpinionsTest(TestCase):
         self.assertEqual(docket.source, Docket.SCRAPER)
         self.assertNotEqual(OpinionCluster.objects.get().docket_id, docket.pk)
 
+    def test_federal_appellate_docket_with_other_caption_is_reused(
+        self,
+    ) -> None:
+        """Is a federal appellate docket reused when its caption differs?"""
+        court = CourtFactory.create(
+            id="ca9", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        docket = DocketFactory.create(
+            court=court,
+            source=Docket.SCRAPER,
+            docket_number="20-35453",
+            case_name="R-CALF USA v. Sonny Perdue",
+        )
+
+        self.import_xml(
+            self.scan_xml.replace("4D2023-2459", "20-35453"),
+            court_id=court.pk,
+        )
+
+        self.assertEqual(Docket.objects.count(), 1)
+        self.assertEqual(OpinionCluster.objects.get().docket_id, docket.pk)
+
+    def test_merge_into_cluster_with_other_caption(self) -> None:
+        """Does a federal docket number match a cluster captioned otherwise?"""
+        court = CourtFactory.create(
+            id="ca5", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        for docket_number, cluster_count in [("20-30019", 1), ("20-30020", 2)]:
+            with (
+                self.subTest(docket_number=docket_number),
+                transaction.atomic(),
+            ):
+                cluster = self.make_matching_cluster()
+                cluster.case_name = "Shell Chem v. Genesis Mrne"
+                cluster.save()
+                docket = cluster.docket
+                docket.court = court
+                docket.docket_number = docket.docket_number_raw = docket_number
+                # Made again from the new number when saving
+                docket.docket_number_core = ""
+                docket.case_name = cluster.case_name
+                docket.save()
+
+                self.import_xml(
+                    self.scan_xml.replace("4D2023-2459", "20-30019"),
+                    court_id=court.pk,
+                )
+
+                self.assertEqual(OpinionCluster.objects.count(), cluster_count)
+                transaction.set_rollback(True)
+
+    def test_merge_into_cluster_with_unaccented_name(self) -> None:
+        """Is a cluster matched when only the scan prints the accents?"""
+        cluster = self.make_matching_cluster()
+        cluster.case_name = "Merritt v. Fernandez"
+        cluster.save()
+
+        self.import_xml(
+            self.scan_xml.replace("Larry B. MERRITT", "Fernández").replace(
+                "STATE of Florida", "Mérritt"
+            )
+        )
+
+        self.assertEqual(OpinionCluster.objects.get().pk, cluster.pk)
+
     def test_dry_run(self) -> None:
         """Does a dry run leave the database and storage untouched?"""
         cluster = self.make_matching_cluster()
