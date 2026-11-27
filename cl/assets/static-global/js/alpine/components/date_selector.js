@@ -32,9 +32,9 @@ document.addEventListener('alpine:init', () => {
         '1d ago': `1d-${this.$id('relative-option')}`,
         '7d ago': `7d-${this.$id('relative-option')}`,
         '14d ago': `14d-${this.$id('relative-option')}`,
-        '1m ago': `1m-${this.$id('relative-option')}`,
-        '3m ago': `3m-${this.$id('relative-option')}`,
-        '6m ago': `6m-${this.$id('relative-option')}`,
+        '1mo ago': `1mo-${this.$id('relative-option')}`,
+        '3mo ago': `3mo-${this.$id('relative-option')}`,
+        '6mo ago': `6mo-${this.$id('relative-option')}`,
         '1y ago': `1y-${this.$id('relative-option')}`,
       };
     },
@@ -76,7 +76,8 @@ document.addEventListener('alpine:init', () => {
       return this.isSelectedType ? undefined : true;
     },
     get isSelectedRelativeDate() {
-      return this.$el.dataset.value === this.dateAfterRelative;
+      const value = this.dateAfterRelative.replace('m ago', 'mo ago');
+      return this.$el.dataset.value === value;
     },
     closeDropdownMenu() {
       this.dropdownMenuOpen = false;
@@ -91,8 +92,9 @@ document.addEventListener('alpine:init', () => {
     enterDropdownFocus() {
       if (!this.dropdownMenuOpen) this.dropdownMenuOpen = true;
       this.$nextTick(() => {
-        if (Object.keys(this.relativeOptionIds).includes(this.dateAfterRelative)) {
-          this.moveFocus(this.relativeOptionIds[this.dateAfterRelative]);
+        const option = this.dateAfterRelative.replace('m ago', 'mo ago');
+        if (Object.keys(this.relativeOptionIds).includes(option)) {
+          this.moveFocus(this.relativeOptionIds[option]);
         } else {
           this.moveFocus(this.relativeOptionIds['1d ago']);
         }

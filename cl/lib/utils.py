@@ -32,7 +32,7 @@ RELATIVE_DATES_SYNTAX: re.Pattern[str] = re.compile(
     \s*                    # Optional whitespace
     (?P<unit>              # Capturing group for units.
         d|day|days         #   'd', 'day', or 'days'
-      | m|month|months     #   'm', 'month', or 'months'
+      | mo|m|month|months  #   'mo', 'm', 'month', or 'months'
       | y|year|years       #   'y', 'year', or 'years'
     )
     (?:\s*ago)?            # Optional 'ago
@@ -661,8 +661,8 @@ def convert_to_es_date_match(date_string: str) -> str:
     unit_key = rd_matched.group("unit").lower()
 
     # Since we need to support custom day values for months and years:
-    # m = 30 days and y = 365 days, do the math.
-    if unit_key in ("m", "month", "months"):
+    # A month is 30 days and a year is 365 days.
+    if unit_key in ("mo", "m", "month", "months"):
         number *= 30
     elif unit_key in ("y", "year", "years"):
         number *= 365
