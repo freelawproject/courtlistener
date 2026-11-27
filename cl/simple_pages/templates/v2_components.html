@@ -860,6 +860,49 @@ Sample code here.
       ]"
     ></c-data-table>
 
+    <h4 class="mt-3">Demo — No data</h4>
+    <p class="text-sm mb-2">Without rows the table keeps its header and shows one row with the default label, a custom <code>no_data_label</code> or the <code>no_data</code> slot.</p>
+    <div class="grid items-start gap-4 md:grid-cols-3">
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500">Default label</p>
+        <c-data-table
+          caption="Data table without rows"
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        ></c-data-table>
+      </div>
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500">Custom <code>no_data_label</code></p>
+        <c-data-table
+          caption="Data table without rows and a custom label"
+          no_data_label="No services match your search."
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        ></c-data-table>
+      </div>
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500"><code>no_data</code> slot</p>
+        <c-data-table
+          caption="Data table without rows and a custom block"
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        >
+          <c-slot name="no_data">
+            <div class="flex flex-col items-center gap-4 py-8 text-center text-sm text-greyscale-900">
+              <c-icon name="page_search" size="lg" class="text-greyscale-400" />
+              <p>You haven't added any services yet.</p>
+            </div>
+          </c-slot>
+        </c-data-table>
+      </div>
+    </div>
+
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>columns</code></c-slot>
@@ -906,10 +949,22 @@ Sample code here.
           <br><strong>Warning:</strong> May allow XSS vulnerabilities if enabled on user-provided HTML, so use only with trusted content.
         </c-slot>
       </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>no_data_label</code></c-slot>
+        <c-slot name="description">
+          Text shown in the table when empty.<br>Defaults to "No data available".<br>Ignored when <code>no_data</code> slot is used
+        </c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
-      <p>No slots</p>
+      <c-library.item optional only>
+        <c-slot name="label"><code>no_data</code></c-slot>
+        <c-slot name="description">
+          Content shown in place of the rows when the table has none, instead of <code>no_data_label</code>. It renders inside a single cell spanning every column, below the header.
+        </c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
@@ -969,6 +1024,30 @@ Sample code here.
     },
   ]"
 &gt;&lt;/c-data-table&gt;
+
+&lt;c-data-table
+  caption="Data table without rows and a custom label"
+  no_data_label="No services match your search."
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+  ]"
+&gt;&lt;/c-data-table&gt;
+
+&lt;c-data-table
+  caption="Data table without rows and a custom block"
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+  ]"
+&gt;
+  &lt;c-slot name="no_data"&gt;
+    &lt;div class="flex flex-col items-center gap-4 py-8 text-center text-sm text-greyscale-900"&gt;
+      &lt;c-icon name="page_search" size="lg" class="text-greyscale-400" /&gt;
+      &lt;p&gt;You haven't added any services yet.&lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/c-slot&gt;
+&lt;/c-data-table&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1011,6 +1090,49 @@ Sample code here.
       </tr>
     </c-flex-table>
 
+    <h4 class="mt-3">Demo — No data</h4>
+    <p class="text-sm mb-2">Without rows the table keeps its header and shows one row with the default label, a custom <code>no_data_label</code> or the <code>no_data</code> slot.</p>
+    <div class="grid items-start gap-4 md:grid-cols-3">
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500">Default label</p>
+        <c-flex-table
+          caption="Flex table without rows"
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        ></c-flex-table>
+      </div>
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500">Custom <code>no_data_label</code></p>
+        <c-flex-table
+          caption="Flex table without rows and a custom label"
+          no_data_label="No services match your search."
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        ></c-flex-table>
+      </div>
+      <div>
+        <p class="mb-1 text-xs leading-6 text-greyscale-500"><code>no_data</code> slot</p>
+        <c-flex-table
+          caption="Flex table without rows and a custom block"
+          :columns="[
+            {'label': 'Service', 'field': 'first'},
+            {'label': 'Speed', 'field': 'second'},
+          ]"
+        >
+          <c-slot name="no_data">
+            <div class="flex flex-col items-center gap-4 py-8 text-center text-sm text-greyscale-900">
+              <c-icon name="page_search" size="lg" class="text-greyscale-400" />
+              <p>You haven't added any services yet.</p>
+            </div>
+          </c-slot>
+        </c-flex-table>
+      </div>
+    </div>
+
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>c-flex-table</code>: <code>columns</code></c-slot>
@@ -1041,6 +1163,13 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>no_data_label</code></c-slot>
+        <c-slot name="description">
+          Text shown in the table when empty.<br>Defaults to "No data available".<br>Ignored when <code>no_data</code> slot is used
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>c-flex-cell</code>: <code>header</code></c-slot>
         <c-slot name="description">
           Boolean. When present, renders a <code>&lt;th scope="row"&gt;</code> instead of <code>&lt;td&gt;</code> for row header cells.
@@ -1067,6 +1196,12 @@ Sample code here.
         <c-slot name="label"><code>c-flex-table</code> default</c-slot>
         <c-slot name="description">
           Raw <code>&lt;tr&gt;</code> elements for the table body. Use <code>c-flex-cell</code> for consistent cell styling, or raw <code>&lt;td&gt;</code> elements when you need attributes like <code>colspan</code>.
+        </c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code> <code>no_data</code></c-slot>
+        <c-slot name="description">
+          Content shown in place of the rows when the table has none, instead of <code>no_data_label</code>. It renders inside a single cell spanning every column, below the header.
         </c-slot>
       </c-library.item>
       <c-library.item only>
@@ -1107,6 +1242,30 @@ Sample code here.
     &lt;c-flex-cell class="text-center first:text-start"&gt;Third service&lt;/c-flex-cell&gt;
     &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
   &lt;/tr&gt;
+&lt;/c-flex-table&gt;
+
+&lt;c-flex-table
+  caption="Flex table without rows and a custom label"
+  no_data_label="No services match your search."
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+  ]"
+&gt;&lt;/c-flex-table&gt;
+
+&lt;c-flex-table
+  caption="Flex table without rows and a custom block"
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+  ]"
+&gt;
+  &lt;c-slot name="no_data"&gt;
+    &lt;div class="flex flex-col items-center gap-4 py-8 text-center text-sm text-greyscale-900"&gt;
+      &lt;c-icon name="page_search" size="lg" class="text-greyscale-400" /&gt;
+      &lt;p&gt;You haven't added any services yet.&lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/c-slot&gt;
 &lt;/c-flex-table&gt;
       </c-code>
     </c-expansion-panel>
