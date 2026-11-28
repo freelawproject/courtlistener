@@ -44,6 +44,7 @@ from cl.search.documents import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     ClusterRedirection,
     Court,
@@ -309,6 +310,22 @@ class SCOTUSDocketEntrySerializer(BaseSourceDocketEntrySerializer):
 
     class Meta:
         model = SCOTUSDocketEntry
+        fields = "__all__"
+
+
+class CaseTransferSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    """A transfer of a docket between two courts.
+
+    Either docket link can be null when that end of the transfer isn't in
+    CourtListener; its court and docket number are always set.
+    """
+
+    class Meta:
+        model = CaseTransfer
         fields = "__all__"
 
 

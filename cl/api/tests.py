@@ -139,6 +139,7 @@ from cl.recap.views import (
 )
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_views import (
+    CaseTransferViewSet,
     CourtViewSet,
     DocketEntryViewSet,
     DocketViewSet,
@@ -2914,6 +2915,26 @@ class V4DRFPaginationTest(TestCase):
             secondary_cursor_key="date_modified",
             non_cursor_key="document_number",
             viewset=SCOTUSDocumentViewSet,
+        )
+
+    @override_settings(WAFFLE_CACHE_PREFIX="test_case_transfers_v4_pagination")
+    async def test_case_transfers_endpoint(self) -> None:
+        """Test the V4 case transfers endpoint pagination.
+
+        Confirms that its cursor pagination works properly. It has no
+        non-cursor sorting key, since it only sorts by indexed fields.
+        """
+        # override_flag writes to the database, which async code can't do
+        # directly.
+        await sync_to_async(self.enterContext)(
+            override_flag("case-transfer-api", active=True)
+        )
+        await self._base_test_for_v4_endpoints(
+            endpoint="casetransfer-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_created",
+            non_cursor_key=None,
+            viewset=CaseTransferViewSet,
         )
 
     async def test_audio_endpoint(self):

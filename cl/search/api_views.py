@@ -31,6 +31,7 @@ from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
     BankruptcyInformationSerializer,
+    CaseTransferSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -64,6 +65,7 @@ from cl.search.documents import (
     PersonDocument,
 )
 from cl.search.filters import (
+    CaseTransferFilter,
     CourtFilter,
     DocketEntryFilter,
     DocketFilter,
@@ -79,6 +81,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
     BankruptcyInformation,
+    CaseTransfer,
     ClusterRedirection,
     Court,
     Docket,
@@ -355,6 +358,17 @@ class SCOTUSDocumentViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
         if self.action == "list":
             return queryset.defer("plain_text")
         return queryset
+
+
+class CaseTransferViewSet(WaffleFlagMixin, BaseSourceReadOnlyViewSet):
+    """Transfers of dockets between courts, such as appeals, workload transfers, merges and jurisdiction changes."""
+
+    waffle_flag = "case-transfer-api"
+    serializer_class = CaseTransferSerializer
+    filterset_class = CaseTransferFilter
+    # The courts and dockets are rendered as links built from their ids, so
+    # no related table is joined.
+    queryset = CaseTransfer.objects.order_by("-id")
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):

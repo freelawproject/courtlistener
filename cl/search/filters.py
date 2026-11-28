@@ -14,6 +14,7 @@ from cl.audio.models import Audio
 from cl.people_db.models import Party, Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -374,4 +375,74 @@ class SCOTUSDocumentFilter(BaseSourceDocumentFilter):
         fields = {
             **BaseSourceDocumentFilter.Meta.fields,
             "document_number": INTEGER_LOOKUPS + ["isnull"],
+        }
+
+
+class CaseTransferCourtFilter(NoEmptyFilterSet):
+    """Filters for the courts at either end of a case transfer.
+
+    Unlike CourtFilter, it can't filter courts by their dockets: from the
+    transfers endpoint, that would let one request scan every docket in
+    CourtListener. Filter transfers by their docket fields instead.
+    """
+
+    jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
+
+    class Meta:
+        model = Court
+        fields = {"id": ["exact", "in"]}
+
+
+class CaseTransferDocketFilter(NoEmptyFilterSet):
+    """Filters for the dockets at either end of a case transfer.
+
+    Unlike DocketFilter, it only offers indexed docket columns and can't
+    reach other tables through the docket: from the transfers endpoint,
+    paths like docket__court__dockets would scan every docket in a court.
+    """
+
+    court = filters.RelatedFilter(
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
+    )
+
+    class Meta:
+        model = Docket
+        fields = {
+            "id": ["exact", "in"],
+            "docket_number": ["exact"],
+            "docket_number_core": ["exact"],
+            "pacer_case_id": ["exact"],
+        }
+
+
+class CaseTransferFilter(BaseSourceFilter):
+    """Filters for case transfers.
+
+    Only indexed columns are filterable. The transfer's own docket number
+    columns, transfer date and transfer type have no index, so use the
+    court and docket filters instead. A docket filter with isnull finds transfers whose end isn't in
+    CourtListener.
+    """
+
+    # A RelatedFilter looks up the object its exact value names, then only
+    # uses its pk, so the lookups read just the id.
+    origin_court = filters.RelatedFilter(
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
+    )
+    origin_docket = filters.RelatedFilter(
+        CaseTransferDocketFilter, queryset=Docket.objects.only("id")
+    )
+    destination_court = filters.RelatedFilter(
+        CaseTransferCourtFilter, queryset=Court.objects.only("id")
+    )
+    destination_docket = filters.RelatedFilter(
+        CaseTransferDocketFilter, queryset=Docket.objects.only("id")
+    )
+
+    class Meta(BaseSourceFilter.Meta):
+        model = CaseTransfer
+        fields = {
+            **BaseSourceFilter.Meta.fields,
+            "origin_docket": ["isnull"],
+            "destination_docket": ["isnull"],
         }
