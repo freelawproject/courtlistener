@@ -1849,10 +1849,10 @@ def scan_lock_keys(scan_case: ScanCase) -> list[str]:
     """Get the Redis lock keys of a scanned opinion's import.
 
     Imports running at the same time in several workers could each find no
-    match and create the same case twice, or merge two scans into a single
-    cluster. Two files are the same case, or match the same cluster, when
+    match and create the same case twice. Two files are the same case when
     they share the scanned opinion, a citation or the court and docket
-    number, so each of those is locked.
+    number, so each of those is locked. A matched cluster is locked on its
+    own before merging into it (see `import_scan_case`).
 
     Args:
         scan_case: The parsed scanned opinion.
@@ -1872,14 +1872,14 @@ def scan_lock_keys(scan_case: ScanCase) -> list[str]:
 
 
 @contextmanager
-def scan_import_locks(scan_case: ScanCase) -> Generator[None]:
-    """Hold the locks of a scanned opinion's import, waiting for them.
+def scan_import_locks(keys: list[str]) -> Generator[None]:
+    """Hold the Redis locks of a scan import, waiting for them.
 
     Caveat: the import must commit before leaving the block, so the next
     import of the same case sees its changes.
 
     Args:
-        scan_case: The parsed scanned opinion.
+        keys: The lock keys, in the order to acquire them.
     """
     r = get_redis_interface("CACHE")
     held: list[tuple[str, str]] = []
@@ -1888,7 +1888,7 @@ def scan_import_locks(scan_case: ScanCase) -> Generator[None]:
         # error, so they're released
         held.extend(
             (key, acquire_redis_lock(r, key, SCAN_IMPORT_LOCK_TTL))
-            for key in scan_lock_keys(scan_case)
+            for key in keys
         )
         yield
     finally:
@@ -1933,8 +1933,85 @@ def import_scanned_opinion(
         return False
     if dry_run:
         return import_scan_case(scan_case, file_path, queue, True, overwrite)
-    with scan_import_locks(scan_case):
+    with scan_import_locks(scan_lock_keys(scan_case)):
         return import_scan_case(scan_case, file_path, queue, False, overwrite)
+
+
+def merge_scan_case(
+    cluster: OpinionCluster,
+    scan_case: ScanCase,
+    file_path: str,
+    queue: str,
+    dry_run: bool,
+) -> bool:
+    """Merge a scanned opinion into the cluster it matched, if it can be.
+
+    Skips a cluster that already has a scan XML, or whose opinions can't be
+    paired with the scan's, logging a warning for review.
+
+    Args:
+        cluster: The matching cluster.
+        scan_case: The parsed scanned opinion.
+        file_path: The local path or the S3 key of the XML, used for
+            logging.
+        queue: The Celery queue of the citation-finding task.
+        dry_run: Only log what would be done.
+
+    Returns:
+        Whether the scan was merged, or would be on a dry run.
+    """
+    citation = scan_case.citation.corrected_citation()
+    if cluster.filepath_xml_scan:
+        # Two scanned opinions matched the same cluster; needs review
+        logger.warning(
+            "%s (%s) matched cluster %s, which already has scan XML %s",
+            file_path,
+            citation,
+            cluster.id,
+            cluster.filepath_xml_scan.name,
+        )
+        return False
+    if not (plan := plan_opinion_merge(cluster, scan_case)):
+        # Skip it instead of merging only the cluster metadata, which
+        # would be hard to clean up afterwards
+        logger.warning(
+            "%s (%s) matched cluster %s, but its opinions %s can't be "
+            "paired with the scan's %s. Skipping it for review: %s%s",
+            file_path,
+            citation,
+            cluster.id,
+            describe_opinions(
+                list(cluster.sub_opinions.filter(main_version__isnull=True))
+            ),
+            describe_opinions(
+                [make_opinion(op, cluster.id) for op in scan_case.opinions]
+            ),
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return False
+    if dry_run:
+        logger.info(
+            "Dry run: would merge %s (%s) into cluster %s (%s): %s%s",
+            file_path,
+            citation,
+            cluster.id,
+            plan.describe(),
+            BASE_URL,
+            cluster.get_absolute_url(),
+        )
+        return True
+    logger.info(
+        "Merging %s (%s) into cluster %s (%s): %s%s",
+        file_path,
+        citation,
+        cluster.id,
+        plan.describe(),
+        BASE_URL,
+        cluster.get_absolute_url(),
+    )
+    merge_into_cluster(cluster, plan, scan_case, queue)
+    return True
 
 
 def import_scan_case(
@@ -1977,59 +2054,13 @@ def import_scan_case(
         return False
 
     if cluster := find_existing_cluster(scan_case):
-        if cluster.filepath_xml_scan:
-            # Two scanned opinions matched the same cluster; needs review
-            logger.warning(
-                "%s (%s) matched cluster %s, which already has scan XML %s",
-                file_path,
-                citation,
-                cluster.id,
-                cluster.filepath_xml_scan.name,
-            )
-            return False
-        if not (plan := plan_opinion_merge(cluster, scan_case)):
-            # Skip it instead of merging only the cluster metadata, which
-            # would be hard to clean up afterwards
-            logger.warning(
-                "%s (%s) matched cluster %s, but its opinions %s can't be "
-                "paired with the scan's %s. Skipping it for review: %s%s",
-                file_path,
-                citation,
-                cluster.id,
-                describe_opinions(
-                    list(
-                        cluster.sub_opinions.filter(main_version__isnull=True)
-                    )
-                ),
-                describe_opinions(
-                    [make_opinion(op, cluster.id) for op in scan_case.opinions]
-                ),
-                BASE_URL,
-                cluster.get_absolute_url(),
-            )
-            return False
         if dry_run:
-            logger.info(
-                "Dry run: would merge %s (%s) into cluster %s (%s): %s%s",
-                file_path,
-                citation,
-                cluster.id,
-                plan.describe(),
-                BASE_URL,
-                cluster.get_absolute_url(),
-            )
-            return True
-        logger.info(
-            "Merging %s (%s) into cluster %s (%s): %s%s",
-            file_path,
-            citation,
-            cluster.id,
-            plan.describe(),
-            BASE_URL,
-            cluster.get_absolute_url(),
-        )
-        merge_into_cluster(cluster, plan, scan_case, queue)
-        return True
+            return merge_scan_case(cluster, scan_case, file_path, queue, True)
+        # Another import that shares no lock key with this one can match the
+        # same cluster, so lock it and check its scan XML again
+        with scan_import_locks([f"scan_import:cluster:{cluster.pk}"]):
+            cluster.refresh_from_db(fields=["filepath_xml_scan"])
+            return merge_scan_case(cluster, scan_case, file_path, queue, False)
 
     if dry_run:
         logger.info(

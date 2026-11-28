@@ -698,6 +698,38 @@ class ImportScannedOpinionsTest(TestCase):
             ],
         )
 
+    def test_merge_checks_the_cluster_again_under_its_lock(self) -> None:
+        """Is a cluster that got another scan's XML after matching skipped?
+
+        Another import that shares no lock key with this one can merge into
+        the same cluster while this one is matching.
+        """
+        cluster = self.make_matching_cluster()
+        matched = OpinionCluster.objects.get(pk=cluster.pk)
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            filepath_xml_scan="scan_xml/other.xml"
+        )
+        with (
+            mock.patch(
+                f"{COMMAND_MODULE}.find_existing_cluster", return_value=matched
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_scan()
+        mock_logger.warning.assert_any_call(
+            "%s (%s) matched cluster %s, which already has scan XML %s",
+            str(SCAN_XML_PATH),
+            "388 So. 3d 1",
+            cluster.pk,
+            "scan_xml/other.xml",
+        )
+        self.assertEqual(cluster.sub_opinions.count(), 1)
+        self.assertFalse(
+            get_redis_interface("CACHE").exists(
+                f"scan_import:cluster:{cluster.pk}"
+            )
+        )
+
     def test_import_new_case(self) -> None:
         """Does a new scanned opinion create its docket, cluster and opinion?"""
         self.import_scan()
