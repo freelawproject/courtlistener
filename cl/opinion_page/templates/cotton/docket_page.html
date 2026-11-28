@@ -159,7 +159,7 @@
           Subscribe with RSS
         </c-menu-button.item>
         <c-menu-button.item
-          href="{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+          href="{% if docket.pacer_case_id %}{% url 'new_docket_alert' %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}{% else %}{% url 'new_docket_alert_by_id' docket.pk %}{% endif %}"
           icon="forward"
           icon_class="w-4 h-4 text-greyscale-500"
           rel="nofollow"
