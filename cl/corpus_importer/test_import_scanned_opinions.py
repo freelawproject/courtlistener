@@ -680,10 +680,34 @@ class ImportScannedOpinionsTest(TestCase):
         )
         return cluster
 
-    def test_scan_lock_keys(self) -> None:
-        """Does an import lock its opinion, citations and docket number?
+    def test_court_months_overlap_within_the_match_window(self) -> None:
+        """Do scans filed up to 31 days apart share a court month key?
 
-        Two files sharing any of them can be the same case.
+        Even when their own months aren't adjacent in the window, e.g.
+        March 31 and May 1.
+        """
+        scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
+        if scan_case is None:
+            raise ValueError("The test XML must parse")
+
+        def month_keys(day: date) -> set[str]:
+            scan_case.date_filed = day
+            return {k for k in scan_lock_keys(scan_case) if "court_month" in k}
+
+        for first, second in [
+            (date(2024, 3, 31), date(2024, 5, 1)),
+            (date(2023, 12, 15), date(2024, 1, 15)),
+            (date(2024, 1, 31), date(2024, 3, 2)),
+        ]:
+            with self.subTest(first=first, second=second):
+                self.assertTrue(month_keys(first) & month_keys(second))
+
+    def test_scan_lock_keys(self) -> None:
+        """Does an import lock its opinion, citations, docket and months?
+
+        Two files sharing any of them can be the same case. The court and
+        date match accepts a cluster filed within 31 days, so the months
+        from April 21 to June 22 are locked.
         """
         scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
         if scan_case is None:
@@ -692,6 +716,9 @@ class ImportScannedOpinionsTest(TestCase):
             scan_lock_keys(scan_case),
             [
                 "scan_import:citation:388 So. 3d 1",
+                "scan_import:court_month:fladistctapp4:2024-04",
+                "scan_import:court_month:fladistctapp4:2024-05",
+                "scan_import:court_month:fladistctapp4:2024-06",
                 "scan_import:docket:fladistctapp4:4D2023-2459",
                 "scan_import:opinion:3593-12-",
             ],
@@ -2333,6 +2360,32 @@ class ImportFromScanningBucketTest(TestCase):
                         for key in expected
                     ],
                 )
+
+    def test_queues_the_files_of_each_scan_in_turn(self) -> None:
+        """Are the files queued one scan at a time, in turn?
+
+        So the workers don't wait for each other on the locks of a volume.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+            "export/3593/14.xml": self.scan_xml,
+            "export/3600/1.xml": self.scan_xml,
+        }
+        with mock.patch(IMPORT_TASK) as mock_task:
+            self.import_from_bucket(files, all=True)
+        self.assertEqual(
+            [
+                c.kwargs["args"][0]
+                for c in mock_task.apply_async.call_args_list
+            ],
+            [
+                "export/3593/12.xml",
+                "export/3600/1.xml",
+                "export/3593/13.xml",
+                "export/3593/14.xml",
+            ],
+        )
 
     def test_dry_run_and_path_run_in_process(self) -> None:
         """Do a dry run and a --path import queue no import tasks?

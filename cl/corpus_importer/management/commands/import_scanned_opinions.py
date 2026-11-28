@@ -6,7 +6,7 @@ import itertools
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -352,6 +352,31 @@ def imported_scan_opinions() -> set[str]:
         for name in names
         if (m := STORED_SCAN_NAME_RE.match(Path(name).name))
     }
+
+
+def interleave_scans(keys: list[str]) -> list[str]:
+    """Order bucket keys taking one file of each scan in turn.
+
+    A scan is usually a reporter volume, whose cases share a court and
+    nearby dates, so the workers would wait for each other's locks on
+    them (see `scan_lock_keys`). Taking the files of different scans in
+    turn lets them import at the same time.
+
+    Args:
+        keys: The S3 keys, in the order of `s3_xml_keys`.
+
+    Returns:
+        The same keys, e.g. the first file of every scan, then the second.
+    """
+    by_scan: dict[str, list[str]] = {}
+    for key in keys:
+        by_scan.setdefault(Path(key).parent.name, []).append(key)
+    return [
+        key
+        for keys_in_turn in itertools.zip_longest(*by_scan.values())
+        for key in keys_in_turn
+        if key is not None
+    ]
 
 
 def s3_key_scan_opinion(key: str) -> str:
@@ -1841,10 +1866,15 @@ def scan_lock_keys(scan_case: ScanCase) -> list[str]:
     """Get the lock keys of a scanned opinion's import.
 
     Imports running at the same time in several workers could each find no
-    match and create the same case twice. Two files are the same case when
-    they share the scanned opinion, a citation or the court and docket
-    number, so each of those is locked. A matched cluster is locked on its
-    own before merging into it (see `import_scan_case`).
+    match and create the same case twice. Two files can be the same case
+    when they share the scanned opinion, a citation or the court and docket
+    number, or when they're in the same court and filed within a month of
+    each other, which `find_existing_cluster` also matches. Each of those
+    is locked. A matched cluster is locked on its own before merging into
+    it (see `import_scan_case`).
+
+    Caveat: imports of a court in nearby months wait for each other, so
+    queue the files of different scans in turn (see `interleave_scans`).
 
     Args:
         scan_case: The parsed scanned opinion.
@@ -1860,6 +1890,20 @@ def scan_lock_keys(scan_case: ScanCase) -> list[str]:
         or scan_case.docket_number
     ):
         keys.add(f"scan_import:docket:{scan_case.court.pk}:{docket_number}")
+    # The court and date match accepts a cluster filed up to 31 days from
+    # the scan's date, so lock every month of that window. Two scans that
+    # could match each other then share the month of either one's date.
+    month = timedelta(days=31)
+    start = scan_case.date_filed - month
+    end = scan_case.date_filed + month
+    year, month_number = start.year, start.month
+    while (year, month_number) <= (end.year, end.month):
+        keys.add(
+            f"scan_import:court_month:{scan_case.court.pk}:"
+            f"{year}-{month_number:02d}"
+        )
+        year, month_number = divmod(year * 12 + month_number, 12)
+        month_number += 1
     return sorted(keys)
 
 
@@ -2257,8 +2301,10 @@ class Command(VerboseCommand):
                     "Leaving out %s XML files already imported",
                     file_count - len(file_paths),
                 )
-        logger.info("Found %s XML files to import", len(file_paths))
         in_process = bool(options["path"]) or dry_run
+        if not in_process:
+            file_paths = interleave_scans(file_paths)
+        logger.info("Found %s XML files to import", len(file_paths))
 
         throttles = []
         if not dry_run:
