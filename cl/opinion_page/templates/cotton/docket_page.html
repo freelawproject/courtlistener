@@ -273,7 +273,7 @@
           {% if active_tab == tab.key %}aria-current="page"{% endif %}
           class="flex items-center gap-1 px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-white text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}"
         >
-          <c-icon :name="tab.icon" />
+          <c-icon :name="tab.icon" size="md" class="text-greyscale-600" />
           {{ tab.label }}
         </a>
       {% endfor %}
