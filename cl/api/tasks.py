@@ -2,10 +2,12 @@
 
 import json
 
+from django.urls import reverse
 from elasticsearch.dsl.response import Hit
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
+from cl.alerts.docket_alert_sources import RECAP_ALERT_SOURCE
 from cl.alerts.models import Alert
 from cl.api.models import (
     Webhook,
@@ -16,7 +18,6 @@ from cl.api.models import (
 from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.favorites.api_serializers import PrayerSerializer
 from cl.favorites.models import Prayer
 from cl.lib.elasticsearch_utils import set_child_docs_and_score
@@ -27,7 +28,7 @@ from cl.search.api_serializers import (
     V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
-from cl.search.models import SEARCH_TYPES, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument
 
 
@@ -54,31 +55,47 @@ def send_test_webhook_event(
 def send_docket_alert_webhook_events(
     des_pks: list[int],
     webhook_recipients_pks: list[int],
+    docket_pk: int | None = None,
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s).
 
     Args:
         des_pks: The list of docket entries primary keys.
         webhook_recipients_pks: A list of User pks to send the webhook to.
+        docket_pk: The docket of the entries, which picks the table to look
+            them up in, since entry pks of different sources can collide.
+            Without it, they're looked up as RECAP entries.
+
+    Only v3+ webhooks get entries from sources other than RECAP, and their
+    payloads also carry the entries' API path as source.
     """
+    source = (
+        Docket.objects.get(pk=docket_pk).get_alert_source()
+        if docket_pk
+        else RECAP_ALERT_SOURCE
+    )
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
         user_id__in=webhook_recipients_pks,
         enabled=True,
     )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-
-    serialized_docket_entries.extend(
-        DocketEntrySerializer(de).data for de in docket_entries
-    )
+    if source is not RECAP_ALERT_SOURCE:
+        # Earlier versions only know the RECAP results format.
+        webhooks = webhooks.filter(version__gte=WebhookVersions.v3)
+    serialized_docket_entries = [
+        source.webhook_serializer(de).data
+        for de in source.entries_by_pk(des_pks)
+    ]
+    # v3 payloads tell receivers which API their results match.
+    api_path = reverse(source.api_view_name, kwargs={"version": "v4"})
 
     for webhook in webhooks:
+        payload: dict = {"results": serialized_docket_entries}
+        if webhook.version >= WebhookVersions.v3:
+            payload = {"source": api_path, **payload}
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": {
-                "results": serialized_docket_entries,
-            },
+            "payload": payload,
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(

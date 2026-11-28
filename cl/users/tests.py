@@ -65,7 +65,11 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.api.utils import (
+    DOUBLE_API_THROTTLES_SWITCH,
+    clear_tiered_cache,
+    get_selectable_webhook_versions,
+)
 from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     PROVIDERS,
@@ -4007,6 +4011,41 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    @override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=True)
+    async def test_docket_alert_webhook_test_source(self) -> None:
+        """Only v3 docket alert test events have a source, like real events."""
+        expected_sources = {
+            WebhookVersions.v2: None,
+            WebhookVersions.v3: reverse(
+                "docketentry-list", kwargs={"version": "v4"}
+            ),
+        }
+        for version, source in expected_sources.items():
+            with self.subTest(version=version):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(self.client, version=version)
+                webhook_pk = await Webhook.objects.values_list(
+                    "pk", flat=True
+                ).aget()
+                webhook_test_path = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhook_pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    await self.client.post(webhook_test_path, {})
+
+                content = await WebhookEvent.objects.values_list(
+                    "content", flat=True
+                ).aget()
+                self.assertEqual(content["payload"].get("source"), source)
+
+    @override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=True)
     async def test_send_webhook_test_all_types(self) -> None:
         """Can we send a webhook test event for all webhook types?"""
         test_cases = {
@@ -4160,6 +4199,89 @@ class WebhooksHTMXTests(APITestCase):
         # Should return all versions available for SEARCH_ALERT event type
         self.assertIn('value="1"', response.content.decode())
         self.assertIn('value="2"', response.content.decode())
+
+    async def test_webhook_v3_behind_scotus_webhooks_setting(self) -> None:
+        """Is v3 offered and accepted only when SCOTUS webhooks are on?"""
+        available_versions_path = reverse(
+            "webhooks-get-available-versions",
+            kwargs={"format": "html"},
+        )
+        for enabled in (False, True):
+            with (
+                self.subTest(enabled=enabled),
+                override_settings(SCOTUS_ALERT_WEBHOOKS_ENABLED=enabled),
+            ):
+                await Webhook.objects.all().adelete()
+                response = await self.client.get(
+                    available_versions_path,
+                    {"event_type": WebhookEventType.DOCKET_ALERT},
+                )
+                content = response.content.decode()
+                self.assertIn('value="2"', content)
+                self.assertEqual('value="3"' in content, enabled)
+
+                response = await self.make_a_webhook(
+                    self.client, version=WebhookVersions.v3
+                )
+                self.assertEqual(
+                    response.status_code,
+                    HTTPStatus.CREATED if enabled else HTTPStatus.OK,
+                )
+                self.assertEqual(
+                    await Webhook.objects.filter(
+                        version=WebhookVersions.v3
+                    ).aexists(),
+                    enabled,
+                )
+
+    async def test_existing_v3_webhook_editable_when_scotus_off(self) -> None:
+        """Can a v3 webhook still be updated once SCOTUS webhooks are off?"""
+        webhook = await sync_to_async(WebhookFactory)(
+            user=self.user_1,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            version=WebhookVersions.v3,
+            enabled=True,
+        )
+        webhook_path = reverse(
+            "webhooks-detail", kwargs={"pk": webhook.pk, "format": "json"}
+        )
+        response = await self.client.put(
+            webhook_path,
+            {
+                "url": "https://example.com/new",
+                "event_type": WebhookEventType.DOCKET_ALERT,
+                "enabled": True,
+                "version": WebhookVersions.v3,
+            },
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await webhook.arefresh_from_db()
+        self.assertEqual(webhook.url, "https://example.com/new")
+
+
+class GetSelectableWebhookVersionsTest(SimpleTestCase):
+    """Tests for get_selectable_webhook_versions."""
+
+    def test_gated_versions(self) -> None:
+        """Are the gated version and later ones left out until enabled?"""
+        all_versions = list(WebhookVersions.choices)
+        test_cases = [
+            ("no gate", None, False, all_versions),
+            ("gate enabled", WebhookVersions.v2, True, all_versions),
+            (
+                "gate disabled",
+                WebhookVersions.v2,
+                False,
+                [(WebhookVersions.v1, "v1")],
+            ),
+        ]
+        for label, gated_version, enabled, expected in test_cases:
+            with self.subTest(label):
+                self.assertEqual(
+                    get_selectable_webhook_versions(gated_version, enabled),
+                    expected,
+                )
 
 
 @override_settings(DEVELOPMENT=False)

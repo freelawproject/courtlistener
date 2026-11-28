@@ -2144,6 +2144,33 @@ def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
     )
 
 
+def get_selectable_webhook_versions(
+    gated_version: WebhookVersions | None = None,
+    enabled: bool = False,
+) -> list[tuple[int, str]]:
+    """Return the webhook versions users can pick for a new webhook.
+
+    Use it to hold back a webhook release until it launches.
+
+    Args:
+        gated_version: The first version to hold back. It and every later
+            version are left out unless enabled is True. If None, every
+            version is returned.
+        enabled: Whether the gated release is live, e.g. the value of the
+            flag or setting that controls it.
+
+    Only the versions offered for new webhooks are limited. Existing webhooks
+    of a gated version keep working and stay editable.
+    """
+    if gated_version is None or enabled:
+        return list(WebhookVersions.choices)
+    return [
+        (version, label)
+        for version, label in WebhookVersions.choices
+        if version < gated_version
+    ]
+
+
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     """Generate a dictionary representing the content for the webhook key.
 

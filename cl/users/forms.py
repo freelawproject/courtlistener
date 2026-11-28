@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Iterator
+from typing import cast
 
 from disposable_email_domains import blocklist
 from django import forms
@@ -24,6 +25,7 @@ from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.api.models import Webhook, WebhookEventType, WebhookVersions
+from cl.api.utils import get_selectable_webhook_versions
 from cl.lib.auth import filter_by_email
 from cl.lib.AuthenticationBackend import LOOKS_LIKE_EMAIL, accounts_for_email
 from cl.lib.types import EmailType
@@ -567,8 +569,9 @@ class WebhookForm(ModelForm):
         """Build the form, limiting the event type and version choices.
 
         When updating, only the webhook's current event type and version are
-        offered, read-only. When creating, only event types that the user
-        doesn't yet have a webhook for in every version are offered.
+        offered, read-only. When creating, v3 is offered only when
+        SCOTUS_ALERT_WEBHOOKS_ENABLED is on, and an event type is shown only
+        if the user still lacks a webhook for it in one of those versions.
         """
         super().__init__(*args, **kwargs)
 
@@ -599,13 +602,20 @@ class WebhookForm(ModelForm):
             used_version_types = [
                 f"{w.event_type}_{w.version}" for w in webhooks
             ]
+            # v3 exists for SCOTUS docket alerts, so it launches with them.
+            version_choices = get_selectable_webhook_versions(
+                WebhookVersions.v3, settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
+            )
             available_type_choices = {
                 w_type
                 for w_type in WebhookEventType.choices
-                for w_version in WebhookVersions.choices
+                for w_version in version_choices
                 if f"{w_type[0]}_{w_version[0]}" not in used_version_types
             }
             self.fields["event_type"].choices = available_type_choices
+            cast(
+                forms.ChoiceField, self.fields["version"]
+            ).choices = version_choices
 
     class Meta:
         model = Webhook

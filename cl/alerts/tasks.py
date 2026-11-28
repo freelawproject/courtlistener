@@ -20,7 +20,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 from redis import ConnectionError as RedisConnectionError
 
-from cl.alerts.docket_alert_sources import SCOTUS_ALERT_SOURCE
+from cl.alerts.docket_alert_sources import RECAP_ALERT_SOURCE
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
@@ -418,14 +418,14 @@ def send_alert_and_webhook(
     )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send docket entries to webhook. SCOTUS webhooks stay off until
-    # send_docket_alert_webhook_events supports SCOTUSDocketEntry: it looks
-    # des_pks up as DocketEntry pks, so it would send unrelated RECAP entries.
-    if (
-        source is not SCOTUS_ALERT_SOURCE
-        or settings.SCOTUS_ALERT_WEBHOOKS_ENABLED
-    ):
+    # Send docket entries to webhook. RECAP calls keep two arguments, so
+    # workers still on the old task signature accept them during a deploy.
+    if source is RECAP_ALERT_SOURCE:
         send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
+    elif settings.SCOTUS_ALERT_WEBHOOKS_ENABLED:
+        send_docket_alert_webhook_events.delay(
+            des_pks, webhook_recipients, d.pk
+        )
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
