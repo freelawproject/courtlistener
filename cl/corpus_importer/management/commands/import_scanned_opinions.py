@@ -3,6 +3,8 @@
 import copy
 import itertools
 import re
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from functools import partial
@@ -34,6 +36,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     map_opinion_type,
     parse_extra_fields,
 )
+from cl.corpus_importer.tasks import import_scanned_opinion_file
 from cl.corpus_importer.utils import (
     HYPERSCAN_TOKENIZER,
     add_citations_to_cluster,
@@ -43,6 +46,12 @@ from cl.corpus_importer.utils import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
+from cl.lib.model_helpers import make_docket_number_core
+from cl.lib.redis_utils import (
+    acquire_redis_lock,
+    get_redis_interface,
+    release_redis_lock,
+)
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.url_utils import BASE_URL
 from cl.lib.utils import glob_files, human_sort
@@ -84,8 +93,14 @@ FINAL_XML_PREFIX = "export/"
 # The `schema` attribute values of `<casebody>` this command knows how to
 # read. The portal raises it when its output changes shape.
 SUPPORTED_SCHEMAS = {"1", "2"}
-# Celery's default queue, used for the citation-finding tasks by default
+# Celery's default queue, used for the import and citation-finding tasks
+# by default
 DEFAULT_QUEUE = "celery"
+# How long an import holds its locks, in milliseconds, in case its worker
+# dies without releasing them
+SCAN_IMPORT_LOCK_TTL = 10 * 60 * 1000
+# The "{scan id}-{opinion id}" that starts a stored scan XML file name
+STORED_SCAN_NAME_RE = re.compile(r"^(\d+-\d+)-")
 
 PER_CURIAM_RE = re.compile(r"per\s+curiam", re.IGNORECASE)
 # A complete date as printed in reporters: "May 22, 2024", "Dec. 18, 2009",
@@ -322,6 +337,42 @@ def read_local_xml(file_path: str) -> str:
         The XML content.
     """
     return Path(file_path).read_text(encoding="utf-8")
+
+
+def imported_scan_opinions() -> set[str]:
+    """Get the scanned opinions already imported into a cluster.
+
+    Used to skip their files before queueing them, so a run started again
+    continues with the files left. It reads the stored XML name of every
+    cluster that has one, in a single query.
+
+    Returns:
+        A set of "{scan id}-{opinion id}", e.g. "3593-12".
+    """
+    names = (
+        OpinionCluster.objects.exclude(filepath_xml_scan="")
+        .exclude(filepath_xml_scan__isnull=True)
+        .values_list("filepath_xml_scan", flat=True)
+        .iterator()
+    )
+    return {
+        m.group(1)
+        for name in names
+        if (m := STORED_SCAN_NAME_RE.match(Path(name).name))
+    }
+
+
+def s3_key_scan_opinion(key: str) -> str:
+    """Get the "{scan id}-{opinion id}" of a bucket key.
+
+    Args:
+        key: An S3 key, e.g. "export/3593/12.xml".
+
+    Returns:
+        e.g. "3593-12"
+    """
+    path = Path(key)
+    return f"{path.parent.name}-{path.stem}"
 
 
 def get_citation_strings(soup: BeautifulSoup) -> list[str]:
@@ -1794,6 +1845,57 @@ def overwrite_scan(
     return True
 
 
+def scan_lock_keys(scan_case: ScanCase) -> list[str]:
+    """Get the Redis lock keys of a scanned opinion's import.
+
+    Imports running at the same time in several workers could each find no
+    match and create the same case twice, or merge two scans into a single
+    cluster. Two files are the same case, or match the same cluster, when
+    they share the scanned opinion, a citation or the court and docket
+    number, so each of those is locked.
+
+    Args:
+        scan_case: The parsed scanned opinion.
+
+    Returns:
+        The keys, sorted so that every import acquires them in the same
+        order and two imports can't deadlock.
+    """
+    keys = {f"scan_import:opinion:{scan_case.file_name_prefix}"}
+    keys.update(f"scan_import:citation:{cite}" for cite in scan_case.citations)
+    if docket_number := (
+        make_docket_number_core(scan_case.docket_number)
+        or scan_case.docket_number
+    ):
+        keys.add(f"scan_import:docket:{scan_case.court.pk}:{docket_number}")
+    return sorted(keys)
+
+
+@contextmanager
+def scan_import_locks(scan_case: ScanCase) -> Generator[None]:
+    """Hold the locks of a scanned opinion's import, waiting for them.
+
+    Caveat: the import must commit before leaving the block, so the next
+    import of the same case sees its changes.
+
+    Args:
+        scan_case: The parsed scanned opinion.
+    """
+    r = get_redis_interface("CACHE")
+    held: list[tuple[str, str]] = []
+    try:
+        # Extending from a generator keeps the locks acquired before an
+        # error, so they're released
+        held.extend(
+            (key, acquire_redis_lock(r, key, SCAN_IMPORT_LOCK_TTL))
+            for key in scan_lock_keys(scan_case)
+        )
+        yield
+    finally:
+        for key, identifier in reversed(held):
+            release_redis_lock(r, key, identifier)
+
+
 def import_scanned_opinion(
     xml: str,
     file_path: str,
@@ -1807,6 +1909,9 @@ def import_scanned_opinion(
     Skips opinions already imported from the scanning project. Merges into
     a matching cluster from another source when one exists; otherwise
     creates a new docket, cluster, citations and opinions.
+
+    Safe to run in several workers at once: the matching and saving wait
+    for any other import of the same case (see `scan_lock_keys`).
 
     Args:
         xml: The XML content.
@@ -1826,6 +1931,32 @@ def import_scanned_opinion(
     logger.info("Processing %s", file_path)
     if not (scan_case := parse_scan_xml(xml, file_path, court_id)):
         return False
+    if dry_run:
+        return import_scan_case(scan_case, file_path, queue, True, overwrite)
+    with scan_import_locks(scan_case):
+        return import_scan_case(scan_case, file_path, queue, False, overwrite)
+
+
+def import_scan_case(
+    scan_case: ScanCase,
+    file_path: str,
+    queue: str,
+    dry_run: bool,
+    overwrite: bool,
+) -> bool:
+    """Import a parsed scanned opinion; see `import_scanned_opinion`.
+
+    Args:
+        scan_case: The parsed scanned opinion.
+        file_path: The local path or the S3 key of the XML, used for
+            logging.
+        queue: The Celery queue of the citation-finding task.
+        dry_run: Only log what would be done.
+        overwrite: Overwrite the opinion if it was imported already.
+
+    Returns:
+        Whether the scan was added, merged or overwritten, or would be.
+    """
     citation = scan_case.citation.corrected_citation()
 
     if cluster_id := find_imported_scan(scan_case):
@@ -1919,6 +2050,65 @@ def import_scanned_opinion(
     return True
 
 
+def import_xml_file(
+    read: Callable[[str], str],
+    file_path: str,
+    court_id: str | None,
+    queue: str,
+    dry_run: bool = False,
+    overwrite: bool = False,
+) -> bool:
+    """Read and import a final XML file, logging any failure.
+
+    A failure is logged instead of raised, so one bad file doesn't stop a
+    volume import.
+
+    Args:
+        read: Reads the XML of `file_path`.
+        file_path: The local path or the S3 key of the XML.
+        court_id: The CL court id, or None to look it up in the XML.
+        queue: The Celery queue of the citation-finding task.
+        dry_run: Only log what would be done.
+        overwrite: Overwrite the opinion if it was imported already.
+
+    Returns:
+        Whether the scan was added, merged or overwritten, or would be on
+        a dry run. False when it was skipped or failed.
+    """
+    try:
+        return import_scanned_opinion(
+            read(file_path), file_path, court_id, queue, dry_run, overwrite
+        )
+    except Exception:
+        logger.exception("Failed to import %s", file_path)
+        return False
+
+
+def import_s3_xml_file(
+    key: str, court_id: str | None, queue: str, overwrite: bool
+) -> bool:
+    """Read and import a final XML file from the scanning portal's bucket.
+
+    Used by the import task; see `import_xml_file`.
+
+    Args:
+        key: The S3 key of the file.
+        court_id: The CL court id, or None to look it up in the XML.
+        queue: The Celery queue of the citation-finding task.
+        overwrite: Overwrite the opinion if it was imported already.
+
+    Returns:
+        Whether the scan was added, merged or overwritten.
+    """
+    return import_xml_file(
+        partial(read_s3_xml, ScanningFinalXmlStorage()),
+        key,
+        court_id,
+        queue,
+        overwrite=overwrite,
+    )
+
+
 class Command(VerboseCommand):
     """Import scanning project final XML files into CourtListener."""
 
@@ -1979,27 +2169,37 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--limit",
             type=int,
-            help="Stop after adding, merging or overwriting this many files. "
-            "Skipped files don't count, so running it again continues with "
-            "the next ones.",
+            help="Stop after this many files. A bucket import counts the "
+            "files it queues; files already imported are left out before "
+            "queueing unless --overwrite is given, so running it again "
+            "continues with the next ones. A dry run or a --path import "
+            "counts the files it would add, merge or overwrite.",
         )
         parser.add_argument(
             "--queue",
             type=str,
             default=DEFAULT_QUEUE,
-            help="The Celery queue of the citation-finding tasks.",
+            help="The Celery queue of the import tasks, one per file, and "
+            "of the citation-finding tasks they queue.",
         )
         parser.add_argument(
             "--throttle-min-items",
             type=int,
             default=20,
-            help="Wait between files while the Celery queues have more than "
-            "this many tasks. The queues are first measured after twice this "
-            "many files, and each file queues several tasks.",
+            help="Wait before queueing the next file while the Celery "
+            "queues have more than this many tasks, which controls how fast "
+            "the workers import. The queues are first measured after twice "
+            "this many files.",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        """Import every XML file found in the given path."""
+        """Import the XML files of the given path or scans.
+
+        A bucket import queues one Celery task per file, so the workers
+        import them in parallel. A --path import and a dry run run in this
+        process, one file at a time, since the workers can't read local
+        files and a dry run is read in its log.
+        """
         super().handle(*args, **options)
         scan_ids, opinion_id = options["scan_id"], options["opinion_id"]
         if opinion_id and (not scan_ids or len(scan_ids) != 1):
@@ -2009,6 +2209,8 @@ class Command(VerboseCommand):
         if options["throttle_min_items"] < 1:
             raise CommandError("--throttle-min-items must be at least 1.")
 
+        court_id, overwrite = options["court_id"], options["overwrite"]
+        dry_run, queue = options["dry_run"], options["queue"]
         if options["path"]:
             file_paths = xml_file_paths(options["path"])
             read = read_local_xml
@@ -2016,13 +2218,25 @@ class Command(VerboseCommand):
             storage = ScanningFinalXmlStorage()
             file_paths = s3_xml_keys(storage, scan_ids, opinion_id)
             read = partial(read_s3_xml, storage)
+            if not overwrite:
+                imported_scans = imported_scan_opinions()
+                file_count = len(file_paths)
+                file_paths = [
+                    key
+                    for key in file_paths
+                    if s3_key_scan_opinion(key) not in imported_scans
+                ]
+                logger.info(
+                    "Leaving out %s XML files already imported",
+                    file_count - len(file_paths),
+                )
         logger.info("Found %s XML files to import", len(file_paths))
+        in_process = bool(options["path"]) or dry_run
 
-        queue = options["queue"]
         throttles = []
-        if not options["dry_run"]:
-            # Saving an import also sends search index tasks to the ETL
-            # queue, so watch it too
+        if not dry_run:
+            # The imports also send search index tasks to the ETL queue, so
+            # watch it too
             throttles = [
                 CeleryThrottle(
                     min_items=options["throttle_min_items"], queue_name=name
@@ -2031,25 +2245,29 @@ class Command(VerboseCommand):
                     [queue, settings.CELERY_ETL_TASK_QUEUE]
                 )
             ]
-        imported = 0
+        count = 0
         for file_path in file_paths:
-            if limit is not None and imported >= limit:
+            if limit is not None and count >= limit:
                 logger.info("Stopping after %s files, the --limit", limit)
                 break
-            try:
-                if not import_scanned_opinion(
-                    read(file_path),
-                    file_path,
-                    options["court_id"],
-                    queue,
-                    options["dry_run"],
-                    options["overwrite"],
+            if in_process:
+                if not import_xml_file(
+                    read, file_path, court_id, queue, dry_run, overwrite
                 ):
                     continue
-            except Exception:
-                # Keep going; one bad file shouldn't stop a volume import
-                logger.exception("Failed to import %s", file_path)
-                continue
-            imported += 1
+            else:
+                import_scanned_opinion_file.apply_async(
+                    args=(file_path, court_id, queue, overwrite), queue=queue
+                )
+            count += 1
+            if not in_process and count % 1000 == 0:
+                logger.info(
+                    "Queued %s of %s files, up to %s",
+                    count,
+                    len(file_paths),
+                    file_path,
+                )
             for throttle in throttles:
                 throttle.maybe_wait()
+        if not in_process:
+            logger.info("Queued %s files", count)
