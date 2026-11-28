@@ -12,7 +12,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from django.core.files.base import File
 from django.core.management import CommandError, call_command
-from django.db import OperationalError, transaction
+from django.db import OperationalError, connection, transaction
 from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
 from eyecite import get_citations
@@ -34,7 +34,6 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     s3_xml_keys,
     scan_lock_keys,
 )
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import ScanningFinalXmlStorage, get_name_by_incrementing
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.factories import PersonFactory, PositionFactory
@@ -724,11 +723,6 @@ class ImportScannedOpinionsTest(TestCase):
             "scan_xml/other.xml",
         )
         self.assertEqual(cluster.sub_opinions.count(), 1)
-        self.assertFalse(
-            get_redis_interface("CACHE").exists(
-                f"scan_import:cluster:{cluster.pk}"
-            )
-        )
 
     def test_import_new_case(self) -> None:
         """Does a new scanned opinion create its docket, cluster and opinion?"""
@@ -2395,39 +2389,31 @@ class ImportFromScanningBucketTest(TestCase):
                 )
         mock_connection.close.assert_called_once()
 
-    def test_import_releases_its_locks(self) -> None:
-        """Are the locks of an import released, even when it fails?"""
+    def test_import_holds_its_locks(self) -> None:
+        """Does an import take every lock of its case before matching?
+
+        They're held until its transaction ends, so a test can't see them
+        freed.
+        """
         scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
         if scan_case is None:
             raise ValueError("The test XML must parse")
-        r = get_redis_interface("CACHE")
-        keys = scan_lock_keys(scan_case)
-        # Delete any lock left behind, so a leak fails the test instead of
-        # making the next import wait for it to expire
-        self.addCleanup(r.delete, *keys)
-        for label, side_effect in [
-            ("imported", None),
-            ("failed", RuntimeError("boom")),
-        ]:
-            with (
-                self.subTest(label),
-                transaction.atomic(),
-                empty_scan_storage(),
-                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
-                mock.patch(
-                    f"{COMMAND_MODULE}.import_scan_case",
-                    side_effect=side_effect,
-                    return_value=True,
-                ) as mock_import,
-            ):
-                self.import_from_bucket(
-                    {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        held: list[int] = []
+
+        def count_advisory_locks(*args: object) -> bool:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                    "AND pid = pg_backend_pid()"
                 )
-                mock_import.assert_called_once()
-                self.assertEqual(
-                    mock_logger.exception.called, side_effect is not None
-                )
-                leaked = r.exists(*keys)
-                r.delete(*keys)
-                self.assertFalse(leaked)
-                transaction.set_rollback(True)
+                held.append(cursor.fetchone()[0])
+            return True
+
+        with mock.patch(
+            f"{COMMAND_MODULE}.import_scan_case",
+            side_effect=count_advisory_locks,
+        ):
+            self.import_from_bucket(
+                {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+            )
+        self.assertEqual(held, [len(scan_lock_keys(scan_case))])

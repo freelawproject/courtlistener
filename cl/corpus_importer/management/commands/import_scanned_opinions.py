@@ -1,10 +1,10 @@
 """Import opinions from the scanning project's final XML files."""
 
 import copy
+import hashlib
 import itertools
 import re
-from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from functools import partial
@@ -47,11 +47,6 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.model_helpers import make_docket_number_core
-from cl.lib.redis_utils import (
-    acquire_redis_lock,
-    get_redis_interface,
-    release_redis_lock,
-)
 from cl.lib.storage import ScanningFinalXmlStorage
 from cl.lib.url_utils import BASE_URL
 from cl.lib.utils import glob_files, human_sort
@@ -96,9 +91,6 @@ SUPPORTED_SCHEMAS = {"1", "2"}
 # Celery's default queue, used for the import and citation-finding tasks
 # by default
 DEFAULT_QUEUE = "celery"
-# How long an import holds its locks, in milliseconds, in case its worker
-# dies without releasing them
-SCAN_IMPORT_LOCK_TTL = 10 * 60 * 1000
 # The "{scan id}-{opinion id}" that starts a stored scan XML file name
 STORED_SCAN_NAME_RE = re.compile(r"^(\d+-\d+)-")
 
@@ -1846,7 +1838,7 @@ def overwrite_scan(
 
 
 def scan_lock_keys(scan_case: ScanCase) -> list[str]:
-    """Get the Redis lock keys of a scanned opinion's import.
+    """Get the lock keys of a scanned opinion's import.
 
     Imports running at the same time in several workers could each find no
     match and create the same case twice. Two files are the same case when
@@ -1871,29 +1863,25 @@ def scan_lock_keys(scan_case: ScanCase) -> list[str]:
     return sorted(keys)
 
 
-@contextmanager
-def scan_import_locks(keys: list[str]) -> Generator[None]:
-    """Hold the Redis locks of a scan import, waiting for them.
+def acquire_scan_import_locks(keys: list[str]) -> None:
+    """Take the locks of a scan import, waiting for other imports to free them.
 
-    Caveat: the import must commit before leaving the block, so the next
-    import of the same case sees its changes.
+    They are Postgres advisory locks held until the transaction ends, so
+    the next import of the same case sees this one's changes, and they're
+    freed if the worker dies, since its connection closes.
+
+    Caveat: call it inside `transaction.atomic()`.
 
     Args:
         keys: The lock keys, in the order to acquire them.
     """
-    r = get_redis_interface("CACHE")
-    held: list[tuple[str, str]] = []
-    try:
-        # Extending from a generator keeps the locks acquired before an
-        # error, so they're released
-        held.extend(
-            (key, acquire_redis_lock(r, key, SCAN_IMPORT_LOCK_TTL))
-            for key in keys
-        )
-        yield
-    finally:
-        for key, identifier in reversed(held):
-            release_redis_lock(r, key, identifier)
+    with connection.cursor() as cursor:
+        for key in keys:
+            # Advisory locks take a 64-bit integer, so use part of a hash
+            lock_id = int.from_bytes(
+                hashlib.sha1(key.encode()).digest()[:8], signed=True
+            )
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
 
 
 def import_scanned_opinion(
@@ -1933,7 +1921,8 @@ def import_scanned_opinion(
         return False
     if dry_run:
         return import_scan_case(scan_case, file_path, queue, True, overwrite)
-    with scan_import_locks(scan_lock_keys(scan_case)):
+    with transaction.atomic():
+        acquire_scan_import_locks(scan_lock_keys(scan_case))
         return import_scan_case(scan_case, file_path, queue, False, overwrite)
 
 
@@ -2057,10 +2046,11 @@ def import_scan_case(
         if dry_run:
             return merge_scan_case(cluster, scan_case, file_path, queue, True)
         # Another import that shares no lock key with this one can match the
-        # same cluster, so lock it and check its scan XML again
-        with scan_import_locks([f"scan_import:cluster:{cluster.pk}"]):
-            cluster.refresh_from_db(fields=["filepath_xml_scan"])
-            return merge_scan_case(cluster, scan_case, file_path, queue, False)
+        # same cluster, so lock it and check its scan XML again. The lock is
+        # held until `import_scanned_opinion` commits.
+        acquire_scan_import_locks([f"scan_import:cluster:{cluster.pk}"])
+        cluster.refresh_from_db(fields=["filepath_xml_scan"])
+        return merge_scan_case(cluster, scan_case, file_path, queue, False)
 
     if dry_run:
         logger.info(
