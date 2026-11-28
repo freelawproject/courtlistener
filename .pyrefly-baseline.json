@@ -1752,13 +1752,6 @@
       "severity": "error"
     },
     {
-      "column": 13,
-      "path": "cl/recap/tasks.py",
-      "name": "bad-argument-type",
-      "concise_description": "Argument `list[ACMSAttachmentPageDataAttachment]` is not assignable to parameter `attachment_dicts` with type `list[_MergeAttachmentDict]` in function `cl.recap.mergers.merge_attachment_page_data`",
-      "severity": "error"
-    },
-    {
       "column": 28,
       "path": "cl/recap/tasks.py",
       "name": "bad-assignment",

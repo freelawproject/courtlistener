@@ -2667,38 +2667,38 @@ async def purchase_appellate_docket_by_docket_number(
         court_id: The CL ID of the court
         docket_number: The docket number of the appellate case.
         fq: The PacerFetchQueue object
-        **kwargs: Unused.
+        **kwargs: Filters for the classic appellate docket report. ACMS
+            dockets do not support filters, so they are ignored there.
 
     Returns:
         a dict with information about the docket and the new data
     """
-    acms_case_id = None
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    report: AppellateDocketReport | None = None
+    docket_data: dict[str, Any] = {}
 
     if should_check_acms_court(court_id):
-        acms_search = AcmsCaseSearch(court_id=court_id, pacer_session=session)
-        await acms_search.query(docket_number)
-        acms_case_id = (
-            acms_search.data["pcx_caseid"] if acms_search.data else None
-        )
+        # The IndexContent page resolves the case and supplies the API token
+        # in one request, so no separate case search is needed.
+        acms_report = ACMSDocketReport(pacer_court_id, session)
+        await acms_report.query_by_docket_number(docket_number)
+        docket_data = acms_report.data
+        if docket_data:
+            docket_data["docket_entries"] = sort_acms_docket_entries(
+                docket_data["docket_entries"]
+            )
+            report = acms_report
 
-    pacer_court_id = map_cl_to_pacer_id(court_id)
-    if acms_case_id:
-        # ACMSDocketReport only accepts the case ID; filters are not currently
-        # supported for ACMS docket reports.
-        report = ACMSDocketReport(pacer_court_id, session)
-        await report.query(acms_case_id)
-    else:
+    if report is None:
+        # Cases filed before a court moved to ACMS are still served by the
+        # classic appellate docket report, as are courts not on ACMS.
         report = AppellateDocketReport(pacer_court_id, session)
         await report.query(docket_number, **kwargs)
+        docket_data = report.data
 
-    docket_data = report.data
     if not docket_data:
         raise ParsingException("No data found in docket report.")
 
-    if acms_case_id:
-        docket_data["docket_entries"] = sort_acms_docket_entries(
-            docket_data["docket_entries"]
-        )
     return await create_or_update_docket_data_from_fetch(
         fq, court_id, None, report, docket_data
     )
@@ -2794,6 +2794,27 @@ async def fetch_appellate_docket_base(
                 fq=fq,
                 **get_fq_appellate_docket_kwargs(fq),
             )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        logger.exception(
+            "fq %s: %s %s answered HTTP %s while purchasing docket",
+            fq_pk,
+            exc.request.method,
+            exc.request.url,
+            status,
+        )
+        if status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+            # The court rejected the request outright, either an auth problem
+            # or a disabled court app. Retrying cannot change that answer.
+            msg = (
+                f"{exc.request.url.host} rejected the request with HTTP "
+                f"{status} while purchasing docket for fq: {fq_pk}."
+            )
+            await mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        raise CourtQueryError(
+            f"HTTP {status} while purchasing docket for fq: {fq_pk}."
+        ) from exc
     except httpx.HTTPError as exc:
         raise CourtQueryError(
             f"Network error while purchasing docket for fq: {fq_pk}."
