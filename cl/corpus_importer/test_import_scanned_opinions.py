@@ -12,7 +12,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from django.core.files.base import File
 from django.core.management import CommandError, call_command
-from django.db import transaction
+from django.db import OperationalError, connection, transaction
 from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
 from eyecite import get_citations
@@ -30,7 +30,9 @@ from cl.corpus_importer.management.commands.import_scanned_opinions import (
     normalize_case_name_caps,
     pair_opinions,
     parse_citations,
+    parse_scan_xml,
     s3_xml_keys,
+    scan_lock_keys,
 )
 from cl.lib.storage import ScanningFinalXmlStorage, get_name_by_incrementing
 from cl.lib.url_utils import BASE_URL
@@ -64,6 +66,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 COMMAND_MODULE = (
     "cl.corpus_importer.management.commands.import_scanned_opinions"
 )
+IMPORT_TASK = f"{COMMAND_MODULE}.import_scanned_opinion_file"
 CITATIONS_TASK = (
     f"{COMMAND_MODULE}.find_citations_and_parentheticals_for_opinion_by_pks"
 )
@@ -676,6 +679,77 @@ class ImportScannedOpinionsTest(TestCase):
             html="",
         )
         return cluster
+
+    def test_court_months_overlap_within_the_match_window(self) -> None:
+        """Do scans filed up to 31 days apart share a court month key?
+
+        Even when their own months aren't adjacent in the window, e.g.
+        March 31 and May 1.
+        """
+        scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
+        if scan_case is None:
+            raise ValueError("The test XML must parse")
+
+        def month_keys(day: date) -> set[str]:
+            scan_case.date_filed = day
+            return {k for k in scan_lock_keys(scan_case) if "court_month" in k}
+
+        for first, second in [
+            (date(2024, 3, 31), date(2024, 5, 1)),
+            (date(2023, 12, 15), date(2024, 1, 15)),
+            (date(2024, 1, 31), date(2024, 3, 2)),
+        ]:
+            with self.subTest(first=first, second=second):
+                self.assertTrue(month_keys(first) & month_keys(second))
+
+    def test_scan_lock_keys(self) -> None:
+        """Does an import lock its opinion, citations, docket and months?
+
+        Two files sharing any of them can be the same case. The court and
+        date match accepts a cluster filed within 31 days, so the months
+        from April 21 to June 22 are locked.
+        """
+        scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
+        if scan_case is None:
+            raise ValueError("The test XML must parse")
+        self.assertEqual(
+            scan_lock_keys(scan_case),
+            [
+                "scan_import:citation:388 So. 3d 1",
+                "scan_import:court_month:fladistctapp4:2024-04",
+                "scan_import:court_month:fladistctapp4:2024-05",
+                "scan_import:court_month:fladistctapp4:2024-06",
+                "scan_import:docket:fladistctapp4:4D2023-2459",
+                "scan_import:opinion:3593-12-",
+            ],
+        )
+
+    def test_merge_checks_the_cluster_again_under_its_lock(self) -> None:
+        """Is a cluster that got another scan's XML after matching skipped?
+
+        Another import that shares no lock key with this one can merge into
+        the same cluster while this one is matching.
+        """
+        cluster = self.make_matching_cluster()
+        matched = OpinionCluster.objects.get(pk=cluster.pk)
+        OpinionCluster.objects.filter(pk=cluster.pk).update(
+            filepath_xml_scan="scan_xml/other.xml"
+        )
+        with (
+            mock.patch(
+                f"{COMMAND_MODULE}.find_existing_cluster", return_value=matched
+            ),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_scan()
+        mock_logger.warning.assert_any_call(
+            "%s (%s) matched cluster %s, which already has scan XML %s",
+            str(SCAN_XML_PATH),
+            "388 So. 3d 1",
+            cluster.pk,
+            "scan_xml/other.xml",
+        )
+        self.assertEqual(cluster.sub_opinions.count(), 1)
 
     def test_import_new_case(self) -> None:
         """Does a new scanned opinion create its docket, cluster and opinion?"""
@@ -2143,9 +2217,11 @@ class ImportFromScanningBucketTest(TestCase):
                 )
 
     def test_limit_counts_dry_runs_and_overwrites(self) -> None:
-        """Does --limit count what a dry run would import and overwrites?
+        """Does --limit count what a dry run would import, and queued files?
 
-        An unchanged scan skipped on overwrite doesn't count.
+        A dry run runs in this process and knows what it would import. An
+        overwrite queues every file, since a worker decides whether it
+        changed, so an unchanged file counts.
         """
         files = {
             "export/3593/12.xml": self.scan_xml,
@@ -2170,24 +2246,30 @@ class ImportFromScanningBucketTest(TestCase):
             for key, xml in files.items()
         }
         corrected["export/3593/12.xml"] = self.scan_xml
-        with mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger:
-            self.import_from_bucket(
-                corrected, scan_id=["3593"], overwrite=True, limit=1
-            )
-        overwritten = [
-            c.args[2]
-            for c in mock_logger.info.call_args_list
-            if c.args[0].startswith("Overwriting")
-        ]
-        self.assertEqual(overwritten, ["export/3593/13.xml"])
+        for limit, expected in [(1, []), (2, ["export/3593/13.xml"])]:
+            with (
+                self.subTest(limit=limit),
+                transaction.atomic(),
+                mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+            ):
+                self.import_from_bucket(
+                    corrected, scan_id=["3593"], overwrite=True, limit=limit
+                )
+                overwritten = [
+                    c.args[2]
+                    for c in mock_logger.info.call_args_list
+                    if c.args[0].startswith("Overwriting")
+                ]
+                self.assertEqual(overwritten, expected)
+                transaction.set_rollback(True)
 
     @override_settings(CELERY_ETL_TASK_QUEUE="etl_tasks")
     def test_throttles_the_queues(self) -> None:
-        """Does the run wait for the queues after each imported file?
+        """Does the run wait for the queues after each queued file?
 
         The ETL queue is watched too, since the search index tasks go there
-        whatever the --queue. Skipped and failed files queue nothing to wait
-        for, and neither does a dry run.
+        whatever the --queue. The file already imported isn't queued, and a
+        dry run queues nothing to wait for.
         """
         self.import_from_bucket(
             {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
@@ -2220,10 +2302,10 @@ class ImportFromScanningBucketTest(TestCase):
                     [c.kwargs for c in mock_throttle.call_args_list],
                     [{"min_items": 5, "queue_name": q} for q in queues],
                 )
-                # Two files imported, each followed by a wait on every queue
+                # Three files queued, each followed by a wait on every queue
                 self.assertEqual(
                     mock_throttle.return_value.maybe_wait.call_count,
-                    2 * len(queues),
+                    3 * len(queues),
                 )
                 transaction.set_rollback(True)
 
@@ -2239,3 +2321,204 @@ class ImportFromScanningBucketTest(TestCase):
                         self.import_from_bucket(
                             {}, all=True, **{option: value}
                         )
+
+    def test_queues_a_task_per_file(self) -> None:
+        """Is each file queued as an import task on --queue?
+
+        A file already imported is left out, unless it's an overwrite.
+        """
+        self.import_from_bucket(
+            {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+        )
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.other_case_xml("13", "HOLLOWAY", 390),
+        }
+        cases: list[tuple[dict[str, Any], list[str]]] = [
+            ({}, ["export/3593/13.xml"]),
+            (
+                {"overwrite": True},
+                ["export/3593/12.xml", "export/3593/13.xml"],
+            ),
+        ]
+        for options, expected in cases:
+            with (
+                self.subTest(options=options),
+                mock.patch(IMPORT_TASK) as mock_task,
+            ):
+                self.import_from_bucket(
+                    files, scan_id=["3593"], queue="batch0", **options
+                )
+                overwrite = options.get("overwrite", False)
+                self.assertEqual(
+                    mock_task.apply_async.call_args_list,
+                    [
+                        mock.call(
+                            args=(key, self.court.pk, "batch0", overwrite),
+                            queue="batch0",
+                        )
+                        for key in expected
+                    ],
+                )
+
+    def test_queues_the_files_of_each_scan_in_turn(self) -> None:
+        """Are the files queued one scan at a time, in turn?
+
+        So the workers don't wait for each other on the locks of a volume.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+            "export/3593/14.xml": self.scan_xml,
+            "export/3600/1.xml": self.scan_xml,
+        }
+        with mock.patch(IMPORT_TASK) as mock_task:
+            self.import_from_bucket(files, all=True)
+        self.assertEqual(
+            [
+                c.kwargs["args"][0]
+                for c in mock_task.apply_async.call_args_list
+            ],
+            [
+                "export/3593/12.xml",
+                "export/3600/1.xml",
+                "export/3593/13.xml",
+                "export/3593/14.xml",
+            ],
+        )
+
+    def test_start_after_continues_from_a_file(self) -> None:
+        """Does --start-after queue the files after it, in queue order?
+
+        The last file queued is logged, to pass it to the next run.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+            "export/3600/1.xml": self.scan_xml,
+        }
+        with (
+            mock.patch(IMPORT_TASK) as mock_task,
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_from_bucket(
+                files, all=True, start_after="export/3600/1.xml", limit=5
+            )
+        self.assertEqual(
+            [
+                c.kwargs["args"][0]
+                for c in mock_task.apply_async.call_args_list
+            ],
+            ["export/3593/13.xml"],
+        )
+        mock_logger.info.assert_any_call(
+            "Queued %s files, up to %s", 1, "export/3593/13.xml"
+        )
+
+    def test_limit_logs_the_last_queued_file(self) -> None:
+        """Is the last file queued logged, not the next one, at the limit?"""
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+        }
+        with (
+            mock.patch(IMPORT_TASK),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_from_bucket(files, all=True, limit=1)
+        mock_logger.info.assert_any_call(
+            "Queued %s files, up to %s", 1, "export/3593/12.xml"
+        )
+
+    def test_start_after_must_be_a_file_to_import(self) -> None:
+        """Is an unknown --start-after file refused?"""
+        with self.assertRaises(CommandError):
+            self.import_from_bucket(
+                {"export/3593/12.xml": self.scan_xml},
+                all=True,
+                start_after="export/9999/1.xml",
+            )
+
+    def test_dry_run_and_path_run_in_process(self) -> None:
+        """Do a dry run and a --path import queue no import tasks?
+
+        The workers can't read local files, and a dry run is read in its
+        log.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "12.xml").write_text(self.scan_xml, "utf-8")
+            cases: list[tuple[str, dict[str, Any], int]] = [
+                ("dry run", {"scan_id": ["3593"], "dry_run": True}, 0),
+                ("path", {"path": tmp_dir}, 1),
+            ]
+            for label, options, cluster_count in cases:
+                with (
+                    self.subTest(label),
+                    transaction.atomic(),
+                    empty_scan_storage(),
+                    mock.patch(IMPORT_TASK) as mock_task,
+                ):
+                    self.import_from_bucket(
+                        {"export/3593/12.xml": self.scan_xml}, **options
+                    )
+                    mock_task.apply_async.assert_not_called()
+                    self.assertEqual(
+                        OpinionCluster.objects.count(), cluster_count
+                    )
+                    transaction.set_rollback(True)
+
+    def test_reconnects_after_a_dropped_connection(self) -> None:
+        """Does the next file get a new connection after one drops?
+
+        Otherwise every file left in the run fails on the closed
+        connection.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "12.xml").write_text(self.scan_xml, "utf-8")
+            Path(tmp_dir, "13.xml").write_text(
+                self.other_case_xml("13", "HOLLOWAY", 390), "utf-8"
+            )
+            with (
+                mock.patch(f"{COMMAND_MODULE}.logger"),
+                mock.patch(
+                    f"{COMMAND_MODULE}.parse_scan_xml",
+                    side_effect=[OperationalError("connection closed"), None],
+                ),
+                mock.patch(f"{COMMAND_MODULE}.connection") as mock_connection,
+            ):
+                mock_connection.is_usable.return_value = False
+                call_command(
+                    "import_scanned_opinions",
+                    court_id=self.court.pk,
+                    path=tmp_dir,
+                )
+        mock_connection.close.assert_called_once()
+
+    def test_import_holds_its_locks(self) -> None:
+        """Does an import take every lock of its case before matching?
+
+        They're held until its transaction ends, so a test can't see them
+        freed.
+        """
+        scan_case = parse_scan_xml(self.scan_xml, "12.xml", self.court.pk)
+        if scan_case is None:
+            raise ValueError("The test XML must parse")
+        held: list[int] = []
+
+        def count_advisory_locks(*args: object) -> bool:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                    "AND pid = pg_backend_pid()"
+                )
+                held.append(cursor.fetchone()[0])
+            return True
+
+        with mock.patch(
+            f"{COMMAND_MODULE}.import_scan_case",
+            side_effect=count_advisory_locks,
+        ):
+            self.import_from_bucket(
+                {"export/3593/12.xml": self.scan_xml}, scan_id=["3593"]
+            )
+        self.assertEqual(held, [len(scan_lock_keys(scan_case))])
