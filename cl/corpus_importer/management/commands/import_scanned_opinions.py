@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup, Tag
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import CommandError, CommandParser
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.utils.text import slugify
 from eyecite.find import get_citations
@@ -2061,7 +2061,8 @@ def import_xml_file(
     """Read and import a final XML file, logging any failure.
 
     A failure is logged instead of raised, so one bad file doesn't stop a
-    volume import.
+    volume import. A database connection broken by the failure is closed,
+    so the next file reconnects instead of failing too.
 
     Args:
         read: Reads the XML of `file_path`.
@@ -2081,6 +2082,11 @@ def import_xml_file(
         )
     except Exception:
         logger.exception("Failed to import %s", file_path)
+        # A command keeps its connection for the whole run, so a dropped one
+        # would fail every file left. Closing it makes the next query
+        # reconnect.
+        if connection.connection is not None and not connection.is_usable():
+            connection.close()
         return False
 
 

@@ -12,7 +12,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from django.core.files.base import File
 from django.core.management import CommandError, call_command
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.db.models.fields.files import FieldFile, FileField
 from django.test import override_settings
 from eyecite import get_citations
@@ -2335,6 +2335,33 @@ class ImportFromScanningBucketTest(TestCase):
                         OpinionCluster.objects.count(), cluster_count
                     )
                     transaction.set_rollback(True)
+
+    def test_reconnects_after_a_dropped_connection(self) -> None:
+        """Does the next file get a new connection after one drops?
+
+        Otherwise every file left in the run fails on the closed
+        connection.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir, "12.xml").write_text(self.scan_xml, "utf-8")
+            Path(tmp_dir, "13.xml").write_text(
+                self.other_case_xml("13", "HOLLOWAY", 390), "utf-8"
+            )
+            with (
+                mock.patch(f"{COMMAND_MODULE}.logger"),
+                mock.patch(
+                    f"{COMMAND_MODULE}.parse_scan_xml",
+                    side_effect=[OperationalError("connection closed"), None],
+                ),
+                mock.patch(f"{COMMAND_MODULE}.connection") as mock_connection,
+            ):
+                mock_connection.is_usable.return_value = False
+                call_command(
+                    "import_scanned_opinions",
+                    court_id=self.court.pk,
+                    path=tmp_dir,
+                )
+        mock_connection.close.assert_called_once()
 
     def test_import_releases_its_locks(self) -> None:
         """Are the locks of an import released, even when it fails?"""
