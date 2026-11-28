@@ -11,7 +11,8 @@ case "$1" in
         --hostname=prefork@%h \
         --queues=${CELERY_QUEUES} \
         --concurrency=${CELERY_PREFORK_CONCURRENCY:-0} \
-        --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
+        --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1} \
+        --max-tasks-per-child=${CELERY_MAX_TASKS_PER_CHILD:-1000}
     ;;
 'web-dev')
     ./manage.py migrate
