@@ -5916,3 +5916,27 @@ def merge_state_scrape_row(
         )
         return
     ledger.extracting(len(dispatched))
+
+
+@app.task(ignore_result=True)
+def import_scanned_opinion_file(
+    key: str, court_id: str | None, queue: str, overwrite: bool
+) -> None:
+    """Import a scanning project final XML file from the portal's bucket.
+
+    Queued by the import_scanned_opinions command, one task per file. A
+    failure is logged instead of raised, and nothing of that file is saved.
+
+    Args:
+        key: The S3 key of the file, e.g. "export/3593/12.xml".
+        court_id: The CL court id, or None to look it up in the XML.
+        queue: The Celery queue of the citation-finding task.
+        overwrite: Overwrite the opinion if it was imported already and its
+            XML changed.
+    """
+    # The command imports this task, so import it here to avoid a cycle
+    from cl.corpus_importer.management.commands.import_scanned_opinions import (
+        import_s3_xml_file,
+    )
+
+    import_s3_xml_file(key, court_id, queue, overwrite)
