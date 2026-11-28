@@ -2241,10 +2241,18 @@ class Command(VerboseCommand):
             "--limit",
             type=int,
             help="Stop after this many files. A bucket import counts the "
-            "files it queues; files already imported are left out before "
-            "queueing unless --overwrite is given, so running it again "
-            "continues with the next ones. A dry run or a --path import "
-            "counts the files it would add, merge or overwrite.",
+            "files it queues, and logs the last one: pass it to "
+            "--start-after to continue with the next files. A dry run or a "
+            "--path import counts the files it would add, merge or "
+            "overwrite.",
+        )
+        parser.add_argument(
+            "--start-after",
+            type=str,
+            help="Leave out the files up to this one, in the order they're "
+            "queued, e.g. export/3593/12.xml. Files already imported are "
+            "left out anyway unless --overwrite is given, so a run without "
+            "it only queues again the files that were skipped or failed.",
         )
         parser.add_argument(
             "--queue",
@@ -2282,6 +2290,7 @@ class Command(VerboseCommand):
 
         court_id, overwrite = options["court_id"], options["overwrite"]
         dry_run, queue = options["dry_run"], options["queue"]
+        in_process = bool(options["path"]) or dry_run
         if options["path"]:
             file_paths = xml_file_paths(options["path"])
             read = read_local_xml
@@ -2289,21 +2298,28 @@ class Command(VerboseCommand):
             storage = ScanningFinalXmlStorage()
             file_paths = s3_xml_keys(storage, scan_ids, opinion_id)
             read = partial(read_s3_xml, storage)
-            if not overwrite:
-                imported_scans = imported_scan_opinions()
-                file_count = len(file_paths)
-                file_paths = [
-                    key
-                    for key in file_paths
-                    if s3_key_scan_opinion(key) not in imported_scans
-                ]
-                logger.info(
-                    "Leaving out %s XML files already imported",
-                    file_count - len(file_paths),
-                )
-        in_process = bool(options["path"]) or dry_run
-        if not in_process:
-            file_paths = interleave_scans(file_paths)
+            if not in_process:
+                file_paths = interleave_scans(file_paths)
+        if start_after := options["start_after"]:
+            try:
+                file_paths = file_paths[file_paths.index(start_after) + 1 :]
+            except ValueError:
+                raise CommandError(
+                    f"--start-after {start_after} isn't one of the files "
+                    "to import."
+                ) from None
+        if not options["path"] and not overwrite:
+            imported_scans = imported_scan_opinions()
+            file_count = len(file_paths)
+            file_paths = [
+                key
+                for key in file_paths
+                if s3_key_scan_opinion(key) not in imported_scans
+            ]
+            logger.info(
+                "Leaving out %s XML files already imported",
+                file_count - len(file_paths),
+            )
         logger.info("Found %s XML files to import", len(file_paths))
 
         throttles = []
@@ -2319,6 +2335,7 @@ class Command(VerboseCommand):
                 )
             ]
         count = 0
+        last_queued = None
         for file_path in file_paths:
             if limit is not None and count >= limit:
                 logger.info("Stopping after %s files, the --limit", limit)
@@ -2332,6 +2349,7 @@ class Command(VerboseCommand):
                 import_scanned_opinion_file.apply_async(
                     args=(file_path, court_id, queue, overwrite), queue=queue
                 )
+                last_queued = file_path
             count += 1
             if not in_process and count % 1000 == 0:
                 logger.info(
@@ -2343,4 +2361,4 @@ class Command(VerboseCommand):
             for throttle in throttles:
                 throttle.maybe_wait()
         if not in_process:
-            logger.info("Queued %s files", count)
+            logger.info("Queued %s files, up to %s", count, last_queued)

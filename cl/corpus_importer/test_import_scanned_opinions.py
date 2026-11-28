@@ -2387,6 +2387,58 @@ class ImportFromScanningBucketTest(TestCase):
             ],
         )
 
+    def test_start_after_continues_from_a_file(self) -> None:
+        """Does --start-after queue the files after it, in queue order?
+
+        The last file queued is logged, to pass it to the next run.
+        """
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+            "export/3600/1.xml": self.scan_xml,
+        }
+        with (
+            mock.patch(IMPORT_TASK) as mock_task,
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_from_bucket(
+                files, all=True, start_after="export/3600/1.xml", limit=5
+            )
+        self.assertEqual(
+            [
+                c.kwargs["args"][0]
+                for c in mock_task.apply_async.call_args_list
+            ],
+            ["export/3593/13.xml"],
+        )
+        mock_logger.info.assert_any_call(
+            "Queued %s files, up to %s", 1, "export/3593/13.xml"
+        )
+
+    def test_limit_logs_the_last_queued_file(self) -> None:
+        """Is the last file queued logged, not the next one, at the limit?"""
+        files = {
+            "export/3593/12.xml": self.scan_xml,
+            "export/3593/13.xml": self.scan_xml,
+        }
+        with (
+            mock.patch(IMPORT_TASK),
+            mock.patch(f"{COMMAND_MODULE}.logger") as mock_logger,
+        ):
+            self.import_from_bucket(files, all=True, limit=1)
+        mock_logger.info.assert_any_call(
+            "Queued %s files, up to %s", 1, "export/3593/12.xml"
+        )
+
+    def test_start_after_must_be_a_file_to_import(self) -> None:
+        """Is an unknown --start-after file refused?"""
+        with self.assertRaises(CommandError):
+            self.import_from_bucket(
+                {"export/3593/12.xml": self.scan_xml},
+                all=True,
+                start_after="export/9999/1.xml",
+            )
+
     def test_dry_run_and_path_run_in_process(self) -> None:
         """Do a dry run and a --path import queue no import tasks?
 
