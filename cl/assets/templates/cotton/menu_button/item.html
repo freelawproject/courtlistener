@@ -1,9 +1,8 @@
-{% load svg_tags %}
-
 <c-vars
   tag="a"
   href=""
   icon=""
+  icon_outline=""
   icon_class="text-greyscale-500"
   item_class="px-4 py-2 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full hover:bg-greyscale-100"
   active_class="bg-greyscale-100"
@@ -14,12 +13,13 @@
 <li role="none" class="{{ li_class }}">
   {% if tag == "button" %}
     <button x-menu:item type="button" x-bind:class="itemClass" data-focused-class="{{ active_class }}" data-item-class="{{ item_class }}" {{ attrs }}>
-      {% if icon %}{% svg icon aria_hidden="true" class=icon_class %}{% endif %}
+      {# adding custom size so it can be controlled and not fall into default #}
+      {% if icon %}<c-icon name="{{ icon }}" :outline="icon_outline" size="custom" class="{{ icon_class }}" />{% endif %}
       {{ slot }}
     </button>
   {% else %}
     <a x-menu:item href="{{ href }}" x-bind:class="itemClass" data-focused-class="{{ active_class }}" data-item-class="{{ item_class }}" {{ attrs }}>
-      {% if icon %}{% svg icon aria_hidden="true" class=icon_class %}{% endif %}
+      {% if icon %}<c-icon name="{{ icon }}" :outline="icon_outline" size="custom" class="{{ icon_class }}" />{% endif %}
       {{ slot }}
     </a>
   {% endif %}

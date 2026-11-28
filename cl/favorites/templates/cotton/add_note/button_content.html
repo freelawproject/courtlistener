@@ -3,9 +3,9 @@
 <c-vars form/>
 
 {% if form.instance.pk %}
-    {% svg "bookmark_full" class="w-4 h-4 text-primary-800" aria_hidden="true" %}
+    {% svg "bookmark" class="w-4 h-4 text-primary-800" aria_hidden="true" %}
     <span class="text-sm">Edit Note</span>
 {% else %}
-    {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
+    {% svg "bookmark_outline" class="w-4 h-4" aria_hidden="true" %}
     <span class="text-sm">Add Note</span>
 {% endif %}

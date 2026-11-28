@@ -148,7 +148,7 @@
         menu_aria_label="Account navigation"
       >
         <c-slot name="button_content">
-          {% svg "avatar" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
+          {% svg "avatar_placeholder" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
           Profile
           <span
             class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
@@ -157,9 +157,11 @@
           </span>
         </c-slot>
         <c-slot name="menu_content">
+          {% with url_name=request.resolver_match.url_name %}
           <c-menu-button.item
             href="{% url 'profile_alerts' %}"
-            icon="bell_outline"
+            icon="bell"
+            icon_outline="{% if url_name == 'profile_search_alerts' or url_name == 'profile_docket_alerts' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -169,6 +171,7 @@
           <c-menu-button.item
             href="{% url 'profile_notes' %}"
             icon="bookmark"
+            icon_outline="{% if url_name == 'profile_notes' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -178,6 +181,7 @@
           <c-menu-button.item
             href="{% url 'tag_list' username=request.user.username %}"
             icon="tag"
+            icon_outline="{% if url_name == 'tag_list' and request.resolver_match.kwargs.username == request.user.username %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -214,7 +218,8 @@
           </c-menu-button.item>
           <c-menu-button.item
             href="{% url 'view_settings' %}"
-            icon="avatar_outline"
+            icon="avatar"
+            icon_outline="{% if url_name == 'view_settings' %}{% else %}true{% endif %}"
             icon_class="text-greyscale-400"
             item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
             li_class="py-[1px] hover:bg-greyscale-100"
@@ -229,11 +234,12 @@
                 type="submit"
                 class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
               >
-                {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
+                <c-icon name="sign_out" size="md" class="text-greyscale-400" />
                 Sign out
               </button>
             </form>
           </li>
+          {% endwith %}
         </c-slot>
       </c-menu-button>
     {% else %}

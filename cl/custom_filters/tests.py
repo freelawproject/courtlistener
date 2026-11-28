@@ -13,6 +13,7 @@ from django.middleware.csp import ContentSecurityPolicyMiddleware, get_nonce
 from django.template import Context, TemplateSyntaxError
 from django.template.utils import get_app_template_dirs
 from django.test import RequestFactory, override_settings
+from lxml.html import fromstring
 
 from cl.custom_filters.templatetags import component_tags
 from cl.custom_filters.templatetags.component_tags import (
@@ -592,17 +593,33 @@ class TestSvgTag(SimpleTestCase):
         self.assertIn("<svg", result)
         self.assertNotIn("&lt;svg", result)
 
-    def test_svg_not_found_in_debug(self) -> None:
-        """Missing SVG returns error message in debug mode."""
-        with self.settings(DEBUG=True):
-            result = svg("nonexistent_svg_that_does_not_exist")
-            self.assertIn("not found", result)
+    def test_missing_svg_raises_in_development_and_tests(self) -> None:
+        """A missing SVG raises where someone can fix it."""
+        for environment in ({"DEVELOPMENT": True}, {"TESTING": True}):
+            with (
+                self.subTest(**environment),
+                self.settings(
+                    **{"DEVELOPMENT": False, "TESTING": False, **environment}
+                ),
+                self.assertRaises(FileNotFoundError),
+            ):
+                svg("nonexistent_svg_that_does_not_exist")
 
     def test_svg_not_found_in_production(self) -> None:
         """Missing SVG returns empty string in production."""
-        with self.settings(DEBUG=False):
+        with self.settings(DEVELOPMENT=False, TESTING=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+    def test_attribute_values_are_escaped(self) -> None:
+        """A value with quotes or markup can't break out of its attribute."""
+        result = svg(
+            "heart", aria_label='A "b" <c>', **{"class": '" onload="x'}
+        )
+        icon = fromstring(result)
+        self.assertEqual(icon.get("aria-label"), 'A "b" <c>')
+        self.assertIsNone(icon.get("onload"))
+        self.assertNotIn("<c>", result)
 
 
 LOGGER = component_tags.logger.name

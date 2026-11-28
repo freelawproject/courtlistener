@@ -4550,9 +4550,9 @@ class BuildDocketTabsTest(SimpleTestCase):
         self.assertEqual(
             icons,
             {
-                "entries": "file_text",
+                "entries": "square_checklist",
                 "parties": "people",
-                "idb": "circle_question_mark",
+                "idb": "circle_info",
                 "authorities": "court",
             },
         )

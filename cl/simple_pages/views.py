@@ -348,7 +348,7 @@ async def components(request: HttpRequest) -> HttpResponse:
         {
             "key": "docket",
             "label": "Docket Alerts",
-            "icon": "file_text",
+            "icon": "square_checklist",
             "url": f"{components_url}?link_tab=docket#tabbed-cards",
         },
     ]

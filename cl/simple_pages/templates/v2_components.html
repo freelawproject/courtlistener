@@ -1549,10 +1549,10 @@ Sample code here.
     <c-menu-button>
       <c-slot name="button_content">Open Menu</c-slot>
       <c-slot name="menu_content">
-        <c-menu-button.item href="#" icon="bell_outline">Alerts</c-menu-button.item>
-        <c-menu-button.item href="#" icon="bookmark">Notes</c-menu-button.item>
+        <c-menu-button.item href="#" icon="bell" icon_outline>Alerts</c-menu-button.item>
+        <c-menu-button.item href="#" icon="bookmark" icon_outline>Notes</c-menu-button.item>
         <c-menu-button.divider />
-        <c-menu-button.item href="#" icon="avatar_outline">Account</c-menu-button.item>
+        <c-menu-button.item href="#" icon="avatar" icon_outline>Account</c-menu-button.item>
       </c-slot>
     </c-menu-button>
 
@@ -1601,7 +1601,7 @@ Sample code here.
     <c-library.list title="Sub-components">
       <c-library.item only>
         <c-slot name="label"><code>c-menu-button.item</code></c-slot>
-        <c-slot name="description">A menu item. Props: href, tag (a|button), icon, icon_class, item_class, li_class</c-slot>
+        <c-slot name="description">A menu item. Props: href, tag (a|button), icon, icon_outline (shows the outline variant of the icon), icon_class, item_class, li_class</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-menu-button.divider</code></c-slot>
@@ -1614,10 +1614,10 @@ Sample code here.
 &lt;c-menu-button&gt;
   &lt;c-slot name="button_content"&gt;Open Menu&lt;/c-slot&gt;
   &lt;c-slot name="menu_content"&gt;
-    &lt;c-menu-button.item href="#" icon="bell_outline"&gt;Alerts&lt;/c-menu-button.item&gt;
-    &lt;c-menu-button.item href="#" icon="bookmark"&gt;Notes&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.item href="#" icon="bell" icon_outline&gt;Alerts&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.item href="#" icon="bookmark" icon_outline&gt;Notes&lt;/c-menu-button.item&gt;
     &lt;c-menu-button.divider /&gt;
-    &lt;c-menu-button.item href="#" icon="avatar_outline"&gt;Account&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.item href="#" icon="avatar" icon_outline&gt;Account&lt;/c-menu-button.item&gt;
   &lt;/c-slot&gt;
 &lt;/c-menu-button&gt;
       </c-code>
@@ -2167,7 +2167,7 @@ Sample code here.
 
     <h4 class="mt-3">Demo</h4>
     <div class="my-4 flex flex-row gap-6 rounded-lg border border-greyscale-200 p-4 text-sm">
-      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" /></span>
+      <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="False" icon_class="w-4 h-4 text-greyscale-400" /></span>
       <span class="flex items-center gap-1"><c-docket-alert-label :has_alert="True" icon_class="w-4 h-4 text-greyscale-500" /></span>
     </div>
 

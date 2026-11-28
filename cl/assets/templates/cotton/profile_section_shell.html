@@ -43,7 +43,7 @@
             class="relative flex w-full items-center gap-2 rounded-lg-10 px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'notes' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
             {% if active_section == "notes" %}aria-current="page"{% endif %}
           >
-            {% svg "bookmark" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            {% svg "bookmark_outline" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
             Notes
           </a>
         </li>
@@ -53,7 +53,7 @@
             class="relative flex w-full items-center gap-2 rounded-lg-10 px-2.5 py-2 text-sm focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 {% if active_section == 'tags' %}bg-greyscale-100 font-medium text-greyscale-900{% else %}font-normal text-greyscale-800 hover:bg-greyscale-50{% endif %}"
             {% if active_section == "tags" %}aria-current="page"{% endif %}
           >
-            {% svg "tag" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
+            {% svg "tag_outline" aria_hidden="true" class="h-5 w-5 shrink-0 text-greyscale-400" %}
             Tags
           </a>
         </li>

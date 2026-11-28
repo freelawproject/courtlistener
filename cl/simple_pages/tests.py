@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import TemplateDoesNotExist, get_template
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
 from django.utils.safestring import mark_safe
 from lxml.html import HtmlElement, fromstring
@@ -19,6 +19,7 @@ from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.lib.types import TabItem
 from cl.people_db.factories import PartyFactory, PartyTypeFactory
 from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.forms import CorpusSearchForm
 from cl.search.models import Docket
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -1370,6 +1371,90 @@ class IconComponentTest(CottonComponentMixin, SimpleTestCase):
             )
         )
         self.assertEqual(icon.get("class").split(), ["shrink-0", "size-3"])
+
+
+class MenuButtonItemTest(CottonComponentMixin, SimpleTestCase):
+    """Tests the icon variant of c-menu-button.item."""
+
+    def test_icon_outline_selects_the_outline_file(self) -> None:
+        """icon_outline swaps the item's icon for its _outline file."""
+        cases = [
+            ('icon="bell"', {}, "bell"),
+            ('icon="bell" icon_outline', {}, "bell_outline"),
+            (
+                'icon="bell" :icon_outline="flag"',
+                {"flag": True},
+                "bell_outline",
+            ),
+            ('icon="bell" :icon_outline="flag"', {"flag": False}, "bell"),
+        ]
+        for props, context, expected_file in cases:
+            with self.subTest(props=props, context=context):
+                html = self.render_component(
+                    f'<c-menu-button.item href="#" {props}>Item</c-menu-button.item>',
+                    context,
+                )
+                self.assertEqual(
+                    fromstring(html).xpath("//path/@d"),
+                    fromstring(svg(expected_file)).xpath("//path/@d"),
+                )
+
+
+class HeaderCurrentPageIconTest(CottonComponentMixin, SimpleTestCase):
+    """The header menu entry for the current page shows its filled icon."""
+
+    # Menu entries with a filled and an outline icon, by the URL they link to.
+    ENTRIES = {
+        "profile_alerts": "bell",
+        "profile_notes": "bookmark",
+        "tag_list": "tag",
+        "view_settings": "avatar",
+    }
+
+    def render_header(self, path: str, user: User) -> HtmlElement:
+        """Renders the header for a signed-in user on the given path."""
+        request = RequestFactory().get(path)
+        request.user = user
+        request.resolver_match = resolve(path)
+        html = self.render_component(
+            '<c-header :request="request" :search_form="search_form" csrf_token="token" only />',
+            {"request": request, "search_form": CorpusSearchForm()},
+        )
+        return fromstring(html)
+
+    def entry_icon(self, header: HtmlElement, href: str) -> list[str]:
+        """Returns the path data of the icon in the menu entry linking to href."""
+        return header.xpath(f'//a[@href="{href}"]//path/@d')
+
+    def test_current_page_entry_is_filled(self) -> None:
+        """Only the entry for the page being viewed is filled.
+
+        Another user's tag list doesn't count as the current user's Tags page.
+        """
+        user = User(username="jane")
+        own_tags = reverse("tag_list", kwargs={"username": "jane"})
+        other_tags = reverse("tag_list", kwargs={"username": "someone"})
+        cases = [
+            (reverse("profile_search_alerts"), "profile_alerts"),
+            (reverse("profile_docket_alerts"), "profile_alerts"),
+            (reverse("profile_notes"), "profile_notes"),
+            (own_tags, "tag_list"),
+            (other_tags, None),
+            (reverse("view_settings"), "view_settings"),
+            (reverse("show_results"), None),
+        ]
+        for path, current in cases:
+            header = self.render_header(path, user)
+            for url_name, icon in self.ENTRIES.items():
+                href = (
+                    own_tags if url_name == "tag_list" else reverse(url_name)
+                )
+                expected = icon if url_name == current else f"{icon}_outline"
+                with self.subTest(path=path, entry=url_name):
+                    self.assertEqual(
+                        self.entry_icon(header, href),
+                        fromstring(svg(expected)).xpath("//path/@d"),
+                    )
 
 
 class ToastComponentTest(CottonComponentMixin, SimpleTestCase):
