@@ -114,6 +114,7 @@ from cl.lib.storage import (
     read_file_bytes,
 )
 from cl.lib.string_diff import find_best_match
+from cl.recap.fetch_queue import report_fetch_started
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
@@ -2095,6 +2096,9 @@ def fetch_pacer_doc_by_rd_base(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return None
     pacer_doc_id = rd.pacer_doc_id
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
@@ -2107,6 +2111,9 @@ def fetch_pacer_doc_by_rd_base(
         raise self.retry()
 
     async_to_sync(mark_fq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    # This task runs in a transaction, so the scheduler can't see the status
+    # change above until it ends. Release the court in Redis instead.
+    report_fetch_started(rd.docket_entry.docket.court_id, fq.pk)
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
@@ -2299,6 +2306,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         replication.
     """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    if fq_is_finished(fq):
+        self.request.chain = None
+        return []
     rd = fq.recap_document
     if rd is None:
         # The RD was deleted after the FQ was created; recap_document is
@@ -2321,6 +2331,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
         raise self.retry()
 
     async_to_sync(mark_fq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    # This task runs in a transaction, so the scheduler can't see the status
+    # change above until it ends. Release the court in Redis instead.
+    report_fetch_started(court_id, fq.pk)
     if not pacer_doc_id:
         msg = f"Unable to get attachment page: Unknown pacer_doc_id for RECAP Document object {rd.pk}"
         async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
@@ -2751,6 +2764,8 @@ async def fetch_appellate_docket_base(
             updates the fetch status accordingly.
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
+    if fq_is_finished(fq):
+        return None
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     if not court_id:
         await mark_fq_status(
@@ -2765,6 +2780,7 @@ async def fetch_appellate_docket_base(
         raise CourtQueryError(f"Blocked by court: {court_id}")
 
     await mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    await sync_to_async(report_fetch_started)(court_id, fq.pk)
 
     session_data = await get_pacer_cookie_from_cache(fq.user_id)
     if session_data is None:
@@ -2872,6 +2888,8 @@ async def fetch_docket_base(
             updates the fetch status accordingly.
     """
     fq = await PacerFetchQueue.objects.select_related("docket").aget(pk=fq_pk)
+    if fq_is_finished(fq):
+        return None
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     if not court_id:
         await mark_fq_status(
@@ -2885,6 +2903,7 @@ async def fetch_docket_base(
         raise CourtQueryError(f"Blocked by court: {court_id}")
 
     await mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+    await sync_to_async(report_fetch_started)(court_id, fq.pk)
 
     session_data = await get_pacer_cookie_from_cache(fq.user_id)
     if session_data is None:
@@ -2966,6 +2985,49 @@ def mark_fq_successful(fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     msg = "Successfully completed fetch and save."
     async_to_sync(mark_fq_status)(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@app.task(ignore_result=True)
+def send_fq_webhooks(fq_pk: int) -> None:
+    """Send the RECAP Fetch webhooks for a request in a final status.
+
+    For code that must not wait on users' webhook endpoints, like the fetch
+    scheduler daemon, where one slow endpoint would hold up every court.
+
+    Args:
+        fq_pk: The PK of the PacerFetchQueue row. Nothing is sent if the row
+            no longer exists.
+    """
+    if fq := PacerFetchQueue.objects.filter(pk=fq_pk).first():
+        async_to_sync(send_recap_fetch_webhooks)(fq)
+
+
+def fq_is_finished(fq: PacerFetchQueue) -> bool:
+    """Check whether a fetch request already reached a final status.
+
+    Fetch tasks call this before doing any work. A request can be finished
+    before its task ever runs: the fetch scheduler fails requests that waited
+    too long (see cl.recap.fetch_scheduler.fail_stale_fetches), and by then
+    the user has been told so and may have submitted it again. Running it
+    anyway could bill their PACER account twice.
+
+    The check isn't atomic with the task's later status updates, so a request
+    failed in the moment between the two still runs. The scheduler only fails
+    a handed-off request after it waited in Celery for over an hour, so that
+    takes a very large backlog.
+
+    Args:
+        fq: The PacerFetchQueue item, freshly loaded from the database.
+
+    Returns:
+        True if the task must not process the request.
+    """
+    return fq.status in (
+        PROCESSING_STATUS.SUCCESSFUL,
+        PROCESSING_STATUS.FAILED,
+        PROCESSING_STATUS.INVALID_CONTENT,
+        PROCESSING_STATUS.NEEDS_INFO,
+    )
 
 
 async def mark_fq_status(fq, msg, status):
