@@ -1,9 +1,12 @@
 """Celery tasks for checking prayed-for documents on PACER."""
 
+import time
+
 from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import DownloadConfirmationPage
@@ -17,7 +20,11 @@ from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.search.models import RECAPDocument
 
 from .models import PrayerAvailability
-from .utils import prayer_unavailable
+from .utils import (
+    compute_lifetime_prayer_stats,
+    lifetime_prayer_stats_cache_key,
+    prayer_unavailable,
+)
 
 
 @app.task(
@@ -76,3 +83,24 @@ async def check_prayer_pacer_base(rd_pk: int, user_pk: int) -> None:
     if billable_pages and billable_pages != 30:
         rd.page_count = billable_pages
         await rd.asave()
+
+
+@app.task(ignore_result=True)
+def refresh_lifetime_prayer_stats(status: int) -> None:
+    """Recompute the cached lifetime stats for prayers with a status.
+
+    Queued by get_lifetime_prayer_stats() when its cached stats go stale, so
+    the slow queries run here instead of in a request. Does nothing if the
+    stats are already fresh.
+
+    Args:
+        status: Prayer.WAITING or Prayer.GRANTED.
+    """
+    # When the queue is backlogged, readers queue another refresh every time
+    # the refresh lock expires, so several can pile up for the same status.
+    # Only the first of them to run needs to do the work; the rest find its
+    # fresh stats here and skip the slow queries.
+    entry = cache.get(lifetime_prayer_stats_cache_key(status))
+    if entry is not None and time.time() < entry["refresh_after"]:
+        return
+    async_to_sync(compute_lifetime_prayer_stats)(status)

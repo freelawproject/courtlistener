@@ -1,3 +1,5 @@
+import time
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
@@ -40,8 +42,12 @@ from cl.favorites.models import (
     UserTag,
 )
 from cl.favorites.selectors import prayer_eligible
-from cl.favorites.tasks import check_prayer_pacer
+from cl.favorites.tasks import (
+    check_prayer_pacer,
+    refresh_lifetime_prayer_stats,
+)
 from cl.favorites.utils import (
+    PrayerStats,
     compute_prayer_total_cost,
     create_prayer,
     delete_prayer,
@@ -51,6 +57,7 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
+    lifetime_prayer_stats_cache_key,
     prayer_unavailable,
 )
 from cl.favorites.views import get_note
@@ -1372,8 +1379,108 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         self.assertEqual(prayer_stats.distinct_count, 2)
         self.assertEqual(prayer_stats.distinct_users, 2)
 
-        await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
-        await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
+        await cache.adelete(lifetime_prayer_stats_cache_key(Prayer.WAITING))
+        await cache.adelete(lifetime_prayer_stats_cache_key(Prayer.GRANTED))
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    async def test_lifetime_prayer_stats_served_from_cache(self) -> None:
+        """Are cached lifetime prayer stats served without a refresh while fresh, and with one queued refresh once stale?
+
+        Computing the stats is too slow for a request on production data, so
+        once anything is cached, requests must only ever read it.
+        """
+        cache_key = lifetime_prayer_stats_cache_key(Prayer.WAITING)
+        cached_stats = PrayerStats(
+            prayer_count=-1,
+            total_cost="-1.00",
+            distinct_count=-1,
+            distinct_users=-1,
+        )
+        delay_path = "cl.favorites.tasks.refresh_lifetime_prayer_stats.delay"
+
+        for label, refresh_after, refresh_count in (
+            ("fresh", time.time() + 60, 0),
+            ("stale", 0, 1),
+        ):
+            with self.subTest(label), patch(delay_path) as mock_delay:
+                await cache.aclear()
+                await cache.aset(
+                    cache_key,
+                    {
+                        "refresh_after": refresh_after,
+                        "stats": asdict(cached_stats),
+                    },
+                )
+                # Read twice: a pending refresh shouldn't be queued again.
+                for _ in range(2):
+                    stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+                    self.assertEqual(stats, cached_stats)
+                self.assertEqual(mock_delay.call_count, refresh_count)
+        # The locmem cache is shared by every test that overrides to it.
+        await cache.aclear()
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    def test_lifetime_prayer_stats_refresh_skips_fresh_stats(self) -> None:
+        """Does a refresh that finds fresh stats skip the slow queries?
+
+        A backlogged queue can hold several refreshes for the same status.
+        Once the first has run, the rest must not redo its work.
+        """
+        # The locmem cache is shared by every test that overrides to it.
+        cache.clear()
+        cache.set(
+            lifetime_prayer_stats_cache_key(Prayer.WAITING),
+            {
+                "refresh_after": time.time() + 60,
+                "stats": asdict(PrayerStats(prayer_count=-1, total_cost="")),
+            },
+        )
+        with patch(
+            "cl.favorites.tasks.compute_lifetime_prayer_stats"
+        ) as mock_compute:
+            refresh_lifetime_prayer_stats(Prayer.WAITING)
+        mock_compute.assert_not_called()
+        cache.clear()
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+    )
+    async def test_lifetime_prayer_stats_refresh_task(self) -> None:
+        """Does the queued refresh replace stale cached stats?"""
+        # The locmem cache is shared by every test that overrides to it.
+        await cache.aclear()
+        await create_prayer(self.user, self.rd_2)
+        await cache.aset(
+            lifetime_prayer_stats_cache_key(Prayer.WAITING),
+            {
+                "refresh_after": 0,
+                "stats": asdict(PrayerStats(prayer_count=-1, total_cost="")),
+            },
+        )
+
+        # Celery runs eagerly in tests, so the refresh finishes before the
+        # stale stats are returned.
+        stale = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(stale.prayer_count, -1)
+        fresh = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(fresh.prayer_count, 1)
+        await cache.aclear()
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""

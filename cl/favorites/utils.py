@@ -1,7 +1,10 @@
 """Helpers for notes, prayers, and prayer statistics and emails."""
 
-from dataclasses import dataclass
+import logging
+import time
+from dataclasses import asdict, dataclass
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
@@ -37,6 +40,8 @@ from cl.search.models import (
     RECAPDocument,
     SCOTUSDocument,
 )
+
+logger = logging.getLogger(__name__)
 
 # Models that can have a Note attached, mapped to the bucket label the
 # profile Notes page groups them under (cl.users.views.view_notes()).
@@ -471,47 +476,106 @@ async def get_user_prayer_history(user: User) -> PrayerStats:
     return PrayerStats(**data)
 
 
-async def get_lifetime_prayer_stats(
-    status: int,
-) -> (
-    PrayerStats
-):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
-    """Get stats for all prayers with a status, cached for a minute.
+LIFETIME_PRAYER_STATS_REFRESH_SECONDS = 60 * 10
 
-    Includes the number of prayers, distinct documents, distinct users, and
-    the total cost.
+
+def lifetime_prayer_stats_cache_key(status: int) -> str:
+    """Return the cache key holding the lifetime stats for a prayer status."""
+    return f"lifetime-prayer-stats-{status}"
+
+
+def lifetime_prayer_stats_lock_key(status: int) -> str:
+    """Return the cache key marking a pending refresh of a status's stats."""
+    return f"lifetime-prayer-stats-refreshing-{status}"
+
+
+async def compute_lifetime_prayer_stats(status: int) -> PrayerStats:
+    """Compute the stats for all prayers with a status and cache them.
+
+    This is slow on production data: the total cost joins every matching
+    prayer to its RECAP document. Callers other than background tasks SHOULD
+    use get_lifetime_prayer_stats() instead.
+
+    Args:
+        status: Prayer.WAITING or Prayer.GRANTED.
+
+    Returns:
+        The freshly computed stats.
     """
-    cache_key = f"prayer-stats-{status}"
-
-    data = await cache.aget(cache_key)
-    if data is not None:
-        return PrayerStats(**data)
-
     prayer_by_status = Prayer.objects.filter(status=status)
-
-    prayer_count = await prayer_by_status.acount()
-
-    distinct_prayers = (
-        await prayer_by_status.values("recap_document").distinct().acount()
+    counts = await prayer_by_status.aaggregate(
+        prayer_count=Count("id"),
+        distinct_count=Count("recap_document", distinct=True),
+        distinct_users=Count("user", distinct=True),
     )
-
-    distinct_users = await prayer_by_status.values("user").distinct().acount()
-
     total_cost = await compute_prayer_total_cost(
         prayer_by_status.select_related("recap_document")
     )
+    stats = PrayerStats(
+        prayer_count=counts["prayer_count"],
+        distinct_count=counts["distinct_count"],
+        distinct_users=counts["distinct_users"],
+        total_cost=f"{total_cost:,.2f}",
+    )
+    # Never expire the entry, so readers can keep serving it while a refresh
+    # runs. Freshness is tracked by refresh_after instead.
+    await cache.aset(
+        lifetime_prayer_stats_cache_key(status),
+        {
+            "refresh_after": time.time()
+            + LIFETIME_PRAYER_STATS_REFRESH_SECONDS,
+            "stats": asdict(stats),
+        },
+        timeout=None,
+    )
+    return stats
 
-    data = {
-        "prayer_count": prayer_count,
-        "distinct_count": distinct_prayers,
-        "distinct_users": distinct_users,
-        "total_cost": f"{total_cost:,.2f}",
-    }
 
-    one_minute = 60
-    await cache.aset(cache_key, data, one_minute)
+async def get_lifetime_prayer_stats(status: int) -> PrayerStats:
+    """Get stats for all prayers with a status.
 
-    return PrayerStats(**data)
+    Includes the number of prayers, distinct documents, distinct users, and
+    the total cost.
+
+    The stats are served from the cache and can be up to
+    LIFETIME_PRAYER_STATS_REFRESH_SECONDS stale, or longer while the Celery
+    queue is backed up: once they're older than that, the next call queues a
+    background refresh and returns the cached stats meanwhile. Only when nothing is
+    cached at all (e.g. after Redis is flushed) are they computed inline,
+    which is slow.
+
+    Args:
+        status: Prayer.WAITING or Prayer.GRANTED.
+
+    Returns:
+        The stats for prayers with that status.
+    """
+    entry = await cache.aget(lifetime_prayer_stats_cache_key(status))
+    if entry is None:
+        return await compute_lifetime_prayer_stats(status)
+
+    # cache.aadd() only succeeds for the first caller, so stale reads queue
+    # one refresh per window. Nothing deletes the lock: it expires with the
+    # window, so a slow refresh can't release a newer one's lock.
+    if time.time() > entry["refresh_after"] and await cache.aadd(
+        lifetime_prayer_stats_lock_key(status),
+        True,
+        LIFETIME_PRAYER_STATS_REFRESH_SECONDS,
+    ):
+        # Imported here because cl.favorites.tasks imports this module.
+        from cl.favorites.tasks import refresh_lifetime_prayer_stats
+
+        try:
+            await sync_to_async(refresh_lifetime_prayer_stats.delay)(status)
+        except Exception:
+            # Stale stats beat a failed page. The lock stays, so the next
+            # attempt waits for the window instead of hammering the broker.
+            logger.exception(
+                "Couldn't queue a refresh of lifetime prayer stats for "
+                "status %s.",
+                status,
+            )
+    return PrayerStats(**entry["stats"])
 
 
 def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
