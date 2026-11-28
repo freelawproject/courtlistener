@@ -163,41 +163,6 @@
       "severity": "error"
     },
     {
-      "column": 38,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 11,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `alert_type`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 43,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
-      "column": 45,
-      "path": "cl/alerts/signals.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `pk`",
-      "severity": "error"
-    },
-    {
       "column": 23,
       "path": "cl/alerts/utils.py",
       "name": "missing-attribute",

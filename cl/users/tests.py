@@ -50,7 +50,7 @@ from cl.alerts.factories import (
     DocketAlertFactory,
     DocketAlertWithParentsFactory,
 )
-from cl.alerts.models import DocketAlert, DocketAlertEvent
+from cl.alerts.models import Alert, DocketAlert, DocketAlertEvent
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -859,6 +859,94 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    def test_deleting_an_account_whose_email_another_stub_holds(self) -> None:
+        """Can an account be deleted when a stub account already holds the same email address? Emails aren't unique, and the stub's username is a hash of the address."""
+        email = "shared@example.com"
+        create_stub_account(
+            {"email": email, "first_name": "Donor", "last_name": "Person"},
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        profile = UserProfileWithParentsFactory(user__email=email)
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+
+        response = self.client.post(
+            reverse("delete_account"), {"password": "password"}
+        )
+
+        self.assertRedirects(response, reverse("delete_profile_done"))
+        profile.refresh_from_db()
+        self.assertTrue(profile.stub_account)
+        self.assertFalse(profile.user.is_active)
+
+    def test_account_deletion_finishes_when_notice_fails(self) -> None:
+        """Does a failure sending the deletion notice still log the user out and redirect, since the account is already deleted by then?"""
+        profile = UserProfileWithParentsFactory()
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+
+        with (
+            patch(
+                "cl.users.views.send_mail",
+                side_effect=ConnectionError("SES is down"),
+            ),
+            patch("cl.users.views.logger") as mock_logger,
+        ):
+            response = self.client.post(
+                reverse("delete_account"), {"password": "password"}
+            )
+
+        mock_logger.exception.assert_called_once()
+        self.assertRedirects(response, reverse("delete_profile_done"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        profile.refresh_from_db()
+        self.assertTrue(profile.stub_account)
+
+    def test_failed_account_deletion_changes_nothing(self) -> None:
+        """Does a failure while converting the account to a stub leave the user's assets in place, queue no alert cleanup and send no deletion notice?"""
+        profile = UserProfileWithParentsFactory()
+        Token.objects.get_or_create(user=profile.user)
+        alert = AlertFactory(user=profile.user)
+        self.assertTrue(
+            self.client.login(
+                username=profile.user.username, password="password"
+            )
+        )
+        mail.outbox.clear()
+
+        with (
+            patch(
+                "cl.users.views.convert_to_stub_account",
+                side_effect=IntegrityError("username"),
+            ),
+            patch(
+                "cl.alerts.signals.remove_alert_hits_set_task"
+            ) as cleanup_task,
+            self.assertRaises(IntegrityError),
+        ):
+            self.client.post(
+                reverse("delete_account"), {"password": "password"}
+            )
+
+        self.assertTrue(Token.objects.filter(user=profile.user).exists())
+        # The alert is back, so the jobs that drop its search records and
+        # hit sets must not have been queued.
+        self.assertTrue(Alert.objects.filter(pk=alert.pk).exists())
+        cleanup_task.delay.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_purges_user_data_and_history_on_account_deletion(self) -> None:
         """Deleting an account hard-deletes the user's logged data, API credentials and the PII left behind in the pghistory event tables, keeps (but disables) donation records, and leaves a second user's data untouched."""
@@ -4666,6 +4754,34 @@ class RegisterViewTest(TestCase):
         self.assertEqual(
             await User.objects.filter(email="donor@example.com").acount(), 1
         )
+
+    def test_claims_the_most_recent_of_several_stubs(self) -> None:
+        """When more than one stub holds the address, does registering claim the most recent one and leave the others alone, rather than failing or treating the address as taken?"""
+        email = "donor@example.com"
+        older, newer = (
+            UserProfileWithParentsFactory(
+                stub_account=True,
+                user__email=email,
+                user__is_active=False,
+                user__date_joined=datetime(year, 1, 1, tzinfo=UTC),
+            )
+            for year in (2020, 2024)
+        )
+
+        response = self.client.post(
+            reverse("register"),
+            self.registration_data("donor", email),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        newer.refresh_from_db()
+        self.assertEqual(newer.user.username, "donor")
+        self.assertTrue(newer.user.is_active)
+        self.assertFalse(newer.stub_account)
+        older.refresh_from_db()
+        self.assertTrue(older.stub_account)
+        self.assertFalse(older.user.is_active)
 
     async def test_stub_account_claim_is_not_treated_as_a_duplicate(
         self,

@@ -178,7 +178,8 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
 
     def tearDown(self) -> None:
-        Alert.objects.all().delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            Alert.objects.all().delete()
 
     async def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
@@ -903,7 +904,8 @@ class AlertHitsSetCleanupTest(TestCase):
         add_document_hit_to_alert_set(self.r, other_alert.pk, "d", 1)
 
         alert_pk = alert.pk
-        alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert.delete()
 
         # All sets for the deleted alert should be gone.
         self.assertEqual(
@@ -1475,7 +1477,8 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         clear_tiered_cache()
 
     def tearDown(self):
-        Alert.objects.all().delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            Alert.objects.all().delete()
         clear_tiered_cache()
 
     async def make_an_alert(
@@ -1554,7 +1557,8 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
 
         # Delete the alert for user_1
-        response = async_to_sync(self.client.delete)(alert_1_path_detail)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = async_to_sync(self.client.delete)(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(search_alert.count(), 1)
 
@@ -3893,7 +3897,8 @@ class SearchAlertsOAESTests(
 
     @classmethod
     def tearDownClass(cls):
-        Alert.objects.all().delete()
+        with cls.captureOnCommitCallbacks(execute=True):
+            Alert.objects.all().delete()
         Audio.objects.all().delete()
         super().tearDownClass()
 
@@ -4256,7 +4261,8 @@ class SearchAlertsOAESTests(
         self.assertIn("'rate': 'dly'", response_str)
 
         # Delete Alert
-        search_alert_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            search_alert_1.delete()
 
         s = AudioPercolator.search().query("match_all")
         response = s.execute()
@@ -4641,7 +4647,8 @@ class SearchAlertsOAESTests(
             self.assertEqual(call.kwargs["inc"], 1)
 
         # Remove test instances.
-        rt_oa_search_alert.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rt_oa_search_alert.delete()
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_send_multiple_rt_alerts(self, mock_abort_audio):
@@ -4738,7 +4745,8 @@ class SearchAlertsOAESTests(
         # Remove test instances.
         rt_oral_argument.delete()
         for alert in alerts_created:
-            alert.delete()
+            with self.captureOnCommitCallbacks(execute=True):
+                alert.delete()
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
@@ -4824,7 +4832,8 @@ class SearchAlertsOAESTests(
         for audio in audios_created:
             audio.delete()
         for alert in alerts_created:
-            alert.delete()
+            with self.captureOnCommitCallbacks(execute=True):
+                alert.delete()
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_percolate_document_in_batches(self, mock_abort_audio):
@@ -4936,8 +4945,9 @@ class SearchAlertsOAESTests(
         schedule_alerts = ScheduledAlertHit.objects.all()
         self.assertEqual(schedule_alerts.count(), 0)
 
-        rt_alert_disabled.delete()
-        dly_alert_disabled.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rt_alert_disabled.delete()
+            dly_alert_disabled.delete()
         oral_argument.delete()
 
     def test_avoid_re_sending_scheduled_sent_alerts(self, mock_abort_audio):
@@ -5088,8 +5098,9 @@ class SearchAlertsOAESTests(
         # After 2*DAYS_TO_DELETE also scheduled Alerts hits are removed.
         self.assertEqual(all_alert_hits.count(), 0)
 
-        dly_alert.delete()
-        dly_alert_2.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            dly_alert.delete()
+            dly_alert_2.delete()
         oral_argument.delete()
         oral_argument_2.delete()
         oral_argument_3.delete()
@@ -5178,9 +5189,10 @@ class SearchAlertsOAESTests(
         for oa in oa_created:
             oa.delete()
 
-        alert_1.delete()
-        alert_2.delete()
-        alert_3.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_1.delete()
+            alert_2.delete()
+            alert_3.delete()
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)
